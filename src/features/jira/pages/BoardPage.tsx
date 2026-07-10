@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useParams } from "react-router";
 import {
   DndContext,
   DragOverlay,
@@ -15,15 +15,12 @@ import type { Issue, IssueStatus, Sprint, User } from "../store/types";
 import { listIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
 import { IssueCard } from "../components/IssueCard";
-import { IssueDetailModal } from "../components/IssueDetailModal";
+import { useIssueModal } from "../components/useIssueModal";
 import { BOARD_STATUSES } from "../components/labels";
 import { resolveMove } from "./boardDnd";
 
 export function BoardPage() {
   const { projectId } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
-  /** ?issue=ALM-1 → 상세 모달 (URL 공유 가능) */
-  const issueKey = searchParams.get("issue");
 
   /** undefined = 로딩 중, null = 활성 스프린트 없음 */
   const [sprint, setSprint] = useState<Sprint | null | undefined>(undefined);
@@ -37,6 +34,7 @@ export function BoardPage() {
 
   const reload = useCallback(async () => {
     if (!projectId) return;
+    setSprint(undefined); // 재조회 시작 = 로딩 — projectId 전환 시 이전 프로젝트 보드 잔상 방지 (W2 인계)
     const sprints = await listSprints(projectId);
     const active = sprints.find((s) => s.state === "active") ?? null;
     const all = active ? await listIssues(projectId) : [];
@@ -49,24 +47,8 @@ export function BoardPage() {
     void reload();
   }, [reload]);
 
-  const openIssue = useCallback(
-    (key: string) => {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("issue", key);
-        return next;
-      });
-    },
-    [setSearchParams],
-  );
-
-  const closeIssue = useCallback(() => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("issue");
-      return next;
-    });
-  }, [setSearchParams]);
+  /** ?issue=ALM-1 → 상세 모달 (URL 공유 가능) — 세 페이지 공용 훅 */
+  const { openIssue, issueModal } = useIssueModal(reload);
 
   const userNames = useMemo(
     () => Object.fromEntries(users.map((u) => [u.id, u.name])),
@@ -162,14 +144,7 @@ export function BoardPage() {
     <>
       {content}
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
-      {issueKey ? (
-        <IssueDetailModal
-          key={issueKey} // 키가 바뀌면 모달 내부 상태 초기화
-          issueKey={issueKey}
-          onClose={closeIssue}
-          onIssueChanged={reload}
-        />
-      ) : null}
+      {issueModal}
     </>
   );
 }
