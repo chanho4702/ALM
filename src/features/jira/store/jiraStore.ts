@@ -273,6 +273,20 @@ export async function updateIssue(
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   const before = { ...issue };
   Object.assign(issue, patch);
+  // 상태/스프린트가 바뀌면 대상 그룹(같은 프로젝트·스프린트·상태) 맨 뒤로 order 재부여
+  // (moveIssue는 beforeId로 정밀 배치, updateIssue는 항상 맨 뒤 — W2 인계)
+  if (before.status !== issue.status || before.sprintId !== issue.sprintId) {
+    const maxOrder = data.issues
+      .filter(
+        (i) =>
+          i.id !== id &&
+          i.projectId === issue.projectId &&
+          i.sprintId === issue.sprintId &&
+          i.status === issue.status,
+      )
+      .reduce((max, i) => Math.max(max, i.order), 0);
+    issue.order = maxOrder + 1;
+  }
   issue.updatedAt = new Date().toISOString();
   recordChanges(data, before, issue, issue.updatedAt);
   persist();

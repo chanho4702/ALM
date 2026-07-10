@@ -177,6 +177,28 @@ describe("updateIssue 활동로그", () => {
   });
 });
 
+describe("updateIssue order 재계산 (W3)", () => {
+  it("sprintId 변경 시 대상 그룹(프로젝트+스프린트+상태) 맨 뒤 order를 부여한다", async () => {
+    const six = await getIssueByKey("ALM-6"); // 백로그 todo, order 1
+    const moved = await updateIssue(six!.id, { sprintId: "s1" });
+    // s1 todo 그룹: ALM-4(1), ALM-5(2) → 맨 뒤 3
+    expect(moved.order).toBe(3);
+  });
+
+  it("status 변경 시 대상 그룹 맨 뒤 order를 부여한다", async () => {
+    const four = await getIssueByKey("ALM-4"); // s1 todo, order 1
+    const moved = await updateIssue(four!.id, { status: "done" });
+    // s1 done 그룹: ALM-1(1) → 맨 뒤 2
+    expect(moved.order).toBe(2);
+  });
+
+  it("제목/설명만 바꾸면 order를 유지한다", async () => {
+    const four = await getIssueByKey("ALM-4");
+    const updated = await updateIssue(four!.id, { title: "제목만 수정" });
+    expect(updated.order).toBe(four!.order);
+  });
+});
+
 describe("comments / deleteIssue", () => {
   it("addComment는 현재 유저 명의로 추가하고 listComments는 시간순으로 반환한다", async () => {
     const one = await getIssueByKey("ALM-1");
