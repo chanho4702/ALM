@@ -1,6 +1,8 @@
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Badge } from "@chanho/react";
 import type { Issue, IssueStatus } from "../store/types";
-import { IssueCard } from "./IssueCard";
+import { SortableIssueCard } from "./IssueCard";
 import { STATUS_LABELS } from "./labels";
 
 export interface BoardColumnProps {
@@ -13,21 +15,25 @@ export interface BoardColumnProps {
 
 export function BoardColumn({ status, issues, userNames }: BoardColumnProps) {
   const label = STATUS_LABELS[status];
+  // 컬럼 droppable id = status 문자열 → resolveMove가 컬럼 드롭을 인식한다
+  const { setNodeRef } = useDroppable({ id: status });
   return (
     <section className="board-column" aria-label={label} data-testid={`board-column-${status}`}>
       <header className="board-column-header">
         <h3>{label}</h3>
         <Badge>{issues.length}</Badge>
       </header>
-      <div className="board-column-cards">
-        {issues.map((issue) => (
-          <IssueCard
-            key={issue.id}
-            issue={issue}
-            assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
-          />
-        ))}
-      </div>
+      <SortableContext items={issues.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+        <div ref={setNodeRef} className="board-column-cards">
+          {issues.map((issue) => (
+            <SortableIssueCard
+              key={issue.id}
+              issue={issue}
+              assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
+            />
+          ))}
+        </div>
+      </SortableContext>
     </section>
   );
 }

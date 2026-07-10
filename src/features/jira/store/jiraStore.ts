@@ -299,6 +299,8 @@ export async function moveIssue(
     )
     .sort((a, b) => a.order - b.order);
   const insertAt = to.beforeId ? column.findIndex((i) => i.id === to.beforeId) : -1;
+  // beforeId가 대상 컬럼에 없으면(드래그 중 다른 곳에서 옮겨진 stale 참조 등) 조용히 맨 끝에
+  // 추가한다 — 의도된 동작. 화면은 이동 후 항상 재조회하므로 최종 상태는 일관된다. (W1 리뷰 인계)
   if (insertAt === -1) column.push(issue);
   else column.splice(insertAt, 0, issue);
   column.forEach((entry, index) => {
