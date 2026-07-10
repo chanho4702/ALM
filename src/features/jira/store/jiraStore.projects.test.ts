@@ -60,4 +60,13 @@ describe("projects", () => {
     const projects = await listProjects();
     expect(projects.map((p) => p.key)).toEqual(["ALM", "PAY"]);
   });
+
+  it("localStorage가 손상된 JSON이면 시드로 재생성한다", async () => {
+    localStorage.setItem("alm.jira.v1", "{corrupted!!");
+    __resetForTest();
+    const projects = await listProjects();
+    expect(projects).toHaveLength(1);
+    expect(projects[0].key).toBe("ALM");
+    expect(localStorage.getItem("alm.jira.v1")).not.toContain("corrupted");
+  });
 });

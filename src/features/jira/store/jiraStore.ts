@@ -20,8 +20,13 @@ function load(): JiraData {
   if (cache) return cache;
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
-    cache = JSON.parse(raw) as JiraData;
-  } else {
+    try {
+      cache = JSON.parse(raw) as JiraData;
+    } catch {
+      // 손상된 JSON — 시드로 재생성
+    }
+  }
+  if (!cache) {
     cache = createSeedData();
     persist();
   }
