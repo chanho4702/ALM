@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import type { ReactNode } from "react";
+import { Link, useParams, useSearchParams } from "react-router";
 import {
   DndContext,
   DragOverlay,
@@ -14,11 +15,16 @@ import type { Issue, IssueStatus, Sprint, User } from "../store/types";
 import { listIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
 import { IssueCard } from "../components/IssueCard";
+import { IssueDetailModal } from "../components/IssueDetailModal";
 import { BOARD_STATUSES } from "../components/labels";
 import { resolveMove } from "./boardDnd";
 
 export function BoardPage() {
   const { projectId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  /** ?issue=ALM-1 → 상세 모달 (URL 공유 가능) */
+  const issueKey = searchParams.get("issue");
+
   /** undefined = 로딩 중, null = 활성 스프린트 없음 */
   const [sprint, setSprint] = useState<Sprint | null | undefined>(undefined);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -26,7 +32,7 @@ export function BoardPage() {
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const toast = useToast();
 
-  // 클릭과 드래그 구분: 5px 이상 움직여야 드래그 시작 (Task 3의 카드 클릭 열기 대비)
+  // 클릭과 드래그 구분: 5px 이상 움직여야 드래그 시작
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const reload = useCallback(async () => {
@@ -42,6 +48,25 @@ export function BoardPage() {
     void listUsers().then(setUsers);
     void reload();
   }, [reload]);
+
+  const openIssue = useCallback(
+    (key: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("issue", key);
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const closeIssue = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("issue");
+      return next;
+    });
+  }, [setSearchParams]);
 
   const userNames = useMemo(
     () => Object.fromEntries(users.map((u) => [u.id, u.name])),
@@ -77,16 +102,15 @@ export function BoardPage() {
     await reload(); // 성공/실패 모두 스토어 기준으로 재조회
   };
 
+  let content: ReactNode;
   if (sprint === undefined) {
-    return (
+    content = (
       <div className="board-loading">
         <Spinner size="large" label="보드 불러오는 중" />
       </div>
     );
-  }
-
-  if (sprint === null) {
-    return (
+  } else if (sprint === null) {
+    content = (
       <section className="board-empty">
         <h2>진행 중인 스프린트가 없습니다</h2>
         <p>백로그에서 스프린트를 만들고 시작하면 보드가 열립니다.</p>
@@ -97,37 +121,55 @@ export function BoardPage() {
         </Link>
       </section>
     );
+  } else {
+    content = (
+      <section>
+        <h2 className="board-title">{sprint.name}</h2>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveIssue(null)}
+        >
+          <div className="board-columns">
+            {BOARD_STATUSES.map((status) => (
+              <BoardColumn
+                key={status}
+                status={status}
+                issues={issues.filter((i) => i.status === status)}
+                userNames={userNames}
+                onOpenIssue={openIssue}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeIssue ? (
+              <IssueCard
+                issue={activeIssue}
+                assigneeName={
+                  activeIssue.assigneeId ? userNames[activeIssue.assigneeId] : undefined
+                }
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      </section>
+    );
   }
 
   return (
-    <section>
-      <h2 className="board-title">{sprint.name}</h2>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveIssue(null)}
-      >
-        <div className="board-columns">
-          {BOARD_STATUSES.map((status) => (
-            <BoardColumn
-              key={status}
-              status={status}
-              issues={issues.filter((i) => i.status === status)}
-              userNames={userNames}
-            />
-          ))}
-        </div>
-        <DragOverlay>
-          {activeIssue ? (
-            <IssueCard
-              issue={activeIssue}
-              assigneeName={activeIssue.assigneeId ? userNames[activeIssue.assigneeId] : undefined}
-            />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-    </section>
+    <>
+      {content}
+      {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
+      {issueKey ? (
+        <IssueDetailModal
+          key={issueKey} // 키가 바뀌면 모달 내부 상태 초기화
+          issueKey={issueKey}
+          onClose={closeIssue}
+          onIssueChanged={reload}
+        />
+      ) : null}
+    </>
   );
 }

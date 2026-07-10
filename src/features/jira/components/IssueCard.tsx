@@ -8,11 +8,13 @@ export interface IssueCardProps {
   issue: Issue;
   /** 담당자 이름. 미지정이면 undefined → Avatar 생략 */
   assigneeName?: string;
+  /** 카드 클릭 시 (이슈 상세 열기). PointerSensor distance 5로 드래그와 구분된다 */
+  onOpen?: () => void;
 }
 
-export function IssueCard({ issue, assigneeName }: IssueCardProps) {
+export function IssueCard({ issue, assigneeName, onOpen }: IssueCardProps) {
   return (
-    <article className="issue-card">
+    <article className="issue-card" onClick={onOpen}>
       <p className="issue-card-title">{issue.title}</p>
       <div className="issue-card-meta">
         <span className="issue-card-key">{issue.key}</span>

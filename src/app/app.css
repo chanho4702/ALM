@@ -190,3 +190,63 @@ body {
 .board-empty a {
   text-decoration: none;
 }
+
+/* ── 이슈 상세 모달 (W2) ────────────────────────────────── */
+
+/* Modal 기본 폭(480px) 확장 — 클래스 중복으로 명시도를 올려 모듈 CSS를 확실히 이긴다 */
+.issue-detail-modal.issue-detail-modal {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.issue-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: var(--chanho-space-300);
+  margin-top: var(--chanho-space-200);
+}
+
+.issue-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  min-width: 0;
+}
+
+.issue-title-button {
+  margin: 0;
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border: 1px solid transparent;
+  border-radius: var(--chanho-radius-medium);
+  background: transparent;
+  font: inherit;
+  font-size: var(--chanho-font-size-300);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-default);
+  text-align: left;
+  cursor: text;
+}
+
+.issue-title-button:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.issue-description-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.issue-description-form button {
+  align-self: flex-start;
+}
+
+.issue-props {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--chanho-space-150);
+}
+
+.issue-props > div {
+  width: 100%; /* Select 필드(div 래퍼)는 패널 폭에 맞춘다 (Lozenge는 span이라 영향 없음) */
+}

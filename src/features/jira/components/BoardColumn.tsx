@@ -11,9 +11,11 @@ export interface BoardColumnProps {
   issues: Issue[];
   /** userId → 이름 (Avatar용) */
   userNames: Record<string, string>;
+  /** 카드 클릭 시 이슈 상세 열기 */
+  onOpenIssue?: (key: string) => void;
 }
 
-export function BoardColumn({ status, issues, userNames }: BoardColumnProps) {
+export function BoardColumn({ status, issues, userNames, onOpenIssue }: BoardColumnProps) {
   const label = STATUS_LABELS[status];
   // 컬럼 droppable id = status 문자열 → resolveMove가 컬럼 드롭을 인식한다
   const { setNodeRef } = useDroppable({ id: status });
@@ -30,6 +32,7 @@ export function BoardColumn({ status, issues, userNames }: BoardColumnProps) {
               key={issue.id}
               issue={issue}
               assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
+              onOpen={onOpenIssue ? () => onOpenIssue(issue.key) : undefined}
             />
           ))}
         </div>
