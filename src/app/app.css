@@ -90,3 +90,103 @@ body {
   flex-direction: column;
   gap: var(--chanho-space-200);
 }
+
+/* ── 칸반 보드 (W2) ─────────────────────────────────────── */
+
+.board-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--chanho-space-600);
+}
+
+.board-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--chanho-space-200);
+  padding: var(--chanho-space-600) 0;
+  text-align: center;
+}
+
+.board-empty h2 {
+  margin: 0;
+}
+
+.board-empty p {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+}
+
+.board-title {
+  margin: 0 0 var(--chanho-space-300);
+  font-size: var(--chanho-font-size-400);
+}
+
+.board-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--chanho-space-200);
+  align-items: start;
+}
+
+.board-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  padding: var(--chanho-space-150);
+  border-radius: var(--chanho-radius-large);
+  background: var(--chanho-color-background-subtle);
+}
+
+.board-column-header {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.board-column-header h3 {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.board-column-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  min-height: 60px; /* 빈 컬럼도 드롭 영역 확보 (Task 2) */
+}
+
+.issue-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+  cursor: grab;
+}
+
+.issue-card-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+}
+
+.issue-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.issue-card-key {
+  margin-right: auto;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+}
+
+.board-empty a {
+  text-decoration: none;
+}
