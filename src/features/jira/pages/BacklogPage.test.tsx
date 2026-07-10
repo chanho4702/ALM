@@ -1,0 +1,129 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, useLocation } from "react-router";
+import { ToastProvider } from "@chanho/react";
+import { App } from "../../../app/App";
+import { __resetForTest } from "../store/jiraStore";
+
+/** 현재 pathname+search를 노출하는 테스트 프로브 */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname + location.search}</div>;
+}
+
+function renderBacklog(initialPath = "/projects/p1/backlog") {
+  return render(
+    <ToastProvider>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <App />
+        <LocationProbe />
+      </MemoryRouter>
+    </ToastProvider>,
+  );
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  __resetForTest();
+});
+
+describe("BacklogPage", () => {
+  it("활성 스프린트 패널과 백로그 목록을 렌더한다", async () => {
+    renderBacklog();
+
+    // 활성 스프린트 패널: s1 이슈 5개 + 완료 버튼
+    const sprint = await screen.findByRole("region", { name: "Sprint 1" });
+    for (const key of ["ALM-1", "ALM-2", "ALM-3", "ALM-4", "ALM-5"]) {
+      expect(within(sprint).getByText(key)).toBeInTheDocument();
+    }
+    expect(within(sprint).getByRole("button", { name: "스프린트 완료" })).toBeInTheDocument();
+
+    // 백로그 목록: sprintId=null 이슈 3개 (시드: ALM-6 담당 최다인)
+    const backlog = screen.getByRole("region", { name: "백로그 목록" });
+    for (const key of ["ALM-6", "ALM-7", "ALM-8"]) {
+      expect(within(backlog).getByText(key)).toBeInTheDocument();
+    }
+    expect(within(backlog).getByRole("img", { name: "최다인" })).toBeInTheDocument();
+
+    // planned 스프린트가 없으므로 시작 버튼도 없다
+    expect(screen.queryByRole("button", { name: "스프린트 시작" })).not.toBeInTheDocument();
+  });
+
+  it("인라인 생성: 제목 입력 → 만들기 → 백로그 목록에 새 이슈가 나타난다", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    const backlog = await screen.findByRole("region", { name: "백로그 목록" });
+    await user.type(within(backlog).getByLabelText("새 이슈 제목"), "성능 개선 조사");
+    await user.click(within(backlog).getByRole("button", { name: "만들기" }));
+
+    // 시드 카운터가 8이므로 다음 키는 ALM-9, 백로그(sprintId=null)로 생성된다
+    expect(await within(backlog).findByText("ALM-9")).toBeInTheDocument();
+    expect(within(backlog).getByText("성능 개선 조사")).toBeInTheDocument();
+    expect(within(backlog).getByLabelText("새 이슈 제목")).toHaveValue(""); // 성공 시 입력 초기화
+  });
+
+  it("스프린트 만들기 → planned 패널이 생기고, 활성 스프린트가 있으면 시작이 거부된다", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    await user.click(await screen.findByRole("button", { name: "스프린트 만들기" }));
+    const planned = await screen.findByRole("region", { name: "Sprint 2" });
+    await user.click(within(planned).getByRole("button", { name: "스프린트 시작" }));
+
+    // 도메인 규칙(스펙 §3): 활성 스프린트는 프로젝트당 1개 → 스토어 throw → danger Toast
+    expect(await screen.findByText("이미 진행 중인 스프린트가 있습니다")).toBeInTheDocument();
+  });
+
+  it("스프린트 완료: 미완료 이슈는 백로그로 돌아오고 done 이슈는 스프린트에 남는다", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    const sprint = await screen.findByRole("region", { name: "Sprint 1" });
+    await user.click(within(sprint).getByRole("button", { name: "스프린트 완료" }));
+
+    // done 스프린트 패널은 렌더하지 않는다
+    await waitFor(() => {
+      expect(screen.queryByRole("region", { name: "Sprint 1" })).not.toBeInTheDocument();
+    });
+    // 미완료(todo/inprogress) 이슈 4개가 백로그로 복귀
+    const backlog = screen.getByRole("region", { name: "백로그 목록" });
+    for (const key of ["ALM-2", "ALM-3", "ALM-4", "ALM-5"]) {
+      expect(within(backlog).getByText(key)).toBeInTheDocument();
+    }
+    // ALM-1(done)은 완료된 스프린트에 남아 화면에서 사라진다
+    expect(screen.queryByText("ALM-1")).not.toBeInTheDocument();
+  });
+
+  it("Dropdown 액션: 스프린트로 이동과 삭제(확인 없이 Toast)", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    // ALM-6 → Sprint 1로 이동
+    const backlog = await screen.findByRole("region", { name: "백로그 목록" });
+    await user.click(within(backlog).getByRole("button", { name: "ALM-6 액션" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Sprint 1로 이동" }));
+    const sprint = screen.getByRole("region", { name: "Sprint 1" });
+    expect(await within(sprint).findByText("ALM-6")).toBeInTheDocument();
+
+    // ALM-8 삭제 — 확인 다이얼로그 없이 즉시 삭제 + Toast
+    await user.click(within(backlog).getByRole("button", { name: "ALM-8 액션" }));
+    await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
+    await waitFor(() => {
+      expect(screen.queryByText("ALM-8")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("ALM-8 이슈를 삭제했습니다")).toBeInTheDocument();
+  });
+
+  it("행 클릭 → ?issue= 쿼리와 함께 상세 모달이 열린다", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    const backlog = await screen.findByRole("region", { name: "백로그 목록" });
+    await user.click(within(backlog).getByText("코멘트 기능 구현")); // ALM-6
+
+    expect(await screen.findByRole("dialog", { name: "ALM-6" })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/backlog?issue=ALM-6");
+  });
+});

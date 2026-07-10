@@ -250,3 +250,101 @@ body {
 .issue-props > div {
   width: 100%; /* Select 필드(div 래퍼)는 패널 폭에 맞춘다 (Lozenge는 span이라 영향 없음) */
 }
+
+/* ── 백로그/스프린트 (W3) ───────────────────────────────── */
+
+.backlog-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-300);
+}
+
+.backlog-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.backlog-page-header h2 {
+  margin: 0;
+  font-size: var(--chanho-font-size-400);
+}
+
+.sprint-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  padding: var(--chanho-space-150);
+  border-radius: var(--chanho-radius-large);
+  background: var(--chanho-color-background-subtle);
+}
+
+.sprint-panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.sprint-panel-header h3 {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.sprint-panel-header > button {
+  margin-left: auto;
+}
+
+.sprint-panel-issues {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.sprint-panel-empty {
+  margin: 0;
+  padding: var(--chanho-space-100);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-200);
+}
+
+.backlog-row {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+  cursor: pointer;
+}
+
+.backlog-row:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.backlog-row-key {
+  flex-shrink: 0;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+}
+
+.backlog-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--chanho-font-size-200);
+}
+
+.backlog-create-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.backlog-create-form > div {
+  flex: 1; /* TextField 래퍼가 남은 폭을 채운다 */
+}
