@@ -100,4 +100,24 @@ describe("IssueDetailModal", () => {
     });
     expect(screen.getByTestId("location")).toHaveTextContent(/\/projects\/p1\/board$/);
   });
+
+  it("미존재 이슈 키로 공유된 URL을 열면 모달을 열지 않고 쿼리를 제거한다", async () => {
+    renderBoard("/projects/p1/board?issue=NOPE-999");
+
+    // 모달이 열리지 않음 (로드 실패 시 getIssueByKey는 null 반환 → 모달 렌더 안 함)
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+
+    // URL에서 ?issue 쿼리가 제거됨 (onClose → setSearchParams)
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("location")).toHaveTextContent(/\/projects\/p1\/board$/);
+      },
+      { timeout: 3000 },
+    );
+  });
 });
