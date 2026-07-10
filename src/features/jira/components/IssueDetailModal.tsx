@@ -1,8 +1,34 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Button, Lozenge, Modal, Select, TextArea, TextField, useToast } from "@chanho/react";
-import type { Issue, IssuePriority, IssueStatus, Sprint, User } from "../store/types";
-import { getIssueByKey, listSprints, listUsers, updateIssue } from "../store/jiraStore";
+import {
+  Avatar,
+  Button,
+  Lozenge,
+  Modal,
+  Select,
+  Tabs,
+  TextArea,
+  TextField,
+  useToast,
+} from "@chanho/react";
+import type {
+  Activity,
+  Comment,
+  Issue,
+  IssuePriority,
+  IssueStatus,
+  Sprint,
+  User,
+} from "../store/types";
+import {
+  addComment,
+  getIssueByKey,
+  listActivity,
+  listComments,
+  listSprints,
+  listUsers,
+  updateIssue,
+} from "../store/jiraStore";
 import { BOARD_STATUSES, PRIORITY_LABELS, STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -15,7 +41,7 @@ export interface IssueDetailModalProps {
   issueKey: string;
   /** 모달 닫기 = URL 쿼리 제거 */
   onClose: () => void;
-  /** 저장 성공 후 보드 재조회 (모달을 연 채 카드 반영) */
+  /** 저장 성공 후 페이지 재조회 (모달을 연 채 목록 반영) */
   onIssueChanged: () => void | Promise<void>;
 }
 
@@ -23,10 +49,23 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [issue, setIssue] = useState<Issue | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [commentDraft, setCommentDraft] = useState("");
   const toast = useToast();
+
+  /** 코멘트·활동 재조회 — 속성 저장/코멘트 작성 후 호출 (활동로그는 스토어 부수효과) */
+  const refreshLogs = async (issueId: string) => {
+    const [commentList, activityList] = await Promise.all([
+      listComments(issueId),
+      listActivity(issueId),
+    ]);
+    setComments(commentList);
+    setActivities(activityList);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -38,18 +77,28 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         onClose();
         return;
       }
-      const [userList, sprintList] = await Promise.all([listUsers(), listSprints(found.projectId)]);
+      const [userList, sprintList, commentList, activityList] = await Promise.all([
+        listUsers(),
+        listSprints(found.projectId),
+        listComments(found.id),
+        listActivity(found.id),
+      ]);
       if (cancelled) return;
       setIssue(found);
       setDescriptionDraft(found.description);
       setUsers(userList);
       setSprints(sprintList);
+      setComments(commentList);
+      setActivities(activityList);
     })();
     return () => {
       cancelled = true;
     };
     // issueKey가 바뀔 때만 재조회 (toast/onClose는 재조회 트리거가 아니다)
   }, [issueKey]);
+
+  const userName = (id: string) => users.find((u) => u.id === id)?.name ?? "알 수 없음";
+  const formatDateTime = (iso: string) => new Date(iso).toLocaleString("ko-KR");
 
   const applyPatch = async (
     patch: Partial<
@@ -61,6 +110,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     try {
       const updated = await updateIssue(issue.id, patch);
       setIssue(updated);
+      await refreshLogs(updated.id); // 상태 등 변경 → 활동 탭 즉시 반영
       await onIssueChanged();
       toast({ title: successTitle, appearance: "success" });
     } catch (error) {
@@ -80,13 +130,35 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     setEditingTitle(false);
     if (!issue) return;
     const next = titleDraft.trim();
-    if (!next || next === issue.title) return; // 빈 제목·변경 없음 → 저장 안 함
+    if (!next) {
+      // W2 인계: 조용한 무시 대신 정보 Toast로 피드백
+      toast({ title: "제목을 입력하세요", appearance: "info" });
+      return;
+    }
+    if (next === issue.title) return; // 변경 없음 → 저장 안 함
     await applyPatch({ title: next }, "제목을 저장했습니다");
   };
 
   const handleDescriptionSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await applyPatch({ description: descriptionDraft }, "설명을 저장했습니다");
+  };
+
+  const handleCommentSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!issue) return;
+    try {
+      await addComment(issue.id, commentDraft); // 빈 본문은 스토어가 throw
+      setCommentDraft("");
+      await refreshLogs(issue.id);
+      toast({ title: "코멘트를 남겼습니다", appearance: "success" });
+    } catch (error) {
+      toast({
+        title: "코멘트 작성 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
   };
 
   if (!issue) return null;
@@ -182,6 +254,62 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           />
         </aside>
       </div>
+      <Tabs
+        label="이슈 기록"
+        className="issue-tabs"
+        items={[
+          {
+            value: "comments",
+            label: `코멘트 (${comments.length})`,
+            content: (
+              <div className="issue-comments" data-testid="issue-comments">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="issue-comment">
+                    <Avatar name={userName(comment.authorId)} size="small" />
+                    <div>
+                      <p className="issue-comment-meta">
+                        <strong>{userName(comment.authorId)}</strong> ·{" "}
+                        {formatDateTime(comment.createdAt)}
+                      </p>
+                      <p className="issue-comment-body">{comment.body}</p>
+                    </div>
+                  </div>
+                ))}
+                {comments.length === 0 ? (
+                  <p className="issue-comment-empty">아직 코멘트가 없습니다</p>
+                ) : null}
+                <form className="issue-comment-form" onSubmit={handleCommentSubmit}>
+                  <TextArea
+                    label="코멘트"
+                    rows={3}
+                    placeholder="코멘트를 입력하세요"
+                    value={commentDraft}
+                    onChange={(e) => setCommentDraft(e.target.value)}
+                  />
+                  <Button type="submit" size="small">
+                    코멘트 남기기
+                  </Button>
+                </form>
+              </div>
+            ),
+          },
+          {
+            value: "activity",
+            label: "활동",
+            content: (
+              <ul className="issue-activity" data-testid="issue-activity">
+                {activities.map((activity) => (
+                  <li key={activity.id}>
+                    <strong>{userName(activity.actorId)}</strong> —{" "}
+                    <span className="issue-activity-detail">{activity.detail}</span>
+                    <span className="issue-activity-time">{formatDateTime(activity.at)}</span>
+                  </li>
+                ))}
+              </ul>
+            ),
+          },
+        ]}
+      />
     </Modal>
   );
 }

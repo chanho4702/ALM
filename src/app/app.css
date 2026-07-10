@@ -401,3 +401,68 @@ body {
   text-align: center;
   color: var(--chanho-color-text-subtle);
 }
+
+/* ── 이슈 상세 코멘트/활동 탭 (W3) ──────────────────────── */
+
+.issue-tabs {
+  margin-top: var(--chanho-space-300);
+}
+
+.issue-comments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  padding-top: var(--chanho-space-150);
+}
+
+.issue-comment {
+  display: flex;
+  gap: var(--chanho-space-100);
+}
+
+.issue-comment-meta {
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-comment-body {
+  margin: var(--chanho-space-50) 0 0;
+  font-size: var(--chanho-font-size-200);
+  white-space: pre-wrap;
+}
+
+.issue-comment-empty {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-200);
+}
+
+.issue-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.issue-comment-form button {
+  align-self: flex-start;
+}
+
+.issue-activity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: var(--chanho-space-150) 0 0;
+  list-style: none;
+}
+
+.issue-activity li {
+  font-size: var(--chanho-font-size-200);
+}
+
+.issue-activity-time {
+  margin-left: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+}

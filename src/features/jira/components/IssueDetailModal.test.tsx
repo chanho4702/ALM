@@ -121,3 +121,74 @@ describe("IssueDetailModal", () => {
     );
   });
 });
+
+describe("IssueDetailModal 코멘트/활동 탭 (W3)", () => {
+  it("코멘트 탭: 시드 코멘트가 작성자 이름과 함께 보이고, 작성하면 목록에 반영된다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-2"); // 시드: 코멘트 2개 (김찬호/이서연)
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    // 코멘트 탭이 기본 활성 (첫 항목)
+    expect(await within(dialog).findByRole("tab", { name: "코멘트 (2)" })).toBeInTheDocument();
+    const comments = within(dialog).getByTestId("issue-comments");
+    expect(
+      within(comments).getByText("드래그 라이브러리는 @dnd-kit로 확정했습니다."),
+    ).toBeInTheDocument();
+    expect(within(comments).getByText("이서연")).toBeInTheDocument();
+
+    // 작성 → 현재 유저(김찬호) 명의로 목록에 추가, 입력 초기화
+    await user.type(within(comments).getByLabelText("코멘트"), "리뷰 완료했습니다");
+    await user.click(within(comments).getByRole("button", { name: "코멘트 남기기" }));
+    expect(await within(comments).findByText("리뷰 완료했습니다")).toBeInTheDocument();
+    expect(within(comments).getAllByText("김찬호")).toHaveLength(2); // 시드 1 + 새 코멘트
+    expect(within(comments).getByLabelText("코멘트")).toHaveValue("");
+  });
+
+  it("빈 코멘트 제출은 스토어가 거부하고 danger Toast를 보여준다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-4");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    const comments = await within(dialog).findByTestId("issue-comments");
+    await user.click(within(comments).getByRole("button", { name: "코멘트 남기기" }));
+
+    expect(await screen.findByText("코멘트 내용을 입력하세요")).toBeInTheDocument();
+  });
+
+  it("활동 탭: 상태 변경이 유저 이름과 함께 자동 로그로 보인다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-4"); // 시드: todo
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    // 상태 변경 (활동로그는 스토어 부수효과로 기록된다)
+    await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
+    await user.click(await screen.findByRole("option", { name: "완료" }));
+    await waitFor(() => {
+      expect(within(dialog).getByTestId("issue-status-lozenge")).toHaveTextContent("완료");
+    });
+
+    // 활동 탭으로 전환 → created + status 로그가 시간순으로 보인다
+    await user.click(within(dialog).getByRole("tab", { name: "활동" }));
+    const activity = await within(dialog).findByTestId("issue-activity");
+    expect(within(activity).getByText("이슈 생성")).toBeInTheDocument();
+    expect(within(activity).getByText(/할 일 → 완료/)).toBeInTheDocument();
+    // actor는 유저 이름으로 표시 (u1 = 김찬호)
+    expect(within(activity).getAllByText("김찬호").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("빈 제목으로 blur하면 정보 Toast를 띄우고 기존 제목을 유지한다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-4");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    await user.click(within(dialog).getByRole("button", { name: "백로그 화면 구현" }));
+    await user.clear(within(dialog).getByLabelText("제목"));
+    await user.tab(); // blur
+
+    expect(await screen.findByText("제목을 입력하세요")).toBeInTheDocument();
+    // 저장되지 않고 기존 제목으로 복귀
+    expect(
+      await within(dialog).findByRole("button", { name: "백로그 화면 구현" }),
+    ).toBeInTheDocument();
+  });
+});
