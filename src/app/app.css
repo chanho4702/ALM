@@ -1,0 +1,6 @@
+body {
+  margin: 0;
+  font-family: var(--chanho-font-family-sans);
+  color: var(--chanho-color-text-default);
+  background: var(--chanho-color-background-default);
+}
