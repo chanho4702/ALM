@@ -348,3 +348,56 @@ body {
 .backlog-create-form > div {
   flex: 1; /* TextField 래퍼가 남은 폭을 채운다 */
 }
+
+/* ── 이슈 목록 (W3) ─────────────────────────────────────── */
+
+.issue-filter-bar {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: var(--chanho-space-150);
+  align-items: end;
+  margin-bottom: var(--chanho-space-300);
+}
+
+.issue-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.issue-table th {
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border-bottom: 2px solid var(--chanho-color-border-default);
+  text-align: left;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-table td {
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+  font-size: var(--chanho-font-size-200);
+}
+
+.issue-table tbody tr {
+  cursor: pointer;
+}
+
+.issue-table tbody tr:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.issue-table-key {
+  white-space: nowrap;
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-table-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.issue-table-empty {
+  text-align: center;
+  color: var(--chanho-color-text-subtle);
+}
