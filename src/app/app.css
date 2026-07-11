@@ -2,53 +2,21 @@ body {
   margin: 0;
   font-family: var(--chanho-font-family-sans);
   color: var(--chanho-color-text-default);
-  background: var(--chanho-color-background-default);
+  background: var(--chanho-color-background-subtle);
 }
+
+/* ── 레이아웃 크롬 (TopBar + SideNav) ───────────────────── */
 
 .jira-layout {
   display: flex;
   min-height: 100vh;
 }
 
-.jira-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--chanho-space-300);
-  width: 240px;
-  flex-shrink: 0;
-  padding: var(--chanho-space-300) var(--chanho-space-200);
-  background: var(--chanho-color-background-subtle);
-  border-right: 1px solid var(--chanho-color-border-default);
-}
-
-.jira-sidebar-brand {
-  font-size: var(--chanho-font-size-400);
+.jira-brand {
+  font-size: var(--chanho-font-size-300);
   font-weight: var(--chanho-font-weight-bold);
   color: var(--chanho-color-text-brand);
-}
-
-.jira-nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--chanho-space-50);
-}
-
-.jira-nav a {
-  padding: var(--chanho-space-100) var(--chanho-space-150);
-  border-radius: var(--chanho-radius-medium);
-  color: var(--chanho-color-text-default);
-  text-decoration: none;
-  font-size: var(--chanho-font-size-200);
-}
-
-.jira-nav a:hover {
-  background: var(--chanho-color-background-neutral-hovered);
-}
-
-.jira-nav a.active {
-  background: var(--chanho-color-background-brand-subtle);
-  color: var(--chanho-color-text-brand);
-  font-weight: var(--chanho-font-weight-semibold);
+  letter-spacing: 0.02em;
 }
 
 .jira-main {
@@ -56,33 +24,24 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-
-.jira-header {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--chanho-space-100) var(--chanho-space-300);
-  border-bottom: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-default);
 }
 
 .jira-content {
-  padding: var(--chanho-space-300);
+  padding: var(--chanho-space-400);
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-300);
 }
 
 .app-loading,
-.empty-projects {
+.app-centered {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--chanho-space-200);
   min-height: 100vh;
-}
-
-.empty-projects p {
-  color: var(--chanho-color-text-subtle);
 }
 
 .project-create-form {
@@ -91,36 +50,12 @@ body {
   gap: var(--chanho-space-200);
 }
 
-/* ── 칸반 보드 (W2) ─────────────────────────────────────── */
+/* ── 칸반 보드 ──────────────────────────────────────────── */
 
 .board-loading {
   display: flex;
   justify-content: center;
   padding: var(--chanho-space-600);
-}
-
-.board-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--chanho-space-200);
-  padding: var(--chanho-space-600) 0;
-  text-align: center;
-}
-
-.board-empty h2 {
-  margin: 0;
-}
-
-.board-empty p {
-  margin: 0;
-  color: var(--chanho-color-text-subtle);
-}
-
-.board-title {
-  margin: 0 0 var(--chanho-space-300);
-  font-size: var(--chanho-font-size-400);
 }
 
 .board-columns {
@@ -135,8 +70,16 @@ body {
   flex-direction: column;
   gap: var(--chanho-space-150);
   padding: var(--chanho-space-150);
+  border: 1px solid transparent;
   border-radius: var(--chanho-radius-large);
   background: var(--chanho-color-background-subtle);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+/* 드래그 중 드롭 대상 컬럼 강조 */
+.board-column.is-over {
+  background: var(--chanho-color-background-selected);
+  border-color: var(--chanho-color-border-brand);
 }
 
 .board-column-header {
@@ -145,34 +88,28 @@ body {
   gap: var(--chanho-space-100);
 }
 
-.board-column-header h3 {
-  margin: 0;
-  font-size: var(--chanho-font-size-200);
-  font-weight: var(--chanho-font-weight-semibold);
-  color: var(--chanho-color-text-subtle);
-}
-
 .board-column-cards {
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-100);
-  min-height: 60px; /* 빈 컬럼도 드롭 영역 확보 (Task 2) */
+  min-height: 60px; /* 빈 컬럼도 드롭 영역 확보 */
 }
 
+/* interactive Card(button) 위에 얹는 레이아웃 — 색/그림자는 Card가 제공 */
 .issue-card {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: var(--chanho-space-100);
-  padding: var(--chanho-space-150);
-  border: 1px solid var(--chanho-color-border-default);
-  border-radius: var(--chanho-radius-medium);
-  background: var(--chanho-color-background-surface);
+  width: 100%;
+  text-align: left;
   cursor: grab;
 }
 
 .issue-card-title {
-  margin: 0;
-  font-size: var(--chanho-font-size-200);
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-default);
 }
 
 .issue-card-meta {
@@ -183,15 +120,12 @@ body {
 
 .issue-card-key {
   margin-right: auto;
-  font-size: var(--chanho-font-size-100);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }
 
-.board-empty a {
-  text-decoration: none;
-}
-
-/* ── 이슈 상세 모달 (W2) ────────────────────────────────── */
+/* ── 이슈 상세 모달 ─────────────────────────────────────── */
 
 /* Modal 기본 폭(480px) 확장 — 클래스 중복으로 명시도를 올려 모듈 CSS를 확실히 이긴다 */
 .issue-detail-modal.issue-detail-modal {
@@ -212,22 +146,10 @@ body {
   min-width: 0;
 }
 
-.issue-title-button {
-  margin: 0;
-  padding: var(--chanho-space-50) var(--chanho-space-100);
-  border: 1px solid transparent;
-  border-radius: var(--chanho-radius-medium);
-  background: transparent;
-  font: inherit;
-  font-size: var(--chanho-font-size-300);
+/* InlineEdit 보기 모드 텍스트를 제목 크기로 */
+.issue-title-view {
+  font-size: var(--chanho-font-size-200);
   font-weight: var(--chanho-font-weight-semibold);
-  color: var(--chanho-color-text-default);
-  text-align: left;
-  cursor: text;
-}
-
-.issue-title-button:hover {
-  background: var(--chanho-color-background-neutral-hovered);
 }
 
 .issue-description-form {
@@ -251,7 +173,7 @@ body {
   width: 100%; /* Select 필드(div 래퍼)는 패널 폭에 맞춘다 (Lozenge는 span이라 영향 없음) */
 }
 
-/* ── 백로그/스프린트 (W3) ───────────────────────────────── */
+/* ── 백로그/스프린트 ────────────────────────────────────── */
 
 .backlog-page {
   display: flex;
@@ -259,24 +181,15 @@ body {
   gap: var(--chanho-space-300);
 }
 
-.backlog-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.backlog-page-header h2 {
-  margin: 0;
-  font-size: var(--chanho-font-size-400);
-}
-
 .sprint-panel {
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-150);
-  padding: var(--chanho-space-150);
+  padding: var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
   border-radius: var(--chanho-radius-large);
-  background: var(--chanho-color-background-subtle);
+  background: var(--chanho-color-background-surface-raised);
+  box-shadow: var(--chanho-shadow-100);
 }
 
 .sprint-panel-header {
@@ -287,7 +200,7 @@ body {
 
 .sprint-panel-header h3 {
   margin: 0;
-  font-size: var(--chanho-font-size-200);
+  font-size: var(--chanho-font-size-100);
   font-weight: var(--chanho-font-weight-semibold);
   color: var(--chanho-color-text-subtle);
 }
@@ -306,7 +219,7 @@ body {
   margin: 0;
   padding: var(--chanho-space-100);
   color: var(--chanho-color-text-subtle);
-  font-size: var(--chanho-font-size-200);
+  font-size: var(--chanho-font-size-100);
 }
 
 .backlog-row {
@@ -318,6 +231,7 @@ body {
   border-radius: var(--chanho-radius-medium);
   background: var(--chanho-color-background-surface);
   cursor: pointer;
+  transition: background 120ms ease;
 }
 
 .backlog-row:hover {
@@ -326,7 +240,8 @@ body {
 
 .backlog-row-key {
   flex-shrink: 0;
-  font-size: var(--chanho-font-size-100);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }
 
@@ -336,7 +251,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--chanho-font-size-200);
+  font-size: var(--chanho-font-size-100);
 }
 
 .backlog-create-form {
@@ -349,7 +264,7 @@ body {
   flex: 1; /* TextField 래퍼가 남은 폭을 채운다 */
 }
 
-/* ── 이슈 목록 (W3) ─────────────────────────────────────── */
+/* ── 이슈 목록 ──────────────────────────────────────────── */
 
 .issue-filter-bar {
   display: grid;
@@ -359,50 +274,20 @@ body {
   margin-bottom: var(--chanho-space-300);
 }
 
-.issue-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.issue-table th {
-  padding: var(--chanho-space-100) var(--chanho-space-150);
-  border-bottom: 2px solid var(--chanho-color-border-default);
-  text-align: left;
-  font-size: var(--chanho-font-size-100);
+.issue-key-cell {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
-}
-
-.issue-table td {
-  padding: var(--chanho-space-100) var(--chanho-space-150);
-  border-bottom: 1px solid var(--chanho-color-border-default);
-  font-size: var(--chanho-font-size-200);
-}
-
-.issue-table tbody tr {
-  cursor: pointer;
-}
-
-.issue-table tbody tr:hover {
-  background: var(--chanho-color-background-neutral-hovered);
-}
-
-.issue-table-key {
   white-space: nowrap;
-  color: var(--chanho-color-text-subtle);
 }
 
-.issue-table-assignee {
+.issue-assignee-cell {
   display: inline-flex;
   align-items: center;
   gap: var(--chanho-space-100);
 }
 
-.issue-table-empty {
-  text-align: center;
-  color: var(--chanho-color-text-subtle);
-}
-
-/* ── 이슈 상세 코멘트/활동 탭 (W3) ──────────────────────── */
+/* ── 이슈 상세 코멘트/활동 탭 ───────────────────────────── */
 
 .issue-tabs {
   margin-top: var(--chanho-space-300);
@@ -415,27 +300,10 @@ body {
   padding-top: var(--chanho-space-150);
 }
 
-.issue-comment {
-  display: flex;
-  gap: var(--chanho-space-100);
-}
-
-.issue-comment-meta {
-  margin: 0;
-  font-size: var(--chanho-font-size-100);
-  color: var(--chanho-color-text-subtle);
-}
-
-.issue-comment-body {
-  margin: var(--chanho-space-50) 0 0;
-  font-size: var(--chanho-font-size-200);
-  white-space: pre-wrap;
-}
-
 .issue-comment-empty {
   margin: 0;
   color: var(--chanho-color-text-subtle);
-  font-size: var(--chanho-font-size-200);
+  font-size: var(--chanho-font-size-100);
 }
 
 .issue-comment-form {
@@ -458,11 +326,11 @@ body {
 }
 
 .issue-activity li {
-  font-size: var(--chanho-font-size-200);
+  font-size: var(--chanho-font-size-100);
 }
 
 .issue-activity-time {
   margin-left: var(--chanho-space-100);
-  font-size: var(--chanho-font-size-100);
+  font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }

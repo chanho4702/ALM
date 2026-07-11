@@ -7,20 +7,31 @@ import { createProject } from "../store/jiraStore";
 export interface ProjectCreateModalProps {
   /** 트리거 버튼 문구 */
   triggerLabel?: string;
+  /** 자체 트리거를 숨긴다 — 외부 버튼(예: EmptyState)에서 열 때 사용. */
+  hideTrigger?: boolean;
+  /** 제어 열림 상태. 지정하면 open/onOpenChange로 외부가 제어한다. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onCreated: (project: Project) => void | Promise<void>;
 }
 
 export function ProjectCreateModal({
   triggerLabel = "새 프로젝트",
+  hideTrigger = false,
+  open: openProp,
+  onOpenChange,
   onCreated,
 }: ProjectCreateModalProps) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : openState;
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const toast = useToast();
 
   const handleOpenChange = (next: boolean) => {
-    setOpen(next);
+    if (isControlled) onOpenChange?.(next);
+    else setOpenState(next);
     if (!next) {
       setName("");
       setKey("");
@@ -45,7 +56,7 @@ export function ProjectCreateModal({
 
   return (
     <Modal
-      trigger={<Button variant="subtle">{triggerLabel}</Button>}
+      trigger={hideTrigger ? <span hidden /> : <Button variant="secondary">{triggerLabel}</Button>}
       title="새 프로젝트"
       description="이름과 키를 입력하세요. 키는 이슈 번호의 접두어가 됩니다."
       open={open}
