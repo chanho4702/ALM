@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import {
   DndContext,
   DragOverlay,
@@ -10,7 +10,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Button, Spinner, useToast } from "@chanho/react";
+import { EmptyState, Lozenge, PageHeader, Spinner, useToast } from "@chanho/react";
 import type { Issue, IssueStatus, Sprint, User } from "../store/types";
 import { listIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
@@ -21,6 +21,7 @@ import { resolveMove } from "./boardDnd";
 
 export function BoardPage() {
   const { projectId } = useParams();
+  const navigate = useNavigate();
 
   /** undefined = 로딩 중, null = 활성 스프린트 없음 */
   const [sprint, setSprint] = useState<Sprint | null | undefined>(undefined);
@@ -93,20 +94,15 @@ export function BoardPage() {
     );
   } else if (sprint === null) {
     content = (
-      <section className="board-empty">
-        <h2>진행 중인 스프린트가 없습니다</h2>
-        <p>백로그에서 스프린트를 만들고 시작하면 보드가 열립니다.</p>
-        <Link to="../backlog">
-          <Button variant="subtle" tabIndex={-1}>
-            백로그로 이동
-          </Button>
-        </Link>
-      </section>
+      <EmptyState
+        title="진행 중인 스프린트가 없습니다"
+        description="백로그에서 스프린트를 만들고 시작하면 보드가 열립니다."
+        primaryAction={{ label: "백로그로 이동", onClick: () => navigate("../backlog") }}
+      />
     );
   } else {
     content = (
       <section>
-        <h2 className="board-title">{sprint.name}</h2>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -142,6 +138,16 @@ export function BoardPage() {
 
   return (
     <>
+      <PageHeader
+        title="보드"
+        actions={
+          sprint ? (
+            <Lozenge appearance="info" aria-label={`활성 스프린트: ${sprint.name}`}>
+              {sprint.name}
+            </Lozenge>
+          ) : null
+        }
+      />
       {content}
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
       {issueModal}

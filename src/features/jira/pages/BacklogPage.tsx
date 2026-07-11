@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "react-router";
-import { Badge, Button, Spinner, TextField, useToast } from "@chanho/react";
+import { Badge, Button, PageHeader, Spinner, TextField, useToast } from "@chanho/react";
 import type { Issue, Sprint, User } from "../store/types";
 import {
   completeSprint,
@@ -107,11 +107,11 @@ export function BacklogPage() {
 
   return (
     <>
-      <section className="backlog-page">
-        <header className="backlog-page-header">
-          <h2>백로그</h2>
+      <PageHeader
+        title="백로그"
+        actions={
           <Button
-            variant="subtle"
+            variant="secondary"
             onClick={() =>
               void run("스프린트 생성 실패", "스프린트를 만들었습니다", () => {
                 if (!projectId) throw new Error("프로젝트를 찾을 수 없습니다");
@@ -121,8 +121,9 @@ export function BacklogPage() {
           >
             스프린트 만들기
           </Button>
-        </header>
-
+        }
+      />
+      <section className="backlog-page">
         {visibleSprints.map((sprint) => (
           <SprintPanel
             key={sprint.id}

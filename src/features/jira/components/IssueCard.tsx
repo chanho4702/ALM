@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Avatar, Lozenge } from "@chanho/react";
+import { Avatar, Card, Lozenge } from "@chanho/react";
 import type { Issue } from "../store/types";
 import { PRIORITY_APPEARANCE, PRIORITY_LABELS } from "./labels";
 
@@ -14,16 +14,18 @@ export interface IssueCardProps {
 
 export function IssueCard({ issue, assigneeName, onOpen }: IssueCardProps) {
   return (
-    <article className="issue-card" onClick={onOpen}>
-      <p className="issue-card-title">{issue.title}</p>
-      <div className="issue-card-meta">
+    // interactive Card는 <button>으로 렌더 — hover elevation은 Card가 제공한다.
+    // 내부는 phrasing 콘텐츠(span)만 둔다.
+    <Card interactive padding="sm" className="issue-card" onClick={onOpen}>
+      <span className="issue-card-title">{issue.title}</span>
+      <span className="issue-card-meta">
         <span className="issue-card-key">{issue.key}</span>
         <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
           {PRIORITY_LABELS[issue.priority]}
         </Lozenge>
         {assigneeName ? <Avatar name={assigneeName} size="small" /> : null}
-      </div>
-    </article>
+      </span>
+    </Card>
   );
 }
 

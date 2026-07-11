@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import type { FormEvent } from "react";
 import {
   Avatar,
   Button,
+  Comment as CommentBlock,
+  InlineEdit,
   Lozenge,
   Modal,
   Select,
   Tabs,
   TextArea,
-  TextField,
   useToast,
 } from "@chanho/react";
 import type {
@@ -51,8 +52,6 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
   const toast = useToast();
@@ -122,23 +121,6 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     }
   };
 
-  const handleTitleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") event.currentTarget.blur(); // 저장은 blur 핸들러 한 곳에서만
-  };
-
-  const handleTitleBlur = async () => {
-    setEditingTitle(false);
-    if (!issue) return;
-    const next = titleDraft.trim();
-    if (!next) {
-      // W2 인계: 조용한 무시 대신 정보 Toast로 피드백
-      toast({ title: "제목을 입력하세요", appearance: "info" });
-      return;
-    }
-    if (next === issue.title) return; // 변경 없음 → 저장 안 함
-    await applyPatch({ title: next }, "제목을 저장했습니다");
-  };
-
   const handleDescriptionSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await applyPatch({ description: descriptionDraft }, "설명을 저장했습니다");
@@ -175,27 +157,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     >
       <div className="issue-detail-body">
         <div className="issue-detail-main">
-          {editingTitle ? (
-            <TextField
-              label="제목"
-              autoFocus
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleTitleBlur}
-              onKeyDown={handleTitleKeyDown}
-            />
-          ) : (
-            <button
-              type="button"
-              className="issue-title-button"
-              onClick={() => {
-                setTitleDraft(issue.title);
-                setEditingTitle(true);
-              }}
-            >
-              {issue.title}
-            </button>
-          )}
+          <InlineEdit
+            label="제목"
+            value={issue.title}
+            viewClassName="issue-title-view"
+            onSave={(next) => void applyPatch({ title: next }, "제목을 저장했습니다")}
+          />
           <form className="issue-description-form" onSubmit={handleDescriptionSubmit}>
             <TextArea
               label="설명"
@@ -264,16 +231,14 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             content: (
               <div className="issue-comments" data-testid="issue-comments">
                 {comments.map((comment) => (
-                  <div key={comment.id} className="issue-comment">
-                    <Avatar name={userName(comment.authorId)} size="small" />
-                    <div>
-                      <p className="issue-comment-meta">
-                        <strong>{userName(comment.authorId)}</strong> ·{" "}
-                        {formatDateTime(comment.createdAt)}
-                      </p>
-                      <p className="issue-comment-body">{comment.body}</p>
-                    </div>
-                  </div>
+                  <CommentBlock
+                    key={comment.id}
+                    author={userName(comment.authorId)}
+                    avatar={<Avatar name={userName(comment.authorId)} size="small" />}
+                    time={formatDateTime(comment.createdAt)}
+                  >
+                    {comment.body}
+                  </CommentBlock>
                 ))}
                 {comments.length === 0 ? (
                   <p className="issue-comment-empty">아직 코멘트가 없습니다</p>

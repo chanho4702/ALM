@@ -1,9 +1,9 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Badge } from "@chanho/react";
+import { Badge, Lozenge } from "@chanho/react";
 import type { Issue, IssueStatus } from "../store/types";
 import { SortableIssueCard } from "./IssueCard";
-import { STATUS_LABELS } from "./labels";
+import { STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
 
 export interface BoardColumnProps {
   status: IssueStatus;
@@ -18,11 +18,15 @@ export interface BoardColumnProps {
 export function BoardColumn({ status, issues, userNames, onOpenIssue }: BoardColumnProps) {
   const label = STATUS_LABELS[status];
   // 컬럼 droppable id = status 문자열 → resolveMove가 컬럼 드롭을 인식한다
-  const { setNodeRef } = useDroppable({ id: status });
+  const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <section className="board-column" aria-label={label} data-testid={`board-column-${status}`}>
+    <section
+      className={["board-column", isOver ? "is-over" : null].filter(Boolean).join(" ")}
+      aria-label={label}
+      data-testid={`board-column-${status}`}
+    >
       <header className="board-column-header">
-        <h3>{label}</h3>
+        <Lozenge appearance={STATUS_APPEARANCE[status]}>{label}</Lozenge>
         <Badge>{issues.length}</Badge>
       </header>
       <SortableContext items={issues.map((i) => i.id)} strategy={verticalListSortingStrategy}>

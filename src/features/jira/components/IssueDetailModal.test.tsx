@@ -34,7 +34,9 @@ describe("IssueDetailModal", () => {
     renderBoard("/projects/p1/board?issue=ALM-4"); // 시드: ALM-4 = todo, 보통, 박준영
 
     const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
-    expect(within(dialog).getByRole("button", { name: "백로그 화면 구현" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "제목 편집" })).toHaveTextContent(
+      "백로그 화면 구현",
+    );
     expect(within(dialog).getByTestId("issue-status-lozenge")).toHaveTextContent("할 일");
     expect(within(dialog).getByLabelText("설명")).toBeInTheDocument();
 
@@ -55,20 +57,22 @@ describe("IssueDetailModal", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("제목 인라인 편집: 클릭 → 입력 → Enter로 저장하고 보드 카드에도 반영된다", async () => {
+  it("제목 인라인 편집(InlineEdit): 클릭 → 입력 → Enter로 저장하고 보드 카드에도 반영된다", async () => {
     const user = userEvent.setup();
     renderBoard("/projects/p1/board?issue=ALM-4");
 
     const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
-    await user.click(within(dialog).getByRole("button", { name: "백로그 화면 구현" }));
+    await user.click(within(dialog).getByRole("button", { name: "제목 편집" }));
     const field = within(dialog).getByLabelText("제목");
     await user.clear(field);
     await user.type(field, "백로그 화면 구현 (2차){Enter}");
 
-    // 모달에 저장된 제목으로 복귀
-    expect(
-      await within(dialog).findByRole("button", { name: "백로그 화면 구현 (2차)" }),
-    ).toBeInTheDocument();
+    // 보기 모드로 복귀하고 저장된 제목을 보여준다
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: "제목 편집" })).toHaveTextContent(
+        "백로그 화면 구현 (2차)",
+      );
+    });
     // 보드 카드에도 반영
     await waitFor(() => {
       expect(
@@ -176,19 +180,20 @@ describe("IssueDetailModal 코멘트/활동 탭 (W3)", () => {
     expect(within(activity).getAllByText("김찬호").length).toBeGreaterThanOrEqual(2);
   });
 
-  it("빈 제목으로 blur하면 정보 Toast를 띄우고 기존 제목을 유지한다", async () => {
+  it("빈 제목은 저장하지 않고 기존 제목을 유지한다 (InlineEdit)", async () => {
     const user = userEvent.setup();
     renderBoard("/projects/p1/board?issue=ALM-4");
 
     const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
-    await user.click(within(dialog).getByRole("button", { name: "백로그 화면 구현" }));
+    await user.click(within(dialog).getByRole("button", { name: "제목 편집" }));
     await user.clear(within(dialog).getByLabelText("제목"));
-    await user.tab(); // blur
+    await user.keyboard("{Enter}"); // 빈 값 저장 시도 → InlineEdit이 무시한다
 
-    expect(await screen.findByText("제목을 입력하세요")).toBeInTheDocument();
     // 저장되지 않고 기존 제목으로 복귀
-    expect(
-      await within(dialog).findByRole("button", { name: "백로그 화면 구현" }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: "제목 편집" })).toHaveTextContent(
+        "백로그 화면 구현",
+      );
+    });
   });
 });

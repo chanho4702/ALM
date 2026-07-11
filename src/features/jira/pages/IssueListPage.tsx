@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { Avatar, Lozenge, Select, Spinner, TextField } from "@chanho/react";
+import {
+  Avatar,
+  EmptyState,
+  Lozenge,
+  PageHeader,
+  Select,
+  Spinner,
+  Table,
+  TextField,
+} from "@chanho/react";
+import type { SortDirection, TableColumn } from "@chanho/react";
 import type { Issue, IssuePriority, IssueStatus, User } from "../store/types";
 import { listIssues, listUsers } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
@@ -16,6 +26,10 @@ import {
 const ALL = "all";
 const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 
+// 정렬용 위계: 보드 컬럼 순서 / 우선순위 높음→낮음
+const STATUS_ORDER: Record<IssueStatus, number> = { todo: 0, inprogress: 1, done: 2 };
+const PRIORITY_ORDER: Record<IssuePriority, number> = { high: 0, medium: 1, low: 2 };
+
 export function IssueListPage() {
   const { projectId } = useParams();
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
@@ -24,6 +38,8 @@ export function IssueListPage() {
   const [status, setStatus] = useState(ALL);
   const [priority, setPriority] = useState(ALL);
   const [assigneeId, setAssigneeId] = useState(ALL);
+  const [sortKey, setSortKey] = useState<string | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const reload = useCallback(async () => {
     if (!projectId) return;
@@ -45,14 +61,106 @@ export function IssueListPage() {
     void reload();
   }, [reload]);
 
-  const { openIssue, issueModal } = useIssueModal(reload);
+  const { openIssue, issueKey, issueModal } = useIssueModal(reload);
 
   const userNames = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u.name])), [users]);
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  };
+
+  // 정렬은 스토어 반환 목록 위에서 클라이언트가 수행한다 (필터는 스토어, 정렬은 화면)
+  const sortedIssues = useMemo(() => {
+    if (!issues || !sortKey) return issues ?? [];
+    const dir = sortDirection === "asc" ? 1 : -1;
+    const assigneeName = (i: Issue) =>
+      i.assigneeId ? (userNames[i.assigneeId] ?? "") : "￿"; // 미지정은 항상 뒤로
+    return [...issues].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "title":
+          cmp = a.title.localeCompare(b.title, "ko");
+          break;
+        case "status":
+          cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          break;
+        case "priority":
+          cmp = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+          break;
+        case "assignee":
+          cmp = assigneeName(a).localeCompare(assigneeName(b), "ko");
+          break;
+      }
+      return cmp * dir;
+    });
+  }, [issues, sortKey, sortDirection, userNames]);
+
+  const selectedId = useMemo(
+    () => (issueKey ? (issues?.find((i) => i.key === issueKey)?.id ?? undefined) : undefined),
+    [issueKey, issues],
+  );
+
+  const columns: TableColumn<Issue>[] = [
+    {
+      key: "key",
+      header: "키",
+      width: "88px",
+      render: (issue) => <span className="issue-key-cell">{issue.key}</span>,
+    },
+    { key: "title", header: "제목", sortable: true },
+    {
+      key: "status",
+      header: "상태",
+      sortable: true,
+      width: "104px",
+      render: (issue) => (
+        <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>{STATUS_LABELS[issue.status]}</Lozenge>
+      ),
+    },
+    {
+      key: "priority",
+      header: "우선순위",
+      sortable: true,
+      width: "104px",
+      render: (issue) => (
+        <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
+          {PRIORITY_LABELS[issue.priority]}
+        </Lozenge>
+      ),
+    },
+    {
+      key: "assignee",
+      header: "담당자",
+      sortable: true,
+      width: "160px",
+      render: (issue) =>
+        issue.assigneeId ? (
+          <span className="issue-assignee-cell">
+            <Avatar name={userNames[issue.assigneeId] ?? ""} size="small" />
+            {userNames[issue.assigneeId]}
+          </span>
+        ) : (
+          "미지정"
+        ),
+    },
+    {
+      key: "createdAt",
+      header: "생성일",
+      width: "112px",
+      align: "right",
+      render: (issue) => new Date(issue.createdAt).toLocaleDateString("ko-KR"),
+    },
+  ];
+
   return (
     <>
+      <PageHeader title="이슈" />
       <section>
-        <h2 className="board-title">이슈</h2>
         <div className="issue-filter-bar">
           <TextField
             label="검색"
@@ -92,55 +200,22 @@ export function IssueListPage() {
           <div className="board-loading">
             <Spinner size="large" label="이슈 불러오는 중" />
           </div>
+        ) : issues.length === 0 ? (
+          <EmptyState
+            title="조건에 맞는 이슈가 없습니다"
+            description="검색어나 필터를 조정해 보세요."
+          />
         ) : (
-          <table className="issue-table">
-            <thead>
-              <tr>
-                <th>키</th>
-                <th>제목</th>
-                <th>상태</th>
-                <th>우선순위</th>
-                <th>담당자</th>
-                <th>생성일</th>
-              </tr>
-            </thead>
-            <tbody>
-              {issues.map((issue) => (
-                <tr key={issue.id} onClick={() => openIssue(issue.key)}>
-                  <td className="issue-table-key">{issue.key}</td>
-                  <td>{issue.title}</td>
-                  <td>
-                    <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>
-                      {STATUS_LABELS[issue.status]}
-                    </Lozenge>
-                  </td>
-                  <td>
-                    <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
-                      {PRIORITY_LABELS[issue.priority]}
-                    </Lozenge>
-                  </td>
-                  <td>
-                    {issue.assigneeId ? (
-                      <span className="issue-table-assignee">
-                        <Avatar name={userNames[issue.assigneeId] ?? ""} size="small" />
-                        {userNames[issue.assigneeId]}
-                      </span>
-                    ) : (
-                      "미지정"
-                    )}
-                  </td>
-                  <td>{new Date(issue.createdAt).toLocaleDateString("ko-KR")}</td>
-                </tr>
-              ))}
-              {issues.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="issue-table-empty">
-                    조건에 맞는 이슈가 없습니다
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+          <Table
+            aria-label="이슈 목록"
+            columns={columns}
+            rows={sortedIssues}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onRowClick={(issue) => openIssue(issue.key)}
+            selectedId={selectedId}
+          />
         )}
       </section>
       {issueModal}
