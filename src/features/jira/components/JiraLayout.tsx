@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
-import { Avatar, Select, SideNav, TopBar } from "@chanho/react";
+import { Avatar, Button, Select, SideNav, TopBar } from "@chanho/react";
 import type { SideNavItem } from "@chanho/react";
 import type { Project, User } from "../store/types";
 import { getCurrentUser } from "../store/jiraStore";
 import { ProjectCreateModal } from "./ProjectCreateModal";
 import { ThemeToggle } from "./ThemeToggle";
+import { useAuth } from "../../../auth/AuthGate";
 
 export interface JiraLayoutProps {
   projects: Project[];
@@ -23,6 +24,7 @@ export function JiraLayout({ projects, onProjectsChanged }: JiraLayoutProps) {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser, logout } = useAuth();
   const [me, setMe] = useState<User | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -71,6 +73,14 @@ export function JiraLayout({ projects, onProjectsChanged }: JiraLayoutProps) {
           actions={
             <>
               <ThemeToggle />
+              {authUser ? (
+                <>
+                  <span className="jira-auth-user">{authUser.name ?? authUser.email}</span>
+                  <Button size="small" variant="ghost" onClick={() => void logout()}>
+                    로그아웃
+                  </Button>
+                </>
+              ) : null}
               {me ? <Avatar name={me.name} size="small" /> : null}
             </>
           }
