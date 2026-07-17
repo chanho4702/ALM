@@ -17,6 +17,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   moveIssue,
+  rankIssue,
   searchIssues,
   startSprint,
   updateComment,
@@ -390,5 +391,47 @@ describe("notifications", () => {
 
     await markAllNotificationsRead();
     expect((await listNotifications()).every((n) => n.read)).toBe(true);
+  });
+});
+
+describe("rankIssue (백로그 DnD)", () => {
+  it("백로그 → 스프린트 맨 뒤로 이동하고 활동로그를 남긴다", async () => {
+    const six = await getIssueByKey("ALM-6"); // 백로그
+    const moved = await rankIssue(six!.id, { sprintId: SPRINT });
+    expect(moved.sprintId).toBe(SPRINT);
+    // s1 그룹(ALM-1~5) 뒤 = 6번째
+    expect(moved.order).toBe(6);
+    const acts = await listActivity(six!.id);
+    expect(acts.at(-1)).toMatchObject({ type: "sprint", detail: "백로그 → Sprint 1" });
+  });
+
+  it("beforeId 앞에 삽입하고 대상 그룹 order를 1..n로 재부여한다", async () => {
+    // 백로그: ALM-6(1), ALM-7(2), ALM-8(3)
+    const six = await getIssueByKey("ALM-6");
+    const eight = await getIssueByKey("ALM-8");
+    await rankIssue(eight!.id, { sprintId: null, beforeId: six!.id }); // ALM-8을 맨 앞으로
+    const backlog = (await listIssues(PROJECT)).filter((i) => i.sprintId === null);
+    expect(backlog.map((i) => [i.key, i.order])).toEqual([
+      ["ALM-8", 1],
+      ["ALM-6", 2],
+      ["ALM-7", 3],
+    ]);
+  });
+
+  it("stale beforeId(그룹에 없음)는 조용히 맨 뒤", async () => {
+    const six = await getIssueByKey("ALM-6");
+    const one = await getIssueByKey("ALM-1"); // s1 소속 — 백로그 그룹엔 없다
+    const moved = await rankIssue(six!.id, { sprintId: null, beforeId: one!.id });
+    const backlog = (await listIssues(PROJECT)).filter((i) => i.sprintId === null);
+    expect(backlog.at(-1)!.key).toBe("ALM-6");
+    expect(moved.order).toBe(backlog.length);
+  });
+
+  it("없는 이슈/스프린트는 거부한다", async () => {
+    await expect(rankIssue("없음", { sprintId: null })).rejects.toThrow("이슈를 찾을 수 없습니다");
+    const six = await getIssueByKey("ALM-6");
+    await expect(rankIssue(six!.id, { sprintId: "없음" })).rejects.toThrow(
+      "스프린트를 찾을 수 없습니다",
+    );
   });
 });

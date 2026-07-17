@@ -357,7 +357,8 @@ export async function listIssues(
   if (filter?.assigneeId) issues = issues.filter((i) => i.assigneeId === filter.assigneeId);
   if (filter?.label) issues = issues.filter((i) => i.labels.includes(filter.label!));
   if (filter?.type) issues = issues.filter((i) => i.type === filter.type);
-  return clone([...issues].sort((a, b) => a.order - b.order));
+  // order 동률(보드 컬럼별 재번호로 발생 가능)은 key로 결정적으로 정렬한다
+  return clone([...issues].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)));
 }
 
 /** 전역 검색 — 전 프로젝트 이슈에서 키/제목/설명 매치, 최근 수정 순, 최대 limit건 */
@@ -505,6 +506,38 @@ export async function moveIssue(
   });
   issue.updatedAt = new Date().toISOString();
   recordChanges(data, before, issue, issue.updatedAt);
+  persist();
+  return clone(issue);
+}
+
+/**
+ * 백로그/스프린트 랭크 이동 — 대상 그룹(프로젝트+sprintId, 상태 무관)에서
+ * beforeId 앞(없으면 맨 뒤)에 놓고 그룹 전체 order를 1..n로 재부여한다.
+ * beforeId가 그룹에 없으면(드래그 중 stale 참조) 조용히 맨 뒤 — 화면은 이후 재조회한다.
+ */
+export async function rankIssue(
+  id: string,
+  to: { sprintId: string | null; beforeId?: string },
+): Promise<Issue> {
+  const data = load();
+  const issue = data.issues.find((i) => i.id === id);
+  if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  if (to.sprintId !== null && !data.sprints.some((s) => s.id === to.sprintId)) {
+    throw new Error("스프린트를 찾을 수 없습니다");
+  }
+  const before = { ...issue, labels: [...issue.labels] };
+  issue.sprintId = to.sprintId;
+  const group = data.issues
+    .filter((i) => i.id !== id && i.projectId === issue.projectId && i.sprintId === to.sprintId)
+    .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
+  const insertAt = to.beforeId ? group.findIndex((i) => i.id === to.beforeId) : -1;
+  if (insertAt === -1) group.push(issue);
+  else group.splice(insertAt, 0, issue);
+  group.forEach((entry, index) => {
+    entry.order = index + 1;
+  });
+  issue.updatedAt = new Date().toISOString();
+  recordChanges(data, before, issue, issue.updatedAt); // sprint 변경 활동로그
   persist();
   return clone(issue);
 }
@@ -704,7 +737,7 @@ export async function listBoardIssues(boardId: string): Promise<Issue[]> {
   }
   if (types.length > 0) issues = issues.filter((i) => types.includes(i.type));
   if (labels.length > 0) issues = issues.filter((i) => i.labels.some((l) => labels.includes(l)));
-  return clone([...issues].sort((a, b) => a.order - b.order));
+  return clone([...issues].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)));
 }
 
 // ── notifications ────────────────────────────────────────────

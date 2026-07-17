@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "react-router";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Badge, Button, Spinner, TextField, useToast } from "@chanho/react";
 import type { Issue, Sprint, User } from "../store/types";
 import {
@@ -11,12 +20,14 @@ import {
   listIssues,
   listSprints,
   listUsers,
+  rankIssue,
   startSprint,
   updateIssue,
 } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
-import { BacklogIssueRow, SprintPanel } from "../components/SprintPanel";
+import { BacklogDropZone, BacklogIssueRow, SortableBacklogRow, SprintPanel } from "../components/SprintPanel";
 import type { MoveTarget } from "../components/SprintPanel";
+import { BACKLOG_PANEL, resolveBacklogMove } from "./backlogDnd";
 
 export function BacklogPage() {
   const { projectId } = useParams();
@@ -25,7 +36,11 @@ export function BacklogPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [newTitle, setNewTitle] = useState("");
+  const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const toast = useToast();
+
+  // 행 클릭(상세)과 드래그 구분: 5px 이상 움직여야 드래그 시작
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const reload = useCallback(async () => {
     if (!projectId) return;
@@ -66,6 +81,39 @@ export function BacklogPage() {
   );
 
   const backlogIssues = issues.filter((i) => i.sprintId === null);
+
+  /** 패널 키 → order순 이슈 id 배열 (resolveBacklogMove 입력) */
+  const panels = useMemo(() => {
+    const map: Record<string, string[]> = {
+      [BACKLOG_PANEL]: issues.filter((i) => i.sprintId === null).map((i) => i.id),
+    };
+    for (const sprint of visibleSprints) {
+      map[sprint.id] = issues.filter((i) => i.sprintId === sprint.id).map((i) => i.id);
+    }
+    return map;
+  }, [issues, visibleSprints]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveIssue(issues.find((i) => i.id === event.active.id) ?? null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveIssue(null);
+    const { active, over } = event;
+    if (!over) return;
+    const target = resolveBacklogMove(String(active.id), String(over.id), panels);
+    if (!target) return;
+    try {
+      await rankIssue(String(active.id), target); // 빈번한 조작이라 성공 toast는 생략
+    } catch (error) {
+      toast({
+        title: "이슈 이동 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+    await reload();
+  };
 
   /** 스토어 액션 공통 래퍼: 성공/도메인 에러 Toast, 끝나면 항상 재조회 (스펙 §5) */
   const run = async (failTitle: string, successTitle: string, action: () => Promise<unknown>) => {
@@ -121,6 +169,13 @@ export function BacklogPage() {
         </Button>
       </div>
       <section className="backlog-page">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveIssue(null)}
+        >
         {visibleSprints.map((sprint) => (
           <SprintPanel
             key={sprint.id}
@@ -143,9 +198,9 @@ export function BacklogPage() {
             <h3>백로그</h3>
             <Badge>{backlogIssues.length}</Badge>
           </header>
-          <div className="sprint-panel-issues">
+          <BacklogDropZone panelId={BACKLOG_PANEL} issueIds={backlogIssues.map((i) => i.id)}>
             {backlogIssues.map((issue) => (
-              <BacklogIssueRow
+              <SortableBacklogRow
                 key={issue.id}
                 issue={issue}
                 assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
@@ -158,7 +213,7 @@ export function BacklogPage() {
             {backlogIssues.length === 0 ? (
               <p className="sprint-panel-empty">백로그가 비어 있습니다</p>
             ) : null}
-          </div>
+          </BacklogDropZone>
           <form className="backlog-create-form" onSubmit={handleCreateIssue}>
             <TextField
               label="새 이슈 제목"
@@ -169,6 +224,21 @@ export function BacklogPage() {
             <Button type="submit">만들기</Button>
           </form>
         </section>
+        <DragOverlay>
+          {activeIssue ? (
+            <BacklogIssueRow
+              issue={activeIssue}
+              assigneeName={
+                activeIssue.assigneeId ? userNames[activeIssue.assigneeId] : undefined
+              }
+              moveTargets={[]}
+              onMove={() => {}}
+              onDelete={() => {}}
+              onOpen={() => {}}
+            />
+          ) : null}
+        </DragOverlay>
+        </DndContext>
       </section>
       {issueModal}
     </>

@@ -1,3 +1,7 @@
+import type { ReactNode } from "react";
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Avatar, Badge, Button, Dropdown, Lozenge } from "@chanho/react";
 import type { Issue, Sprint } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
@@ -72,6 +76,53 @@ export function BacklogIssueRow({
   );
 }
 
+/**
+ * useSortable 래퍼 — DragOverlay에는 래핑 없는 BacklogIssueRow를 쓴다
+ * (같은 id로 useSortable을 두 번 등록하면 안 되기 때문, SortableIssueCard와 동일 패턴).
+ */
+export function SortableBacklogRow(props: BacklogIssueRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.issue.id,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : undefined,
+      }}
+      {...attributes}
+      {...listeners}
+    >
+      <BacklogIssueRow {...props} />
+    </div>
+  );
+}
+
+/** 패널의 드롭 영역 — droppable id는 "backlog" 또는 sprintId (resolveBacklogMove 입력) */
+export function BacklogDropZone({
+  panelId,
+  issueIds,
+  children,
+}: {
+  panelId: string;
+  issueIds: string[];
+  children: ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: panelId });
+  return (
+    <SortableContext items={issueIds} strategy={verticalListSortingStrategy}>
+      <div
+        ref={setNodeRef}
+        className={isOver ? "sprint-panel-issues is-over" : "sprint-panel-issues"}
+      >
+        {children}
+      </div>
+    </SortableContext>
+  );
+}
+
 export interface SprintPanelProps {
   sprint: Sprint;
   /** 이 스프린트의 이슈 (order 오름차순) */
@@ -114,9 +165,9 @@ export function SprintPanel({
           </Button>
         ) : null}
       </header>
-      <div className="sprint-panel-issues">
+      <BacklogDropZone panelId={sprint.id} issueIds={issues.map((i) => i.id)}>
         {issues.map((issue) => (
-          <BacklogIssueRow
+          <SortableBacklogRow
             key={issue.id}
             issue={issue}
             assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
@@ -127,7 +178,7 @@ export function SprintPanel({
           />
         ))}
         {issues.length === 0 ? <p className="sprint-panel-empty">이슈가 없습니다</p> : null}
-      </div>
+      </BacklogDropZone>
     </section>
   );
 }

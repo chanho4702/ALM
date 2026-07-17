@@ -1234,6 +1234,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-50);
+  min-height: 40px; /* 빈 패널도 드롭 영역 확보 */
+  border: 1px solid transparent;
+  border-radius: var(--chanho-radius-medium);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+/* 드래그 중 드롭 대상 패널 강조 — 보드 컬럼과 같은 시각 언어 */
+.sprint-panel-issues.is-over {
+  background: var(--chanho-color-background-selected);
+  border-color: var(--chanho-color-border-brand);
+}
+
+.backlog-row {
+  cursor: grab;
 }
 
 .sprint-panel-empty {
