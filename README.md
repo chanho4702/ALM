@@ -33,7 +33,7 @@ UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이�
 ```bash
 pnpm install                       # ../design-system/artifacts 의 tarball 필요
 pnpm dev --port 5175 --strictPort  # http://localhost:5175/alm/
-pnpm test                          # vitest run (171 test cases)
+pnpm test                          # vitest run (187 test cases)
 pnpm typecheck                     # tsc --noEmit
 pnpm build                         # vite build (→ dist/)
 ```
@@ -89,7 +89,8 @@ pnpm build                         # vite build (→ dist/)
 - **백로그/스프린트 `BacklogPage`** — 스프린트 생성·시작·완료, 인라인 이슈 생성, **드래그로 스프린트↔백로그 이동·패널 내 순서(랭크) 변경**(`rankIssue`·`resolveBacklogMove`, Dropdown 이동 병행)(`SprintPanel`).
 - **이슈 목록 `IssueListPage`** — 테이블 + 필터(검색/상태/우선순위/담당자/라벨) + 정렬.
 - **이슈 상세 `IssueDetailModal`** — `?issue=ALM-1` 쿼리로 열리는 공유 가능 모달(`useIssueModal`). 인라인 편집·속성 패널·코멘트·활동로그.
-- **이슈 타입** — 작업/스토리/버그/에픽 색 글리프(`IssueTypeGlyph`).
+- **이슈 타입** — 작업/스토리/버그/에픽/하위 작업 색 글리프(`IssueTypeGlyph`).
+- **이슈 관계** — 단일 `parentId` 2단계 계층(에픽→일반 이슈→하위 작업, 스토어가 규칙 검증)·상세 모달의 부모 Select/하위 이슈 섹션(진행 n/m·인라인 하위 작업 추가·클릭 시 모달 전환)·**이슈 링크**(차단함/차단됨/관련, 미완료 차단자 있으면 "차단됨" 경고)·칸반 카드 에픽 태그.
 - **알림 `NotificationsModal`** — 상단 벨 미읽음 Badge, 개별/전체 읽음.
 - **검색 `SearchModal`** · **만들기 `CreateIssueModal`** — 전역 상단바에서 호출.
 - **프로젝트 디렉터리** — `ProjectListPage`(카드) · `ProjectCreatePage`(영문 이름→키 자동 제안) · `ProjectSettingsPage`(수정·삭제).
