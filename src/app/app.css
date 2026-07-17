@@ -765,6 +765,60 @@ body {
   border-color: var(--chanho-color-border-brand);
 }
 
+/* WIP 제한 초과 — danger 테두리 (이동 자체는 허용, 지라와 동일) */
+.board-column.is-over-wip {
+  border-color: var(--chanho-color-border-danger);
+  background: var(--chanho-color-background-danger-subtle);
+}
+
+.board-wip-warning {
+  color: var(--chanho-color-text-danger);
+  font-size: var(--chanho-font-size-100);
+}
+
+/* 보드 설정 모달 */
+.board-settings-modal.board-settings-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.board-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: var(--chanho-space-100);
+}
+
+.board-settings-fieldset {
+  margin: 0;
+  padding: var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.board-settings-fieldset legend {
+  padding: 0 var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.board-settings-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-100) var(--chanho-space-200);
+}
+
+.board-settings-column-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--chanho-space-100);
+}
+
 .board-column-header {
   display: flex;
   align-items: center;

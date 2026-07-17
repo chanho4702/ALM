@@ -132,3 +132,63 @@ describe("보드 퀵 필터바", () => {
     expect(screen.getByLabelText("보드 검색")).toHaveValue("");
   });
 });
+
+describe("보드 컬럼 WIP·설정 모달", () => {
+  it("칸반 보드(b2)의 WIP 초과 컬럼이 danger 강조와 카운트를 보여준다", async () => {
+    // 시드 b2: kanban·backend 라벨·진행 중 WIP 2 — backend 이슈 3개를 진행 중으로 만든다
+    const { createIssue } = await import("../store/jiraStore");
+    for (let i = 0; i < 3; i++) {
+      await createIssue({
+        projectId: "p1",
+        title: `백엔드 진행 ${i}`,
+        labels: ["backend"],
+        status: "inprogress",
+      });
+    }
+    renderBoard("/projects/p1/boards/b2");
+
+    const column = await screen.findByTestId("board-column-inprogress");
+    await waitFor(() => {
+      expect(column).toHaveClass("is-over-wip");
+    });
+    expect(within(column).getByText("3/2")).toBeInTheDocument();
+    expect(within(column).getByRole("img", { name: "WIP 제한 초과" })).toBeInTheDocument();
+  });
+
+  it("보드 설정에서 이름을 바꾸면 툴바에 반영된다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/boards/b2");
+    await screen.findByText("백엔드 팀", { selector: ".board-name" });
+
+    await user.click(screen.getByRole("button", { name: "보드 메뉴" }));
+    await user.click(await screen.findByRole("menuitem", { name: "보드 설정" }));
+    const dialog = await screen.findByRole("dialog", { name: "보드 설정" });
+
+    const nameField = within(dialog).getByLabelText("이름");
+    await user.clear(nameField);
+    await user.type(nameField, "백엔드 파이프라인");
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    expect(
+      await screen.findByText("백엔드 파이프라인", { selector: ".board-name" }),
+    ).toBeInTheDocument();
+  });
+
+  it("보드를 삭제하면 기본 보드로 이동한다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/boards/b2");
+    await screen.findByText("백엔드 팀", { selector: ".board-name" });
+
+    await user.click(screen.getByRole("button", { name: "보드 메뉴" }));
+    await user.click(await screen.findByRole("menuitem", { name: "보드 설정" }));
+    const dialog = await screen.findByRole("dialog", { name: "보드 설정" });
+    await user.click(within(dialog).getByRole("button", { name: "보드 삭제" }));
+
+    const confirm = await screen.findByRole("dialog", { name: "보드 삭제" });
+    await user.click(within(confirm).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/boards/b1");
+    });
+  });
+});

@@ -10,10 +10,11 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { EmptyState, Lozenge, Spinner, useToast } from "@chanho/react";
+import { Button, Dropdown, EmptyState, Lozenge, Spinner, useToast } from "@chanho/react";
 import type { Board, Issue, IssueStatus, Sprint, User } from "../store/types";
 import { createIssue, getBoard, listBoardIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
+import { BoardSettingsModal } from "../components/BoardSettingsModal";
 import {
   BoardFilterBar,
   EMPTY_QUICK_FILTER,
@@ -39,6 +40,7 @@ export function BoardPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [quick, setQuick] = useState<QuickFilter>(EMPTY_QUICK_FILTER);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const toast = useToast();
 
   // 클릭과 드래그 구분: 5px 이상 움직여야 드래그 시작
@@ -167,16 +169,21 @@ export function BoardPage() {
           onDragCancel={() => setActiveIssue(null)}
         >
           <div className="board-columns">
-            {BOARD_STATUSES.map((status) => (
-              <BoardColumn
-                key={status}
-                status={status}
-                issues={visibleIssues.filter((i) => i.status === status)}
-                userNames={userNames}
-                onOpenIssue={openIssue}
-                onCreateIssue={handleColumnCreate}
-              />
-            ))}
+            {BOARD_STATUSES.map((status) => {
+              const column = board.columns.find((c) => c.status === status);
+              return (
+                <BoardColumn
+                  key={status}
+                  status={status}
+                  issues={visibleIssues.filter((i) => i.status === status)}
+                  userNames={userNames}
+                  onOpenIssue={openIssue}
+                  onCreateIssue={handleColumnCreate}
+                  columnName={column?.name}
+                  wipLimit={column?.wipLimit ?? null}
+                />
+              );
+            })}
           </div>
           <DragOverlay>
             {activeIssue ? (
@@ -206,6 +213,14 @@ export function BoardPage() {
               {sprint.name}
             </Lozenge>
           ) : null}
+          <Dropdown
+            trigger={
+              <Button variant="ghost" size="small" aria-label="보드 메뉴">
+                ⋯
+              </Button>
+            }
+            items={[{ label: "보드 설정", onSelect: () => setSettingsOpen(true) }]}
+          />
         </div>
         <BoardFilterBar
           users={users}
@@ -215,6 +230,15 @@ export function BoardPage() {
         />
       </div>
       {content}
+      <BoardSettingsModal
+        board={board}
+        users={users}
+        labelOptions={labelOptions}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onSaved={reload}
+        onDeleted={() => navigate(`/projects/${projectId}/board`)}
+      />
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
       {issueModal}
     </>

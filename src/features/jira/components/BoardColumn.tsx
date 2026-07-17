@@ -17,6 +17,10 @@ export interface BoardColumnProps {
   onOpenIssue?: (key: string) => void;
   /** 컬럼 하단 인라인 생성 — 지라의 "+ 만들기" (해당 상태로 바로 생성) */
   onCreateIssue?: (status: IssueStatus, title: string) => void | Promise<void>;
+  /** 보드 컬럼 커스텀 이름 (미지정 시 상태 라벨) */
+  columnName?: string;
+  /** WIP 제한 — 초과 시 danger 강조 (이동 자체는 허용) */
+  wipLimit?: number | null;
 }
 
 export function BoardColumn({
@@ -25,8 +29,11 @@ export function BoardColumn({
   userNames,
   onOpenIssue,
   onCreateIssue,
+  columnName,
+  wipLimit = null,
 }: BoardColumnProps) {
-  const label = STATUS_LABELS[status];
+  const label = columnName ?? STATUS_LABELS[status];
+  const overWip = wipLimit !== null && issues.length > wipLimit;
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   // 컬럼 droppable id = status 문자열 → resolveMove가 컬럼 드롭을 인식한다
@@ -42,13 +49,22 @@ export function BoardColumn({
 
   return (
     <section
-      className={["board-column", isOver ? "is-over" : null].filter(Boolean).join(" ")}
+      className={["board-column", isOver ? "is-over" : null, overWip ? "is-over-wip" : null]
+        .filter(Boolean)
+        .join(" ")}
       aria-label={label}
       data-testid={`board-column-${status}`}
     >
       <header className="board-column-header">
         <Lozenge appearance={STATUS_APPEARANCE[status]}>{label}</Lozenge>
-        <Badge>{issues.length}</Badge>
+        <Badge appearance={overWip ? "danger" : "neutral"}>
+          {wipLimit !== null ? `${issues.length}/${wipLimit}` : issues.length}
+        </Badge>
+        {overWip ? (
+          <span className="board-wip-warning" role="img" aria-label="WIP 제한 초과">
+            ⚠
+          </span>
+        ) : null}
       </header>
       <SortableContext items={issues.map((i) => i.id)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="board-column-cards">
