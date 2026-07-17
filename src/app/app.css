@@ -191,6 +191,12 @@ body {
   gap: var(--chanho-space-100);
 }
 
+.issue-card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-50);
+}
+
 .issue-card-key {
   margin-right: auto;
   font-family: var(--chanho-font-family-mono);
@@ -388,7 +394,7 @@ body {
 
 .issue-filter-bar {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
   gap: var(--chanho-space-150);
   align-items: end;
   margin-bottom: var(--chanho-space-300);

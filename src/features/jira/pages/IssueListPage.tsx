@@ -38,6 +38,8 @@ export function IssueListPage() {
   const [status, setStatus] = useState(ALL);
   const [priority, setPriority] = useState(ALL);
   const [assigneeId, setAssigneeId] = useState(ALL);
+  const [label, setLabel] = useState(ALL);
+  const [labelOptions, setLabelOptions] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -48,9 +50,13 @@ export function IssueListPage() {
       status: status === ALL ? undefined : (status as IssueStatus),
       priority: priority === ALL ? undefined : (priority as IssuePriority),
       assigneeId: assigneeId === ALL ? undefined : assigneeId,
+      label: label === ALL ? undefined : label,
     });
     setIssues(list);
-  }, [projectId, text, status, priority, assigneeId]);
+    // 라벨 선택지는 필터와 무관한 프로젝트 전체 라벨 합집합
+    const all = await listIssues(projectId);
+    setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
+  }, [projectId, text, status, priority, assigneeId, label]);
 
   useEffect(() => {
     void listUsers().then(setUsers);
@@ -94,6 +100,19 @@ export function IssueListPage() {
           break;
         case "assignee":
           cmp = assigneeName(a).localeCompare(assigneeName(b), "ko");
+          break;
+        case "createdAt":
+          cmp = a.createdAt.localeCompare(b.createdAt);
+          break;
+        case "updatedAt":
+          cmp = a.updatedAt.localeCompare(b.updatedAt);
+          break;
+        case "dueDate":
+          // 미지정 마감일은 정렬 방향과 무관하게 항상 뒤로 (dir 미적용 early return)
+          if (a.dueDate === null && b.dueDate === null) return 0;
+          if (a.dueDate === null) return 1;
+          if (b.dueDate === null) return -1;
+          cmp = a.dueDate.localeCompare(b.dueDate);
           break;
       }
       return cmp * dir;
@@ -149,11 +168,29 @@ export function IssueListPage() {
         ),
     },
     {
+      key: "dueDate",
+      header: "마감일",
+      sortable: true,
+      width: "112px",
+      align: "right",
+      render: (issue) =>
+        issue.dueDate ? new Date(issue.dueDate).toLocaleDateString("ko-KR") : "—",
+    },
+    {
       key: "createdAt",
       header: "생성일",
+      sortable: true,
       width: "112px",
       align: "right",
       render: (issue) => new Date(issue.createdAt).toLocaleDateString("ko-KR"),
+    },
+    {
+      key: "updatedAt",
+      header: "수정일",
+      sortable: true,
+      width: "112px",
+      align: "right",
+      render: (issue) => new Date(issue.updatedAt).toLocaleDateString("ko-KR"),
     },
   ];
 
@@ -164,7 +201,7 @@ export function IssueListPage() {
         <div className="issue-filter-bar">
           <TextField
             label="검색"
-            placeholder="제목·키 검색"
+            placeholder="제목·설명·키 검색"
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -193,6 +230,15 @@ export function IssueListPage() {
             options={[
               { value: ALL, label: "전체" },
               ...users.map((u) => ({ value: u.id, label: u.name })),
+            ]}
+          />
+          <Select
+            label="라벨"
+            value={label}
+            onValueChange={setLabel}
+            options={[
+              { value: ALL, label: "전체" },
+              ...labelOptions.map((l) => ({ value: l, label: l })),
             ]}
           />
         </div>

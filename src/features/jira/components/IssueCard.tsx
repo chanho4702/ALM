@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Avatar, Card, Lozenge } from "@chanho/react";
+import { Avatar, Card, Lozenge, Tag } from "@chanho/react";
 import type { Issue } from "../store/types";
 import { PRIORITY_APPEARANCE, PRIORITY_LABELS } from "./labels";
 
@@ -18,6 +18,13 @@ export function IssueCard({ issue, assigneeName, onOpen }: IssueCardProps) {
     // 내부는 phrasing 콘텐츠(span)만 둔다.
     <Card interactive padding="sm" className="issue-card" onClick={onOpen}>
       <span className="issue-card-title">{issue.title}</span>
+      {issue.labels.length > 0 ? (
+        <span className="issue-card-labels">
+          {issue.labels.map((label) => (
+            <Tag key={label} label={label} />
+          ))}
+        </span>
+      ) : null}
       <span className="issue-card-meta">
         <span className="issue-card-key">{issue.key}</span>
         <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>

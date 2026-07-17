@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
-import { __resetForTest } from "../store/jiraStore";
+import { __resetForTest, createIssue } from "../store/jiraStore";
 
 /** 현재 pathname+search를 노출하는 테스트 프로브 */
 function LocationProbe() {
@@ -98,5 +98,55 @@ describe("IssueListPage", () => {
 
     expect(await screen.findByRole("dialog", { name: "ALM-2" })).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/issues?issue=ALM-2");
+  });
+});
+
+describe("IssueListPage 확장 (설명 검색·라벨 필터·날짜 정렬)", () => {
+  it("검색이 설명 본문도 매치한다", async () => {
+    await createIssue({
+      projectId: "p1",
+      title: "제목에는 검색어 없음",
+      description: "결제 모듈 리팩터링 작업",
+    });
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.type(screen.getByLabelText("검색"), "결제 모듈");
+    await waitFor(() => {
+      expect(screen.queryByText("ALM-1")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("제목에는 검색어 없음")).toBeInTheDocument();
+  });
+
+  it("라벨 필터로 목록을 좁힌다 (시드: backend = ALM-6)", async () => {
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.click(screen.getByRole("combobox", { name: "라벨" }));
+    await user.click(await screen.findByRole("option", { name: "backend" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("row")).toHaveLength(2); // 헤더 + ALM-6
+    });
+    expect(screen.getByText("ALM-6")).toBeInTheDocument();
+  });
+
+  it("마감일 정렬 시 미지정 이슈는 항상 뒤로 간다", async () => {
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.click(screen.getByRole("button", { name: /마감일/ }));
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole("row").slice(1); // 헤더 제외
+      const firstKey = within(rows[0]).getByText(/ALM-\d+/).textContent;
+      // 시드에서 마감일이 있는 이슈는 ALM-2, ALM-4뿐
+      expect(["ALM-2", "ALM-4"]).toContain(firstKey);
+      const lastRow = rows[rows.length - 1];
+      expect(within(lastRow).getByText("—")).toBeInTheDocument(); // 미지정은 맨 뒤
+    });
   });
 });
