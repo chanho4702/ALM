@@ -13,11 +13,19 @@ export const SIDENAV_DEFAULT_WIDTH = 240;
 /** uiStore가 바뀔 때마다 window에 발행 — 사이드바 등 구독자가 다시 읽는다 */
 export const UI_CHANGED_EVENT = "alm:ui-changed";
 
+/** 저장 필터 — query는 스마트 검색 문자열 그대로 (URL·사이드바에서 재사용) */
+export interface SavedFilter {
+  id: string;
+  name: string;
+  query: string;
+}
+
 interface UiState {
   recentProjectIds: string[];
   starredProjectIds: string[];
   sideNavCollapsed: boolean;
   sideNavWidth: number;
+  savedFilters: SavedFilter[];
 }
 
 const DEFAULT_STATE: UiState = {
@@ -25,6 +33,7 @@ const DEFAULT_STATE: UiState = {
   starredProjectIds: [],
   sideNavCollapsed: false,
   sideNavWidth: SIDENAV_DEFAULT_WIDTH,
+  savedFilters: [],
 };
 
 function load(): UiState {
@@ -37,6 +46,7 @@ function load(): UiState {
       starredProjectIds: parsed.starredProjectIds ?? [],
       sideNavCollapsed: parsed.sideNavCollapsed ?? false,
       sideNavWidth: parsed.sideNavWidth ?? SIDENAV_DEFAULT_WIDTH,
+      savedFilters: parsed.savedFilters ?? [],
     };
   } catch {
     return { ...DEFAULT_STATE };
@@ -95,6 +105,31 @@ export async function getSideNavWidth(): Promise<number> {
 export async function setSideNavWidth(width: number): Promise<void> {
   const clamped = Math.min(SIDENAV_MAX_WIDTH, Math.max(SIDENAV_MIN_WIDTH, Math.round(width)));
   persist({ ...load(), sideNavWidth: clamped });
+}
+
+export async function listSavedFilters(): Promise<SavedFilter[]> {
+  return load().savedFilters;
+}
+
+/** 저장 필터 추가 — 같은 이름이 있으면 쿼리를 덮어쓴다 */
+export async function saveFilter(name: string, query: string): Promise<SavedFilter> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("필터 이름을 입력하세요");
+  const state = load();
+  const existing = state.savedFilters.find((f) => f.name === trimmed);
+  if (existing) {
+    existing.query = query;
+    persist(state);
+    return existing;
+  }
+  const filter: SavedFilter = { id: crypto.randomUUID(), name: trimmed, query };
+  persist({ ...state, savedFilters: [...state.savedFilters, filter] });
+  return filter;
+}
+
+export async function deleteSavedFilter(id: string): Promise<void> {
+  const state = load();
+  persist({ ...state, savedFilters: state.savedFilters.filter((f) => f.id !== id) });
 }
 
 /** 삭제된 프로젝트를 최근/별표에서 걷어낸다 (프로젝트 삭제 후 호출) */

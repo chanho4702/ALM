@@ -435,3 +435,41 @@ describe("rankIssue (백로그 DnD)", () => {
     );
   });
 });
+
+describe("queryIssues (상세 검색)", () => {
+  it("필드 간 AND, 다중 값 OR로 거른다", async () => {
+    const { queryIssues } = await import("./jiraStore");
+    const { EMPTY_QUERY } = await import("./searchQuery");
+    // 진행 중 OR 완료 + frontend 라벨 = ALM-2, ALM-3 중 라벨 매치
+    const result = await queryIssues({
+      ...EMPTY_QUERY,
+      statuses: ["inprogress", "done"],
+      labels: ["frontend"],
+    });
+    expect(result.map((i) => i.key).sort()).toEqual(["ALM-2", "ALM-3"]);
+  });
+
+  it("정렬: 마감일은 미지정이 뒤, 우선순위는 높음 먼저", async () => {
+    const { queryIssues } = await import("./jiraStore");
+    const { EMPTY_QUERY } = await import("./searchQuery");
+    const byDue = await queryIssues({ ...EMPTY_QUERY, sort: "due" });
+    expect(byDue[0].dueDate).not.toBeNull();
+    expect(byDue.at(-1)!.dueDate).toBeNull();
+
+    const byPriority = await queryIssues({ ...EMPTY_QUERY, sort: "priority" });
+    expect(byPriority[0].priority).toBe("high");
+    expect(byPriority.at(-1)!.priority).toBe("low");
+  });
+
+  it("전 프로젝트를 가로질러 검색하고 프로젝트 필터로 좁힌다", async () => {
+    const { queryIssues } = await import("./jiraStore");
+    const { EMPTY_QUERY } = await import("./searchQuery");
+    const other = await createProject({ key: "PAY", name: "결제" });
+    await createIssue({ projectId: other.id, title: "결제 검색 대상" });
+
+    const all = await queryIssues({ ...EMPTY_QUERY, text: "검색 대상" });
+    expect(all).toHaveLength(1);
+    const scoped = await queryIssues({ ...EMPTY_QUERY, projectIds: ["p1"], text: "검색 대상" });
+    expect(scoped).toHaveLength(0);
+  });
+});

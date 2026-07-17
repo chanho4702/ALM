@@ -68,3 +68,22 @@ describe("uiStore 사이드바 너비", () => {
     expect(await getSideNavWidth()).toBe(400);
   });
 });
+
+describe("uiStore 저장 필터", () => {
+  it("저장·나열·삭제, 같은 이름은 덮어쓴다, 빈 이름 거부", async () => {
+    const { deleteSavedFilter, listSavedFilters, saveFilter } = await import("./uiStore");
+    const first = await saveFilter("내 버그", "타입:버그 담당:김찬호");
+    await saveFilter("이번 주", "정렬:마감");
+    expect((await listSavedFilters()).map((f) => f.name)).toEqual(["내 버그", "이번 주"]);
+
+    await saveFilter("내 버그", "타입:버그"); // 덮어쓰기
+    const filters = await listSavedFilters();
+    expect(filters).toHaveLength(2);
+    expect(filters.find((f) => f.id === first.id)?.query).toBe("타입:버그");
+
+    await deleteSavedFilter(first.id);
+    expect((await listSavedFilters()).map((f) => f.name)).toEqual(["이번 주"]);
+
+    await expect(saveFilter("  ", "x")).rejects.toThrow("필터 이름을 입력하세요");
+  });
+});

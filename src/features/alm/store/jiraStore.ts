@@ -17,6 +17,7 @@ import type {
 } from "./types";
 import { CURRENT_USER_ID } from "../../../mock/users";
 import { createSeedData } from "../../../mock/seed";
+import type { IssueQuery } from "./searchQuery";
 
 const STORAGE_KEY = "alm.jira.v1";
 
@@ -387,6 +388,58 @@ export async function listIssues(
   if (filter?.type) issues = issues.filter((i) => i.type === filter.type);
   // order 동률(보드 컬럼별 재번호로 발생 가능)은 key로 결정적으로 정렬한다
   return clone([...issues].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)));
+}
+
+/**
+ * 상세 검색 — IssueQuery 실행 (전 프로젝트, 다중 값 OR·필드 간 AND).
+ * 추후 jira-service GraphQL 쿼리로 이 시그니처가 그대로 넘어간다.
+ */
+export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
+  let issues = [...load().issues];
+  const text = query.text.trim().toLowerCase();
+  if (text) {
+    issues = issues.filter(
+      (i) =>
+        i.title.toLowerCase().includes(text) ||
+        i.key.toLowerCase().includes(text) ||
+        i.description.toLowerCase().includes(text),
+    );
+  }
+  if (query.projectIds.length > 0) {
+    issues = issues.filter((i) => query.projectIds.includes(i.projectId));
+  }
+  if (query.statuses.length > 0) issues = issues.filter((i) => query.statuses.includes(i.status));
+  if (query.priorities.length > 0) {
+    issues = issues.filter((i) => query.priorities.includes(i.priority));
+  }
+  if (query.types.length > 0) issues = issues.filter((i) => query.types.includes(i.type));
+  if (query.assigneeIds.length > 0) {
+    issues = issues.filter((i) =>
+      i.assigneeId === null
+        ? query.assigneeIds.includes("unassigned")
+        : query.assigneeIds.includes(i.assigneeId),
+    );
+  }
+  if (query.labels.length > 0) {
+    issues = issues.filter((i) => i.labels.some((l) => query.labels.includes(l)));
+  }
+  const priorityRank: Record<IssuePriority, number> = { high: 0, medium: 1, low: 2 };
+  issues.sort((a, b) => {
+    switch (query.sort) {
+      case "created":
+        return b.createdAt.localeCompare(a.createdAt);
+      case "due":
+        if (a.dueDate === null && b.dueDate === null) return a.key.localeCompare(b.key);
+        if (a.dueDate === null) return 1; // 미지정 마감일은 뒤로
+        if (b.dueDate === null) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      case "priority":
+        return priorityRank[a.priority] - priorityRank[b.priority];
+      default:
+        return b.updatedAt.localeCompare(a.updatedAt);
+    }
+  });
+  return clone(issues);
 }
 
 /** 전역 검색 — 전 프로젝트 이슈에서 키/제목/설명 매치, 최근 수정 순, 최대 limit건 */
