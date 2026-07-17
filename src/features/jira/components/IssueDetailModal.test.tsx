@@ -298,3 +298,75 @@ describe("IssueDetailModal 댓글 수정/삭제", () => {
     expect(within(comments).getByText("컬럼 간 이동부터 붙여볼게요.")).toBeInTheDocument();
   });
 });
+
+describe("IssueDetailModal 이슈 관계", () => {
+  it("차단됨 경고: ALM-2는 미완료 차단자(ALM-3)가 있어 danger Lozenge가 보인다", async () => {
+    renderBoard("/projects/p1/board?issue=ALM-2");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    expect(await within(dialog).findByTestId("issue-blocked-lozenge")).toHaveTextContent("차단됨");
+  });
+
+  it("에픽(ALM-4)의 하위 이슈 목록에 ALM-2가 보이고, 클릭하면 그 이슈 모달로 전환된다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-4");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+
+    const childrenSection = await within(dialog).findByTestId("issue-children");
+    expect(within(childrenSection).getByText("ALM-2")).toBeInTheDocument();
+    expect(within(childrenSection).getByText(/완료 0\/1/)).toBeInTheDocument();
+
+    await user.click(within(childrenSection).getByText("칸반 보드 UI 구현"));
+    expect(await screen.findByRole("dialog", { name: "ALM-2" })).toBeInTheDocument();
+  });
+
+  it("일반 이슈에서 하위 작업을 인라인 추가하면 목록에 나타난다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-1");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+
+    await user.type(within(dialog).getByLabelText("하위 작업 추가"), "세부 구현");
+    await user.click(within(dialog).getByRole("button", { name: "추가" }));
+
+    const childrenSection = within(dialog).getByTestId("issue-children");
+    expect(await within(childrenSection).findByText("세부 구현")).toBeInTheDocument();
+    expect(within(childrenSection).getByRole("img", { name: "하위 작업" })).toBeInTheDocument();
+  });
+
+  it("링크 섹션: 차단됨 그룹 표시, 링크 추가/제거", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-2");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+
+    const linksSection = await within(dialog).findByTestId("issue-links");
+    expect(within(linksSection).getByText("차단됨")).toBeInTheDocument();
+    expect(within(linksSection).getByText("ALM-3")).toBeInTheDocument();
+
+    // 관련 링크 추가: ALM-2 ↔ ALM-5
+    await user.click(within(linksSection).getByRole("combobox", { name: "종류" }));
+    await user.click(await screen.findByRole("option", { name: "관련" }));
+    await user.click(within(linksSection).getByRole("combobox", { name: "대상 이슈" }));
+    await user.click(await screen.findByRole("option", { name: /ALM-5/ }));
+    await user.click(within(linksSection).getByRole("button", { name: "링크 추가" }));
+
+    expect(
+      await within(linksSection).findByText("관련", { selector: ".issue-link-group-title" }),
+    ).toBeInTheDocument();
+    expect(within(linksSection).getByText("ALM-5")).toBeInTheDocument();
+
+    // 차단 링크 제거 → 차단됨 그룹 사라짐
+    await user.click(within(linksSection).getByRole("button", { name: "ALM-3 링크 제거" }));
+    await waitFor(() => {
+      expect(within(linksSection).queryByText("ALM-3")).not.toBeInTheDocument();
+    });
+  });
+
+  it("부모 Select로 에픽을 지정할 수 있다 (에픽 모달에는 부모 Select 없음)", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-1");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+
+    await user.click(within(dialog).getByRole("combobox", { name: "부모" }));
+    await user.click(await screen.findByRole("option", { name: /ALM-4/ }));
+    expect(await screen.findByText("부모를 변경했습니다")).toBeInTheDocument();
+  });
+});

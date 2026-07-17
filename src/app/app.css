@@ -1182,6 +1182,95 @@ body {
   color: var(--chanho-color-text-default);
 }
 
+/* 이슈 관계 (하위 이슈·링크) */
+.issue-relations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.issue-relations h4 {
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-relations-count {
+  font-weight: var(--chanho-font-weight-regular, 400);
+}
+
+.issue-relation-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issue-relation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  flex: 1;
+  min-width: 0;
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.issue-relation-row:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.issue-relation-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-link-item {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}
+
+.issue-link-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.issue-link-group-title {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-relation-add {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.issue-relation-add > div {
+  flex: 1;
+}
+
+.issue-link-add {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: var(--chanho-space-100);
+  align-items: end;
+}
+
 .issue-comment-edit {
   display: flex;
   flex-direction: column;
