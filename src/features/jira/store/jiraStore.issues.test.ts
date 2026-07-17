@@ -5,6 +5,7 @@ import {
   completeSprint,
   createIssue,
   createSprint,
+  deleteComment,
   deleteIssue,
   getIssueByKey,
   listActivity,
@@ -13,6 +14,7 @@ import {
   listSprints,
   moveIssue,
   startSprint,
+  updateComment,
   updateIssue,
 } from "./jiraStore";
 
@@ -221,5 +223,81 @@ describe("comments / deleteIssue", () => {
     await expect(getIssueByKey("ALM-2")).resolves.toBeNull();
     expect(await listComments(two!.id)).toHaveLength(0);
     expect(await listActivity(two!.id)).toHaveLength(0);
+  });
+});
+
+describe("dueDate / labels (요구사항 갭)", () => {
+  it("createIssue는 dueDate와 labels를 저장한다 (기본값 null/[])", async () => {
+    const plain = await createIssue({ projectId: PROJECT, title: "기본값" });
+    expect(plain.dueDate).toBeNull();
+    expect(plain.labels).toEqual([]);
+    const rich = await createIssue({
+      projectId: PROJECT,
+      title: "옵션",
+      dueDate: "2026-08-01",
+      labels: ["backend", "api"],
+    });
+    expect(rich.dueDate).toBe("2026-08-01");
+    expect(rich.labels).toEqual(["backend", "api"]);
+  });
+
+  it("updateIssue로 dueDate/labels를 바꾸면 활동로그에 남는다", async () => {
+    const issue = await createIssue({ projectId: PROJECT, title: "변경 대상" });
+    await updateIssue(issue.id, { dueDate: "2026-08-15", labels: ["design"] });
+    const acts = await listActivity(issue.id);
+    expect(acts).toContainEqual(
+      expect.objectContaining({ type: "duedate", detail: "미지정 → 2026-08-15" }),
+    );
+    expect(acts).toContainEqual(expect.objectContaining({ type: "labels", detail: "design" }));
+  });
+
+  it("listIssues는 label 필터를 지원한다", async () => {
+    await createIssue({ projectId: PROJECT, title: "백엔드 작업", labels: ["backend"] });
+    const hits = await listIssues(PROJECT, { label: "backend" });
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every((i) => i.labels.includes("backend"))).toBe(true);
+  });
+});
+
+describe("설명 검색", () => {
+  it("text 필터가 제목뿐 아니라 설명도 검색한다", async () => {
+    await createIssue({
+      projectId: PROJECT,
+      title: "제목에는 없음",
+      description: "결제 모듈 리팩터링",
+    });
+    const hits = await listIssues(PROJECT, { text: "결제 모듈" });
+    expect(hits).toHaveLength(1);
+    expect(hits[0].title).toBe("제목에는 없음");
+  });
+});
+
+describe("updateComment / deleteComment", () => {
+  it("본인 댓글을 수정하면 body와 updatedAt이 갱신된다", async () => {
+    const issue = await createIssue({ projectId: PROJECT, title: "댓글 이슈" });
+    const comment = await addComment(issue.id, "원본");
+    const updated = await updateComment(comment.id, "수정본");
+    expect(updated.body).toBe("수정본");
+    expect(updated.updatedAt).toBeDefined();
+  });
+
+  it("본인 댓글을 삭제할 수 있다", async () => {
+    const issue = await createIssue({ projectId: PROJECT, title: "댓글 이슈" });
+    const comment = await addComment(issue.id, "삭제될 댓글");
+    await deleteComment(comment.id);
+    expect(await listComments(issue.id)).toHaveLength(0);
+  });
+
+  it("타인 댓글은 수정/삭제할 수 없다 (시드 c2는 u2 작성)", async () => {
+    await expect(updateComment("c2", "해킹")).rejects.toThrow("본인 댓글만 수정할 수 있습니다");
+    await expect(deleteComment("c2")).rejects.toThrow("본인 댓글만 삭제할 수 있습니다");
+  });
+
+  it("빈 본문 수정과 없는 댓글은 거부한다", async () => {
+    const issue = await createIssue({ projectId: PROJECT, title: "댓글 이슈" });
+    const comment = await addComment(issue.id, "원본");
+    await expect(updateComment(comment.id, "  ")).rejects.toThrow("코멘트 내용을 입력하세요");
+    await expect(updateComment("nope", "x")).rejects.toThrow("코멘트를 찾을 수 없습니다");
+    await expect(deleteComment("nope")).rejects.toThrow("코멘트를 찾을 수 없습니다");
   });
 });
