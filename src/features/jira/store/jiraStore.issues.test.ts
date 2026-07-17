@@ -4,6 +4,7 @@ import {
   addComment,
   completeSprint,
   createIssue,
+  createProject,
   createSprint,
   deleteComment,
   deleteIssue,
@@ -13,6 +14,7 @@ import {
   listIssues,
   listSprints,
   moveIssue,
+  searchIssues,
   startSprint,
   updateComment,
   updateIssue,
@@ -299,5 +301,27 @@ describe("updateComment / deleteComment", () => {
     await expect(updateComment(comment.id, "  ")).rejects.toThrow("코멘트 내용을 입력하세요");
     await expect(updateComment("nope", "x")).rejects.toThrow("코멘트를 찾을 수 없습니다");
     await expect(deleteComment("nope")).rejects.toThrow("코멘트를 찾을 수 없습니다");
+  });
+});
+
+describe("searchIssues (전역 검색)", () => {
+  it("전 프로젝트에서 키/제목/설명을 매치한다", async () => {
+    const byKey = await searchIssues("alm-2");
+    expect(byKey.map((i) => i.key)).toEqual(["ALM-2"]);
+
+    const byTitle = await searchIssues("칸반");
+    expect(byTitle.map((i) => i.key)).toEqual(["ALM-2"]);
+
+    // 다른 프로젝트의 이슈도 함께 검색된다
+    const other = await createProject({ key: "PAY", name: "결제" });
+    await createIssue({ projectId: other.id, title: "칸반 개선" });
+    const across = await searchIssues("칸반");
+    expect(across).toHaveLength(2);
+  });
+
+  it("빈 검색어는 빈 배열, limit을 넘는 결과는 잘린다", async () => {
+    expect(await searchIssues("   ")).toEqual([]);
+    const all = await searchIssues("ALM", 3);
+    expect(all).toHaveLength(3);
   });
 });

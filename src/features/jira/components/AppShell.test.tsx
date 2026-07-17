@@ -1,0 +1,97 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, useLocation } from "react-router";
+import { ToastProvider } from "@chanho/react";
+import { App } from "../../../app/App";
+import { __resetForTest } from "../store/jiraStore";
+
+/** 현재 pathname+search를 노출하는 테스트 프로브 */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname + location.search}</div>;
+}
+
+function renderShell(initialPath: string) {
+  return render(
+    <ToastProvider>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <App />
+        <LocationProbe />
+      </MemoryRouter>
+    </ToastProvider>,
+  );
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  __resetForTest();
+});
+
+describe("AppShell 전역 만들기", () => {
+  it("어느 화면에서든 이슈를 만들고 상세로 이동한다 (디렉터리에서)", async () => {
+    const user = userEvent.setup();
+    renderShell("/projects");
+    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+
+    await user.click(screen.getByRole("button", { name: "만들기" }));
+    const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
+
+    // 프로젝트 기본값: 첫 프로젝트(ALM 플랫폼)
+    expect(within(dialog).getByRole("combobox", { name: "프로젝트" })).toHaveTextContent(
+      "ALM 플랫폼 (ALM)",
+    );
+    await user.type(within(dialog).getByLabelText("제목"), "전역에서 만든 이슈");
+    await user.type(within(dialog).getByLabelText("라벨"), "global, shell");
+    await user.click(within(dialog).getByRole("button", { name: "만들기" }));
+
+    // 시드 다음 번호(ALM-9)의 상세가 열린 이슈 목록으로 이동
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/issues?issue=ALM-9");
+    });
+    expect(await screen.findByRole("dialog", { name: "ALM-9" })).toBeInTheDocument();
+  });
+
+  it("프로젝트 내부에서는 현재 프로젝트가 기본값이다", async () => {
+    const user = userEvent.setup();
+    renderShell("/projects/p1/board");
+    await screen.findByRole("navigation", { name: "브레드크럼" });
+
+    await user.click(screen.getByRole("button", { name: "만들기" }));
+    const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
+    expect(within(dialog).getByRole("combobox", { name: "프로젝트" })).toHaveTextContent(
+      "ALM 플랫폼 (ALM)",
+    );
+  });
+});
+
+describe("AppShell 전역 검색", () => {
+  it("검색 인풋 입력 → 결과 모달 → 클릭 시 이슈 상세로 이동한다", async () => {
+    const user = userEvent.setup();
+    renderShell("/projects");
+    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+
+    fireEvent.change(screen.getByLabelText("전역 검색"), { target: { value: "칸반" } });
+
+    const dialog = await screen.findByRole("dialog", { name: "이슈 검색" });
+    const results = await within(dialog).findByTestId("search-results");
+    expect(within(results).getByText("ALM-2")).toBeInTheDocument();
+    expect(within(results).getByText("칸반 보드 UI 구현")).toBeInTheDocument();
+    expect(within(results).getByText("ALM 플랫폼")).toBeInTheDocument(); // 프로젝트명 표시
+
+    await user.click(within(results).getByText("칸반 보드 UI 구현"));
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/issues?issue=ALM-2");
+    });
+    expect(await screen.findByRole("dialog", { name: "ALM-2" })).toBeInTheDocument();
+  });
+
+  it("결과가 없으면 빈 상태를 보여준다", async () => {
+    renderShell("/projects");
+    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+
+    fireEvent.change(screen.getByLabelText("전역 검색"), { target: { value: "존재하지않는이슈" } });
+    const dialog = await screen.findByRole("dialog", { name: "이슈 검색" });
+    expect(await within(dialog).findByText("결과가 없습니다")).toBeInTheDocument();
+  });
+});

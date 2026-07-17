@@ -51,15 +51,13 @@ describe("ProjectCreatePage", () => {
     await user.type(await screen.findByLabelText("이름"), "결제 서비스");
     await user.type(screen.getByLabelText("키"), "PAY");
     await user.type(screen.getByLabelText("설명"), "결제 도메인");
-    await user.click(screen.getByRole("button", { name: "만들기" }));
+    await user.click(screen.getByRole("button", { name: "프로젝트 만들기" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("location").textContent).toMatch(/^\/projects\/.+\/board$/);
     });
-    // 스위처가 새 프로젝트를 보여준다
-    expect(screen.getByRole("combobox", { name: "프로젝트" })).toHaveTextContent(
-      "결제 서비스 (PAY)",
-    );
+    // 사이드바 아이덴티티가 새 프로젝트를 보여준다
+    expect(screen.getByText("PAY · 소프트웨어 프로젝트")).toBeInTheDocument();
   });
 
   it("취소 → 프로젝트 디렉터리로 돌아간다", async () => {

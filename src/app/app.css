@@ -5,11 +5,97 @@ body {
   background: var(--chanho-color-background-subtle);
 }
 
-/* ── 레이아웃 크롬 (TopBar + SideNav) ───────────────────── */
+/* ── 전역 셸 (지라의 전역 상단 나비) ─────────────────────── */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--chanho-color-background-default);
+}
+
+.app-shell-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.topbar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-150);
+}
+
+/* ── 프로젝트 레이아웃 (사이드바 + 콘텐츠) ───────────────── */
 
 .jira-layout {
+  flex: 1;
   display: flex;
-  min-height: 100vh;
+  min-height: 0;
+}
+
+/* 사이드바 헤더 — 프로젝트 아이덴티티 (스위처 아님) */
+.project-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  min-width: 0;
+}
+
+.project-identity-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: var(--chanho-font-size-200);
+}
+
+.project-identity-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-identity-name {
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-identity-meta {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  white-space: nowrap;
+}
+
+/* 콘텐츠 상단 브레드크럼 — 프로젝트 / 이름 / 페이지 */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-200) var(--chanho-space-400) 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.breadcrumbs button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--chanho-color-text-subtle);
+  cursor: pointer;
+}
+
+.breadcrumbs button:hover {
+  color: var(--chanho-color-text-link);
+  text-decoration: underline;
+}
+
+.breadcrumbs [aria-current="page"] {
+  color: var(--chanho-color-text-default);
 }
 
 .jira-brand {
@@ -51,13 +137,6 @@ body {
 }
 
 /* ── 프로젝트 목록 (JiraLayout 밖 단독 페이지) ──────────── */
-
-.project-list-layout {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background: var(--chanho-color-background-default);
-}
 
 .project-list-content {
   width: min(960px, 100%);
@@ -210,10 +289,76 @@ body {
   gap: var(--chanho-space-100);
 }
 
-.sidenav-footer-actions {
+/* ── 전역 이슈 만들기 / 검색 모달 ───────────────────────── */
+
+.create-issue-modal.create-issue-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.create-issue-form {
   display: flex;
   flex-direction: column;
-  gap: var(--chanho-space-100);
+  gap: var(--chanho-space-200);
+}
+
+.create-issue-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--chanho-space-150);
+}
+
+.search-modal.search-modal {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.search-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.search-result-row {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  width: 100%;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 0;
+  border-radius: var(--chanho-radius-medium);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result-row:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.search-result-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-project {
+  flex-shrink: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
 }
 
 /* ── 칸반 보드 ──────────────────────────────────────────── */

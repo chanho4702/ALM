@@ -1,9 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { Button, Card, PageHeader, TextArea, TextField, TopBar, useToast } from "@chanho/react";
+import { Button, Card, PageHeader, TextArea, TextField, useToast } from "@chanho/react";
 import { createProject } from "../store/jiraStore";
-import { ThemeToggle } from "../components/ThemeToggle";
 
 export interface ProjectCreatePageProps {
   onProjectsChanged: () => void | Promise<void>;
@@ -52,9 +51,7 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
   };
 
   return (
-    <div className="project-list-layout">
-      <TopBar brand={<span className="jira-brand">ALM</span>} actions={<ThemeToggle />} />
-      <main className="project-list-content project-form-content">
+    <main className="project-list-content project-form-content">
         <PageHeader title="새 프로젝트" />
         <Card padding="lg">
           <form className="project-create-form" onSubmit={handleSubmit}>
@@ -86,12 +83,11 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
                 취소
               </Button>
               <Button type="submit" disabled={!name.trim() || !key.trim()}>
-                만들기
+                프로젝트 만들기
               </Button>
             </div>
           </form>
         </Card>
-      </main>
-    </div>
+    </main>
   );
 }

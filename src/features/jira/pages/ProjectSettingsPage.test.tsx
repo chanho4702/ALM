@@ -29,7 +29,7 @@ beforeEach(() => {
 });
 
 describe("ProjectSettingsPage", () => {
-  it("이름/설명을 수정하면 스위처에도 반영된다 (키는 읽기 전용 표시)", async () => {
+  it("이름/설명을 수정하면 사이드바 아이덴티티에도 반영된다 (키는 읽기 전용 표시)", async () => {
     const user = userEvent.setup();
     renderSettings();
 
@@ -43,9 +43,9 @@ describe("ProjectSettingsPage", () => {
     await user.click(screen.getByRole("button", { name: "저장" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "프로젝트" })).toHaveTextContent(
-        "ALM 플랫폼 v2 (ALM)",
-      );
+      expect(
+        screen.getByText("ALM 플랫폼 v2", { selector: ".project-identity-name" }),
+      ).toBeInTheDocument();
     });
   });
 

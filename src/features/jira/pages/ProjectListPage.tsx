@@ -7,12 +7,10 @@ import {
   EmptyState,
   Modal,
   PageHeader,
-  TopBar,
   useToast,
 } from "@chanho/react";
 import type { Project } from "../store/types";
 import { deleteProject, listIssues } from "../store/jiraStore";
-import { ThemeToggle } from "../components/ThemeToggle";
 
 export interface ProjectListPageProps {
   projects: Project[];
@@ -58,8 +56,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
   };
 
   return (
-    <div className="project-list-layout">
-      <TopBar brand={<span className="jira-brand">ALM</span>} actions={<ThemeToggle />} />
+    <>
       <main className="project-list-content">
         <PageHeader
           title="프로젝트"
@@ -167,6 +164,6 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
           </div>
         </Modal>
       ) : null}
-    </div>
+    </>
   );
 }

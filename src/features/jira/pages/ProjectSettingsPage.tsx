@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router";
 import { Button, Card, Modal, PageHeader, TextArea, TextField, useToast } from "@chanho/react";
-import type { JiraOutletContext } from "../components/JiraLayout";
+import type { JiraOutletContext } from "../components/ProjectLayout";
 import { deleteProject, listIssues, updateProject } from "../store/jiraStore";
 
 /** 프로젝트 이름/설명 수정과 삭제(위험 구역) — 키는 이슈 접두어라 불변 */
