@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { Avatar, Button, TopBar } from "@chanho/react";
 import type { Issue, Project, User } from "../store/types";
 import { getCurrentUser } from "../store/jiraStore";
+import { recordProjectVisit } from "../store/uiStore";
 import { CreateIssueModal } from "./CreateIssueModal";
 import { GlobalSideNav } from "./GlobalSideNav";
 import { SearchModal } from "./SearchModal";
@@ -35,6 +36,11 @@ export function AppShell({ projects }: AppShellProps) {
   // 현재 URL의 프로젝트 — 전역 만들기 모달의 기본 프로젝트
   const currentProjectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
   const currentProject = projects.find((p) => p.id === currentProjectId);
+
+  // 프로젝트 방문 기록 → 사이드바 "최근" 섹션
+  useEffect(() => {
+    if (currentProject) void recordProjectVisit(currentProject.id);
+  }, [currentProject?.id]);
 
   const openIssue = (issue: Issue) => {
     setSearchOpen(false);

@@ -113,6 +113,51 @@ describe("App 라우팅과 전역 셸", () => {
     });
   });
 
+  it("프로젝트를 방문하면 '최근' 섹션에 나타난다", async () => {
+    const user = userEvent.setup();
+    renderApp("/projects/p1/board");
+    await screen.findByRole("navigation", { name: "브레드크럼" });
+
+    // 홈으로 이동해도 최근 섹션에 방문한 프로젝트가 남는다
+    await user.click(within(globalNav()).getByRole("button", { name: "홈" }));
+    const recent = await within(globalNav()).findByTestId("nav-recent");
+    expect(within(recent).getByRole("button", { name: "ALM 플랫폼" })).toBeInTheDocument();
+  });
+
+  it("디렉터리에서 별표를 켜면 사이드바 '별표' 섹션에 나타나고, 끄면 사라진다", async () => {
+    const user = userEvent.setup();
+    renderApp("/projects");
+    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+
+    await user.click(screen.getByRole("button", { name: "ALM 플랫폼 별표" }));
+    const starred = await within(globalNav()).findByTestId("nav-starred");
+    expect(within(starred).getByRole("button", { name: "ALM 플랫폼" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "ALM 플랫폼 별표" }));
+    await waitFor(() => {
+      expect(within(globalNav()).queryByTestId("nav-starred")).not.toBeInTheDocument();
+    });
+  });
+
+  it("사이드바를 접으면 아이콘 레일이 되고, 상태가 유지되며, 다시 펼 수 있다", async () => {
+    const user = userEvent.setup();
+    renderApp("/projects/p1/board");
+    await screen.findByRole("navigation", { name: "브레드크럼" });
+
+    // 접기 → 하위 페이지(백로그 등)와 섹션이 사라진다
+    await user.click(within(globalNav()).getByRole("button", { name: "사이드바 접기" }));
+    await waitFor(() => {
+      expect(within(globalNav()).queryByRole("button", { name: "백로그" })).not.toBeInTheDocument();
+    });
+    expect(globalNav()).toHaveClass("is-collapsed");
+    // 아이콘(아바타)으로 프로젝트 이동은 여전히 가능
+    expect(within(globalNav()).getByRole("button", { name: "ALM 플랫폼" })).toBeInTheDocument();
+
+    // 펼치기 → 복원
+    await user.click(within(globalNav()).getByRole("button", { name: "사이드바 펼치기" }));
+    expect(await within(globalNav()).findByRole("button", { name: "백로그" })).toBeInTheDocument();
+  });
+
   it("프로젝트 내부에는 브레드크럼(프로젝트 / 이름 / 페이지)이 보인다", async () => {
     const user = userEvent.setup();
     renderApp("/projects/p1/backlog");

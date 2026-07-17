@@ -4,6 +4,7 @@ import { useNavigate, useOutletContext, useParams } from "react-router";
 import { Button, Card, Modal, PageHeader, TextArea, TextField, useToast } from "@chanho/react";
 import type { JiraOutletContext } from "../components/ProjectLayout";
 import { deleteProject, listIssues, updateProject } from "../store/jiraStore";
+import { pruneProject } from "../store/uiStore";
 
 /** 프로젝트 이름/설명 수정과 삭제(위험 구역) — 키는 이슈 접두어라 불변 */
 export function ProjectSettingsPage() {
@@ -54,6 +55,7 @@ export function ProjectSettingsPage() {
   const handleDelete = async () => {
     try {
       await deleteProject(project.id);
+      await pruneProject(project.id); // 최근/별표에서도 제거
       toast({ title: `프로젝트 ${project.key}를 삭제했습니다`, appearance: "success" });
       await onProjectsChanged();
       navigate("/projects");

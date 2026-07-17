@@ -89,8 +89,66 @@ body {
 .global-nav-avatar {
   width: 20px;
   height: 20px;
+  flex-shrink: 0;
   font-size: var(--chanho-font-size-75);
   border-radius: var(--chanho-radius-small);
+}
+
+/* 홈/프로젝트 항목의 첫 글자 글리프 — 접힘(아이콘 레일)에서도 남는다 */
+.global-nav-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.global-nav-item.is-active .global-nav-glyph {
+  background: var(--chanho-color-background-brand);
+  color: var(--chanho-color-text-inverse);
+}
+
+/* 접힘 — 아이콘 레일: 라벨/섹션/하위 페이지를 숨기고 아이콘만 남긴다 */
+.global-nav.is-collapsed {
+  width: 56px;
+  padding: var(--chanho-space-200) var(--chanho-space-100);
+  align-items: center;
+}
+
+.global-nav.is-collapsed .global-nav-label,
+.global-nav.is-collapsed .global-nav-section {
+  display: none;
+}
+
+.global-nav.is-collapsed .global-nav-item {
+  justify-content: center;
+  padding: var(--chanho-space-100) 0;
+  width: 40px;
+}
+
+.global-nav-collapse {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin-top: auto;
+  padding: var(--chanho-space-100);
+  border: 0;
+  border-radius: var(--chanho-radius-medium);
+  background: none;
+  font: inherit;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  cursor: pointer;
+}
+
+.global-nav-collapse:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+  color: var(--chanho-color-text-default);
 }
 
 .global-nav-project-name {
@@ -215,6 +273,11 @@ body {
   display: flex;
   align-items: center;
   gap: var(--chanho-space-150);
+}
+
+/* 별표 토글 — 켜지면 경고 톤(노란 별) */
+.project-star.is-starred {
+  color: var(--chanho-color-text-warning);
 }
 
 /* 키 이니셜 아바타 — 스틸 블루 단일 액센트 */

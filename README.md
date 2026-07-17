@@ -4,7 +4,7 @@ Chanho Design System(@chanho/react·tokens)의 첫 실전 소비 프로젝트. m
 
 ## MVP 범위 (완료)
 
-- **전역 셸(AppShell, 새 지라 나비)** — 상단바(브랜드→홈 · 전역 **검색** · 전역 **"만들기"** 이슈 생성 모달 · 테마/사용자) + **상주 전역 사이드바**(홈/프로젝트 + 프로젝트 목록, 현재 프로젝트는 대시보드/보드/백로그/이슈/설정이 중첩 확장)
+- **전역 셸(AppShell, 새 지라 나비)** — 상단바(브랜드→홈 · 전역 **검색** · 전역 **"만들기"** 이슈 생성 모달 · 테마/사용자) + **상주 전역 사이드바**(홈/프로젝트 + **최근**(방문 5개)·**별표**(디렉터리 카드 ☆ 토글)·프로젝트 섹션, 현재 프로젝트는 대시보드/보드/백로그/이슈/설정 중첩 확장, **접기** 시 아이콘 레일 — 상태는 `alm.jira.ui.v1`에 저장)
 - **홈(For you)** — `/home`이 앱 홈: 내 담당 이슈(전 프로젝트) + 최근 업데이트, 클릭 시 상세로
 - **프로젝트 셸** — `/projects` 카드 디렉터리가 앱 홈(빈 상태 포함), `/projects/new` 생성 페이지(영문 이름 → 키 이니셜 자동 제안), `/projects/:id/settings` 설정 페이지(이름/설명 수정 + 삭제 위험 구역). 사이드바 상단은 프로젝트 아이덴티티(아바타·이름·키), 콘텐츠 상단 브레드크럼. 이슈 키 접두어(`ALM-1`, 삭제돼도 번호 재사용 안 함·키 불변)
 - **칸반 보드** — 할 일/진행 중/완료 3컬럼, @dnd-kit 드래그 이동 (활성 스프린트 이슈만 표시), 카드에 라벨 Tag
@@ -24,7 +24,7 @@ Vite 7 · React 19 · TypeScript(strict) · react-router 7 · @chanho/react 0.2.
 ```bash
 pnpm install     # ../design-system/artifacts 의 tarball 필요
 pnpm dev         # http://localhost:5173
-pnpm test        # vitest run (116 tests)
+pnpm test        # vitest run (124 tests)
 pnpm typecheck   # tsc --noEmit
 pnpm build       # vite build
 ```
@@ -37,7 +37,7 @@ src/
 ├── features/jira/
 │   ├── pages/          # HomePage(For you)·ProjectListPage·ProjectCreatePage·ProjectSettingsPage·DashboardPage·BoardPage·BacklogPage·IssueListPage
 │   ├── components/     # AppShell(전역 셸)·GlobalSideNav(상주 사이드바)·ProjectLayout·CreateIssueModal·SearchModal·IssueCard·IssueDetailModal ...
-│   └── store/          # jiraStore.ts (백엔드 교체 지점) + 테스트
+│   └── store/          # jiraStore.ts (백엔드 교체 지점) · uiStore.ts (최근/별표/접힘) + 테스트
 └── mock/               # 시드, 목업 유저
 ```
 

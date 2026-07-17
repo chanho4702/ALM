@@ -11,6 +11,7 @@ import {
 } from "@chanho/react";
 import type { Project } from "../store/types";
 import { deleteProject, listIssues } from "../store/jiraStore";
+import { listStarredProjectIds, pruneProject, toggleProjectStar } from "../store/uiStore";
 
 export interface ProjectListPageProps {
   projects: Project[];
@@ -23,7 +24,17 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
   const navigate = useNavigate();
   const toast = useToast();
   const [issueCounts, setIssueCounts] = useState<Record<string, number>>({});
+  const [starredIds, setStarredIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState<Project | null>(null);
+
+  useEffect(() => {
+    void listStarredProjectIds().then(setStarredIds);
+  }, []);
+
+  const handleStarToggle = async (project: Project) => {
+    await toggleProjectStar(project.id); // uiStore 이벤트로 사이드바 별표 섹션도 갱신된다
+    setStarredIds(await listStarredProjectIds());
+  };
 
   // 프로젝트별 이슈 개수 — 카드 메타와 삭제 경고에 쓴다
   useEffect(() => {
@@ -43,6 +54,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
     if (!deleting) return;
     try {
       await deleteProject(deleting.id);
+      await pruneProject(deleting.id); // 최근/별표에서도 제거
       toast({ title: `프로젝트 ${deleting.key}를 삭제했습니다`, appearance: "success" });
       setDeleting(null);
       await onProjectsChanged();
@@ -87,6 +99,20 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
                     <h3>{project.name}</h3>
                     <span className="issue-key-cell">{project.key}</span>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    className={
+                      starredIds.includes(project.id)
+                        ? "project-star is-starred"
+                        : "project-star"
+                    }
+                    aria-label={`${project.name} 별표`}
+                    aria-pressed={starredIds.includes(project.id)}
+                    onClick={() => void handleStarToggle(project)}
+                  >
+                    {starredIds.includes(project.id) ? "★" : "☆"}
+                  </Button>
                   <Dropdown
                     trigger={
                       <Button variant="ghost" size="small" aria-label={`${project.name} 관리`}>

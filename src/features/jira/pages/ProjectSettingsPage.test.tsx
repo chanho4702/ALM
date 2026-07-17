@@ -42,9 +42,13 @@ describe("ProjectSettingsPage", () => {
     await user.type(nameField, "ALM 플랫폼 v2");
     await user.click(screen.getByRole("button", { name: "저장" }));
 
-    const nav = screen.getByRole("navigation", { name: "전역 내비게이션" });
+    const projectSection = within(
+      screen.getByRole("navigation", { name: "전역 내비게이션" }),
+    ).getByTestId("nav-projects");
     await waitFor(() => {
-      expect(within(nav).getByRole("button", { name: "ALM 플랫폼 v2" })).toBeInTheDocument();
+      expect(
+        within(projectSection).getByRole("button", { name: "ALM 플랫폼 v2" }),
+      ).toBeInTheDocument();
     });
   });
 
