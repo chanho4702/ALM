@@ -74,3 +74,37 @@ describe("ProjectCreatePage", () => {
     });
   });
 });
+
+describe("프로젝트 템플릿", () => {
+  it("템플릿 카드가 미리보기와 함께 렌더되고 기본 선택은 빈 프로젝트다", async () => {
+    renderCreate();
+    const grid = await screen.findByTestId("template-grid");
+
+    expect(within(grid).getByRole("radio", { name: /빈 프로젝트/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    // 정직한 미리보기: 칸반 카드에 WIP까지 표기
+    expect(within(grid).getByText(/진행 중 \(WIP 3\)/)).toBeInTheDocument();
+    expect(within(grid).getByText("Sprint 1")).toBeInTheDocument();
+  });
+
+  it("스크럼 템플릿으로 만들면 스프린트 보드로 이동하고 백로그에 샘플 이슈가 있다", async () => {
+    const user = userEvent.setup();
+    renderCreate();
+    const grid = await screen.findByTestId("template-grid");
+
+    await user.click(within(grid).getByRole("radio", { name: /스프린트 단위로 계획/ }));
+    await user.type(screen.getByLabelText("이름"), "스크럼 팀");
+    await user.type(screen.getByLabelText("키"), "SCR");
+    await user.click(screen.getByRole("button", { name: "프로젝트 만들기" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location").textContent).toMatch(/\/projects\/.+\/boards\/.+/);
+    });
+    // 템플릿 보드 이름이 툴바에 보인다
+    expect(
+      await screen.findByText("스프린트 보드", { selector: ".board-name" }),
+    ).toBeInTheDocument();
+  });
+});

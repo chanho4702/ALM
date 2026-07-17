@@ -103,7 +103,7 @@ describe("AppShell 알림 벨", () => {
     await screen.findByRole("heading", { name: "ALM 플랫폼" });
 
     // 시드 미읽음 2개
-    const bell = screen.getByRole("button", { name: "알림 2개 미읽음" });
+    const bell = await screen.findByRole("button", { name: "알림 2개 미읽음" });
     await user.click(bell);
 
     const dialog = await screen.findByRole("dialog", { name: "알림" });
@@ -128,7 +128,7 @@ describe("AppShell 알림 벨", () => {
     renderShell("/projects");
     await screen.findByRole("heading", { name: "ALM 플랫폼" });
 
-    await user.click(screen.getByRole("button", { name: "알림 2개 미읽음" }));
+    await user.click(await screen.findByRole("button", { name: "알림 2개 미읽음" }));
     const dialog = await screen.findByRole("dialog", { name: "알림" });
     await user.click(within(dialog).getByRole("button", { name: "모두 읽음" }));
     await user.click(within(dialog).getByRole("button", { name: "닫기" }));

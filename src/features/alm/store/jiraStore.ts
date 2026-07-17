@@ -18,6 +18,8 @@ import type {
 import { CURRENT_USER_ID } from "../../../mock/users";
 import { createSeedData } from "../../../mock/seed";
 import type { IssueQuery } from "./searchQuery";
+import { getTemplate } from "./projectTemplates";
+import type { ProjectTemplateId } from "./projectTemplates";
 
 const STORAGE_KEY = "alm.jira.v1";
 
@@ -122,6 +124,8 @@ export async function createProject(input: {
   key: string;
   name: string;
   description?: string;
+  /** 생성 템플릿 — 기본 blank(현행 기본 보드만) */
+  templateId?: ProjectTemplateId;
 }): Promise<Project> {
   const data = load();
   const key = input.key.trim().toUpperCase();
@@ -140,8 +144,36 @@ export async function createProject(input: {
   };
   data.projects.push(project);
   data.issueCounters[project.id] = 0;
-  data.boards.push(defaultBoard(project.id)); // 프로젝트는 항상 기본 보드를 갖는다
+
+  // 프로젝트는 항상 기본 보드를 갖는다 — 템플릿이 있으면 그 구성으로 교체
+  const template = getTemplate(input.templateId ?? "blank");
+  const board = defaultBoard(project.id);
+  if (template.board) {
+    board.name = template.board.name;
+    board.type = template.board.type;
+    board.columns = template.board.columns.map((c) => ({ ...c }));
+    board.filter = {
+      assigneeIds: [...template.board.filter.assigneeIds],
+      types: [...template.board.filter.types],
+      labels: [...template.board.filter.labels],
+    };
+  }
+  data.boards.push(board);
+  if (template.withSprint) {
+    data.sprints.push({ id: nextId(), projectId: project.id, name: "Sprint 1", state: "planned" });
+  }
   persist();
+
+  // 샘플 이슈는 createIssue 경유 — 키 시퀀스·활동로그가 정상 경로로 남는다
+  for (const sample of template.samples) {
+    await createIssue({
+      projectId: project.id,
+      title: sample.title,
+      type: sample.type,
+      status: sample.status,
+      labels: sample.labels,
+    });
+  }
   return clone(project);
 }
 

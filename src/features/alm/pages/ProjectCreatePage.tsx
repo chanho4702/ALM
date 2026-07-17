@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { Button, Card, PageHeader, TextArea, TextField, useToast } from "@chanho/react";
+import { Badge, Button, Card, PageHeader, TextArea, TextField, useToast } from "@chanho/react";
 import { createProject } from "../store/jiraStore";
+import { PROJECT_TEMPLATES } from "../store/projectTemplates";
+import type { ProjectTemplateId } from "../store/projectTemplates";
 
 export interface ProjectCreatePageProps {
   onProjectsChanged: () => void | Promise<void>;
@@ -28,6 +30,7 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
   /** 키를 직접 만졌으면 이름 기반 자동 제안을 멈춘다 */
   const [keyTouched, setKeyTouched] = useState(false);
   const [description, setDescription] = useState("");
+  const [templateId, setTemplateId] = useState<ProjectTemplateId>("blank");
 
   const handleNameChange = (next: string) => {
     setName(next);
@@ -37,7 +40,7 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      const project = await createProject({ key, name, description });
+      const project = await createProject({ key, name, description, templateId });
       toast({ title: `프로젝트 ${project.key}를 만들었습니다`, appearance: "success" });
       await onProjectsChanged();
       navigate(`/projects/${project.id}/board`);
@@ -53,6 +56,46 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
   return (
     <main className="project-list-content project-form-content">
         <PageHeader title="새 프로젝트" />
+
+        {/* 템플릿 선택 — 카드가 실제로 만들어질 컬럼 구성을 그대로 보여준다 (ALM 특색) */}
+        <div
+          className="template-grid"
+          role="radiogroup"
+          aria-label="프로젝트 템플릿"
+          data-testid="template-grid"
+        >
+          {PROJECT_TEMPLATES.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              role="radio"
+              aria-checked={templateId === template.id}
+              className={
+                templateId === template.id ? "template-card is-selected" : "template-card"
+              }
+              onClick={() => setTemplateId(template.id)}
+            >
+              <span className="template-card-head">
+                <span className="template-card-glyph" aria-hidden>
+                  {template.glyph}
+                </span>
+                <strong>{template.name}</strong>
+              </span>
+              <span className="template-card-desc">{template.description}</span>
+              <span className="template-card-preview">
+                {template.preview.join("  |  ")}
+              </span>
+              {template.includes.length > 0 ? (
+                <span className="template-card-includes">
+                  {template.includes.map((item) => (
+                    <Badge key={item}>{item}</Badge>
+                  ))}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+
         <Card padding="lg">
           <form className="project-create-form" onSubmit={handleSubmit}>
             <TextField

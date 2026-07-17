@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
+
+// findBy*/waitFor 기본 1초는 24개 jsdom 파일 병렬 실행의 워커 경합에서 플레이키하다
+configure({ asyncUtilTimeout: 5000 });
 
 afterEach(() => {
   cleanup();
