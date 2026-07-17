@@ -1,52 +1,150 @@
 # ALM Front — 지라 클론
 
-Chanho Design System(@chanho/react·tokens)의 첫 실전 소비 프로젝트. myFront와 분리된 독립 프론트 앱이며, 향후 MSA의 한 서비스로 게이트웨이 뒤에 배치된다. ALM(Application Lifecycle Management)은 이후 컨플루언스 클론(위키)까지 품는 우산 이름이다.
+Chanho Design System(`@chanho/react`·`@chanho/tokens`)을 100% 소비하는 독립 프론트 앱.
+지라(Jira) 스타일의 **이슈·스프린트·프로젝트 관리(ALM)** 화면을 제공하며,
+MSA 템플릿의 프론트 3종 중 하나로 게이트웨이(:8000) 뒤, Keycloak OIDC SSO 체제에 속한다.
 
-## MVP 범위 (완료)
+- 개발: `http://localhost:5175/alm/` (Vite dev, `--strictPort`)
+- 통합 배포: nginx 경로 기반 `http://localhost/alm/` (`base: "/alm/"`, 라우터 `basename="/alm"`)
+- 데이터: 현재 **localStorage 목업**(`alm.jira.v1`). 백엔드(jira-service) 도입 시 store 파일만 교체하는 구조.
 
-- **전역 셸(AppShell, 새 지라 나비)** — 상단바(브랜드→홈 · 전역 **검색** · 전역 **"만들기"** 이슈 생성 모달 · 테마/사용자) + **상주 전역 사이드바**(홈/프로젝트 + **최근**(방문 5개)·**별표**(디렉터리 카드 ☆ 토글)·프로젝트 섹션, 현재 프로젝트는 대시보드/타임라인/보드/백로그/이슈/설정 중첩 확장, **접기** 시 아이콘 레일, **드래그로 너비 조절**(180~400px, ←/→ 키보드·더블클릭 리셋) — 상태는 `alm.jira.ui.v1`에 저장)
-- **홈(For you)** — `/home`이 앱 홈: 내 담당 이슈(전 프로젝트) + 최근 업데이트, 클릭 시 상세로
-- **이슈 타입** — 작업/스토리/버그/에픽. 카드·백로그 행·목록에 색 글리프(지라 색 언어), 상세/전역 만들기에서 변경, 목록 타입 필터, 활동로그 기록
-- **알림** — 상단 벨(미읽음 Badge). 담당자에게 할당/상태 변경/코멘트 알림(본인 액션 제외 — 목업은 단일 사용자라 시드 알림이 데모), 클릭 시 해당 이슈 상세로, 개별/전체 읽음
-- **보드 인라인 생성** — 각 컬럼 하단 "+ 이슈 만들기"로 해당 상태·활성 스프린트에 바로 생성
-- **타임라인(간트)** — 이슈별 막대(생성일→마감일, 상태 색), 월/주 눈금, 오늘 마커, 막대 클릭 시 상세
-- **프로젝트 셸** — `/projects` 카드 디렉터리, `/projects/new` 생성 페이지(영문 이름 → 키 이니셜 자동 제안), `/projects/:id/settings` 설정(이름/설명 수정 + 삭제 위험 구역). 프로젝트 내부는 지라식 상단: 브레드크럼(프로젝트/이름) → **프로젝트 헤더**(키 해시 색 그라데이션 아바타 + 이름 + ★별표) → **가로 뷰 탭**(요약·타임라인·보드·백로그·이슈·설정, 밑줄 액티브). 이슈 키 접두어(`ALM-1`, 번호 재사용 안 함·키 불변)
-- **칸반 보드** — 할 일/진행 중/완료 3컬럼, @dnd-kit 드래그 이동 (활성 스프린트 이슈만 표시), 카드에 라벨 Tag
-- **백로그/스프린트** — 생성·시작·완료(미완료 이슈 백로그 복귀), 인라인 이슈 생성, Dropdown으로 스프린트 이동/삭제
-- **이슈 목록** — 테이블 + 필터(검색 제목·설명·키 / 상태 / 우선순위 / 담당자 / 라벨) + 정렬(제목·상태·우선순위·담당자·마감일·생성일·수정일)
-- **이슈 상세** — `?issue=ALM-1` URL 공유 모달: 제목 인라인 편집, 설명, 속성 패널(Select 4종 + 마감일 + 라벨), 생성/수정일, 이슈 삭제(확인), 코멘트 작성·수정·삭제(본인만)/활동로그 Tabs
-- **대시보드** — 상태별 이슈 카운트 타일 + 담당자별 분포(미지정 포함)
+---
 
-데이터는 localStorage 목업(`alm.jira.v1`), 유저는 목업 4명 고정. 화면은 `src/features/jira/store/jiraStore.ts`의 async 함수만 호출하므로 백엔드(jira-service)가 생기면 이 파일 내부만 fetch로 교체한다.
+## 기술 스택 (실측)
 
-## 스택
+| 항목 | 버전/내용 |
+|---|---|
+| 빌드 | Vite 7, `@vitejs/plugin-react` |
+| 런타임 | React 19, react-dom 19 |
+| 언어 | TypeScript 5.7 (`strict`, `noUnusedLocals/Parameters`) |
+| 라우팅 | react-router 7 (`BrowserRouter basename="/alm"`) |
+| 드래그앤드롭 | `@dnd-kit/core`·`sortable`·`utilities` (칸반 보드) |
+| 디자인 시스템 | `@chanho/react` 0.3.0 + `@chanho/tokens` 0.2.0 (`file:../design-system/artifacts/*.tgz`) |
+| 테스트 | Vitest 3 + Testing Library(react·user-event·jest-dom), jsdom |
+| 패키지 매니저 | **pnpm** (`pnpm-lock.yaml`, `pnpm-workspace.yaml`) |
 
-Vite 7 · React 19 · TypeScript(strict) · react-router 7 · @chanho/react 0.2.0 + @chanho/tokens 0.1.0(tarball, `file:../design-system/artifacts/*.tgz`) · @dnd-kit · Vitest + Testing Library. **UI는 100% 디자인 시스템 — 타 UI 라이브러리 금지.**
+UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이브러리 미사용).
+`@chanho/tokens`는 워크스페이스 override로 tarball을 고정한다(`pnpm-workspace.yaml`).
 
-## 개발
+---
+
+## 실행 방법 (실측)
 
 ```bash
-pnpm install     # ../design-system/artifacts 의 tarball 필요
-pnpm dev         # http://localhost:5173
-pnpm test        # vitest run (138 tests)
-pnpm typecheck   # tsc --noEmit
-pnpm build       # vite build
+pnpm install                       # ../design-system/artifacts 의 tarball 필요
+pnpm dev --port 5175 --strictPort  # http://localhost:5175/alm/
+pnpm test                          # vitest run (138 test cases)
+pnpm typecheck                     # tsc --noEmit
+pnpm build                         # vite build (→ dist/)
 ```
 
-## 구조
+`package.json` 스크립트는 `dev`(=`vite`)·`test`·`typecheck`·`build` 4개다. 포트·strictPort는
+스크립트가 아니라 CLI 인자로 주입한다(레포 루트 `scripts/dev-up.ps1`이 `pnpm dev --port 5175 --strictPort`로 기동).
+
+---
+
+## 환경변수
+
+| 변수 | 기본값 | 용도 |
+|---|---|---|
+| `VITE_API_BASE` | `""` (동일 오리진) | 인증 클라이언트가 백엔드를 부를 베이스 오리진. 통합 배포는 nginx same-origin이라 비워 둔다. |
+
+`.env` 파일은 커밋돼 있지 않다 — 기본값(빈 문자열)으로 nginx 리버스 프록시 경로(`/api`, `/oauth2`)를 탄다.
+
+---
+
+## 인증/SSO 흐름 (실측)
+
+인증은 `src/auth/`의 재사용 모듈이 담당하며, **최상위 `AuthGate`가 앱 전체를 감싼다**(`main.tsx`).
+
+- **게이트는 프로덕션 빌드에서만 활성**이다(`enabled = import.meta.env.PROD`). dev/vitest에서는 게이트가 꺼져
+  로그인 없이 목업 단일 사용자로 바로 렌더된다 — 인증 검증은 nginx 통합 배포 경로에서만 일어난다.
+- **Access Token(AT)은 인스턴스 메모리에만** 둔다. Refresh Token(RT)은 백엔드가 심는 HttpOnly 쿠키라 프론트가 직접 다루지 않는다.
+
+부트스트랩 시퀀스(`AuthGate`):
+
+1. 마운트 → `POST /api/auth/refresh`(RT 쿠키)로 silent refresh 시도.
+2. 성공 → `GET /api/me`로 사용자(`AppUser`)를 받아 children 렌더.
+3. 실패 → 되돌아올 경로를 `post_login_redirect` 쿠키(5분, SameSite=Lax)에 심고
+   `GET {base}/oauth2/authorization/keycloak`로 리다이렉트. KC SSO 세션이 살아 있으면 무프롬프트로 왕복한다.
+   (auth-server `LoginSuccessHandler`가 returnTo 쿠키를 읽어 원래 경로로 복귀)
+
+그 밖의 계약:
+
+- **구글 바로 로그인**: `/oauth2/authorization/keycloak?kc_idp_hint=google`
+- **`apiFetch`**: 요청에 `Authorization: Bearer` 자동 첨부, 401이면 refresh 1회 후 재시도.
+- **로그아웃**: `POST /api/auth/logout`(백채널로 KC 세션 종료 + RT 쿠키 삭제) 후 메모리 AT를 비우고 `/`로 이동.
+- 클라이언트는 `createAuthClient({ baseUrl })` 팩토리라 다른 백엔드는 `VITE_API_BASE`만 바꿔 끼운다.
+
+---
+
+## 주요 기능/화면 (실측)
+
+- **전역 셸(`AppShell`)** — 상단바(브랜드·전역 검색·"만들기" 이슈 생성 모달·알림 벨·테마 토글) + 상주 전역 사이드바(`GlobalSideNav`: 홈/프로젝트·최근·별표). UI 상태는 `alm.jira.ui.v1`에 저장.
+- **홈 `HomePage`(For you)** — 내 담당 이슈 + 최근 업데이트 모음.
+- **프로젝트 셸(`ProjectLayout`)** — 브레드크럼 + 프로젝트 헤더(해시 색 아바타 `ProjectAvatar` + ★별표) + 가로 뷰 탭(요약·타임라인·보드·백로그·이슈·설정). 이슈 키 접두어(`ALM-1`).
+- **대시보드 `DashboardPage`** — 상태별 이슈 카운트 + 담당자별 분포.
+- **타임라인 `TimelinePage`** — 간트형 막대(생성일→마감일, 상태 색), 오늘 마커.
+- **칸반 보드 `BoardPage`** — 할 일/진행 중/완료 3컬럼, `@dnd-kit` 드래그 이동(활성 스프린트 이슈), 컬럼 하단 인라인 이슈 생성(`BoardColumn`).
+- **백로그/스프린트 `BacklogPage`** — 스프린트 생성·시작·완료, 인라인 이슈 생성(`SprintPanel`).
+- **이슈 목록 `IssueListPage`** — 테이블 + 필터(검색/상태/우선순위/담당자/라벨) + 정렬.
+- **이슈 상세 `IssueDetailModal`** — `?issue=ALM-1` 쿼리로 열리는 공유 가능 모달(`useIssueModal`). 인라인 편집·속성 패널·코멘트·활동로그.
+- **이슈 타입** — 작업/스토리/버그/에픽 색 글리프(`IssueTypeGlyph`).
+- **알림 `NotificationsModal`** — 상단 벨 미읽음 Badge, 개별/전체 읽음.
+- **검색 `SearchModal`** · **만들기 `CreateIssueModal`** — 전역 상단바에서 호출.
+- **프로젝트 디렉터리** — `ProjectListPage`(카드) · `ProjectCreatePage`(영문 이름→키 자동 제안) · `ProjectSettingsPage`(수정·삭제).
+
+목업 사용자는 4명 고정(`김찬호`/`이서연`/`박준영`/`최다인`), 현재 사용자는 `u1`(김찬호).
+
+---
+
+## 라우트 목록 (실측)
+
+모든 라우트는 `AppShell` 레이아웃 아래에 놓인다(`src/app/App.tsx`, `basename="/alm"`).
+
+| 경로 | 화면 |
+|---|---|
+| `/home` | `HomePage` (For you) |
+| `/projects` | `ProjectListPage` |
+| `/projects/new` | `ProjectCreatePage` |
+| `/projects/:projectId/dashboard` | `DashboardPage` |
+| `/projects/:projectId/timeline` | `TimelinePage` |
+| `/projects/:projectId/board` | `BoardPage` |
+| `/projects/:projectId/backlog` | `BacklogPage` |
+| `/projects/:projectId/issues` | `IssueListPage` |
+| `/projects/:projectId/settings` | `ProjectSettingsPage` |
+| `*` (`/` 포함) | `/home`으로 리다이렉트 |
+
+`?issue=<키>` 쿼리는 위 어느 경로에서든 이슈 상세 모달을 연다(라우트 아님).
+
+---
+
+## 디렉터리 구조
 
 ```
-src/
-├── app/                # 라우터(/home, /projects[/new], /projects/:projectId/dashboard|board|backlog|issues|settings), 전역 스타일
-├── features/jira/
-│   ├── pages/          # HomePage(For you)·ProjectListPage·ProjectCreatePage·ProjectSettingsPage·DashboardPage·BoardPage·BacklogPage·IssueListPage
-│   ├── components/     # AppShell(전역 셸)·GlobalSideNav(상주 사이드바)·ProjectLayout·CreateIssueModal·SearchModal·IssueCard·IssueDetailModal ...
-│   └── store/          # jiraStore.ts (백엔드 교체 지점) · uiStore.ts (최근/별표/접힘) + 테스트
-└── mock/               # 시드, 목업 유저
+alm-front/
+├─ index.html               #root + /src/app/main.tsx, <title>ALM</title>
+├─ vite.config.ts           # base: "/alm/"
+├─ pnpm-workspace.yaml       # @chanho/tokens tarball override
+├─ src/
+│  ├─ app/                  # main.tsx(AuthGate→BrowserRouter→App)·App.tsx(라우팅)·app.css
+│  ├─ auth/                 # 인증 모듈(다른 백엔드로 복사 가능)
+│  │  ├─ client.ts          #   createAuthClient 팩토리(refresh/me/logout/apiFetch)
+│  │  ├─ AuthGate.tsx       #   프로덕션 전용 로그인 게이트 + useAuth
+│  │  ├─ returnTo.ts        #   post_login_redirect 쿠키
+│  │  └─ types.ts           #   AppUser / AuthClient 계약
+│  ├─ features/jira/
+│  │  ├─ pages/             # Home·ProjectList·ProjectCreate·ProjectSettings·Dashboard·Timeline·Board·Backlog·IssueList
+│  │  ├─ components/        # AppShell·GlobalSideNav·ProjectLayout·CreateIssueModal·SearchModal·NotificationsModal·IssueCard·IssueDetailModal·SprintPanel·ThemeToggle ...
+│  │  └─ store/             # jiraStore.ts(백엔드 교체 지점, `alm.jira.v1`) · uiStore.ts(`alm.jira.ui.v1`) · types.ts
+│  └─ mock/                 # seed.ts(시드 데이터) · users.ts(목업 4명)
+└─ docs/                    # 설계 spec·웨이브별 plan·BACKLOG(백엔드 의존 기능)
 ```
+
+---
 
 ## 문서
 
-- 설계: `docs/superpowers/specs/2026-07-06-jira-clone-design.md`
+- 설계: `docs/superpowers/specs/` (지라 클론 디자인·셸 리디자인·gap 설계)
 - 구현 계획(웨이브별): `docs/superpowers/plans/`
-- **백엔드 의존 기능 백로그**: `docs/BACKLOG.md` — 첨부파일·실시간 협업·알림 푸시·권한 등 jira-service 도입 시 진행
+- 백엔드 의존 기능 백로그: `docs/BACKLOG.md` (첨부·실시간 협업·알림 푸시·권한 — jira-service 도입 시)
