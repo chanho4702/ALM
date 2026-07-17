@@ -21,6 +21,8 @@ export interface BoardColumnProps {
   columnName?: string;
   /** WIP 제한 — 초과 시 danger 강조 (이동 자체는 허용) */
   wipLimit?: number | null;
+  /** 스윔레인에서 밴드별 유니크 droppable id (기본: status) — "밴드키:status" 형식 */
+  droppableId?: string;
 }
 
 export function BoardColumn({
@@ -31,13 +33,14 @@ export function BoardColumn({
   onCreateIssue,
   columnName,
   wipLimit = null,
+  droppableId,
 }: BoardColumnProps) {
   const label = columnName ?? STATUS_LABELS[status];
   const overWip = wipLimit !== null && issues.length > wipLimit;
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
-  // 컬럼 droppable id = status 문자열 → resolveMove가 컬럼 드롭을 인식한다
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+  // 컬럼 droppable id = status 문자열(스윔레인은 "밴드키:status") → resolveMove가 컬럼 드롭을 인식한다
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId ?? status });
 
   const handleCreateSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

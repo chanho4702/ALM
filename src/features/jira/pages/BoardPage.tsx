@@ -10,8 +10,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Button, Dropdown, EmptyState, Lozenge, Spinner, useToast } from "@chanho/react";
-import type { Board, Issue, IssueStatus, Sprint, User } from "../store/types";
+import { Avatar, Button, Dropdown, EmptyState, Lozenge, Select, Spinner, useToast } from "@chanho/react";
+import type { Board, BoardSwimlane, Issue, IssueStatus, Sprint, User } from "../store/types";
 import { createIssue, getBoard, listBoardIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
 import { BoardSettingsModal } from "../components/BoardSettingsModal";
@@ -41,6 +41,8 @@ export function BoardPage() {
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [quick, setQuick] = useState<QuickFilter>(EMPTY_QUICK_FILTER);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** 화면 그룹핑 — 초기값은 보드 설정(swimlane), Select로 임시 전환 */
+  const [groupBy, setGroupBy] = useState<BoardSwimlane>("none");
   const toast = useToast();
 
   // 클릭과 드래그 구분: 5px 이상 움직여야 드래그 시작
@@ -59,7 +61,11 @@ export function BoardPage() {
     ]);
     setIssues(boardIssues);
     setSprint(sprints.find((s) => s.state === "active") ?? null);
-    setBoard(found);
+    setBoard((prev) => {
+      // 보드가 바뀌었을 때만 그룹핑을 보드 기본값으로 리셋 (화면 전환 유지)
+      if (prev?.id !== found.id) setGroupBy(found.swimlane);
+      return found;
+    });
   }, [projectId, boardId]);
 
   useEffect(() => {
@@ -85,6 +91,21 @@ export function BoardPage() {
     () => [...new Set(issues.flatMap((i) => i.labels))].sort(),
     [issues],
   );
+
+  /** 담당자 스윔레인 밴드 — 이슈가 있는 담당자 순, 미지정 마지막 */
+  const bands = useMemo(() => {
+    if (groupBy !== "assignee") return null;
+    const result: { key: string; name: string; issues: Issue[] }[] = [];
+    for (const user of users) {
+      const userIssues = visibleIssues.filter((i) => i.assigneeId === user.id);
+      if (userIssues.length > 0) result.push({ key: user.id, name: user.name, issues: userIssues });
+    }
+    const unassigned = visibleIssues.filter((i) => i.assigneeId === null);
+    if (unassigned.length > 0) {
+      result.push({ key: "unassigned", name: "미지정", issues: unassigned });
+    }
+    return result;
+  }, [groupBy, users, visibleIssues]);
 
   /** status → order순 이슈 id 배열 (resolveMove 입력) */
   const columnIds = useMemo(() => {
@@ -123,7 +144,10 @@ export function BoardPage() {
     setActiveIssue(null);
     const { active, over } = event;
     if (!over) return;
-    const target = resolveMove(String(active.id), String(over.id), columnIds);
+    // 스윔레인 컬럼 id("밴드키:status")는 status로 정규화 — 밴드는 시각적 그룹일 뿐이다
+    const rawOver = String(over.id);
+    const overId = rawOver.includes(":") ? rawOver.split(":").pop()! : rawOver;
+    const target = resolveMove(String(active.id), overId, columnIds);
     if (!target) return;
     try {
       await moveIssue(String(active.id), target);
@@ -168,23 +192,58 @@ export function BoardPage() {
           onDragEnd={handleDragEnd}
           onDragCancel={() => setActiveIssue(null)}
         >
-          <div className="board-columns">
-            {BOARD_STATUSES.map((status) => {
-              const column = board.columns.find((c) => c.status === status);
-              return (
-                <BoardColumn
-                  key={status}
-                  status={status}
-                  issues={visibleIssues.filter((i) => i.status === status)}
-                  userNames={userNames}
-                  onOpenIssue={openIssue}
-                  onCreateIssue={handleColumnCreate}
-                  columnName={column?.name}
-                  wipLimit={column?.wipLimit ?? null}
-                />
-              );
-            })}
-          </div>
+          {bands ? (
+            bands.map((band) => (
+              <section
+                key={band.key}
+                className="board-swimlane"
+                aria-label={`${band.name} 스윔레인`}
+                data-testid={`swimlane-${band.key}`}
+              >
+                <header className="board-swimlane-header">
+                  {band.key !== "unassigned" ? <Avatar name={band.name} size="small" /> : null}
+                  <strong>{band.name}</strong>
+                  <span className="board-swimlane-count">{band.issues.length}개</span>
+                </header>
+                <div className="board-columns">
+                  {BOARD_STATUSES.map((status) => {
+                    const column = board.columns.find((c) => c.status === status);
+                    return (
+                      <BoardColumn
+                        key={status}
+                        status={status}
+                        droppableId={`${band.key}:${status}`}
+                        issues={band.issues.filter((i) => i.status === status)}
+                        userNames={userNames}
+                        onOpenIssue={openIssue}
+                        columnName={column?.name}
+                        // 밴드별 개수는 전체 WIP 기준과 달라 오해 소지 — 스윔레인에선 표시 생략
+                        wipLimit={null}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            ))
+          ) : (
+            <div className="board-columns">
+              {BOARD_STATUSES.map((status) => {
+                const column = board.columns.find((c) => c.status === status);
+                return (
+                  <BoardColumn
+                    key={status}
+                    status={status}
+                    issues={visibleIssues.filter((i) => i.status === status)}
+                    userNames={userNames}
+                    onOpenIssue={openIssue}
+                    onCreateIssue={handleColumnCreate}
+                    columnName={column?.name}
+                    wipLimit={column?.wipLimit ?? null}
+                  />
+                );
+              })}
+            </div>
+          )}
           <DragOverlay>
             {activeIssue ? (
               <IssueCard
@@ -213,6 +272,16 @@ export function BoardPage() {
               {sprint.name}
             </Lozenge>
           ) : null}
+          <span className="board-toolbar-spacer" />
+          <Select
+            label="그룹"
+            value={groupBy}
+            options={[
+              { value: "none", label: "없음" },
+              { value: "assignee", label: "담당자별" },
+            ]}
+            onValueChange={(v) => setGroupBy(v as BoardSwimlane)}
+          />
           <Dropdown
             trigger={
               <Button variant="ghost" size="small" aria-label="보드 메뉴">

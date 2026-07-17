@@ -192,3 +192,35 @@ describe("보드 컬럼 WIP·설정 모달", () => {
     });
   });
 });
+
+describe("담당자 스윔레인", () => {
+  it("그룹=담당자 전환 시 담당자 밴드가 렌더되고 미지정이 마지막이다", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole("region", { name: "할 일" });
+
+    await user.click(screen.getByRole("combobox", { name: "그룹" }));
+    await user.click(await screen.findByRole("option", { name: "담당자별" }));
+
+    // 시드 s1: 김찬호(ALM-1,3) 이서연(ALM-2) 박준영(ALM-4) 미지정(ALM-5)
+    const bands = await screen.findAllByRole("region", { name: /스윔레인/ });
+    expect(bands.length).toBe(4);
+    expect(bands[bands.length - 1]).toHaveAttribute("data-testid", "swimlane-unassigned");
+
+    // 김찬호 밴드에는 김찬호 담당 이슈만
+    const mine = screen.getByTestId("swimlane-u1");
+    expect(within(mine).getByText("ALM-1")).toBeInTheDocument();
+    expect(within(mine).getByText("ALM-3")).toBeInTheDocument();
+    expect(within(mine).queryByText("ALM-2")).not.toBeInTheDocument();
+
+    // 미지정 밴드
+    expect(within(screen.getByTestId("swimlane-unassigned")).getByText("ALM-5")).toBeInTheDocument();
+
+    // 그룹 해제 → 단일 3컬럼 복귀
+    await user.click(screen.getByRole("combobox", { name: "그룹" }));
+    await user.click(await screen.findByRole("option", { name: "없음" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("swimlane-u1")).not.toBeInTheDocument();
+    });
+  });
+});

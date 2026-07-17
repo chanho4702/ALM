@@ -692,6 +692,31 @@ body {
   gap: var(--chanho-space-100);
 }
 
+.board-toolbar-spacer {
+  flex: 1;
+}
+
+/* 담당자 스윔레인 — 가로 밴드 */
+.board-swimlane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin-bottom: var(--chanho-space-300);
+}
+
+.board-swimlane-header {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  font-size: var(--chanho-font-size-100);
+}
+
+.board-swimlane-count {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
 .board-name {
   font-size: var(--chanho-font-size-200);
   font-weight: var(--chanho-font-weight-semibold);
