@@ -137,3 +137,18 @@ describe("AppShell 알림 벨", () => {
     expect(await screen.findByRole("button", { name: "알림" })).toBeInTheDocument();
   });
 });
+
+describe("전역 만들기 타입 선택지", () => {
+  it("하위 작업 타입은 전역 만들기에서 제외된다 (상세의 '하위 작업 추가' 전용)", async () => {
+    const user = userEvent.setup();
+    renderShell("/projects");
+    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+
+    await user.click(screen.getByRole("button", { name: "만들기" }));
+    const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
+    await user.click(within(dialog).getByRole("combobox", { name: "타입" }));
+
+    expect(await screen.findByRole("option", { name: "에픽" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "하위 작업" })).not.toBeInTheDocument();
+  });
+});

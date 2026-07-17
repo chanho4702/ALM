@@ -12,7 +12,15 @@ import {
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Avatar, Button, Dropdown, EmptyState, Lozenge, Select, Spinner, useToast } from "@chanho/react";
 import type { Board, BoardSwimlane, Issue, IssueStatus, Sprint, User } from "../store/types";
-import { createIssue, getBoard, listBoardIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
+import {
+  createIssue,
+  getBoard,
+  listBoardIssues,
+  listIssues,
+  listSprints,
+  listUsers,
+  moveIssue,
+} from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
 import { BoardSettingsModal } from "../components/BoardSettingsModal";
 import {
@@ -38,6 +46,8 @@ export function BoardPage() {
   const [sprint, setSprint] = useState<Sprint | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  /** epicId → 이름 (카드 에픽 태그) */
+  const [epicsById, setEpicsById] = useState<Record<string, string>>({});
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [quick, setQuick] = useState<QuickFilter>(EMPTY_QUICK_FILTER);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -55,11 +65,13 @@ export function BoardPage() {
       setBoard(null);
       return;
     }
-    const [boardIssues, sprints] = await Promise.all([
+    const [boardIssues, sprints, epics] = await Promise.all([
       listBoardIssues(found.id),
       found.type === "scrum" ? listSprints(projectId) : Promise.resolve([]),
+      listIssues(projectId, { type: "epic" }),
     ]);
     setIssues(boardIssues);
+    setEpicsById(Object.fromEntries(epics.map((e) => [e.id, e.title])));
     setSprint(sprints.find((s) => s.state === "active") ?? null);
     setBoard((prev) => {
       // 보드가 바뀌었을 때만 그룹핑을 보드 기본값으로 리셋 (화면 전환 유지)
@@ -85,6 +97,15 @@ export function BoardPage() {
 
   /** 퀵 필터 적용 결과 — 컬럼 렌더와 DnD 모두 이 목록 기준 */
   const visibleIssues = useMemo(() => applyQuickFilter(issues, quick), [issues, quick]);
+
+  /** issueId → 부모 에픽 이름 (카드 에픽 태그) */
+  const epicNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const issue of issues) {
+      if (issue.parentId && epicsById[issue.parentId]) map[issue.id] = epicsById[issue.parentId];
+    }
+    return map;
+  }, [issues, epicsById]);
 
   /** 보드 이슈들의 라벨 합집합 (퀵 필터 라벨 선택지) */
   const labelOptions = useMemo(
@@ -216,6 +237,7 @@ export function BoardPage() {
                         issues={band.issues.filter((i) => i.status === status)}
                         userNames={userNames}
                         onOpenIssue={openIssue}
+                        epicNames={epicNames}
                         columnName={column?.name}
                         // 밴드별 개수는 전체 WIP 기준과 달라 오해 소지 — 스윔레인에선 표시 생략
                         wipLimit={null}
@@ -236,6 +258,7 @@ export function BoardPage() {
                     issues={visibleIssues.filter((i) => i.status === status)}
                     userNames={userNames}
                     onOpenIssue={openIssue}
+                    epicNames={epicNames}
                     onCreateIssue={handleColumnCreate}
                     columnName={column?.name}
                     wipLimit={column?.wipLimit ?? null}

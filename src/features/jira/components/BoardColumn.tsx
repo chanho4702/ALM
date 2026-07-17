@@ -23,6 +23,8 @@ export interface BoardColumnProps {
   wipLimit?: number | null;
   /** 스윔레인에서 밴드별 유니크 droppable id (기본: status) — "밴드키:status" 형식 */
   droppableId?: string;
+  /** issueId → 부모 에픽 이름 (카드 에픽 태그) */
+  epicNames?: Record<string, string>;
 }
 
 export function BoardColumn({
@@ -34,6 +36,7 @@ export function BoardColumn({
   columnName,
   wipLimit = null,
   droppableId,
+  epicNames = {},
 }: BoardColumnProps) {
   const label = columnName ?? STATUS_LABELS[status];
   const overWip = wipLimit !== null && issues.length > wipLimit;
@@ -76,6 +79,7 @@ export function BoardColumn({
               key={issue.id}
               issue={issue}
               assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
+              epicName={epicNames[issue.id]}
               onOpen={onOpenIssue ? () => onOpenIssue(issue.key) : undefined}
             />
           ))}

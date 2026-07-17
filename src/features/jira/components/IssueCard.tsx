@@ -9,16 +9,23 @@ export interface IssueCardProps {
   issue: Issue;
   /** 담당자 이름. 미지정이면 undefined → Avatar 생략 */
   assigneeName?: string;
+  /** 부모 에픽 이름 — 있으면 지라의 에픽 태그(warning Lozenge) 표시 */
+  epicName?: string;
   /** 카드 클릭 시 (이슈 상세 열기). PointerSensor distance 5로 드래그와 구분된다 */
   onOpen?: () => void;
 }
 
-export function IssueCard({ issue, assigneeName, onOpen }: IssueCardProps) {
+export function IssueCard({ issue, assigneeName, epicName, onOpen }: IssueCardProps) {
   return (
     // interactive Card는 <button>으로 렌더 — hover elevation은 Card가 제공한다.
     // 내부는 phrasing 콘텐츠(span)만 둔다.
     <Card interactive padding="sm" className="issue-card" onClick={onOpen}>
       <span className="issue-card-title">{issue.title}</span>
+      {epicName ? (
+        <span className="issue-card-epic">
+          <Lozenge appearance="warning">{epicName}</Lozenge>
+        </span>
+      ) : null}
       {issue.labels.length > 0 ? (
         <span className="issue-card-labels">
           {issue.labels.map((label) => (

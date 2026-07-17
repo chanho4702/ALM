@@ -224,3 +224,14 @@ describe("담당자 스윔레인", () => {
     });
   });
 });
+
+describe("카드 에픽 태그", () => {
+  it("에픽 자식 카드(ALM-2)에 부모 에픽 이름 Lozenge가 보인다", async () => {
+    renderBoard();
+    // ALM-2(스토리, parent=에픽 ALM-4 "백로그 화면 구현")는 진행 중 컬럼
+    const inprogress = await screen.findByTestId("board-column-inprogress");
+    expect(
+      await within(inprogress).findByText("백로그 화면 구현"),
+    ).toBeInTheDocument(); // 에픽 태그 (i4 카드 자체는 todo 컬럼에 있다)
+  });
+});

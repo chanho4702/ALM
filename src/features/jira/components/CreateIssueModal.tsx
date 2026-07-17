@@ -122,7 +122,11 @@ export function CreateIssueModal({
           <Select
             label="타입"
             value={type}
-            options={ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+            // 하위 작업은 부모가 필수라 이슈 상세의 "하위 작업 추가"에서만 만든다
+            options={ISSUE_TYPES.filter((t) => t !== "subtask").map((t) => ({
+              value: t,
+              label: TYPE_LABELS[t],
+            }))}
             onValueChange={(v) => setType(v as IssueType)}
           />
           <Select
