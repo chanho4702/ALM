@@ -173,14 +173,27 @@ describe("App 라우팅과 전역 셸", () => {
     expect(resizer).toHaveAttribute("aria-valuenow", "240");
   });
 
-  it("프로젝트 내부에는 브레드크럼(프로젝트 / 이름 / 페이지)이 보인다", async () => {
+  it("프로젝트 내부에는 브레드크럼(프로젝트/이름)과 활성 뷰 탭이 보인다", async () => {
     const user = userEvent.setup();
     renderApp("/projects/p1/backlog");
 
+    // 지라식: 브레드크럼은 프로젝트/이름까지, 현재 뷰는 탭이 표시
     const crumbs = await screen.findByRole("navigation", { name: "브레드크럼" });
-    expect(crumbs).toHaveTextContent("프로젝트/ALM 플랫폼/백로그");
+    expect(crumbs).toHaveTextContent("프로젝트/ALM 플랫폼");
 
-    // 첫 조각 클릭 → 디렉터리로
+    const tabs = screen.getByRole("navigation", { name: "프로젝트 뷰" });
+    expect(within(tabs).getByRole("button", { name: "백로그" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    // 탭으로 뷰 전환
+    await user.click(within(tabs).getByRole("button", { name: "요약" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/dashboard");
+    });
+
+    // 브레드크럼 첫 조각 클릭 → 디렉터리로
     await user.click(within(crumbs).getByRole("button", { name: "프로젝트" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(/\/projects$/);

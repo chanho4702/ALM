@@ -4,7 +4,6 @@ import {
   Avatar,
   EmptyState,
   Lozenge,
-  PageHeader,
   Select,
   Spinner,
   Table,
@@ -232,7 +231,6 @@ export function IssueListPage() {
 
   return (
     <>
-      <PageHeader title="이슈" />
       <section>
         <div className="issue-filter-bar">
           <TextField

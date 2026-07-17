@@ -10,7 +10,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { EmptyState, Lozenge, PageHeader, Spinner, useToast } from "@chanho/react";
+import { EmptyState, Lozenge, Spinner, useToast } from "@chanho/react";
 import type { Issue, IssueStatus, Sprint, User } from "../store/types";
 import { createIssue, listIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
@@ -155,16 +155,13 @@ export function BoardPage() {
 
   return (
     <>
-      <PageHeader
-        title="보드"
-        actions={
-          sprint ? (
-            <Lozenge appearance="info" aria-label={`활성 스프린트: ${sprint.name}`}>
-              {sprint.name}
-            </Lozenge>
-          ) : null
-        }
-      />
+      {sprint ? (
+        <div className="view-actions">
+          <Lozenge appearance="info" aria-label={`활성 스프린트: ${sprint.name}`}>
+            {sprint.name}
+          </Lozenge>
+        </div>
+      ) : null}
       {content}
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
       {issueModal}

@@ -12,6 +12,7 @@ import {
 import type { Project } from "../store/types";
 import { deleteProject, listIssues } from "../store/jiraStore";
 import { listStarredProjectIds, pruneProject, toggleProjectStar } from "../store/uiStore";
+import { ProjectAvatar } from "../components/ProjectAvatar";
 
 export interface ProjectListPageProps {
   projects: Project[];
@@ -92,9 +93,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
             {projects.map((project) => (
               <Card key={project.id} padding="md" className="project-card">
                 <div className="project-card-head">
-                  <span className="project-avatar" aria-hidden>
-                    {project.key.charAt(0)}
-                  </span>
+                  <ProjectAvatar project={project} size="md" />
                   <div className="project-card-title">
                     <h3>{project.name}</h3>
                     <span className="issue-key-cell">{project.key}</span>

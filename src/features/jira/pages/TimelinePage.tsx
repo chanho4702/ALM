@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { EmptyState, PageHeader, Spinner } from "@chanho/react";
+import { EmptyState, Spinner } from "@chanho/react";
 import type { Issue } from "../store/types";
 import { listIssues } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
@@ -89,7 +89,6 @@ export function TimelinePage() {
 
   return (
     <>
-      <PageHeader title="타임라인" />
       {model === null ? (
         <EmptyState
           title="아직 이슈가 없습니다"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router";
-import { Button, Card, Modal, PageHeader, TextArea, TextField, useToast } from "@chanho/react";
+import { Button, Card, Modal, TextArea, TextField, useToast } from "@chanho/react";
 import type { JiraOutletContext } from "../components/ProjectLayout";
 import { deleteProject, listIssues, updateProject } from "../store/jiraStore";
 import { pruneProject } from "../store/uiStore";
@@ -70,7 +70,6 @@ export function ProjectSettingsPage() {
 
   return (
     <>
-      <PageHeader title="프로젝트 설정" />
       <div className="project-settings">
         <Card padding="lg" title="일반">
           <form className="project-create-form" onSubmit={handleSave}>

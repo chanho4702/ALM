@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { Avatar, Card, EmptyState, PageHeader, ProgressBar, Spinner } from "@chanho/react";
+import { Avatar, Card, EmptyState, ProgressBar, Spinner } from "@chanho/react";
 import type { Issue, IssueStatus, User } from "../store/types";
 import { listIssues, listUsers } from "../store/jiraStore";
 import { STATUS_LABELS } from "../components/labels";
@@ -70,7 +70,6 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="대시보드" />
       {total === 0 ? (
         <EmptyState
           title="아직 이슈가 없습니다"

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import type { Project } from "../store/types";
+import { ProjectAvatar } from "./ProjectAvatar";
 import {
   SIDENAV_DEFAULT_WIDTH,
   SIDENAV_MAX_WIDTH,
@@ -20,7 +21,7 @@ const clampWidth = (width: number) =>
 
 /** 프로젝트 하위 페이지 — 현재 프로젝트 항목 아래에 중첩 표시된다 */
 const PROJECT_PAGES = [
-  { id: "dashboard", label: "대시보드" },
+  { id: "dashboard", label: "요약" },
   { id: "timeline", label: "타임라인" },
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },
@@ -118,9 +119,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
       title={project.name}
       onClick={() => navigate(`/projects/${project.id}/board`)}
     >
-      <span className="project-avatar global-nav-avatar" aria-hidden>
-        {project.key.charAt(0)}
-      </span>
+      <ProjectAvatar project={project} size="sm" />
       <span className="global-nav-label global-nav-project-name">{project.name}</span>
     </button>
   );
@@ -146,6 +145,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
       aria-label="전역 내비게이션"
       style={collapsed ? undefined : { width }}
     >
+      <div className="global-nav-scroll">
       <ul className="global-nav-list">
         <li>
           <button
@@ -211,15 +211,16 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
         </>
       ) : null}
 
+      </div>
+      {/* 지라식 접기 토글 — 사이드바 경계선 상단에 떠 있는 원형 chevron */}
       <button
         type="button"
-        className="global-nav-collapse"
+        className="global-nav-toggle"
         aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
         title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
         onClick={() => void setSideNavCollapsed(!collapsed)}
       >
-        <span aria-hidden>{collapsed ? "»" : "«"}</span>
-        <span className="global-nav-label">{collapsed ? "" : "접기"}</span>
+        <span aria-hidden>{collapsed ? "›" : "‹"}</span>
       </button>
       {collapsed ? null : (
         <div

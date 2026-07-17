@@ -33,7 +33,7 @@ describe("ProjectSettingsPage", () => {
     const user = userEvent.setup();
     renderSettings();
 
-    expect(await screen.findByRole("heading", { name: "프로젝트 설정" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "일반" })).toBeInTheDocument();
     expect(screen.getByText("ALM", { selector: ".issue-key-cell" })).toBeInTheDocument(); // 키 표시
     expect(screen.queryByLabelText("키")).not.toBeInTheDocument(); // 입력 필드는 아님
 
