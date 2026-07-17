@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import {
   Avatar,
   Button,
@@ -9,7 +9,9 @@ import {
   Modal,
   Select,
   Tabs,
+  Tag,
   TextArea,
+  TextField,
   useToast,
 } from "@chanho/react";
 import type {
@@ -23,11 +25,15 @@ import type {
 } from "../store/types";
 import {
   addComment,
+  deleteComment,
+  deleteIssue,
+  getCurrentUser,
   getIssueByKey,
   listActivity,
   listComments,
   listSprints,
   listUsers,
+  updateComment,
   updateIssue,
 } from "../store/jiraStore";
 import { BOARD_STATUSES, PRIORITY_LABELS, STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
@@ -48,12 +54,18 @@ export interface IssueDetailModalProps {
 
 export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDetailModalProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
+  const [me, setMe] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
+  const [labelDraft, setLabelDraft] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** 수정 중인 코멘트 id — null이면 보기 모드 */
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [commentEditDraft, setCommentEditDraft] = useState("");
   const toast = useToast();
 
   /** 코멘트·활동 재조회 — 속성 저장/코멘트 작성 후 호출 (활동로그는 스토어 부수효과) */
@@ -76,11 +88,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         onClose();
         return;
       }
-      const [userList, sprintList, commentList, activityList] = await Promise.all([
+      const [userList, sprintList, commentList, activityList, currentUser] = await Promise.all([
         listUsers(),
         listSprints(found.projectId),
         listComments(found.id),
         listActivity(found.id),
+        getCurrentUser(),
       ]);
       if (cancelled) return;
       setIssue(found);
@@ -89,6 +102,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       setSprints(sprintList);
       setComments(commentList);
       setActivities(activityList);
+      setMe(currentUser);
     })();
     return () => {
       cancelled = true;
@@ -101,7 +115,17 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
 
   const applyPatch = async (
     patch: Partial<
-      Pick<Issue, "title" | "description" | "status" | "priority" | "assigneeId" | "sprintId">
+      Pick<
+        Issue,
+        | "title"
+        | "description"
+        | "status"
+        | "priority"
+        | "assigneeId"
+        | "sprintId"
+        | "dueDate"
+        | "labels"
+      >
     >,
     successTitle: string,
   ) => {
@@ -124,6 +148,74 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const handleDescriptionSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await applyPatch({ description: descriptionDraft }, "설명을 저장했습니다");
+  };
+
+  /** Enter로 라벨 추가 — 중복은 무시하고 입력만 비운다 */
+  const handleLabelKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || !issue) return;
+    event.preventDefault();
+    const label = labelDraft.trim();
+    setLabelDraft("");
+    if (!label || issue.labels.includes(label)) return;
+    void applyPatch({ labels: [...issue.labels, label] }, "라벨을 추가했습니다");
+  };
+
+  const handleLabelRemove = (label: string) => {
+    if (!issue) return;
+    void applyPatch({ labels: issue.labels.filter((l) => l !== label) }, "라벨을 제거했습니다");
+  };
+
+  const handleIssueDelete = async () => {
+    if (!issue) return;
+    try {
+      await deleteIssue(issue.id);
+      toast({ title: `${issue.key}를 삭제했습니다`, appearance: "success" });
+      setConfirmingDelete(false);
+      await onIssueChanged();
+      onClose();
+    } catch (error) {
+      toast({
+        title: "이슈 삭제 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+  };
+
+  const startCommentEdit = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setCommentEditDraft(comment.body);
+  };
+
+  const handleCommentEditSave = async () => {
+    if (!issue || !editingCommentId) return;
+    try {
+      await updateComment(editingCommentId, commentEditDraft);
+      setEditingCommentId(null);
+      await refreshLogs(issue.id);
+      toast({ title: "코멘트를 수정했습니다", appearance: "success" });
+    } catch (error) {
+      toast({
+        title: "코멘트 수정 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+  };
+
+  const handleCommentDelete = async (commentId: string) => {
+    if (!issue) return;
+    try {
+      await deleteComment(commentId);
+      await refreshLogs(issue.id);
+      toast({ title: "코멘트를 삭제했습니다", appearance: "success" });
+    } catch (error) {
+      toast({
+        title: "코멘트 삭제 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
   };
 
   const handleCommentSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -219,8 +311,66 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               void applyPatch({ sprintId: v === BACKLOG ? null : v }, "스프린트를 변경했습니다")
             }
           />
+          <TextField
+            label="마감일"
+            type="date"
+            value={issue.dueDate ?? ""}
+            onChange={(e) =>
+              void applyPatch({ dueDate: e.target.value || null }, "마감일을 저장했습니다")
+            }
+          />
+          <div className="issue-labels-field">
+            <TextField
+              label="라벨 추가"
+              placeholder="입력 후 Enter"
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onKeyDown={handleLabelKeyDown}
+            />
+            {issue.labels.length > 0 ? (
+              <div className="issue-labels-list">
+                {issue.labels.map((label) => (
+                  <Tag key={label} label={label} onRemove={() => handleLabelRemove(label)} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <dl className="issue-dates">
+            <dt>생성일</dt>
+            <dd>{formatDateTime(issue.createdAt)}</dd>
+            <dt>수정일</dt>
+            <dd>{formatDateTime(issue.updatedAt)}</dd>
+          </dl>
+          <Button variant="danger" size="small" onClick={() => setConfirmingDelete(true)}>
+            이슈 삭제
+          </Button>
         </aside>
       </div>
+      {confirmingDelete ? (
+        <Modal
+          trigger={<span hidden />}
+          title="이슈 삭제"
+          open
+          onOpenChange={(next) => {
+            if (!next) setConfirmingDelete(false);
+          }}
+        >
+          <div className="project-delete-confirm">
+            <p>
+              <strong>{issue.key}</strong> 이슈를 삭제하면 코멘트와 활동 기록도 함께 사라집니다.
+              되돌릴 수 없습니다.
+            </p>
+            <div className="project-delete-actions">
+              <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
+                취소
+              </Button>
+              <Button variant="danger" onClick={() => void handleIssueDelete()}>
+                삭제
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
       <Tabs
         label="이슈 기록"
         className="issue-tabs"
@@ -230,16 +380,60 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             label: `코멘트 (${comments.length})`,
             content: (
               <div className="issue-comments" data-testid="issue-comments">
-                {comments.map((comment) => (
-                  <CommentBlock
-                    key={comment.id}
-                    author={userName(comment.authorId)}
-                    avatar={<Avatar name={userName(comment.authorId)} size="small" />}
-                    time={formatDateTime(comment.createdAt)}
-                  >
-                    {comment.body}
-                  </CommentBlock>
-                ))}
+                {comments.map((comment) => {
+                  const mine = me !== null && comment.authorId === me.id;
+                  const editing = editingCommentId === comment.id;
+                  return (
+                    <CommentBlock
+                      key={comment.id}
+                      author={userName(comment.authorId)}
+                      avatar={<Avatar name={userName(comment.authorId)} size="small" />}
+                      time={
+                        comment.updatedAt
+                          ? `${formatDateTime(comment.createdAt)} (수정됨)`
+                          : formatDateTime(comment.createdAt)
+                      }
+                      // 본인 댓글에만 수정/삭제 노출. 수정 중엔 편집 폼의 저장/취소가 대신한다
+                      actions={
+                        mine && !editing
+                          ? [
+                              { label: "수정", onClick: () => startCommentEdit(comment) },
+                              {
+                                label: "삭제",
+                                danger: true,
+                                onClick: () => void handleCommentDelete(comment.id),
+                              },
+                            ]
+                          : undefined
+                      }
+                    >
+                      {editing ? (
+                        <div className="issue-comment-edit">
+                          <TextArea
+                            label="코멘트 수정"
+                            rows={3}
+                            value={commentEditDraft}
+                            onChange={(e) => setCommentEditDraft(e.target.value)}
+                          />
+                          <div className="issue-comment-edit-actions">
+                            <Button
+                              size="small"
+                              variant="ghost"
+                              onClick={() => setEditingCommentId(null)}
+                            >
+                              취소
+                            </Button>
+                            <Button size="small" onClick={() => void handleCommentEditSave()}>
+                              저장
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        comment.body
+                      )}
+                    </CommentBlock>
+                  );
+                })}
                 {comments.length === 0 ? (
                   <p className="issue-comment-empty">아직 코멘트가 없습니다</p>
                 ) : null}

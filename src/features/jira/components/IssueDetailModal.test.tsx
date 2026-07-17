@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
@@ -195,5 +195,105 @@ describe("IssueDetailModal 코멘트/활동 탭 (W3)", () => {
         "백로그 화면 구현",
       );
     });
+  });
+});
+
+describe("IssueDetailModal 확장 (마감일·라벨·생성/수정일·삭제)", () => {
+  it("마감일을 입력하면 저장되고, 지우면 미지정으로 돌아간다", async () => {
+    renderBoard("/projects/p1/board?issue=ALM-4");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    const due = within(dialog).getByLabelText("마감일");
+    fireEvent.change(due, { target: { value: "2026-08-01" } });
+
+    expect(await screen.findByText("마감일을 저장했습니다")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("마감일")).toHaveValue("2026-08-01");
+  });
+
+  it("라벨을 추가하고 제거할 수 있다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-4"); // 시드: 라벨 없음
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    await user.type(within(dialog).getByLabelText("라벨 추가"), "urgent{Enter}");
+    expect(await within(dialog).findByText("urgent")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "urgent 태그 제거" }));
+    await waitFor(() => {
+      expect(within(dialog).queryByText("urgent")).not.toBeInTheDocument();
+    });
+  });
+
+  it("생성일과 수정일을 속성 패널에 표시한다", async () => {
+    renderBoard("/projects/p1/board?issue=ALM-4");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    expect(within(dialog).getByText("생성일")).toBeInTheDocument();
+    expect(within(dialog).getByText("수정일")).toBeInTheDocument();
+  });
+
+  it("이슈 삭제: 확인 모달을 거쳐 삭제하면 모달이 닫히고 보드에서 사라진다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-4");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    await user.click(within(dialog).getByRole("button", { name: "이슈 삭제" }));
+
+    const confirm = await screen.findByRole("dialog", { name: "이슈 삭제" });
+    await user.click(within(confirm).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(
+      within(screen.getByTestId("board-column-todo")).queryByText("ALM-4"),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("IssueDetailModal 댓글 수정/삭제", () => {
+  it("본인 댓글에만 수정/삭제 버튼이 보인다 (시드: c1=김찬호 본인, c2=이서연)", async () => {
+    renderBoard("/projects/p1/board?issue=ALM-2");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    const comments = await within(dialog).findByTestId("issue-comments");
+    expect(within(comments).getAllByRole("button", { name: "수정" })).toHaveLength(1);
+    expect(within(comments).getAllByRole("button", { name: "삭제" })).toHaveLength(1);
+  });
+
+  it("본인 댓글을 수정하면 본문이 바뀌고 (수정됨) 표시가 붙는다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-2");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    const comments = await within(dialog).findByTestId("issue-comments");
+    await user.click(within(comments).getByRole("button", { name: "수정" }));
+
+    const editField = within(comments).getByLabelText("코멘트 수정");
+    await user.clear(editField);
+    await user.type(editField, "dnd-kit v6로 업그레이드했습니다.");
+    await user.click(within(comments).getByRole("button", { name: "저장" }));
+
+    expect(
+      await within(comments).findByText("dnd-kit v6로 업그레이드했습니다."),
+    ).toBeInTheDocument();
+    expect(within(comments).getByText(/\(수정됨\)/)).toBeInTheDocument();
+  });
+
+  it("본인 댓글을 삭제하면 목록에서 사라진다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-2");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    const comments = await within(dialog).findByTestId("issue-comments");
+    await user.click(within(comments).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => {
+      expect(
+        within(comments).queryByText("드래그 라이브러리는 @dnd-kit로 확정했습니다."),
+      ).not.toBeInTheDocument();
+    });
+    // 타인 댓글은 남아 있다
+    expect(within(comments).getByText("컬럼 간 이동부터 붙여볼게요.")).toBeInTheDocument();
   });
 });

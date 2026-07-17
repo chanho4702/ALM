@@ -246,6 +246,53 @@ body {
   width: 100%; /* Select 필드(div 래퍼)는 패널 폭에 맞춘다 (Lozenge는 span이라 영향 없음) */
 }
 
+.issue-labels-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  width: 100%;
+}
+
+.issue-labels-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-50);
+}
+
+/* 생성일/수정일 읽기 전용 표시 */
+.issue-dates {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--chanho-space-50) var(--chanho-space-100);
+  margin: 0;
+  padding-top: var(--chanho-space-100);
+  border-top: 1px solid var(--chanho-color-border-default);
+  width: 100%;
+  font-size: var(--chanho-font-size-75);
+}
+
+.issue-dates dt {
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-dates dd {
+  margin: 0;
+  text-align: right;
+  color: var(--chanho-color-text-default);
+}
+
+.issue-comment-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.issue-comment-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
 /* ── 백로그/스프린트 ────────────────────────────────────── */
 
 .backlog-page {
