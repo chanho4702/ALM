@@ -1,17 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import type { Project } from "../store/types";
 import {
+  SIDENAV_DEFAULT_WIDTH,
+  SIDENAV_MAX_WIDTH,
+  SIDENAV_MIN_WIDTH,
   UI_CHANGED_EVENT,
+  getSideNavWidth,
   isSideNavCollapsed,
   listRecentProjectIds,
   listStarredProjectIds,
   setSideNavCollapsed,
+  setSideNavWidth,
 } from "../store/uiStore";
+
+const clampWidth = (width: number) =>
+  Math.min(SIDENAV_MAX_WIDTH, Math.max(SIDENAV_MIN_WIDTH, width));
 
 /** 프로젝트 하위 페이지 — 현재 프로젝트 항목 아래에 중첩 표시된다 */
 const PROJECT_PAGES = [
   { id: "dashboard", label: "대시보드" },
+  { id: "timeline", label: "타임라인" },
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },
   { id: "issues", label: "이슈" },
@@ -32,12 +42,51 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(SIDENAV_DEFAULT_WIDTH);
+  /** 드래그 중 최신 너비 — pointerup에서 저장할 값 */
+  const widthRef = useRef(SIDENAV_DEFAULT_WIDTH);
 
   const refresh = useCallback(() => {
     void listRecentProjectIds().then(setRecentIds);
     void listStarredProjectIds().then(setStarredIds);
     void isSideNavCollapsed().then(setCollapsed);
+    void getSideNavWidth().then((w) => {
+      widthRef.current = w;
+      setWidth(w);
+    });
   }, []);
+
+  /** 핸들 드래그 — 움직이는 동안은 로컬 상태만, 놓을 때 저장 */
+  const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = widthRef.current;
+    const onMove = (move: globalThis.PointerEvent) => {
+      const next = clampWidth(startWidth + (move.clientX - startX));
+      widthRef.current = next;
+      setWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      void setSideNavWidth(widthRef.current);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  /** 키보드 접근성 — ←/→ 16px 단위, Home = 기본값 복원 */
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    let next: number | null = null;
+    if (event.key === "ArrowLeft") next = clampWidth(widthRef.current - 16);
+    else if (event.key === "ArrowRight") next = clampWidth(widthRef.current + 16);
+    else if (event.key === "Home") next = SIDENAV_DEFAULT_WIDTH;
+    if (next === null) return;
+    event.preventDefault();
+    widthRef.current = next;
+    setWidth(next);
+    void setSideNavWidth(next);
+  };
 
   // uiStore 변경(방문 기록·별표 토글·접기)을 구독한다 — 발행처는 uiStore.persist
   useEffect(() => {
@@ -95,6 +144,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
     <nav
       className={collapsed ? "global-nav is-collapsed" : "global-nav"}
       aria-label="전역 내비게이션"
+      style={collapsed ? undefined : { width }}
     >
       <ul className="global-nav-list">
         <li>
@@ -171,6 +221,26 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
         <span aria-hidden>{collapsed ? "»" : "«"}</span>
         <span className="global-nav-label">{collapsed ? "" : "접기"}</span>
       </button>
+      {collapsed ? null : (
+        <div
+          className="global-nav-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="사이드바 너비 조절"
+          aria-valuemin={SIDENAV_MIN_WIDTH}
+          aria-valuemax={SIDENAV_MAX_WIDTH}
+          aria-valuenow={width}
+          tabIndex={0}
+          title="드래그로 너비 조절 (더블클릭: 기본값)"
+          onPointerDown={handleResizeStart}
+          onKeyDown={handleResizeKeyDown}
+          onDoubleClick={() => {
+            widthRef.current = SIDENAV_DEFAULT_WIDTH;
+            setWidth(SIDENAV_DEFAULT_WIDTH);
+            void setSideNavWidth(SIDENAV_DEFAULT_WIDTH);
+          }}
+        />
+      )}
     </nav>
   );
 }

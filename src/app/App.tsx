@@ -13,6 +13,7 @@ import { ProjectCreatePage } from "../features/jira/pages/ProjectCreatePage";
 import { ProjectSettingsPage } from "../features/jira/pages/ProjectSettingsPage";
 import { DashboardPage } from "../features/jira/pages/DashboardPage";
 import { HomePage } from "../features/jira/pages/HomePage";
+import { TimelinePage } from "../features/jira/pages/TimelinePage";
 
 export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -49,6 +50,7 @@ export function App() {
           element={<ProjectLayout projects={projects} onProjectsChanged={reload} />}
         >
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="timeline" element={<TimelinePage />} />
           <Route path="board" element={<BoardPage />} />
           <Route path="backlog" element={<BacklogPage />} />
           <Route path="issues" element={<IssueListPage />} />

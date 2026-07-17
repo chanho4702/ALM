@@ -158,6 +158,21 @@ describe("App 라우팅과 전역 셸", () => {
     expect(await within(globalNav()).findByRole("button", { name: "백로그" })).toBeInTheDocument();
   });
 
+  it("리사이즈 핸들 키보드(→/Home)로 사이드바 너비를 조절한다", async () => {
+    const user = userEvent.setup();
+    renderApp("/home");
+    await screen.findByRole("heading", { name: /안녕하세요/ });
+
+    const resizer = within(globalNav()).getByRole("separator", { name: "사이드바 너비 조절" });
+    expect(resizer).toHaveAttribute("aria-valuenow", "240");
+
+    resizer.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(resizer).toHaveAttribute("aria-valuenow", "256");
+    await user.keyboard("{Home}");
+    expect(resizer).toHaveAttribute("aria-valuenow", "240");
+  });
+
   it("프로젝트 내부에는 브레드크럼(프로젝트 / 이름 / 페이지)이 보인다", async () => {
     const user = userEvent.setup();
     renderApp("/projects/p1/backlog");

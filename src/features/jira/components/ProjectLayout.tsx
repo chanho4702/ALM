@@ -15,6 +15,7 @@ export interface JiraOutletContext {
 
 const PAGE_LABELS: Record<string, string> = {
   dashboard: "대시보드",
+  timeline: "타임라인",
   board: "보드",
   backlog: "백로그",
   issues: "이슈",

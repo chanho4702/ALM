@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  getSideNavWidth,
   isSideNavCollapsed,
   listRecentProjectIds,
   listStarredProjectIds,
   pruneProject,
   recordProjectVisit,
   setSideNavCollapsed,
+  setSideNavWidth,
   toggleProjectStar,
 } from "./uiStore";
 
@@ -52,5 +54,17 @@ describe("uiStore 접힘/정리", () => {
     await pruneProject("p1");
     expect(await listRecentProjectIds()).toEqual([]);
     expect(await listStarredProjectIds()).toEqual([]);
+  });
+});
+
+describe("uiStore 사이드바 너비", () => {
+  it("기본 240, 저장 시 180~400으로 클램프한다", async () => {
+    expect(await getSideNavWidth()).toBe(240);
+    await setSideNavWidth(320);
+    expect(await getSideNavWidth()).toBe(320);
+    await setSideNavWidth(50);
+    expect(await getSideNavWidth()).toBe(180);
+    await setSideNavWidth(9999);
+    expect(await getSideNavWidth()).toBe(400);
   });
 });

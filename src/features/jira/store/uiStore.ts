@@ -6,6 +6,10 @@
 const STORAGE_KEY = "alm.jira.ui.v1";
 const RECENT_LIMIT = 5;
 
+export const SIDENAV_MIN_WIDTH = 180;
+export const SIDENAV_MAX_WIDTH = 400;
+export const SIDENAV_DEFAULT_WIDTH = 240;
+
 /** uiStore가 바뀔 때마다 window에 발행 — 사이드바 등 구독자가 다시 읽는다 */
 export const UI_CHANGED_EVENT = "alm:ui-changed";
 
@@ -13,12 +17,14 @@ interface UiState {
   recentProjectIds: string[];
   starredProjectIds: string[];
   sideNavCollapsed: boolean;
+  sideNavWidth: number;
 }
 
 const DEFAULT_STATE: UiState = {
   recentProjectIds: [],
   starredProjectIds: [],
   sideNavCollapsed: false,
+  sideNavWidth: SIDENAV_DEFAULT_WIDTH,
 };
 
 function load(): UiState {
@@ -30,6 +36,7 @@ function load(): UiState {
       recentProjectIds: parsed.recentProjectIds ?? [],
       starredProjectIds: parsed.starredProjectIds ?? [],
       sideNavCollapsed: parsed.sideNavCollapsed ?? false,
+      sideNavWidth: parsed.sideNavWidth ?? SIDENAV_DEFAULT_WIDTH,
     };
   } catch {
     return { ...DEFAULT_STATE };
@@ -78,6 +85,16 @@ export async function isSideNavCollapsed(): Promise<boolean> {
 
 export async function setSideNavCollapsed(collapsed: boolean): Promise<void> {
   persist({ ...load(), sideNavCollapsed: collapsed });
+}
+
+export async function getSideNavWidth(): Promise<number> {
+  return load().sideNavWidth;
+}
+
+/** 사이드바 너비 저장 — MIN/MAX로 클램프한다 */
+export async function setSideNavWidth(width: number): Promise<void> {
+  const clamped = Math.min(SIDENAV_MAX_WIDTH, Math.max(SIDENAV_MIN_WIDTH, Math.round(width)));
+  persist({ ...load(), sideNavWidth: clamped });
 }
 
 /** 삭제된 프로젝트를 최근/별표에서 걷어낸다 (프로젝트 삭제 후 호출) */

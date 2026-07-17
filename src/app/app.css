@@ -30,7 +30,8 @@ body {
 /* ── 전역 사이드바 (새 지라 나비 — 모든 화면 상주) ───────── */
 
 .global-nav {
-  width: 240px;
+  position: relative; /* 리사이즈 핸들 기준 */
+  width: 240px; /* 기본값 — 실제 너비는 인라인 스타일(uiStore)로 덮인다 */
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -149,6 +150,21 @@ body {
 .global-nav-collapse:hover {
   background: var(--chanho-color-background-neutral-hovered);
   color: var(--chanho-color-text-default);
+}
+
+/* 드래그 리사이즈 핸들 — 오른쪽 가장자리 6px 히트 영역 */
+.global-nav-resizer {
+  position: absolute;
+  inset: 0 -3px 0 auto;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.global-nav-resizer:hover,
+.global-nav-resizer:focus-visible {
+  background: var(--chanho-color-border-brand);
+  outline: none;
 }
 
 .global-nav-project-name {
@@ -670,6 +686,158 @@ body {
   font-family: var(--chanho-font-family-mono);
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
+}
+
+/* ── 타임라인 (간트) ────────────────────────────────────── */
+
+.timeline {
+  display: flex;
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-large);
+  background: var(--chanho-color-background-surface);
+  overflow: hidden;
+}
+
+.timeline-side {
+  flex-shrink: 0;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--chanho-color-border-default);
+}
+
+.timeline-side-header {
+  height: 56px; /* 월(28) + 주 눈금(28) 헤더와 정렬 */
+  display: flex;
+  align-items: flex-end;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  box-sizing: border-box;
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.timeline-issue {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  height: 36px;
+  padding: 0 var(--chanho-space-150);
+  border: 0;
+  border-bottom: 1px solid var(--chanho-color-border-default);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline-issue:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.timeline-issue-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--chanho-font-size-100);
+}
+
+.timeline-scroll {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.timeline-grid {
+  position: relative;
+}
+
+.timeline-months {
+  position: relative;
+  height: 28px;
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.timeline-month {
+  position: absolute;
+  top: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding-left: var(--chanho-space-100);
+  box-sizing: border-box;
+  border-left: 1px solid var(--chanho-color-border-default);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.timeline-ticks {
+  position: relative;
+  height: 28px;
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.timeline-tick {
+  position: absolute;
+  top: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+  border-left: 1px dashed var(--chanho-color-border-default);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.timeline-today {
+  position: absolute;
+  top: 28px; /* 월 헤더 아래부터 */
+  bottom: 0;
+  width: 2px;
+  background: var(--chanho-color-background-danger);
+  z-index: 1;
+}
+
+.timeline-row {
+  position: relative;
+  height: 36px;
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 8px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--chanho-radius-medium);
+  cursor: pointer;
+  min-width: 12px;
+}
+
+.timeline-bar.is-todo {
+  background: var(--chanho-color-background-neutral-pressed);
+}
+
+.timeline-bar.is-inprogress {
+  background: var(--chanho-color-background-info);
+}
+
+.timeline-bar.is-done {
+  background: var(--chanho-color-background-success);
+}
+
+/* 마감일 미지정 — 하루짜리 점 막대, 흐리게 */
+.timeline-bar.no-due {
+  opacity: 0.45;
+}
+
+.timeline-bar:hover {
+  filter: brightness(1.1);
 }
 
 /* ── 이슈 상세 모달 ─────────────────────────────────────── */
