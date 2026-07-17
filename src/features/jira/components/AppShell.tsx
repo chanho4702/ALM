@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { Avatar, Button, Dropdown, TopBar } from "@chanho/react";
+import { Avatar, Button, TopBar } from "@chanho/react";
 import type { Issue, Project, User } from "../store/types";
 import { getCurrentUser } from "../store/jiraStore";
 import { CreateIssueModal } from "./CreateIssueModal";
+import { GlobalSideNav } from "./GlobalSideNav";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "../../../auth/AuthGate";
@@ -15,8 +16,8 @@ export interface AppShellProps {
 }
 
 /**
- * 지라의 전역 상단 내비게이션 — 모든 라우트를 감싼다.
- * 브랜드 · "프로젝트" 드롭다운 · 전역 "만들기" · 전역 검색 · 테마/사용자.
+ * 새 지라 내비게이션의 전역 셸 — 상단바(검색·만들기·사용자) + 상주 전역 사이드바.
+ * 프로젝트 전환/이동은 사이드바가 담당한다.
  */
 export function AppShell({ projects }: AppShellProps) {
   const navigate = useNavigate();
@@ -44,35 +45,13 @@ export function AppShell({ projects }: AppShellProps) {
     <div className="app-shell">
       <TopBar
         brand={
-          <span className="topbar-nav">
-            <button
-              type="button"
-              className="jira-brand jira-brand-link"
-              onClick={() => navigate("/projects")}
-            >
-              ALM
-            </button>
-            <Dropdown
-              trigger={
-                <Button variant="ghost" size="small">
-                  프로젝트 ▾
-                </Button>
-              }
-              items={[
-                ...projects.map((p) => ({
-                  label: `${p.name} (${p.key})`,
-                  onSelect: () => navigate(`/projects/${p.id}/board`),
-                })),
-                { label: "모든 프로젝트 보기", onSelect: () => navigate("/projects") },
-                { label: "프로젝트 만들기", onSelect: () => navigate("/projects/new") },
-              ]}
-            />
-            {projects.length > 0 ? (
-              <Button size="small" onClick={() => setCreateOpen(true)}>
-                만들기
-              </Button>
-            ) : null}
-          </span>
+          <button
+            type="button"
+            className="jira-brand jira-brand-link"
+            onClick={() => navigate("/home")}
+          >
+            ALM
+          </button>
         }
         // 첫 입력에 검색 모달을 열고, 이어지는 검색은 모달 안 인풋이 담당한다
         onSearch={(query) => {
@@ -84,6 +63,11 @@ export function AppShell({ projects }: AppShellProps) {
         searchPlaceholder="이슈 검색"
         actions={
           <>
+            {projects.length > 0 ? (
+              <Button size="small" onClick={() => setCreateOpen(true)}>
+                만들기
+              </Button>
+            ) : null}
             <ThemeToggle />
             {authUser ? (
               <>
@@ -97,8 +81,11 @@ export function AppShell({ projects }: AppShellProps) {
           </>
         }
       />
-      <div className="app-shell-content">
-        <Outlet />
+      <div className="app-body">
+        <GlobalSideNav projects={projects} />
+        <div className="app-shell-content">
+          <Outlet />
+        </div>
       </div>
 
       <CreateIssueModal

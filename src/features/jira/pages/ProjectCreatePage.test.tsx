@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
@@ -56,8 +56,9 @@ describe("ProjectCreatePage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("location").textContent).toMatch(/^\/projects\/.+\/board$/);
     });
-    // 사이드바 아이덴티티가 새 프로젝트를 보여준다
-    expect(screen.getByText("PAY · 소프트웨어 프로젝트")).toBeInTheDocument();
+    // 전역 사이드바에 새 프로젝트가 나타난다
+    const nav = screen.getByRole("navigation", { name: "전역 내비게이션" });
+    expect(within(nav).getByRole("button", { name: "결제 서비스" })).toBeInTheDocument();
   });
 
   it("취소 → 프로젝트 디렉터리로 돌아간다", async () => {

@@ -21,54 +21,96 @@ body {
   min-height: 0;
 }
 
-.topbar-nav {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--chanho-space-150);
-}
-
-/* ── 프로젝트 레이아웃 (사이드바 + 콘텐츠) ───────────────── */
-
-.jira-layout {
+.app-body {
   flex: 1;
   display: flex;
   min-height: 0;
 }
 
-/* 사이드바 헤더 — 프로젝트 아이덴티티 (스위처 아님) */
-.project-identity {
+/* ── 전역 사이드바 (새 지라 나비 — 모든 화면 상주) ───────── */
+
+.global-nav {
+  width: 240px;
+  flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: var(--chanho-space-150);
-  min-width: 0;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-200) var(--chanho-space-150);
+  border-right: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-subtle);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
-.project-identity-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: var(--chanho-font-size-200);
-}
-
-.project-identity-text {
+.global-nav-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.project-identity-name {
-  font-size: var(--chanho-font-size-100);
+.global-nav-section {
+  margin-top: var(--chanho-space-200);
+  padding: 0 var(--chanho-space-100);
+  font-size: var(--chanho-font-size-75);
   font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+  letter-spacing: 0.04em;
+}
+
+.global-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  width: 100%;
+  padding: var(--chanho-space-100);
+  border: 0;
+  border-radius: var(--chanho-radius-medium);
+  background: none;
+  font: inherit;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-default);
+  text-align: left;
+  cursor: pointer;
+}
+
+.global-nav-item:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.global-nav-item.is-active {
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-selected);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.global-nav-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: var(--chanho-font-size-75);
+  border-radius: var(--chanho-radius-small);
+}
+
+.global-nav-project-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.project-identity-meta {
-  font-size: var(--chanho-font-size-75);
-  color: var(--chanho-color-text-subtle);
-  white-space: nowrap;
+/* 현재 프로젝트의 하위 페이지 — 아바타 폭만큼 들여쓰기 */
+.global-nav-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 var(--chanho-space-100);
+  padding: 0 0 0 var(--chanho-space-300);
+  list-style: none;
 }
+
+/* ── 프로젝트 콘텐츠 영역 ────────────────────────────────── */
 
 /* 콘텐츠 상단 브레드크럼 — 프로젝트 / 이름 / 페이지 */
 .breadcrumbs {
@@ -649,6 +691,30 @@ body {
   display: inline-flex;
   align-items: center;
   gap: var(--chanho-space-100);
+}
+
+/* ── 홈 (For you) ───────────────────────────────────────── */
+
+.home-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--chanho-space-200);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .home-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 /* ── 대시보드 ───────────────────────────────────────────── */

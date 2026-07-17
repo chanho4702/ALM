@@ -12,6 +12,7 @@ import { ProjectListPage } from "../features/jira/pages/ProjectListPage";
 import { ProjectCreatePage } from "../features/jira/pages/ProjectCreatePage";
 import { ProjectSettingsPage } from "../features/jira/pages/ProjectSettingsPage";
 import { DashboardPage } from "../features/jira/pages/DashboardPage";
+import { HomePage } from "../features/jira/pages/HomePage";
 
 export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -34,9 +35,10 @@ export function App() {
 
   return (
     <Routes>
-      {/* 전역 셸(상단 나비) 아래에 모든 화면이 놓인다 — 지라 구조 */}
+      {/* 전역 셸(상단바 + 상주 사이드바) 아래에 모든 화면이 놓인다 — 새 지라 구조 */}
       <Route element={<AppShell projects={projects} onProjectsChanged={reload} />}>
-        {/* 프로젝트 디렉터리가 앱의 홈이다 — 빈 상태(0개)도 이 페이지가 처리한다 */}
+        {/* For you 홈 — 내 담당·최근 업데이트 */}
+        <Route path="/home" element={<HomePage />} />
         <Route
           path="/projects"
           element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}
@@ -52,8 +54,8 @@ export function App() {
           <Route path="issues" element={<IssueListPage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />
         </Route>
-        {/* "/" 포함 그 외 전부 → 프로젝트 디렉터리 */}
-        <Route path="*" element={<Navigate to="/projects" replace />} />
+        {/* "/" 포함 그 외 전부 → 홈 */}
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Route>
     </Routes>
   );

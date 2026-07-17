@@ -29,7 +29,7 @@ beforeEach(() => {
 });
 
 describe("ProjectSettingsPage", () => {
-  it("이름/설명을 수정하면 사이드바 아이덴티티에도 반영된다 (키는 읽기 전용 표시)", async () => {
+  it("이름/설명을 수정하면 전역 사이드바에도 반영된다 (키는 읽기 전용 표시)", async () => {
     const user = userEvent.setup();
     renderSettings();
 
@@ -42,10 +42,9 @@ describe("ProjectSettingsPage", () => {
     await user.type(nameField, "ALM 플랫폼 v2");
     await user.click(screen.getByRole("button", { name: "저장" }));
 
+    const nav = screen.getByRole("navigation", { name: "전역 내비게이션" });
     await waitFor(() => {
-      expect(
-        screen.getByText("ALM 플랫폼 v2", { selector: ".project-identity-name" }),
-      ).toBeInTheDocument();
+      expect(within(nav).getByRole("button", { name: "ALM 플랫폼 v2" })).toBeInTheDocument();
     });
   });
 

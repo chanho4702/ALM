@@ -24,21 +24,29 @@ function renderApp(initialPath = "/") {
   );
 }
 
+/** 전역 사이드바 (모든 화면 상주) */
+function globalNav() {
+  return screen.getByRole("navigation", { name: "전역 내비게이션" });
+}
+
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
 });
 
 describe("App 라우팅과 전역 셸", () => {
-  it("루트 접근 시 프로젝트 디렉터리(/projects)가 홈이다", async () => {
+  it("루트 접근 시 For you 홈(/home)이 열리고 전역 사이드바가 보인다", async () => {
     renderApp();
-    expect(await screen.findByRole("heading", { name: "프로젝트" })).toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent("/projects");
-    // 시드 프로젝트 카드가 보인다
-    expect(screen.getByRole("heading", { name: "ALM 플랫폼" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /안녕하세요/ })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/home");
+    // 전역 사이드바: 홈/프로젝트 + 프로젝트 목록
+    const nav = globalNav();
+    expect(within(nav).getByRole("button", { name: "홈" })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: "프로젝트" })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: "ALM 플랫폼" })).toBeInTheDocument();
   });
 
-  it("프로젝트가 0개면 디렉터리가 빈 상태를 보여주고 생성 페이지로 안내한다", async () => {
+  it("프로젝트가 0개면 홈이 빈 상태를 보여주고 생성 페이지로 안내한다", async () => {
     // 시드를 우회해 빈 데이터를 미리 심는다
     localStorage.setItem(
       "alm.jira.v1",
@@ -71,26 +79,35 @@ describe("App 라우팅과 전역 셸", () => {
     });
   });
 
-  it("전역 '프로젝트' 드롭다운으로 프로젝트를 전환한다", async () => {
+  it("사이드바에서 프로젝트를 바꾸면 해당 보드로 이동하고 하위 페이지가 중첩 확장된다", async () => {
     const pay = await createProject({ key: "PAY", name: "결제 서비스" }); // 시드 + 2번째 프로젝트
     const user = userEvent.setup();
     renderApp("/projects/p1/board");
+    await screen.findByRole("navigation", { name: "브레드크럼" });
 
-    await user.click(await screen.findByRole("button", { name: "프로젝트 ▾" }));
-    await user.click(await screen.findByRole("menuitem", { name: "결제 서비스 (PAY)" }));
+    // 현재 프로젝트(ALM 플랫폼)의 하위 페이지가 펼쳐져 있다
+    const nav = globalNav();
+    expect(within(nav).getByRole("button", { name: "백로그" })).toBeInTheDocument();
+
+    // 다른 프로젝트 클릭 → 그 보드로 이동, 확장도 따라온다
+    await user.click(within(nav).getByRole("button", { name: "결제 서비스" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(`/projects/${pay.id}/board`);
     });
-    // 사이드바 아이덴티티가 새 프로젝트를 보여준다
-    expect(screen.getByText("PAY · 소프트웨어 프로젝트")).toBeInTheDocument();
+
+    // 하위 페이지 클릭 → 해당 페이지로
+    await user.click(within(globalNav()).getByRole("button", { name: "백로그" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent(`/projects/${pay.id}/backlog`);
+    });
   });
 
-  it("드롭다운의 '모든 프로젝트 보기'로 디렉터리에 돌아온다", async () => {
+  it("사이드바 '프로젝트'로 디렉터리에 간다", async () => {
     const user = userEvent.setup();
     renderApp("/projects/p1/board");
+    await screen.findByRole("navigation", { name: "브레드크럼" });
 
-    await user.click(await screen.findByRole("button", { name: "프로젝트 ▾" }));
-    await user.click(await screen.findByRole("menuitem", { name: "모든 프로젝트 보기" }));
+    await user.click(within(globalNav()).getByRole("button", { name: "프로젝트" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(/\/projects$/);
     });
