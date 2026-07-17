@@ -15,6 +15,7 @@ import { ProjectSettingsPage } from "../features/alm/pages/ProjectSettingsPage";
 import { DashboardPage } from "../features/alm/pages/DashboardPage";
 import { HomePage } from "../features/alm/pages/HomePage";
 import { TimelinePage } from "../features/alm/pages/TimelinePage";
+import { SearchPage } from "../features/alm/pages/SearchPage";
 
 export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -41,6 +42,7 @@ export function App() {
       <Route element={<AppShell projects={projects} onProjectsChanged={reload} />}>
         {/* For you 홈 — 내 담당·최근 업데이트 */}
         <Route path="/home" element={<HomePage />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route
           path="/projects"
           element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}

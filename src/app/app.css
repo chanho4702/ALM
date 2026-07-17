@@ -606,6 +606,64 @@ body {
   color: var(--chanho-color-text-subtle);
 }
 
+/* ── 상세 검색 (/search) ────────────────────────────────── */
+
+.search-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-50);
+}
+
+.search-builders {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--chanho-space-150);
+  align-items: end;
+}
+
+.search-count {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.search-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--chanho-color-border-default);
+  padding-top: var(--chanho-space-100);
+}
+
+/* 사이드바 저장 필터 행 — hover 시 삭제 × */
+.global-nav-filter-row {
+  display: flex;
+  align-items: center;
+}
+
+.global-nav-filter-row .global-nav-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.global-nav-filter-delete {
+  border: 0;
+  background: none;
+  padding: var(--chanho-space-50);
+  color: var(--chanho-color-text-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.global-nav-filter-row:hover .global-nav-filter-delete,
+.global-nav-filter-delete:focus-visible {
+  opacity: 1;
+}
+
+.global-nav-filter-delete:hover {
+  color: var(--chanho-color-text-danger);
+}
+
 /* ── 알림 ───────────────────────────────────────────────── */
 
 .notification-bell {

@@ -10,13 +10,16 @@ import {
   SIDENAV_MAX_WIDTH,
   SIDENAV_MIN_WIDTH,
   UI_CHANGED_EVENT,
+  deleteSavedFilter,
   getSideNavWidth,
   isSideNavCollapsed,
   listRecentProjectIds,
+  listSavedFilters,
   listStarredProjectIds,
   setSideNavCollapsed,
   setSideNavWidth,
 } from "../store/uiStore";
+import type { SavedFilter } from "../store/uiStore";
 
 const clampWidth = (width: number) =>
   Math.min(SIDENAV_MAX_WIDTH, Math.max(SIDENAV_MIN_WIDTH, width));
@@ -44,6 +47,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
   const { pathname } = useLocation();
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(SIDENAV_DEFAULT_WIDTH);
   /** 드래그 중 최신 너비 — pointerup에서 저장할 값 */
@@ -52,6 +56,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
   const refresh = useCallback(() => {
     void listRecentProjectIds().then(setRecentIds);
     void listStarredProjectIds().then(setStarredIds);
+    void listSavedFilters().then(setSavedFilters);
     void isSideNavCollapsed().then(setCollapsed);
     void getSideNavWidth().then((w) => {
       widthRef.current = w;
@@ -204,7 +209,53 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
             <span className="global-nav-label">프로젝트</span>
           </button>
         </li>
+        <li>
+          <button
+            type="button"
+            className={itemClass(pathname === "/search")}
+            aria-label="검색"
+            title="검색"
+            onClick={() => navigate("/search")}
+          >
+            <span className="global-nav-glyph" aria-hidden>
+              검
+            </span>
+            <span className="global-nav-label">검색</span>
+          </button>
+        </li>
       </ul>
+
+      {/* 저장 필터 — ALM 특색: 저장 즉시 사이드바 상주, 원클릭 적용 */}
+      {!collapsed && savedFilters.length > 0 ? (
+        <>
+          <span className="global-nav-section">필터</span>
+          <ul className="global-nav-list" data-testid="nav-filters">
+            {savedFilters.map((filter) => (
+              <li key={filter.id} className="global-nav-filter-row">
+                <button
+                  type="button"
+                  className="global-nav-item"
+                  title={filter.query}
+                  onClick={() => navigate(`/search?q=${encodeURIComponent(filter.query)}`)}
+                >
+                  <span className="global-nav-glyph" aria-hidden>
+                    ⌕
+                  </span>
+                  <span className="global-nav-label global-nav-project-name">{filter.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className="global-nav-filter-delete"
+                  aria-label={`필터 ${filter.name} 삭제`}
+                  onClick={() => void deleteSavedFilter(filter.id)}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       {projectSection("최근", recentProjects, "nav-recent")}
       {projectSection("별표", starredProjects, "nav-starred")}

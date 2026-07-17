@@ -142,6 +142,10 @@ export function AppShell({ projects }: AppShellProps) {
         open={searchOpen}
         onOpenChange={setSearchOpen}
         onNavigate={openIssue}
+        onAdvanced={(query) => {
+          setSearchOpen(false);
+          navigate(`/search?q=${encodeURIComponent(query)}`);
+        }}
       />
       <NotificationsModal
         notifications={notifications}

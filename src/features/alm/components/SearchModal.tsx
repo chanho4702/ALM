@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { EmptyState, Lozenge, Modal, TextField } from "@chanho/react";
+import { Button, EmptyState, Lozenge, Modal, TextField } from "@chanho/react";
 import type { Issue, Project } from "../store/types";
 import { searchIssues } from "../store/jiraStore";
 import { STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
@@ -12,6 +12,8 @@ export interface SearchModalProps {
   onOpenChange: (open: boolean) => void;
   /** 결과 클릭 — 셸이 해당 이슈 상세로 이동시킨다 */
   onNavigate: (issue: Issue) => void;
+  /** "고급 검색으로" — 셸이 /search?q= 로 이동시킨다 */
+  onAdvanced: (query: string) => void;
 }
 
 /** 지라의 전역 검색 — 전 프로젝트 이슈를 키/제목/설명으로 찾는다 */
@@ -21,6 +23,7 @@ export function SearchModal({
   open,
   onOpenChange,
   onNavigate,
+  onAdvanced,
 }: SearchModalProps) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<Issue[]>([]);
@@ -84,6 +87,11 @@ export function SearchModal({
             ))}
           </ul>
         )}
+        <div className="search-modal-footer">
+          <Button variant="ghost" size="small" onClick={() => onAdvanced(query)}>
+            고급 검색으로 — 상태·담당·타입 조건까지
+          </Button>
+        </div>
       </div>
     </Modal>
   );

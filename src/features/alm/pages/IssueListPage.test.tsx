@@ -53,7 +53,7 @@ describe("IssueListPage", () => {
     await screen.findByText("ALM-1");
 
     // 텍스트 필터: "구현" 포함 = ALM-2·3·4·5·6
-    await user.type(screen.getByLabelText("검색"), "구현");
+    await user.type(screen.getByPlaceholderText("제목·설명·키 검색"), "구현");
     await waitFor(() => {
       expect(screen.queryByText("ALM-1")).not.toBeInTheDocument();
     });
@@ -112,7 +112,7 @@ describe("IssueListPage 확장 (설명 검색·라벨 필터·날짜 정렬)", (
     renderIssues();
     await screen.findByText("ALM-1");
 
-    await user.type(screen.getByLabelText("검색"), "결제 모듈");
+    await user.type(screen.getByPlaceholderText("제목·설명·키 검색"), "결제 모듈");
     await waitFor(() => {
       expect(screen.queryByText("ALM-1")).not.toBeInTheDocument();
     });
