@@ -135,6 +135,7 @@ export async function createProject(input: {
   };
   data.projects.push(project);
   data.issueCounters[project.id] = 0;
+  data.boards.push(defaultBoard(project.id)); // 프로젝트는 항상 기본 보드를 갖는다
   persist();
   return clone(project);
 }

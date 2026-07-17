@@ -6,6 +6,7 @@ import { listProjects } from "../features/jira/store/jiraStore";
 import { AppShell } from "../features/jira/components/AppShell";
 import { ProjectLayout } from "../features/jira/components/ProjectLayout";
 import { BoardPage } from "../features/jira/pages/BoardPage";
+import { BoardRedirect } from "../features/jira/pages/BoardRedirect";
 import { BacklogPage } from "../features/jira/pages/BacklogPage";
 import { IssueListPage } from "../features/jira/pages/IssueListPage";
 import { ProjectListPage } from "../features/jira/pages/ProjectListPage";
@@ -51,7 +52,8 @@ export function App() {
         >
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="timeline" element={<TimelinePage />} />
-          <Route path="board" element={<BoardPage />} />
+          <Route path="board" element={<BoardRedirect />} />
+          <Route path="boards/:boardId" element={<BoardPage />} />
           <Route path="backlog" element={<BacklogPage />} />
           <Route path="issues" element={<IssueListPage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />

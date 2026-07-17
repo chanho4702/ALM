@@ -200,7 +200,7 @@ body {
   white-space: nowrap;
 }
 
-/* 현재 프로젝트의 하위 페이지 — 아바타 폭만큼 들여쓰기 */
+/* 현재 프로젝트의 하위 페이지 — 아바타 폭만큼 들여쓰기 (보드 목록은 한 단계 더 중첩) */
 .global-nav-sub {
   display: flex;
   flex-direction: column;
@@ -208,6 +208,17 @@ body {
   margin: 2px 0 var(--chanho-space-100);
   padding: 0 0 0 var(--chanho-space-300);
   list-style: none;
+}
+
+.global-nav-sub .global-nav-sub {
+  margin-bottom: 2px;
+  padding-left: var(--chanho-space-200);
+  border-left: 1px solid var(--chanho-color-border-default);
+}
+
+.global-nav-add {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
 }
 
 /* ── 프로젝트 콘텐츠 영역 ────────────────────────────────── */

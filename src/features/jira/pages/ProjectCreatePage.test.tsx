@@ -54,11 +54,14 @@ describe("ProjectCreatePage", () => {
     await user.click(screen.getByRole("button", { name: "프로젝트 만들기" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("location").textContent).toMatch(/^\/projects\/.+\/board$/);
+      // /board 진입 후 기본 보드로 redirect된 최종 URL
+      expect(screen.getByTestId("location").textContent).toMatch(/^\/projects\/.+\/boards\/.+$/);
     });
-    // 전역 사이드바에 새 프로젝트가 나타난다
-    const nav = screen.getByRole("navigation", { name: "전역 내비게이션" });
-    expect(within(nav).getByRole("button", { name: "결제 서비스" })).toBeInTheDocument();
+    // 전역 사이드바 프로젝트 섹션에 새 프로젝트가 나타난다 ("최근" 섹션에도 뜨므로 스코프)
+    const projectSection = within(
+      screen.getByRole("navigation", { name: "전역 내비게이션" }),
+    ).getByTestId("nav-projects");
+    expect(within(projectSection).getByRole("button", { name: "결제 서비스" })).toBeInTheDocument();
   });
 
   it("취소 → 프로젝트 디렉터리로 돌아간다", async () => {

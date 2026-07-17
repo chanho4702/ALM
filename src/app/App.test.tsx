@@ -200,3 +200,47 @@ describe("App 라우팅과 전역 셸", () => {
     });
   });
 });
+
+describe("사이드바 보드 중첩", () => {
+  it("현재 프로젝트의 '보드' 아래 보드 목록이 중첩되고 클릭으로 전환한다", async () => {
+    const user = userEvent.setup();
+    renderApp("/projects/p1/board");
+    await screen.findByRole("navigation", { name: "브레드크럼" });
+
+    // 기본 보드로 redirect됨
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/boards/b1");
+    });
+
+    const boardList = await within(globalNav()).findByTestId("nav-boards");
+    expect(within(boardList).getByRole("button", { name: "메인 보드" })).toBeInTheDocument();
+
+    await user.click(within(boardList).getByRole("button", { name: "백엔드 팀" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/boards/b2");
+    });
+  });
+
+  it("'+ 새 보드'로 보드를 만들면 목록에 추가되고 그 보드로 이동한다", async () => {
+    const user = userEvent.setup();
+    renderApp("/projects/p1/boards/b1");
+    await screen.findByRole("navigation", { name: "전역 내비게이션" });
+    const boardList = await within(globalNav()).findByTestId("nav-boards");
+
+    await user.click(within(boardList).getByRole("button", { name: "+ 새 보드" }));
+    const dialog = await screen.findByRole("dialog", { name: "새 보드" });
+    await user.type(within(dialog).getByLabelText("이름"), "QA 보드");
+    await user.click(within(dialog).getByRole("button", { name: "보드 만들기" }));
+
+    await waitFor(() => {
+      const location = screen.getByTestId("location").textContent ?? "";
+      expect(location).toMatch(/\/projects\/p1\/boards\/.+/);
+      expect(location).not.toContain("/boards/b1"); // 새로 만든 보드로 이동
+    });
+    expect(
+      within(await within(globalNav()).findByTestId("nav-boards")).getByRole("button", {
+        name: "QA 보드",
+      }),
+    ).toBeInTheDocument();
+  });
+});

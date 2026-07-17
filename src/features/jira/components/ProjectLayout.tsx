@@ -53,7 +53,9 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
     return <Navigate to="/projects" replace />;
   }
 
-  const segment = location.pathname.split("/")[3] ?? "board";
+  const rawSegment = location.pathname.split("/")[3] ?? "board";
+  // /boards/:boardId 도 "보드" 탭으로 취급한다
+  const segment = rawSegment === "boards" ? "board" : rawSegment;
   const starred = starredIds.includes(current.id);
 
   return (

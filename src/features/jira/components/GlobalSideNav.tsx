@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
-import type { Project } from "../store/types";
+import type { Board, Project } from "../store/types";
+import { listBoards } from "../store/jiraStore";
+import { BoardCreateModal } from "./BoardCreateModal";
 import { ProjectAvatar } from "./ProjectAvatar";
 import {
   SIDENAV_DEFAULT_WIDTH,
@@ -98,7 +100,34 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)(?:\/([^/?]+))?/);
   const currentProjectId = projectMatch && projectMatch[1] !== "new" ? projectMatch[1] : undefined;
-  const currentPage = projectMatch?.[2];
+  const rawPage = projectMatch?.[2];
+  // /boards/:boardId 는 "보드" 페이지로 취급, 활성 보드 id를 함께 뽑는다
+  const currentPage = rawPage === "boards" ? "board" : rawPage;
+  const currentBoardId =
+    rawPage === "boards" ? pathname.split("/")[4] : undefined;
+
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [createBoardOpen, setCreateBoardOpen] = useState(false);
+
+  // 현재 프로젝트의 보드 목록 — 프로젝트 전환·보드 생성/수정(UI_CHANGED_EVENT) 시 갱신
+  useEffect(() => {
+    if (!currentProjectId) {
+      setBoards([]);
+      return;
+    }
+    let cancelled = false;
+    const loadBoards = () => {
+      void listBoards(currentProjectId).then((list) => {
+        if (!cancelled) setBoards(list);
+      });
+    };
+    loadBoards();
+    window.addEventListener(UI_CHANGED_EVENT, loadBoards);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(UI_CHANGED_EVENT, loadBoards);
+    };
+  }, [currentProjectId]);
 
   const isHome = pathname === "/home" || pathname === "/";
   const isDirectory = pathname === "/projects" || pathname === "/projects/new";
@@ -195,11 +224,38 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
                         <li key={page.id}>
                           <button
                             type="button"
-                            className={itemClass(currentPage === page.id)}
+                            className={itemClass(currentPage === page.id && page.id !== "board")}
                             onClick={() => navigate(`/projects/${project.id}/${page.id}`)}
                           >
                             {page.label}
                           </button>
+                          {/* "보드" 아래 한 단계 더 — 보드 목록 + 새 보드 (지라 사이드바 중첩) */}
+                          {page.id === "board" ? (
+                            <ul className="global-nav-sub" data-testid="nav-boards">
+                              {boards.map((board) => (
+                                <li key={board.id}>
+                                  <button
+                                    type="button"
+                                    className={itemClass(currentBoardId === board.id)}
+                                    onClick={() =>
+                                      navigate(`/projects/${project.id}/boards/${board.id}`)
+                                    }
+                                  >
+                                    {board.name}
+                                  </button>
+                                </li>
+                              ))}
+                              <li>
+                                <button
+                                  type="button"
+                                  className="global-nav-item global-nav-add"
+                                  onClick={() => setCreateBoardOpen(true)}
+                                >
+                                  + 새 보드
+                                </button>
+                              </li>
+                            </ul>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -222,6 +278,14 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
       >
         <span aria-hidden>{collapsed ? "›" : "‹"}</span>
       </button>
+      {currentProjectId ? (
+        <BoardCreateModal
+          projectId={currentProjectId}
+          open={createBoardOpen}
+          onOpenChange={setCreateBoardOpen}
+          onCreated={(board) => navigate(`/projects/${currentProjectId}/boards/${board.id}`)}
+        />
+      ) : null}
       {collapsed ? null : (
         <div
           className="global-nav-resizer"

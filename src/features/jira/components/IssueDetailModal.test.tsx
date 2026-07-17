@@ -89,7 +89,8 @@ describe("IssueDetailModal", () => {
     await user.click(within(todo).getByText("백로그 화면 구현"));
 
     expect(await screen.findByRole("dialog", { name: "ALM-4" })).toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/board?issue=ALM-4");
+    // /board → 기본 보드(/boards/b1) redirect 후에도 ?issue 쿼리는 보존된다
+    expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/boards/b1?issue=ALM-4");
   });
 
   it("모달을 닫으면 ?issue 쿼리가 제거된다", async () => {
@@ -102,7 +103,7 @@ describe("IssueDetailModal", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
-    expect(screen.getByTestId("location")).toHaveTextContent(/\/projects\/p1\/board$/);
+    expect(screen.getByTestId("location")).toHaveTextContent(/\/projects\/p1\/boards\/b1$/);
   });
 
   it("미존재 이슈 키로 공유된 URL을 열면 모달을 열지 않고 쿼리를 제거한다", async () => {
@@ -119,7 +120,7 @@ describe("IssueDetailModal", () => {
     // URL에서 ?issue 쿼리가 제거됨 (onClose → setSearchParams)
     await waitFor(
       () => {
-        expect(screen.getByTestId("location")).toHaveTextContent(/\/projects\/p1\/board$/);
+        expect(screen.getByTestId("location")).toHaveTextContent(/\/projects\/p1\/boards\/b1$/);
       },
       { timeout: 3000 },
     );

@@ -186,3 +186,13 @@ describe("boards 마이그레이션", () => {
     expect(boards[0]).toMatchObject({ name: "메인 보드", type: "scrum", isDefault: true });
   });
 });
+
+describe("createProject 기본 보드", () => {
+  it("새 프로젝트는 기본 스크럼 보드를 함께 갖는다", async () => {
+    const { createProject } = await import("./jiraStore");
+    const project = await createProject({ key: "PAY", name: "결제" });
+    const boards = await listBoards(project.id);
+    expect(boards).toHaveLength(1);
+    expect(boards[0]).toMatchObject({ name: "메인 보드", type: "scrum", isDefault: true });
+  });
+});

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Navigate, useNavigate, useParams } from "react-router";
 import {
   DndContext,
   DragOverlay,
@@ -11,20 +11,24 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { EmptyState, Lozenge, Spinner, useToast } from "@chanho/react";
-import type { Issue, IssueStatus, Sprint, User } from "../store/types";
-import { createIssue, listIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
+import type { Board, Issue, IssueStatus, Sprint, User } from "../store/types";
+import { createIssue, getBoard, listBoardIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
 import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
 import { BOARD_STATUSES } from "../components/labels";
 import { resolveMove } from "./boardDnd";
 
+const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
+
 export function BoardPage() {
-  const { projectId } = useParams();
+  const { projectId, boardId } = useParams();
   const navigate = useNavigate();
 
-  /** undefined = 로딩 중, null = 활성 스프린트 없음 */
-  const [sprint, setSprint] = useState<Sprint | null | undefined>(undefined);
+  /** undefined = 로딩 중, null = 보드 없음(기본 보드로 redirect) */
+  const [board, setBoard] = useState<Board | null | undefined>(undefined);
+  /** 스크럼 보드의 활성 스프린트 (칸반이면 null) */
+  const [sprint, setSprint] = useState<Sprint | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
@@ -34,16 +38,23 @@ export function BoardPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const reload = useCallback(async () => {
-    if (!projectId) return;
-    setSprint(undefined); // 재조회 시작 = 로딩 — projectId 전환 시 이전 프로젝트 보드 잔상 방지 (W2 인계)
-    const sprints = await listSprints(projectId);
-    const active = sprints.find((s) => s.state === "active") ?? null;
-    const all = active ? await listIssues(projectId) : [];
-    setIssues(active ? all.filter((i) => i.sprintId === active.id) : []);
-    setSprint(active);
-  }, [projectId]);
+    if (!projectId || !boardId) return;
+    const found = await getBoard(boardId);
+    if (!found || found.projectId !== projectId) {
+      setBoard(null);
+      return;
+    }
+    const [boardIssues, sprints] = await Promise.all([
+      listBoardIssues(found.id),
+      found.type === "scrum" ? listSprints(projectId) : Promise.resolve([]),
+    ]);
+    setIssues(boardIssues);
+    setSprint(sprints.find((s) => s.state === "active") ?? null);
+    setBoard(found);
+  }, [projectId, boardId]);
 
   useEffect(() => {
+    setBoard(undefined); // 보드 전환 시 이전 보드 잔상 방지
     void listUsers().then(setUsers);
     void reload();
   }, [reload]);
@@ -63,11 +74,17 @@ export function BoardPage() {
     return map;
   }, [issues]);
 
-  /** 컬럼 하단 인라인 생성 — 해당 상태·활성 스프린트로 바로 만든다 */
+  /** 컬럼 하단 인라인 생성 — 스크럼: 활성 스프린트로, 칸반: 백로그로 */
   const handleColumnCreate = async (status: IssueStatus, title: string) => {
-    if (!projectId || !sprint) return;
+    if (!projectId || !board) return;
+    if (board.type === "scrum" && !sprint) return;
     try {
-      const issue = await createIssue({ projectId, title, status, sprintId: sprint.id });
+      const issue = await createIssue({
+        projectId,
+        title,
+        status,
+        sprintId: board.type === "scrum" ? sprint!.id : null,
+      });
       toast({ title: `${issue.key}를 만들었습니다`, appearance: "success" });
     } catch (error) {
       toast({
@@ -101,14 +118,20 @@ export function BoardPage() {
     await reload(); // 성공/실패 모두 스토어 기준으로 재조회
   };
 
-  let content: ReactNode;
-  if (sprint === undefined) {
-    content = (
+  if (board === undefined) {
+    return (
       <div className="board-loading">
         <Spinner size="large" label="보드 불러오는 중" />
       </div>
     );
-  } else if (sprint === null) {
+  }
+  if (board === null) {
+    // 없는 보드 ID → 기본 보드로 (BoardRedirect가 해석)
+    return <Navigate to={`/projects/${projectId}/board`} replace />;
+  }
+
+  let content: ReactNode;
+  if (board.type === "scrum" && !sprint) {
     content = (
       <EmptyState
         title="진행 중인 스프린트가 없습니다"
@@ -155,13 +178,19 @@ export function BoardPage() {
 
   return (
     <>
-      {sprint ? (
-        <div className="view-actions">
-          <Lozenge appearance="info" aria-label={`활성 스프린트: ${sprint.name}`}>
-            {sprint.name}
+      <div className="board-toolbar">
+        <div className="board-toolbar-title">
+          <strong className="board-name">{board.name}</strong>
+          <Lozenge appearance={board.type === "scrum" ? "info" : "success"}>
+            {BOARD_TYPE_LABELS[board.type]}
           </Lozenge>
+          {board.type === "scrum" && sprint ? (
+            <Lozenge appearance="info" aria-label={`활성 스프린트: ${sprint.name}`}>
+              {sprint.name}
+            </Lozenge>
+          ) : null}
         </div>
-      ) : null}
+      </div>
       {content}
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
       {issueModal}
