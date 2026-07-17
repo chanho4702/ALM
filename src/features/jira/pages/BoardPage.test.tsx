@@ -97,3 +97,38 @@ describe("보드 컬럼 인라인 생성", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("보드 퀵 필터바", () => {
+  it("담당자 아바타 토글로 해당 담당자 카드만 남는다", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole("region", { name: "할 일" });
+
+    // 시드 s1: 박준영 담당 = ALM-4 하나
+    await user.click(screen.getByRole("button", { name: "담당자 박준영" }));
+    await waitFor(() => {
+      expect(screen.queryByText("ALM-2")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("ALM-4")).toBeInTheDocument();
+
+    // 미지정까지 켜면 ALM-5도 함께
+    await user.click(screen.getByRole("button", { name: "담당자 미지정" }));
+    expect(await screen.findByText("ALM-5")).toBeInTheDocument();
+  });
+
+  it("검색으로 좁히고 초기화로 복원한다", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole("region", { name: "할 일" });
+
+    await user.type(screen.getByLabelText("보드 검색"), "칸반");
+    await waitFor(() => {
+      expect(screen.queryByText("ALM-4")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("ALM-2")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "필터 초기화" }));
+    expect(await screen.findByText("ALM-4")).toBeInTheDocument();
+    expect(screen.getByLabelText("보드 검색")).toHaveValue("");
+  });
+});

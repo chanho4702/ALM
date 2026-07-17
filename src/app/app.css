@@ -679,6 +679,62 @@ body {
 
 /* ── 칸반 보드 ──────────────────────────────────────────── */
 
+/* 보드 툴바 — 이름·타입·스프린트 + 퀵 필터바 */
+.board-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.board-toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.board-name {
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.board-filter-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-150);
+}
+
+.board-filter-bar > div:first-child {
+  min-width: 220px; /* 검색 TextField */
+}
+
+/* 담당자 아바타 스택 — 클릭 토글, 선택 시 브랜드 링 */
+.board-avatar-stack {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 2px;
+}
+
+.board-avatar-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: transform 100ms ease;
+}
+
+.board-avatar-toggle:hover {
+  transform: translateY(-2px);
+}
+
+.board-avatar-toggle.is-active {
+  border-color: var(--chanho-color-border-brand);
+  background: var(--chanho-color-background-selected);
+}
+
 .board-loading {
   display: flex;
   justify-content: center;

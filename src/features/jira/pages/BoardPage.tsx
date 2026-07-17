@@ -14,6 +14,12 @@ import { EmptyState, Lozenge, Spinner, useToast } from "@chanho/react";
 import type { Board, Issue, IssueStatus, Sprint, User } from "../store/types";
 import { createIssue, getBoard, listBoardIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
+import {
+  BoardFilterBar,
+  EMPTY_QUICK_FILTER,
+  applyQuickFilter,
+} from "../components/BoardFilterBar";
+import type { QuickFilter } from "../components/BoardFilterBar";
 import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
 import { BOARD_STATUSES } from "../components/labels";
@@ -32,6 +38,7 @@ export function BoardPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  const [quick, setQuick] = useState<QuickFilter>(EMPTY_QUICK_FILTER);
   const toast = useToast();
 
   // 클릭과 드래그 구분: 5px 이상 움직여야 드래그 시작
@@ -55,6 +62,7 @@ export function BoardPage() {
 
   useEffect(() => {
     setBoard(undefined); // 보드 전환 시 이전 보드 잔상 방지
+    setQuick(EMPTY_QUICK_FILTER); // 퀵 필터는 보드별 화면 상태
     void listUsers().then(setUsers);
     void reload();
   }, [reload]);
@@ -67,12 +75,21 @@ export function BoardPage() {
     [users],
   );
 
+  /** 퀵 필터 적용 결과 — 컬럼 렌더와 DnD 모두 이 목록 기준 */
+  const visibleIssues = useMemo(() => applyQuickFilter(issues, quick), [issues, quick]);
+
+  /** 보드 이슈들의 라벨 합집합 (퀵 필터 라벨 선택지) */
+  const labelOptions = useMemo(
+    () => [...new Set(issues.flatMap((i) => i.labels))].sort(),
+    [issues],
+  );
+
   /** status → order순 이슈 id 배열 (resolveMove 입력) */
   const columnIds = useMemo(() => {
     const map: Record<IssueStatus, string[]> = { todo: [], inprogress: [], done: [] };
-    for (const issue of issues) map[issue.status].push(issue.id);
+    for (const issue of visibleIssues) map[issue.status].push(issue.id);
     return map;
-  }, [issues]);
+  }, [visibleIssues]);
 
   /** 컬럼 하단 인라인 생성 — 스크럼: 활성 스프린트로, 칸반: 백로그로 */
   const handleColumnCreate = async (status: IssueStatus, title: string) => {
@@ -97,7 +114,7 @@ export function BoardPage() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveIssue(issues.find((i) => i.id === event.active.id) ?? null);
+    setActiveIssue(visibleIssues.find((i) => i.id === event.active.id) ?? null);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -154,7 +171,7 @@ export function BoardPage() {
               <BoardColumn
                 key={status}
                 status={status}
-                issues={issues.filter((i) => i.status === status)}
+                issues={visibleIssues.filter((i) => i.status === status)}
                 userNames={userNames}
                 onOpenIssue={openIssue}
                 onCreateIssue={handleColumnCreate}
@@ -190,6 +207,12 @@ export function BoardPage() {
             </Lozenge>
           ) : null}
         </div>
+        <BoardFilterBar
+          users={users}
+          labelOptions={labelOptions}
+          quick={quick}
+          onChange={setQuick}
+        />
       </div>
       {content}
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
