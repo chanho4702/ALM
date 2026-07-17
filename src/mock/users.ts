@@ -1,4 +1,4 @@
-import type { User } from "../features/jira/store/types";
+import type { User } from "../features/alm/store/types";
 
 export const MOCK_USERS: User[] = [
   { id: "u1", name: "김찬호" },

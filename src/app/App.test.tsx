@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "./App";
-import { __resetForTest, createProject } from "../features/jira/store/jiraStore";
+import { __resetForTest, createProject } from "../features/alm/store/jiraStore";
 import { MOCK_USERS } from "../mock/users";
 
 /** 현재 pathname을 노출하는 테스트 프로브 */

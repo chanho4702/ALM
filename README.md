@@ -1,7 +1,8 @@
-# ALM Front — 지라 클론
+# ALM Front
 
 Chanho Design System(`@chanho/react`·`@chanho/tokens`)을 100% 소비하는 독립 프론트 앱.
-지라(Jira) 스타일의 **이슈·스프린트·프로젝트 관리(ALM)** 화면을 제공하며,
+**자체 ALM(Application Lifecycle Management) 제품** — 지라에서 영감을 받았지만 그대로 복제하지
+않고, 한국어 스마트 검색·필터 URL 공유 같은 ALM 고유의 편의 기능을 얹는다.
 MSA 템플릿의 프론트 3종 중 하나로 게이트웨이(:8000) 뒤, Keycloak OIDC SSO 체제에 속한다.
 
 - 개발: `http://localhost:5175/alm/` (Vite dev, `--strictPort`)

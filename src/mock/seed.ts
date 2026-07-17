@@ -7,7 +7,7 @@ import type {
   Notification,
   Project,
   Sprint,
-} from "../features/jira/store/types";
+} from "../features/alm/store/types";
 import { MOCK_USERS } from "./users";
 
 export function createSeedData(): JiraData {

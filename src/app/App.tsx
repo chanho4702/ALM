@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { Spinner } from "@chanho/react";
-import type { Project } from "../features/jira/store/types";
-import { listProjects } from "../features/jira/store/jiraStore";
-import { AppShell } from "../features/jira/components/AppShell";
-import { ProjectLayout } from "../features/jira/components/ProjectLayout";
-import { BoardPage } from "../features/jira/pages/BoardPage";
-import { BoardRedirect } from "../features/jira/pages/BoardRedirect";
-import { BacklogPage } from "../features/jira/pages/BacklogPage";
-import { IssueListPage } from "../features/jira/pages/IssueListPage";
-import { ProjectListPage } from "../features/jira/pages/ProjectListPage";
-import { ProjectCreatePage } from "../features/jira/pages/ProjectCreatePage";
-import { ProjectSettingsPage } from "../features/jira/pages/ProjectSettingsPage";
-import { DashboardPage } from "../features/jira/pages/DashboardPage";
-import { HomePage } from "../features/jira/pages/HomePage";
-import { TimelinePage } from "../features/jira/pages/TimelinePage";
+import type { Project } from "../features/alm/store/types";
+import { listProjects } from "../features/alm/store/jiraStore";
+import { AppShell } from "../features/alm/components/AppShell";
+import { ProjectLayout } from "../features/alm/components/ProjectLayout";
+import { BoardPage } from "../features/alm/pages/BoardPage";
+import { BoardRedirect } from "../features/alm/pages/BoardRedirect";
+import { BacklogPage } from "../features/alm/pages/BacklogPage";
+import { IssueListPage } from "../features/alm/pages/IssueListPage";
+import { ProjectListPage } from "../features/alm/pages/ProjectListPage";
+import { ProjectCreatePage } from "../features/alm/pages/ProjectCreatePage";
+import { ProjectSettingsPage } from "../features/alm/pages/ProjectSettingsPage";
+import { DashboardPage } from "../features/alm/pages/DashboardPage";
+import { HomePage } from "../features/alm/pages/HomePage";
+import { TimelinePage } from "../features/alm/pages/TimelinePage";
 
 export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
