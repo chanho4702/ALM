@@ -34,7 +34,7 @@ UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이�
 ```bash
 pnpm install                       # ../design-system/artifacts 의 tarball 필요
 pnpm dev --port 5175 --strictPort  # http://localhost:5175/alm/
-pnpm test                          # vitest run (203 test cases)
+pnpm test                          # vitest run (209 test cases)
 pnpm typecheck                     # tsc --noEmit
 pnpm build                         # vite build (→ dist/)
 ```
@@ -95,7 +95,7 @@ pnpm build                         # vite build (→ dist/)
 - **알림 `NotificationsModal`** — 상단 벨 미읽음 Badge, 개별/전체 읽음.
 - **검색 `SearchModal`** · **만들기 `CreateIssueModal`** — 전역 상단바에서 호출.
 - **상세 검색 `SearchPage`(/search) — ALM 특색** — JQL 대신 **한국어 스마트 검색**(`상태:진행중 담당:김찬호 타입:버그 로그인`), 조건 칩·Select 빌더와 양방향 동기화(진실은 URL `q` 하나 → **링크만 보내면 같은 검색, 필터 URL 공유**), 저장 필터는 사이드바 "필터" 섹션 상주(원클릭 적용). 쿼리 모델(`IssueQuery`)은 추후 GraphQL 인자로 1:1 매핑.
-- **프로젝트 디렉터리** — `ProjectListPage`(카드) · `ProjectCreatePage`(영문 이름→키 자동 제안) · `ProjectSettingsPage`(수정·삭제).
+- **프로젝트 디렉터리** — `ProjectListPage`(카드) · `ProjectCreatePage`(영문 이름→키 자동 제안, **생성 템플릿**: 빈/스크럼/칸반/버그 트래킹 — 카드 미리보기가 실제 만들어질 컬럼 구성(WIP 포함) 그대로, 샘플 이슈·Sprint 1 자동 세팅) · `ProjectSettingsPage`(수정·삭제).
 
 목업 사용자는 4명 고정(`김찬호`/`이서연`/`박준영`/`최다인`), 현재 사용자는 `u1`(김찬호).
 
