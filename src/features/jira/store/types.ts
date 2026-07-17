@@ -22,7 +22,7 @@ export interface Sprint {
 
 export type IssueStatus = "todo" | "inprogress" | "done";
 export type IssuePriority = "high" | "medium" | "low";
-export type IssueType = "task" | "story" | "bug" | "epic";
+export type IssueType = "task" | "story" | "bug" | "epic" | "subtask";
 
 export interface Issue {
   id: string;
@@ -36,6 +36,11 @@ export interface Issue {
   assigneeId: string | null;
   reporterId: string;
   sprintId: string | null; // null = 백로그
+  /**
+   * 부모 이슈 (지라 최신 모델의 단일 parent — 2단계 계층):
+   * 에픽은 parent 불가 / 일반 이슈(작업·스토리·버그) parent = 에픽만 / 하위 작업 parent = 일반 이슈만
+   */
+  parentId: string | null;
   dueDate: string | null; // "YYYY-MM-DD", null = 미지정
   labels: string[]; // 자유 문자열 라벨
   order: number; // 컬럼/목록 내 정렬
@@ -64,7 +69,9 @@ export interface Activity {
     | "sprint"
     | "duedate"
     | "labels"
-    | "issuetype";
+    | "issuetype"
+    | "parent"
+    | "link";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }
@@ -101,6 +108,18 @@ export interface Board {
   createdAt: string;
 }
 
+export type IssueLinkType = "blocks" | "relates";
+
+/**
+ * 이슈 링크 — blocks: source가 target을 차단(방향 있음), relates: 양방향(레코드 1개).
+ */
+export interface IssueLink {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  type: IssueLinkType;
+}
+
 /** 사용자에게 전달되는 알림 — 본인 액션은 알리지 않는다 (지라와 동일) */
 export interface Notification {
   id: string;
@@ -125,6 +144,7 @@ export interface JiraData {
   activities: Activity[];
   notifications: Notification[];
   boards: Board[];
+  links: IssueLink[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */
   issueCounters: Record<string, number>;
 }

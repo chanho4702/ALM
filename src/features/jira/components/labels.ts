@@ -35,13 +35,14 @@ export const BOARD_STATUSES: IssueStatus[] = ["todo", "inprogress", "done"];
 
 // ── 이슈 타입 (지라: 작업 파랑 / 스토리 초록 / 버그 빨강 / 에픽 보라≈주황) ──
 
-export const ISSUE_TYPES: IssueType[] = ["task", "story", "bug", "epic"];
+export const ISSUE_TYPES: IssueType[] = ["task", "story", "bug", "epic", "subtask"];
 
 export const TYPE_LABELS: Record<IssueType, string> = {
   task: "작업",
   story: "스토리",
   bug: "버그",
   epic: "에픽",
+  subtask: "하위 작업",
 };
 
 export const TYPE_APPEARANCE: Record<IssueType, LozengeAppearance> = {
@@ -49,6 +50,7 @@ export const TYPE_APPEARANCE: Record<IssueType, LozengeAppearance> = {
   story: "success",
   bug: "danger",
   epic: "warning",
+  subtask: "neutral",
 };
 
 /** 카드/행에 쓰는 한 글자 글리프 — 지라 타입 아이콘 대응 */
@@ -57,4 +59,5 @@ export const TYPE_GLYPHS: Record<IssueType, string> = {
   story: "◆",
   bug: "●",
   epic: "⚡",
+  subtask: "☑",
 };

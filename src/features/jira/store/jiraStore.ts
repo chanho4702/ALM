@@ -4,6 +4,8 @@ import type {
   BoardType,
   Comment,
   Issue,
+  IssueLink,
+  IssueLinkType,
   IssuePriority,
   IssueStatus,
   IssueType,
@@ -52,9 +54,11 @@ function normalize(data: JiraData): JiraData {
     issue.dueDate ??= null;
     issue.labels ??= [];
     issue.type ??= "task";
+    issue.parentId ??= null;
   }
   data.notifications ??= [];
   data.boards ??= [];
+  data.links ??= [];
   // 보드가 없는 프로젝트에는 기본 스크럼 보드를 만들어 기존 데이터/URL과 호환한다
   for (const project of data.projects) {
     if (!data.boards.some((b) => b.projectId === project.id)) {
@@ -173,6 +177,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.activities = data.activities.filter((a) => !issueIds.has(a.issueId));
   data.notifications = data.notifications.filter((n) => !issueIds.has(n.issueId));
   data.boards = data.boards.filter((b) => b.projectId !== id);
+  data.links = data.links.filter((l) => !issueIds.has(l.sourceId) && !issueIds.has(l.targetId));
   delete data.issueCounters[id];
   persist();
 }
@@ -196,7 +201,30 @@ const TYPE_LABELS: Record<IssueType, string> = {
   story: "스토리",
   bug: "버그",
   epic: "에픽",
+  subtask: "하위 작업",
 };
+
+/**
+ * 2단계 계층 규칙 — 위반이면 throw.
+ * 에픽: parent 불가 / 하위 작업: parent = 일반 이슈만 / 일반 이슈: parent = 에픽만.
+ */
+function assertParentAllowed(data: JiraData, issue: Issue, parentId: string | null): void {
+  if (parentId === null) return;
+  if (parentId === issue.id) throw new Error("자기 자신을 부모로 지정할 수 없습니다");
+  const parent = data.issues.find((i) => i.id === parentId);
+  if (!parent) throw new Error("부모 이슈를 찾을 수 없습니다");
+  if (parent.projectId !== issue.projectId) {
+    throw new Error("같은 프로젝트의 이슈만 부모로 지정할 수 있습니다");
+  }
+  if (issue.type === "epic") throw new Error("에픽은 부모를 가질 수 없습니다");
+  if (issue.type === "subtask") {
+    if (parent.type === "epic" || parent.type === "subtask") {
+      throw new Error("하위 작업의 부모는 일반 이슈여야 합니다");
+    }
+    return;
+  }
+  if (parent.type !== "epic") throw new Error("일반 이슈의 부모는 에픽이어야 합니다");
+}
 
 function userLabel(data: JiraData, userId: string | null): string {
   if (!userId) return "미지정";
@@ -390,6 +418,7 @@ export async function createIssue(input: {
   priority?: IssuePriority;
   assigneeId?: string | null;
   sprintId?: string | null;
+  parentId?: string | null;
   dueDate?: string | null;
   labels?: string[];
 }): Promise<Issue> {
@@ -416,12 +445,17 @@ export async function createIssue(input: {
     assigneeId: input.assigneeId ?? null,
     reporterId: CURRENT_USER_ID,
     sprintId: input.sprintId ?? null,
+    parentId: null, // 계층 검증 후 아래에서 지정
     dueDate: input.dueDate ?? null,
     labels: input.labels ?? [],
     order: maxOrder + 1,
     createdAt: now,
     updatedAt: now,
   };
+  if (input.parentId) {
+    assertParentAllowed(data, issue, input.parentId);
+    issue.parentId = input.parentId;
+  }
   data.issues.push(issue);
   data.activities.push({
     id: nextId(),
@@ -456,7 +490,37 @@ export async function updateIssue(
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   const before = { ...issue, labels: [...issue.labels] };
+  // 타입 전환 정합성: 자식이 있는데 규칙 위반 타입이 되면 거부, 자신의 parent가 위반되면 자동 해제
+  if (patch.type !== undefined && patch.type !== issue.type) {
+    const children = data.issues.filter((i) => i.parentId === issue.id);
+    if (children.length > 0) {
+      const childrenAllowed =
+        patch.type === "epic"
+          ? children.every((c) => c.type !== "subtask" && c.type !== "epic")
+          : patch.type === "subtask"
+            ? false // 하위 작업은 자식을 가질 수 없다
+            : children.every((c) => c.type === "subtask");
+      if (!childrenAllowed) throw new Error("하위 이슈가 있어 타입을 변경할 수 없습니다");
+    }
+  }
   Object.assign(issue, patch);
+  if (patch.type !== undefined && issue.parentId !== null) {
+    try {
+      assertParentAllowed(data, issue, issue.parentId);
+    } catch {
+      // 새 타입과 기존 부모가 양립 불가 → 부모 자동 해제 (활동로그)
+      const parentKey = data.issues.find((i) => i.id === issue.parentId)?.key ?? "없음";
+      issue.parentId = null;
+      data.activities.push({
+        id: nextId(),
+        issueId: issue.id,
+        actorId: CURRENT_USER_ID,
+        type: "parent",
+        detail: `${parentKey} → 없음`,
+        at: new Date().toISOString(),
+      });
+    }
+  }
   // 상태/스프린트가 바뀌면 대상 그룹(같은 프로젝트·스프린트·상태) 맨 뒤로 order 재부여
   // (moveIssue는 beforeId로 정밀 배치, updateIssue는 항상 맨 뒤 — W2 인계)
   if (before.status !== issue.status || before.sprintId !== issue.sprintId) {
@@ -510,6 +574,108 @@ export async function moveIssue(
   return clone(issue);
 }
 
+// ── issue relations (parent / links) ─────────────────────────
+
+/** 부모 지정/해제 — 계층 규칙은 assertParentAllowed가 단일 진실 */
+export async function setIssueParent(id: string, parentId: string | null): Promise<Issue> {
+  const data = load();
+  const issue = data.issues.find((i) => i.id === id);
+  if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertParentAllowed(data, issue, parentId);
+  if (issue.parentId === parentId) return clone(issue);
+  const keyOf = (pid: string | null) =>
+    pid === null ? "없음" : (data.issues.find((i) => i.id === pid)?.key ?? "없음");
+  const detail = `${keyOf(issue.parentId)} → ${keyOf(parentId)}`;
+  issue.parentId = parentId;
+  issue.updatedAt = new Date().toISOString();
+  data.activities.push({
+    id: nextId(),
+    issueId: issue.id,
+    actorId: CURRENT_USER_ID,
+    type: "parent",
+    detail,
+    at: issue.updatedAt,
+  });
+  persist();
+  return clone(issue);
+}
+
+export async function listChildren(issueId: string): Promise<Issue[]> {
+  return clone(
+    load()
+      .issues.filter((i) => i.parentId === issueId)
+      .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)),
+  );
+}
+
+export async function addIssueLink(input: {
+  sourceId: string;
+  targetId: string;
+  type: IssueLinkType;
+}): Promise<IssueLink> {
+  const data = load();
+  const source = data.issues.find((i) => i.id === input.sourceId);
+  const target = data.issues.find((i) => i.id === input.targetId);
+  if (!source || !target) throw new Error("이슈를 찾을 수 없습니다");
+  if (source.id === target.id) throw new Error("자기 자신과는 연결할 수 없습니다");
+  const duplicate = data.links.some((l) => {
+    if (l.type !== input.type) return false;
+    if (l.sourceId === input.sourceId && l.targetId === input.targetId) return true;
+    // relates는 양방향 — 무순서 중복도 막는다
+    return input.type === "relates" && l.sourceId === input.targetId && l.targetId === input.sourceId;
+  });
+  if (duplicate) throw new Error("이미 연결돼 있습니다");
+  const link: IssueLink = { id: nextId(), ...input };
+  data.links.push(link);
+  const at = new Date().toISOString();
+  const label = input.type === "blocks" ? "차단" : "관련";
+  for (const [issue, other] of [
+    [source, target],
+    [target, source],
+  ] as const) {
+    data.activities.push({
+      id: nextId(),
+      issueId: issue.id,
+      actorId: CURRENT_USER_ID,
+      type: "link",
+      detail: `${label} 링크: ${other.key}`,
+      at,
+    });
+  }
+  persist();
+  return clone(link);
+}
+
+export async function removeIssueLink(linkId: string): Promise<void> {
+  const data = load();
+  const index = data.links.findIndex((l) => l.id === linkId);
+  if (index === -1) throw new Error("링크를 찾을 수 없습니다");
+  data.links.splice(index, 1);
+  persist();
+}
+
+export interface IssueLinkView {
+  link: IssueLink;
+  other: Issue;
+  /** blocks: outward=차단함, inward=차단됨 / relates: 항상 outward(관련) */
+  direction: "outward" | "inward";
+}
+
+export async function listIssueLinks(issueId: string): Promise<IssueLinkView[]> {
+  const data = load();
+  const views: IssueLinkView[] = [];
+  for (const link of data.links) {
+    if (link.sourceId !== issueId && link.targetId !== issueId) continue;
+    const otherId = link.sourceId === issueId ? link.targetId : link.sourceId;
+    const other = data.issues.find((i) => i.id === otherId);
+    if (!other) continue;
+    const direction: IssueLinkView["direction"] =
+      link.type === "relates" || link.sourceId === issueId ? "outward" : "inward";
+    views.push({ link: clone(link), other: clone(other), direction });
+  }
+  return views;
+}
+
 /**
  * 백로그/스프린트 랭크 이동 — 대상 그룹(프로젝트+sprintId, 상태 무관)에서
  * beforeId 앞(없으면 맨 뒤)에 놓고 그룹 전체 order를 1..n로 재부여한다.
@@ -550,6 +716,10 @@ export async function deleteIssue(id: string): Promise<void> {
   data.comments = data.comments.filter((c) => c.issueId !== id);
   data.activities = data.activities.filter((a) => a.issueId !== id);
   data.notifications = data.notifications.filter((n) => n.issueId !== id);
+  data.links = data.links.filter((l) => l.sourceId !== id && l.targetId !== id);
+  for (const child of data.issues) {
+    if (child.parentId === id) child.parentId = null; // 자식은 부모만 해제
+  }
   persist();
 }
 

@@ -34,6 +34,7 @@ export function createSeedData(): JiraData {
     description: "",
     type: "task" as const,
     reporterId: "u1",
+    parentId: null as string | null,
     dueDate: null,
     labels: [] as string[],
     createdAt: now,
@@ -45,7 +46,7 @@ export function createSeedData(): JiraData {
 
   const issues: Issue[] = [
     { ...base, id: "i1", key: "ALM-1", title: "프로젝트 스캐폴드 구성", status: "done", priority: "high", assigneeId: "u1", sprintId: "s1", order: 1, labels: ["infra"] },
-    { ...base, id: "i2", key: "ALM-2", title: "칸반 보드 UI 구현", status: "inprogress", priority: "high", assigneeId: "u2", sprintId: "s1", order: 1, labels: ["frontend", "design"], dueDate: dueSoon, type: "story" },
+    { ...base, id: "i2", key: "ALM-2", title: "칸반 보드 UI 구현", status: "inprogress", priority: "high", assigneeId: "u2", sprintId: "s1", order: 1, labels: ["frontend", "design"], dueDate: dueSoon, type: "story", parentId: "i4" },
     { ...base, id: "i3", key: "ALM-3", title: "이슈 상세 모달 구현", status: "inprogress", priority: "medium", assigneeId: "u1", sprintId: "s1", order: 2, labels: ["frontend"] },
     { ...base, id: "i4", key: "ALM-4", title: "백로그 화면 구현", status: "todo", priority: "medium", assigneeId: "u3", sprintId: "s1", order: 1, dueDate: dueSoon, type: "epic" },
     { ...base, id: "i5", key: "ALM-5", title: "이슈 목록 필터 구현", status: "todo", priority: "low", assigneeId: null, sprintId: "s1", order: 2 },
@@ -136,6 +137,8 @@ export function createSeedData(): JiraData {
     activities,
     notifications,
     boards,
+    // 데모 링크: ALM-3(상세 모달)이 ALM-2(보드 UI)를 차단
+    links: [{ id: "l1", sourceId: "i3", targetId: "i2", type: "blocks" as const }],
     issueCounters: { p1: 8 },
   };
 }
