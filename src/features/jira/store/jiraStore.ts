@@ -77,7 +77,11 @@ export async function listProjects(): Promise<Project[]> {
   return clone(load().projects);
 }
 
-export async function createProject(input: { key: string; name: string }): Promise<Project> {
+export async function createProject(input: {
+  key: string;
+  name: string;
+  description?: string;
+}): Promise<Project> {
   const data = load();
   const key = input.key.trim().toUpperCase();
   const name = input.name.trim();
@@ -86,11 +90,52 @@ export async function createProject(input: { key: string; name: string }): Promi
   if (data.projects.some((p) => p.key === key)) {
     throw new Error(`이미 존재하는 프로젝트 키입니다: ${key}`);
   }
-  const project: Project = { id: nextId(), key, name, createdAt: new Date().toISOString() };
+  const project: Project = {
+    id: nextId(),
+    key,
+    name,
+    description: input.description?.trim() ?? "",
+    createdAt: new Date().toISOString(),
+  };
   data.projects.push(project);
   data.issueCounters[project.id] = 0;
   persist();
   return clone(project);
+}
+
+/** 키는 이슈 키 접두어라 불변 — 이름/설명만 수정 가능 */
+export async function updateProject(
+  id: string,
+  patch: { name?: string; description?: string },
+): Promise<Project> {
+  const data = load();
+  const project = data.projects.find((p) => p.id === id);
+  if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("프로젝트 이름을 입력하세요");
+    project.name = name;
+  }
+  if (patch.description !== undefined) {
+    project.description = patch.description.trim();
+  }
+  persist();
+  return clone(project);
+}
+
+/** 프로젝트의 스프린트·이슈·댓글·활동·이슈 카운터까지 연쇄 삭제한다 */
+export async function deleteProject(id: string): Promise<void> {
+  const data = load();
+  const index = data.projects.findIndex((p) => p.id === id);
+  if (index === -1) throw new Error("프로젝트를 찾을 수 없습니다");
+  const issueIds = new Set(data.issues.filter((i) => i.projectId === id).map((i) => i.id));
+  data.projects.splice(index, 1);
+  data.sprints = data.sprints.filter((s) => s.projectId !== id);
+  data.issues = data.issues.filter((i) => i.projectId !== id);
+  data.comments = data.comments.filter((c) => !issueIds.has(c.issueId));
+  data.activities = data.activities.filter((a) => !issueIds.has(a.issueId));
+  delete data.issueCounters[id];
+  persist();
 }
 
 // ── 라벨 매핑 (활동로그 detail용) ─────────────────────────────

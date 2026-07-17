@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   __resetForTest,
+  addComment,
+  createIssue,
   createProject,
+  createSprint,
+  deleteProject,
   getCurrentUser,
+  listComments,
+  listIssues,
   listProjects,
+  listSprints,
   listUsers,
+  updateProject,
 } from "./jiraStore";
 
 beforeEach(() => {
@@ -68,5 +76,69 @@ describe("projects", () => {
     expect(projects).toHaveLength(1);
     expect(projects[0].key).toBe("ALM");
     expect(localStorage.getItem("alm.jira.v1")).not.toContain("corrupted");
+  });
+
+  it("createProject는 설명을 함께 저장한다 (미지정이면 빈 문자열)", async () => {
+    const withDesc = await createProject({ key: "PAY", name: "결제", description: "결제 서비스" });
+    expect(withDesc.description).toBe("결제 서비스");
+    const withoutDesc = await createProject({ key: "OPS", name: "운영" });
+    expect(withoutDesc.description).toBe("");
+  });
+});
+
+describe("updateProject", () => {
+  it("이름/설명을 수정하고 키는 그대로 유지한다", async () => {
+    const [project] = await listProjects();
+    const updated = await updateProject(project.id, {
+      name: "ALM 플랫폼 v2",
+      description: "새 설명",
+    });
+    expect(updated).toMatchObject({ key: "ALM", name: "ALM 플랫폼 v2", description: "새 설명" });
+  });
+
+  it("이름이 공백이면 거부한다", async () => {
+    const [project] = await listProjects();
+    await expect(updateProject(project.id, { name: "  " })).rejects.toThrow(
+      "프로젝트 이름을 입력하세요",
+    );
+  });
+
+  it("없는 프로젝트면 거부한다", async () => {
+    await expect(updateProject("nope", { name: "x" })).rejects.toThrow(
+      "프로젝트를 찾을 수 없습니다",
+    );
+  });
+});
+
+describe("deleteProject", () => {
+  it("프로젝트와 스프린트·이슈·댓글이 연쇄 삭제된다", async () => {
+    const [project] = await listProjects();
+    const issues = await listIssues(project.id);
+    expect(issues.length).toBeGreaterThan(0);
+    const comment = await addComment(issues[0].id, "곧 사라질 댓글");
+
+    await deleteProject(project.id);
+
+    expect(await listProjects()).toHaveLength(0);
+    expect(await listIssues(project.id)).toHaveLength(0);
+    expect(await listSprints(project.id)).toHaveLength(0);
+    expect(await listComments(comment.issueId)).toHaveLength(0);
+  });
+
+  it("다른 프로젝트의 데이터는 건드리지 않는다", async () => {
+    const other = await createProject({ key: "PAY", name: "결제" });
+    await createSprint(other.id);
+    await createIssue({ projectId: other.id, title: "살아남을 이슈" });
+
+    const [alm] = await listProjects();
+    await deleteProject(alm.id);
+
+    expect((await listProjects()).map((p) => p.key)).toEqual(["PAY"]);
+    expect(await listIssues(other.id)).toHaveLength(1);
+    expect(await listSprints(other.id)).toHaveLength(1);
+  });
+
+  it("없는 프로젝트면 거부한다", async () => {
+    await expect(deleteProject("nope")).rejects.toThrow("프로젝트를 찾을 수 없습니다");
   });
 });
