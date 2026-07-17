@@ -50,6 +50,79 @@ body {
   gap: var(--chanho-space-200);
 }
 
+/* ── 프로젝트 목록 (JiraLayout 밖 단독 페이지) ──────────── */
+
+.project-list-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--chanho-color-background-default);
+}
+
+.project-list-content {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: var(--chanho-space-400);
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-300);
+  box-sizing: border-box;
+}
+
+.project-name-cell {
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.project-desc-cell {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  color: var(--chanho-color-text-subtle);
+}
+
+.project-desc-empty {
+  color: var(--chanho-color-text-subtlest);
+  font-style: italic;
+}
+
+.project-key-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.project-key-readonly-label {
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-subtle);
+}
+
+.project-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.project-delete-confirm p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.project-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.sidenav-footer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
 /* ── 칸반 보드 ──────────────────────────────────────────── */
 
 .board-loading {

@@ -59,12 +59,17 @@ export function JiraLayout({ projects, onProjectsChanged }: JiraLayoutProps) {
           />
         }
         footer={
-          <ProjectCreateModal
-            onCreated={async (project) => {
-              await onProjectsChanged();
-              navigate(`/projects/${project.id}/board`);
-            }}
-          />
+          <div className="sidenav-footer-actions">
+            <ProjectCreateModal
+              onCreated={async (project) => {
+                await onProjectsChanged();
+                navigate(`/projects/${project.id}/board`);
+              }}
+            />
+            <Button variant="ghost" onClick={() => navigate("/projects")}>
+              프로젝트 관리
+            </Button>
+          </div>
         }
       />
       <div className="jira-main">

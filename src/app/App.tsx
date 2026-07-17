@@ -8,6 +8,7 @@ import { EmptyProjects } from "../features/jira/components/EmptyProjects";
 import { BoardPage } from "../features/jira/pages/BoardPage";
 import { BacklogPage } from "../features/jira/pages/BacklogPage";
 import { IssueListPage } from "../features/jira/pages/IssueListPage";
+import { ProjectListPage } from "../features/jira/pages/ProjectListPage";
 
 export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -34,6 +35,10 @@ export function App() {
 
   return (
     <Routes>
+      <Route
+        path="/projects"
+        element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}
+      />
       <Route
         path="/projects/:projectId"
         element={<JiraLayout projects={projects} onProjectsChanged={reload} />}

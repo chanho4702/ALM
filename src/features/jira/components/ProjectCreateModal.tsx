@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Button, Modal, TextField, useToast } from "@chanho/react";
+import { Button, Modal, TextArea, TextField, useToast } from "@chanho/react";
 import type { Project } from "../store/types";
 import { createProject } from "../store/jiraStore";
 
@@ -27,6 +27,7 @@ export function ProjectCreateModal({
   const open = isControlled ? openProp : openState;
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
+  const [description, setDescription] = useState("");
   const toast = useToast();
 
   const handleOpenChange = (next: boolean) => {
@@ -35,13 +36,14 @@ export function ProjectCreateModal({
     if (!next) {
       setName("");
       setKey("");
+      setDescription("");
     }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      const project = await createProject({ key, name });
+      const project = await createProject({ key, name, description });
       toast({ title: `프로젝트 ${project.key}를 만들었습니다`, appearance: "success" });
       handleOpenChange(false);
       await onCreated(project);
@@ -75,6 +77,13 @@ export function ProjectCreateModal({
           onChange={(e) => setKey(e.target.value.toUpperCase())}
           placeholder="예: PAY"
           description="대문자로 자동 변환됩니다"
+        />
+        <TextArea
+          label="설명"
+          rows={3}
+          placeholder="프로젝트 설명 (선택)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         />
         <Button type="submit" disabled={!name.trim() || !key.trim()}>
           만들기
