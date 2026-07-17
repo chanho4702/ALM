@@ -69,23 +69,116 @@ body {
   box-sizing: border-box;
 }
 
-.project-name-cell {
-  font-weight: var(--chanho-font-weight-semibold);
+/* 홈에서도 브랜드는 클릭 → 프로젝트 디렉터리 */
+.jira-brand-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 
-.project-desc-cell {
-  display: inline-block;
-  max-width: 320px;
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--chanho-space-200);
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.project-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-150);
+}
+
+/* 키 이니셜 아바타 — 스틸 블루 단일 액센트 */
+.project-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-brand);
+  color: var(--chanho-color-text-inverse);
+  font-size: var(--chanho-font-size-300);
+  font-weight: var(--chanho-font-weight-bold);
+}
+
+.project-card-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.project-card-title h3 {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
+}
+
+.project-card-desc {
+  margin: 0;
+  min-height: 2.8em;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.project-card-meta {
+  display: flex;
+  gap: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }
 
-.project-desc-empty {
-  color: var(--chanho-color-text-subtlest);
-  font-style: italic;
+.project-card-actions {
+  display: flex;
+  gap: var(--chanho-space-100);
+  padding-top: var(--chanho-space-100);
+  border-top: 1px solid var(--chanho-color-border-default);
+}
+
+.project-form-content {
+  width: min(560px, 100%);
+}
+
+.project-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.project-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-300);
+  max-width: 560px;
+}
+
+.project-danger-zone {
+  border-color: var(--chanho-color-border-danger);
+}
+
+.project-danger-desc {
+  margin: 0 0 var(--chanho-space-200);
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+  line-height: 1.5;
 }
 
 .project-key-readonly {

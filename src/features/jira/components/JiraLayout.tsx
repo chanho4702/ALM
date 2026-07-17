@@ -4,13 +4,18 @@ import { Avatar, Button, Select, SideNav, TopBar } from "@chanho/react";
 import type { SideNavItem } from "@chanho/react";
 import type { Project, User } from "../store/types";
 import { getCurrentUser } from "../store/jiraStore";
-import { ProjectCreateModal } from "./ProjectCreateModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "../../../auth/AuthGate";
 
 export interface JiraLayoutProps {
   projects: Project[];
-  /** 프로젝트 목록이 바뀌었을 때(생성 등) App이 다시 로드하도록 알린다 */
+  /** 프로젝트 목록이 바뀌었을 때(수정/삭제 등) App이 다시 로드하도록 알린다 */
+  onProjectsChanged: () => void | Promise<void>;
+}
+
+/** Outlet 하위 페이지(설정 등)가 useOutletContext로 받는 값 */
+export interface JiraOutletContext {
+  projects: Project[];
   onProjectsChanged: () => void | Promise<void>;
 }
 
@@ -19,6 +24,7 @@ const NAV_ITEMS: SideNavItem[] = [
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },
   { id: "issues", label: "이슈" },
+  { id: "settings", label: "설정" },
 ];
 
 export function JiraLayout({ projects, onProjectsChanged }: JiraLayoutProps) {
@@ -35,8 +41,8 @@ export function JiraLayout({ projects, onProjectsChanged }: JiraLayoutProps) {
 
   const current = projects.find((p) => p.id === projectId);
   if (!current) {
-    // 존재하지 않는 프로젝트 ID → 첫 프로젝트 보드로
-    return <Navigate to={`/projects/${projects[0].id}/board`} replace />;
+    // 프로젝트가 없거나 존재하지 않는 ID → 프로젝트 디렉터리로
+    return <Navigate to="/projects" replace />;
   }
 
   // 현재 경로의 마지막 세그먼트로 활성 항목을 판별한다
@@ -61,21 +67,26 @@ export function JiraLayout({ projects, onProjectsChanged }: JiraLayoutProps) {
         }
         footer={
           <div className="sidenav-footer-actions">
-            <ProjectCreateModal
-              onCreated={async (project) => {
-                await onProjectsChanged();
-                navigate(`/projects/${project.id}/board`);
-              }}
-            />
+            <Button variant="secondary" onClick={() => navigate("/projects/new")}>
+              새 프로젝트
+            </Button>
             <Button variant="ghost" onClick={() => navigate("/projects")}>
-              프로젝트 관리
+              모든 프로젝트
             </Button>
           </div>
         }
       />
       <div className="jira-main">
         <TopBar
-          brand={<span className="jira-brand">ALM</span>}
+          brand={
+            <button
+              type="button"
+              className="jira-brand jira-brand-link"
+              onClick={() => navigate("/projects")}
+            >
+              ALM
+            </button>
+          }
           actions={
             <>
               <ThemeToggle />
@@ -92,7 +103,7 @@ export function JiraLayout({ projects, onProjectsChanged }: JiraLayoutProps) {
           }
         />
         <main className="jira-content">
-          <Outlet />
+          <Outlet context={{ projects, onProjectsChanged } satisfies JiraOutletContext} />
         </main>
       </div>
     </div>

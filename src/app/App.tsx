@@ -4,11 +4,12 @@ import { Spinner } from "@chanho/react";
 import type { Project } from "../features/jira/store/types";
 import { listProjects } from "../features/jira/store/jiraStore";
 import { JiraLayout } from "../features/jira/components/JiraLayout";
-import { EmptyProjects } from "../features/jira/components/EmptyProjects";
 import { BoardPage } from "../features/jira/pages/BoardPage";
 import { BacklogPage } from "../features/jira/pages/BacklogPage";
 import { IssueListPage } from "../features/jira/pages/IssueListPage";
 import { ProjectListPage } from "../features/jira/pages/ProjectListPage";
+import { ProjectCreatePage } from "../features/jira/pages/ProjectCreatePage";
+import { ProjectSettingsPage } from "../features/jira/pages/ProjectSettingsPage";
 import { DashboardPage } from "../features/jira/pages/DashboardPage";
 
 export function App() {
@@ -30,16 +31,14 @@ export function App() {
     );
   }
 
-  if (projects.length === 0) {
-    return <EmptyProjects onCreated={reload} />;
-  }
-
   return (
     <Routes>
+      {/* 프로젝트 디렉터리가 앱의 홈이다 — 빈 상태(0개)도 이 페이지가 처리한다 */}
       <Route
         path="/projects"
         element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}
       />
+      <Route path="/projects/new" element={<ProjectCreatePage onProjectsChanged={reload} />} />
       <Route
         path="/projects/:projectId"
         element={<JiraLayout projects={projects} onProjectsChanged={reload} />}
@@ -48,9 +47,10 @@ export function App() {
         <Route path="board" element={<BoardPage />} />
         <Route path="backlog" element={<BacklogPage />} />
         <Route path="issues" element={<IssueListPage />} />
+        <Route path="settings" element={<ProjectSettingsPage />} />
       </Route>
-      {/* "/" 포함 그 외 전부 → 첫 프로젝트 보드 */}
-      <Route path="*" element={<Navigate to={`/projects/${projects[0].id}/board`} replace />} />
+      {/* "/" 포함 그 외 전부 → 프로젝트 디렉터리 */}
+      <Route path="*" element={<Navigate to="/projects" replace />} />
     </Routes>
   );
 }
