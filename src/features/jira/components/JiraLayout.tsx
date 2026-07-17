@@ -15,6 +15,7 @@ export interface JiraLayoutProps {
 }
 
 const NAV_ITEMS: SideNavItem[] = [
+  { id: "dashboard", label: "대시보드" },
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },
   { id: "issues", label: "이슈" },

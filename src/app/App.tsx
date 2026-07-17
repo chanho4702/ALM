@@ -9,6 +9,7 @@ import { BoardPage } from "../features/jira/pages/BoardPage";
 import { BacklogPage } from "../features/jira/pages/BacklogPage";
 import { IssueListPage } from "../features/jira/pages/IssueListPage";
 import { ProjectListPage } from "../features/jira/pages/ProjectListPage";
+import { DashboardPage } from "../features/jira/pages/DashboardPage";
 
 export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -43,6 +44,7 @@ export function App() {
         path="/projects/:projectId"
         element={<JiraLayout projects={projects} onProjectsChanged={reload} />}
       >
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="board" element={<BoardPage />} />
         <Route path="backlog" element={<BacklogPage />} />
         <Route path="issues" element={<IssueListPage />} />

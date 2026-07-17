@@ -413,6 +413,119 @@ body {
   gap: var(--chanho-space-100);
 }
 
+/* ── 대시보드 ───────────────────────────────────────────── */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-300);
+}
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--chanho-space-200);
+}
+
+@media (max-width: 900px) {
+  .dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 상태 카운트 타일 — 왼쪽 액센트가 상태 색 언어를 잇는다 */
+.stat-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  overflow: hidden;
+}
+
+.stat-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+}
+
+.stat-tile-brand::before {
+  background: var(--chanho-color-background-brand);
+}
+
+.stat-tile-neutral::before {
+  background: var(--chanho-color-background-neutral-pressed);
+}
+
+.stat-tile-info::before {
+  background: var(--chanho-color-background-info);
+}
+
+.stat-tile-success::before {
+  background: var(--chanho-color-background-success);
+}
+
+.stat-tile-label {
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-subtle);
+  letter-spacing: 0.02em;
+}
+
+.stat-tile-value {
+  font-size: var(--chanho-font-size-500);
+  font-weight: var(--chanho-font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.stat-tile-sub {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtlest, var(--chanho-color-text-subtle));
+}
+
+.assignee-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assignee-stat-row {
+  display: grid;
+  grid-template-columns: 24px 96px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: var(--chanho-space-150);
+}
+
+.assignee-stat-unassigned {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.assignee-stat-name {
+  font-size: var(--chanho-font-size-100);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignee-stat-count {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── 이슈 상세 코멘트/활동 탭 ───────────────────────────── */
 
 .issue-tabs {
