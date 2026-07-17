@@ -33,7 +33,7 @@ UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이�
 ```bash
 pnpm install                       # ../design-system/artifacts 의 tarball 필요
 pnpm dev --port 5175 --strictPort  # http://localhost:5175/alm/
-pnpm test                          # vitest run (138 test cases)
+pnpm test                          # vitest run (161 test cases)
 pnpm typecheck                     # tsc --noEmit
 pnpm build                         # vite build (→ dist/)
 ```
@@ -85,7 +85,7 @@ pnpm build                         # vite build (→ dist/)
 - **프로젝트 셸(`ProjectLayout`)** — 브레드크럼 + 프로젝트 헤더(해시 색 아바타 `ProjectAvatar` + ★별표) + 가로 뷰 탭(요약·타임라인·보드·백로그·이슈·설정). 이슈 키 접두어(`ALM-1`).
 - **대시보드 `DashboardPage`** — 상태별 이슈 카운트 + 담당자별 분포.
 - **타임라인 `TimelinePage`** — 간트형 막대(생성일→마감일, 상태 색), 오늘 마커.
-- **칸반 보드 `BoardPage`** — 할 일/진행 중/완료 3컬럼, `@dnd-kit` 드래그 이동(활성 스프린트 이슈), 컬럼 하단 인라인 이슈 생성(`BoardColumn`).
+- **다중 보드 `BoardPage`** — 프로젝트당 여러 보드(**스크럼**=활성 스프린트 / **칸반**=전체 흐름). 보드는 "보는 방법"만 저장하는 필터 뷰(저장 필터: 담당자/타입/라벨). 퀵 필터바(검색·담당자 아바타 토글·타입/라벨), 담당자 **스윔레인**(그룹 전환), 컬럼 이름/**WIP 제한**(초과 danger 강조), 보드 설정 모달(`BoardSettingsModal`), 사이드바 보드 중첩+`BoardCreateModal`. `@dnd-kit` 드래그·컬럼 하단 인라인 생성(`BoardColumn`).
 - **백로그/스프린트 `BacklogPage`** — 스프린트 생성·시작·완료, 인라인 이슈 생성(`SprintPanel`).
 - **이슈 목록 `IssueListPage`** — 테이블 + 필터(검색/상태/우선순위/담당자/라벨) + 정렬.
 - **이슈 상세 `IssueDetailModal`** — `?issue=ALM-1` 쿼리로 열리는 공유 가능 모달(`useIssueModal`). 인라인 편집·속성 패널·코멘트·활동로그.
@@ -109,7 +109,8 @@ pnpm build                         # vite build (→ dist/)
 | `/projects/new` | `ProjectCreatePage` |
 | `/projects/:projectId/dashboard` | `DashboardPage` |
 | `/projects/:projectId/timeline` | `TimelinePage` |
-| `/projects/:projectId/board` | `BoardPage` |
+| `/projects/:projectId/board` | 기본 보드로 redirect (`BoardRedirect`, `?issue` 보존) |
+| `/projects/:projectId/boards/:boardId` | `BoardPage` |
 | `/projects/:projectId/backlog` | `BacklogPage` |
 | `/projects/:projectId/issues` | `IssueListPage` |
 | `/projects/:projectId/settings` | `ProjectSettingsPage` |
