@@ -1,5 +1,6 @@
 import type {
   Activity,
+  Board,
   Comment,
   Issue,
   JiraData,
@@ -92,6 +93,40 @@ export function createSeedData(): JiraData {
     },
   ];
 
+  // 기본 스크럼 보드 + 칸반 보드(라벨 필터·WIP 데모)
+  const boards: Board[] = [
+    {
+      id: "b1",
+      projectId: "p1",
+      name: "메인 보드",
+      type: "scrum",
+      filter: { assigneeIds: [], types: [], labels: [] },
+      columns: [
+        { status: "todo", name: "할 일", wipLimit: null },
+        { status: "inprogress", name: "진행 중", wipLimit: null },
+        { status: "done", name: "완료", wipLimit: null },
+      ],
+      swimlane: "none",
+      isDefault: true,
+      createdAt: now,
+    },
+    {
+      id: "b2",
+      projectId: "p1",
+      name: "백엔드 팀",
+      type: "kanban",
+      filter: { assigneeIds: [], types: [], labels: ["backend"] },
+      columns: [
+        { status: "todo", name: "할 일", wipLimit: null },
+        { status: "inprogress", name: "진행 중", wipLimit: 2 },
+        { status: "done", name: "완료", wipLimit: null },
+      ],
+      swimlane: "none",
+      isDefault: false,
+      createdAt: now,
+    },
+  ];
+
   return {
     users: [...MOCK_USERS],
     projects: [project],
@@ -100,6 +135,7 @@ export function createSeedData(): JiraData {
     comments,
     activities,
     notifications,
+    boards,
     issueCounters: { p1: 8 },
   };
 }

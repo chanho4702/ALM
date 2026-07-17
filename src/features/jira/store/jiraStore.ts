@@ -1,5 +1,7 @@
 import type {
   Activity,
+  Board,
+  BoardType,
   Comment,
   Issue,
   IssuePriority,
@@ -18,6 +20,29 @@ const STORAGE_KEY = "alm.jira.v1";
 
 let cache: JiraData | null = null;
 
+/** 기본 3컬럼(할 일/진행 중/완료, WIP 없음)의 보드를 만든다 */
+export function defaultBoard(
+  projectId: string,
+  name = "메인 보드",
+  type: BoardType = "scrum",
+): Board {
+  return {
+    id: nextId(),
+    projectId,
+    name,
+    type,
+    filter: { assigneeIds: [], types: [], labels: [] },
+    columns: [
+      { status: "todo", name: "할 일", wipLimit: null },
+      { status: "inprogress", name: "진행 중", wipLimit: null },
+      { status: "done", name: "완료", wipLimit: null },
+    ],
+    swimlane: "none",
+    isDefault: true,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 /** 필드가 추가되기 전 저장된 v1 데이터를 현재 스키마로 승격한다 (스토리지 키는 유지) */
 function normalize(data: JiraData): JiraData {
   for (const project of data.projects) {
@@ -29,6 +54,13 @@ function normalize(data: JiraData): JiraData {
     issue.type ??= "task";
   }
   data.notifications ??= [];
+  data.boards ??= [];
+  // 보드가 없는 프로젝트에는 기본 스크럼 보드를 만들어 기존 데이터/URL과 호환한다
+  for (const project of data.projects) {
+    if (!data.boards.some((b) => b.projectId === project.id)) {
+      data.boards.push(defaultBoard(project.id));
+    }
+  }
   return data;
 }
 
@@ -139,6 +171,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.comments = data.comments.filter((c) => !issueIds.has(c.issueId));
   data.activities = data.activities.filter((a) => !issueIds.has(a.issueId));
   data.notifications = data.notifications.filter((n) => !issueIds.has(n.issueId));
+  data.boards = data.boards.filter((b) => b.projectId !== id);
   delete data.issueCounters[id];
   persist();
 }
@@ -549,6 +582,128 @@ export async function deleteComment(id: string): Promise<void> {
   }
   data.comments.splice(index, 1);
   persist();
+}
+
+// ── boards ───────────────────────────────────────────────────
+
+/** 기본 보드 우선, 이후 생성순 */
+export async function listBoards(projectId: string): Promise<Board[]> {
+  return clone(
+    load()
+      .boards.filter((b) => b.projectId === projectId)
+      .sort((a, b) =>
+        a.isDefault === b.isDefault
+          ? a.createdAt.localeCompare(b.createdAt)
+          : a.isDefault
+            ? -1
+            : 1,
+      ),
+  );
+}
+
+export async function getBoard(id: string): Promise<Board | null> {
+  const board = load().boards.find((b) => b.id === id);
+  return board ? clone(board) : null;
+}
+
+export async function createBoard(input: {
+  projectId: string;
+  name: string;
+  type: BoardType;
+}): Promise<Board> {
+  const data = load();
+  if (!data.projects.some((p) => p.id === input.projectId)) {
+    throw new Error("프로젝트를 찾을 수 없습니다");
+  }
+  const name = input.name.trim();
+  if (!name) throw new Error("보드 이름을 입력하세요");
+  const board = { ...defaultBoard(input.projectId, name, input.type), isDefault: false };
+  data.boards.push(board);
+  persist();
+  return clone(board);
+}
+
+/** columns 패치는 status 3종 각 1개·WIP(null 또는 1 이상 정수)를 검증한다 */
+function validateColumns(columns: Board["columns"]): void {
+  const statuses = columns.map((c) => c.status).sort();
+  if (columns.length !== 3 || statuses.join() !== ["done", "inprogress", "todo"].join()) {
+    throw new Error("컬럼은 할 일/진행 중/완료 각 1개여야 합니다");
+  }
+  for (const column of columns) {
+    if (!column.name.trim()) throw new Error("컬럼 이름을 입력하세요");
+    if (column.wipLimit !== null && (!Number.isInteger(column.wipLimit) || column.wipLimit < 1)) {
+      throw new Error("WIP 제한은 1 이상의 정수여야 합니다");
+    }
+  }
+}
+
+export async function updateBoard(
+  id: string,
+  patch: Partial<Pick<Board, "name" | "filter" | "columns" | "swimlane" | "isDefault">>,
+): Promise<Board> {
+  const data = load();
+  const board = data.boards.find((b) => b.id === id);
+  if (!board) throw new Error("보드를 찾을 수 없습니다");
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("보드 이름을 입력하세요");
+    board.name = name;
+  }
+  if (patch.columns !== undefined) {
+    validateColumns(patch.columns);
+    board.columns = patch.columns;
+  }
+  if (patch.filter !== undefined) board.filter = patch.filter;
+  if (patch.swimlane !== undefined) board.swimlane = patch.swimlane;
+  if (patch.isDefault === true) {
+    for (const other of data.boards) {
+      if (other.projectId === board.projectId) other.isDefault = other.id === board.id;
+    }
+  }
+  persist();
+  return clone(board);
+}
+
+export async function deleteBoard(id: string): Promise<void> {
+  const data = load();
+  const board = data.boards.find((b) => b.id === id);
+  if (!board) throw new Error("보드를 찾을 수 없습니다");
+  const siblings = data.boards.filter((b) => b.projectId === board.projectId);
+  if (siblings.length <= 1) throw new Error("마지막 보드는 삭제할 수 없습니다");
+  data.boards = data.boards.filter((b) => b.id !== id);
+  // 기본 보드를 지웠으면 남은 첫 보드를 기본으로 승격
+  if (board.isDefault) {
+    const remaining = data.boards
+      .filter((b) => b.projectId === board.projectId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (remaining[0]) remaining[0].isDefault = true;
+  }
+  persist();
+}
+
+/**
+ * 보드에 보이는 이슈 — scrum: 활성 스프린트(없으면 빈 배열), kanban: 프로젝트 전체.
+ * 공통으로 보드 저장 필터를 적용한다. 퀵 필터는 화면 몫이다.
+ */
+export async function listBoardIssues(boardId: string): Promise<Issue[]> {
+  const data = load();
+  const board = data.boards.find((b) => b.id === boardId);
+  if (!board) throw new Error("보드를 찾을 수 없습니다");
+  let issues = data.issues.filter((i) => i.projectId === board.projectId);
+  if (board.type === "scrum") {
+    const active = data.sprints.find((s) => s.projectId === board.projectId && s.state === "active");
+    if (!active) return [];
+    issues = issues.filter((i) => i.sprintId === active.id);
+  }
+  const { assigneeIds, types, labels } = board.filter;
+  if (assigneeIds.length > 0) {
+    issues = issues.filter((i) =>
+      i.assigneeId === null ? assigneeIds.includes("unassigned") : assigneeIds.includes(i.assigneeId),
+    );
+  }
+  if (types.length > 0) issues = issues.filter((i) => types.includes(i.type));
+  if (labels.length > 0) issues = issues.filter((i) => i.labels.some((l) => labels.includes(l)));
+  return clone([...issues].sort((a, b) => a.order - b.order));
 }
 
 // ── notifications ────────────────────────────────────────────
