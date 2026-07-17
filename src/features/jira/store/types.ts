@@ -5,8 +5,9 @@ export interface User {
 
 export interface Project {
   id: string;
-  key: string; // "ALM" 같은 대문자 접두어
+  key: string; // "ALM" 같은 대문자 접두어 — 생성 후 불변 (이슈 키 접두어 보전)
   name: string;
+  description: string;
   createdAt: string;
 }
 
@@ -33,6 +34,8 @@ export interface Issue {
   assigneeId: string | null;
   reporterId: string;
   sprintId: string | null; // null = 백로그
+  dueDate: string | null; // "YYYY-MM-DD", null = 미지정
+  labels: string[]; // 자유 문자열 라벨
   order: number; // 컬럼/목록 내 정렬
   createdAt: string;
   updatedAt: string;
@@ -44,13 +47,14 @@ export interface Comment {
   authorId: string;
   body: string;
   createdAt: string;
+  updatedAt?: string; // 수정된 댓글만 값 존재 ("수정됨" 표시 근거)
 }
 
 export interface Activity {
   id: string;
   issueId: string;
   actorId: string;
-  type: "created" | "status" | "assignee" | "priority" | "sprint";
+  type: "created" | "status" | "assignee" | "priority" | "sprint" | "duedate" | "labels";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }

@@ -16,12 +16,24 @@ const STORAGE_KEY = "alm.jira.v1";
 
 let cache: JiraData | null = null;
 
+/** 필드가 추가되기 전 저장된 v1 데이터를 현재 스키마로 승격한다 (스토리지 키는 유지) */
+function normalize(data: JiraData): JiraData {
+  for (const project of data.projects) {
+    project.description ??= "";
+  }
+  for (const issue of data.issues) {
+    issue.dueDate ??= null;
+    issue.labels ??= [];
+  }
+  return data;
+}
+
 function load(): JiraData {
   if (cache) return cache;
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
     try {
-      cache = JSON.parse(raw) as JiraData;
+      cache = normalize(JSON.parse(raw) as JiraData);
     } catch {
       // 손상된 JSON — 시드로 재생성
     }
