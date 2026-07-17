@@ -150,6 +150,7 @@ alm-front/
 
 ## 문서
 
-- 설계: `docs/superpowers/specs/` (지라 클론 디자인·셸 리디자인·gap 설계)
-- 구현 계획(웨이브별): `docs/superpowers/plans/`
+- **현황 스냅샷: `docs/STATUS.md`** — 어디까지 했고 무엇이 남았나 (여기부터 읽기)
+- 설계: `docs/superpowers/specs/` (셸 리디자인·다중 보드·백로그 DnD·이슈 관계·상세 검색·템플릿)
+- 구현 계획(태스크별): `docs/superpowers/plans/`
 - 백엔드 의존 기능 백로그: `docs/BACKLOG.md` (첨부·실시간 협업·알림 푸시·권한 — jira-service 도입 시)
