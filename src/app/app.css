@@ -466,6 +466,77 @@ body {
   color: var(--chanho-color-text-subtle);
 }
 
+/* ── 알림 ───────────────────────────────────────────────── */
+
+.notification-bell {
+  position: relative;
+}
+
+.notification-bell .chanho-badge,
+.notification-bell [class*="badge"] {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+}
+
+.notifications-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.notifications-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notifications-unread {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.notification-row.is-unread .notification-dot {
+  background: var(--chanho-color-background-brand);
+}
+
+.notification-row.is-unread .notification-message {
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.notification-message {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-time {
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-regular, 400);
+  color: var(--chanho-color-text-subtle);
+}
+
 /* ── 칸반 보드 ──────────────────────────────────────────── */
 
 .board-loading {
@@ -511,6 +582,24 @@ body {
   min-height: 60px; /* 빈 컬럼도 드롭 영역 확보 */
 }
 
+/* 컬럼 하단 인라인 생성 — 지라의 "+ 만들기" */
+.board-column-add {
+  justify-content: flex-start;
+  color: var(--chanho-color-text-subtle);
+}
+
+.board-column-create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.board-column-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
 /* interactive Card(button) 위에 얹는 레이아웃 — 색/그림자는 Card가 제공 */
 .issue-card {
   display: flex;
@@ -538,6 +627,42 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--chanho-space-50);
+}
+
+/* 이슈 타입 글리프 — 지라 타입 아이콘의 색 언어 (작업 파랑/스토리 초록/버그 빨강/에픽 주황) */
+.issue-type-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: var(--chanho-radius-small);
+  color: var(--chanho-color-text-inverse);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.issue-type-glyph.type-task {
+  background: var(--chanho-color-background-info);
+}
+
+.issue-type-glyph.type-story {
+  background: var(--chanho-color-background-success);
+}
+
+.issue-type-glyph.type-bug {
+  background: var(--chanho-color-background-danger);
+}
+
+.issue-type-glyph.type-epic {
+  background: var(--chanho-color-background-warning);
+}
+
+/* 지연된 마감일 — 완료 전인데 날짜가 지났다 */
+.due-cell.is-overdue {
+  color: var(--chanho-color-text-danger);
+  font-weight: var(--chanho-font-weight-semibold);
 }
 
 .issue-card-key {
@@ -737,7 +862,7 @@ body {
 
 .issue-filter-bar {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr repeat(5, minmax(0, 1fr));
   gap: var(--chanho-space-150);
   align-items: end;
   margin-bottom: var(--chanho-space-300);

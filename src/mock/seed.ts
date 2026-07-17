@@ -1,4 +1,12 @@
-import type { Activity, Comment, Issue, JiraData, Project, Sprint } from "../features/jira/store/types";
+import type {
+  Activity,
+  Comment,
+  Issue,
+  JiraData,
+  Notification,
+  Project,
+  Sprint,
+} from "../features/jira/store/types";
 import { MOCK_USERS } from "./users";
 
 export function createSeedData(): JiraData {
@@ -23,6 +31,7 @@ export function createSeedData(): JiraData {
   const base = {
     projectId: "p1",
     description: "",
+    type: "task" as const,
     reporterId: "u1",
     dueDate: null,
     labels: [] as string[],
@@ -35,13 +44,13 @@ export function createSeedData(): JiraData {
 
   const issues: Issue[] = [
     { ...base, id: "i1", key: "ALM-1", title: "프로젝트 스캐폴드 구성", status: "done", priority: "high", assigneeId: "u1", sprintId: "s1", order: 1, labels: ["infra"] },
-    { ...base, id: "i2", key: "ALM-2", title: "칸반 보드 UI 구현", status: "inprogress", priority: "high", assigneeId: "u2", sprintId: "s1", order: 1, labels: ["frontend", "design"], dueDate: dueSoon },
+    { ...base, id: "i2", key: "ALM-2", title: "칸반 보드 UI 구현", status: "inprogress", priority: "high", assigneeId: "u2", sprintId: "s1", order: 1, labels: ["frontend", "design"], dueDate: dueSoon, type: "story" },
     { ...base, id: "i3", key: "ALM-3", title: "이슈 상세 모달 구현", status: "inprogress", priority: "medium", assigneeId: "u1", sprintId: "s1", order: 2, labels: ["frontend"] },
-    { ...base, id: "i4", key: "ALM-4", title: "백로그 화면 구현", status: "todo", priority: "medium", assigneeId: "u3", sprintId: "s1", order: 1, dueDate: dueSoon },
+    { ...base, id: "i4", key: "ALM-4", title: "백로그 화면 구현", status: "todo", priority: "medium", assigneeId: "u3", sprintId: "s1", order: 1, dueDate: dueSoon, type: "epic" },
     { ...base, id: "i5", key: "ALM-5", title: "이슈 목록 필터 구현", status: "todo", priority: "low", assigneeId: null, sprintId: "s1", order: 2 },
     { ...base, id: "i6", key: "ALM-6", title: "코멘트 기능 구현", status: "todo", priority: "medium", assigneeId: "u4", sprintId: null, order: 1, labels: ["backend"] },
     { ...base, id: "i7", key: "ALM-7", title: "활동 로그 표시", status: "todo", priority: "low", assigneeId: null, sprintId: null, order: 2 },
-    { ...base, id: "i8", key: "ALM-8", title: "다크 테마 점검", status: "todo", priority: "low", assigneeId: null, sprintId: null, order: 3, labels: ["design"] },
+    { ...base, id: "i8", key: "ALM-8", title: "다크 테마 점검", status: "todo", priority: "low", assigneeId: null, sprintId: null, order: 3, labels: ["design"], type: "bug" },
   ];
 
   const comments: Comment[] = [
@@ -59,6 +68,30 @@ export function createSeedData(): JiraData {
     at: now,
   }));
 
+  // 목업은 단일 사용자(u1)라 실시간 알림이 생성될 일이 없으므로 시드로 데모 데이터를 준다
+  const notifications: Notification[] = [
+    {
+      id: "n1",
+      userId: "u1",
+      issueId: "i2",
+      issueKey: "ALM-2",
+      actorId: "u2",
+      message: "이서연 님이 ALM-2에 코멘트를 남겼습니다",
+      at: now,
+      read: false,
+    },
+    {
+      id: "n2",
+      userId: "u1",
+      issueId: "i3",
+      issueKey: "ALM-3",
+      actorId: "u3",
+      message: "박준영 님이 ALM-3을 나에게 할당했습니다",
+      at: now,
+      read: false,
+    },
+  ];
+
   return {
     users: [...MOCK_USERS],
     projects: [project],
@@ -66,6 +99,7 @@ export function createSeedData(): JiraData {
     issues,
     comments,
     activities,
+    notifications,
     issueCounters: { p1: 8 },
   };
 }

@@ -95,3 +95,45 @@ describe("AppShell 전역 검색", () => {
     expect(await within(dialog).findByText("결과가 없습니다")).toBeInTheDocument();
   });
 });
+
+describe("AppShell 알림 벨", () => {
+  it("미읽음 배지를 보여주고, 알림 클릭 시 해당 이슈 상세로 이동하며 읽음 처리된다", async () => {
+    const user = userEvent.setup();
+    renderShell("/projects");
+    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+
+    // 시드 미읽음 2개
+    const bell = screen.getByRole("button", { name: "알림 2개 미읽음" });
+    await user.click(bell);
+
+    const dialog = await screen.findByRole("dialog", { name: "알림" });
+    const list = within(dialog).getByTestId("notification-list");
+    expect(within(list).getByText(/이서연 님이 ALM-2에 코멘트를 남겼습니다/)).toBeInTheDocument();
+
+    await user.click(within(list).getByText(/ALM-2에 코멘트/));
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/issues?issue=ALM-2");
+    });
+    const detail = await screen.findByRole("dialog", { name: "ALM-2" });
+
+    // 상세 모달을 닫으면(배경 aria-hidden 해제) 읽음 처리된 배지가 보인다 → 미읽음 1개
+    await user.click(within(detail).getByRole("button", { name: "닫기" }));
+    expect(
+      await screen.findByRole("button", { name: "알림 1개 미읽음" }),
+    ).toBeInTheDocument();
+  });
+
+  it("모두 읽음을 누르면 배지가 사라진다", async () => {
+    const user = userEvent.setup();
+    renderShell("/projects");
+    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+
+    await user.click(screen.getByRole("button", { name: "알림 2개 미읽음" }));
+    const dialog = await screen.findByRole("dialog", { name: "알림" });
+    await user.click(within(dialog).getByRole("button", { name: "모두 읽음" }));
+    await user.click(within(dialog).getByRole("button", { name: "닫기" }));
+
+    // 모달을 닫으면 미읽음 없는 벨("알림")이 보인다
+    expect(await screen.findByRole("button", { name: "알림" })).toBeInTheDocument();
+  });
+});

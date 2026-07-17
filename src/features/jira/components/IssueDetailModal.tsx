@@ -20,6 +20,7 @@ import type {
   Issue,
   IssuePriority,
   IssueStatus,
+  IssueType,
   Sprint,
   User,
 } from "../store/types";
@@ -36,7 +37,14 @@ import {
   updateComment,
   updateIssue,
 } from "../store/jiraStore";
-import { BOARD_STATUSES, PRIORITY_LABELS, STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
+import {
+  BOARD_STATUSES,
+  ISSUE_TYPES,
+  PRIORITY_LABELS,
+  STATUS_APPEARANCE,
+  STATUS_LABELS,
+  TYPE_LABELS,
+} from "./labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const UNASSIGNED = "unassigned";
@@ -119,6 +127,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         Issue,
         | "title"
         | "description"
+        | "type"
         | "status"
         | "priority"
         | "assigneeId"
@@ -272,6 +281,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <Lozenge appearance={STATUS_APPEARANCE[issue.status]} data-testid="issue-status-lozenge">
             {STATUS_LABELS[issue.status]}
           </Lozenge>
+          <Select
+            label="타입"
+            value={issue.type}
+            options={ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+            onValueChange={(v) => void applyPatch({ type: v as IssueType }, "타입을 변경했습니다")}
+          />
           <Select
             label="상태"
             value={issue.status}

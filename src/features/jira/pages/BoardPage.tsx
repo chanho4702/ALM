@@ -12,7 +12,7 @@ import {
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { EmptyState, Lozenge, PageHeader, Spinner, useToast } from "@chanho/react";
 import type { Issue, IssueStatus, Sprint, User } from "../store/types";
-import { listIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
+import { createIssue, listIssues, listSprints, listUsers, moveIssue } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
 import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
@@ -62,6 +62,22 @@ export function BoardPage() {
     for (const issue of issues) map[issue.status].push(issue.id);
     return map;
   }, [issues]);
+
+  /** 컬럼 하단 인라인 생성 — 해당 상태·활성 스프린트로 바로 만든다 */
+  const handleColumnCreate = async (status: IssueStatus, title: string) => {
+    if (!projectId || !sprint) return;
+    try {
+      const issue = await createIssue({ projectId, title, status, sprintId: sprint.id });
+      toast({ title: `${issue.key}를 만들었습니다`, appearance: "success" });
+    } catch (error) {
+      toast({
+        title: "이슈 생성 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+    await reload();
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveIssue(issues.find((i) => i.id === event.active.id) ?? null);
@@ -118,6 +134,7 @@ export function BoardPage() {
                 issues={issues.filter((i) => i.status === status)}
                 userNames={userNames}
                 onOpenIssue={openIssue}
+                onCreateIssue={handleColumnCreate}
               />
             ))}
           </div>

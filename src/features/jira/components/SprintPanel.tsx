@@ -1,5 +1,6 @@
 import { Avatar, Badge, Button, Dropdown, Lozenge } from "@chanho/react";
 import type { Issue, Sprint } from "../store/types";
+import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PRIORITY_APPEARANCE, PRIORITY_LABELS, STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
 
 /** 이슈를 옮길 수 있는 대상. sprintId null = 백로그 */
@@ -29,6 +30,7 @@ export function BacklogIssueRow({
 }: BacklogIssueRowProps) {
   return (
     <div className="backlog-row" onClick={() => onOpen(issue.key)}>
+      <IssueTypeGlyph type={issue.type} />
       <span className="backlog-row-key">{issue.key}</span>
       <span className="backlog-row-title">{issue.title}</span>
       <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>{STATUS_LABELS[issue.status]}</Lozenge>

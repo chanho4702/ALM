@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Modal, Select, TextArea, TextField, useToast } from "@chanho/react";
-import type { Issue, IssuePriority, Project, User } from "../store/types";
+import type { Issue, IssuePriority, IssueType, Project, User } from "../store/types";
 import { createIssue, listUsers } from "../store/jiraStore";
-import { PRIORITY_LABELS } from "./labels";
+import { ISSUE_TYPES, PRIORITY_LABELS, TYPE_LABELS } from "./labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const UNASSIGNED = "unassigned";
@@ -32,6 +32,7 @@ export function CreateIssueModal({
   const [projectId, setProjectId] = useState(defaultProjectId ?? projects[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [type, setType] = useState<IssueType>("task");
   const [priority, setPriority] = useState<IssuePriority>("medium");
   const [assigneeId, setAssigneeId] = useState(UNASSIGNED);
   const [dueDate, setDueDate] = useState("");
@@ -49,6 +50,7 @@ export function CreateIssueModal({
   const reset = () => {
     setTitle("");
     setDescription("");
+    setType("task");
     setPriority("medium");
     setAssigneeId(UNASSIGNED);
     setDueDate("");
@@ -62,6 +64,7 @@ export function CreateIssueModal({
         projectId,
         title,
         description,
+        type,
         priority,
         assigneeId: assigneeId === UNASSIGNED ? null : assigneeId,
         dueDate: dueDate || null,
@@ -116,6 +119,12 @@ export function CreateIssueModal({
           onChange={(e) => setDescription(e.target.value)}
         />
         <div className="create-issue-grid">
+          <Select
+            label="타입"
+            value={type}
+            options={ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+            onValueChange={(v) => setType(v as IssueType)}
+          />
           <Select
             label="우선순위"
             value={priority}

@@ -2,6 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Avatar, Card, Lozenge, Tag } from "@chanho/react";
 import type { Issue } from "../store/types";
+import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PRIORITY_APPEARANCE, PRIORITY_LABELS } from "./labels";
 
 export interface IssueCardProps {
@@ -26,6 +27,7 @@ export function IssueCard({ issue, assigneeName, onOpen }: IssueCardProps) {
         </span>
       ) : null}
       <span className="issue-card-meta">
+        <IssueTypeGlyph type={issue.type} />
         <span className="issue-card-key">{issue.key}</span>
         <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
           {PRIORITY_LABELS[issue.priority]}

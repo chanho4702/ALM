@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { Avatar, Button, TopBar } from "@chanho/react";
-import type { Issue, Project, User } from "../store/types";
-import { getCurrentUser } from "../store/jiraStore";
+import { Avatar, Badge, Button, TopBar } from "@chanho/react";
+import type { Issue, Notification, Project, User } from "../store/types";
+import {
+  getCurrentUser,
+  getIssueByKey,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "../store/jiraStore";
 import { recordProjectVisit } from "../store/uiStore";
 import { CreateIssueModal } from "./CreateIssueModal";
 import { GlobalSideNav } from "./GlobalSideNav";
+import { NotificationsModal } from "./NotificationsModal";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "../../../auth/AuthGate";
@@ -28,10 +35,25 @@ export function AppShell({ projects }: AppShellProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  const reloadNotifications = () => void listNotifications().then(setNotifications);
 
   useEffect(() => {
     void getCurrentUser().then(setMe);
+    reloadNotifications();
   }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const openNotification = async (notification: Notification) => {
+    await markNotificationRead(notification.id);
+    reloadNotifications();
+    setNotificationsOpen(false);
+    const issue = await getIssueByKey(notification.issueKey);
+    if (issue) navigate(`/projects/${issue.projectId}/issues?issue=${issue.key}`);
+  };
 
   // 현재 URL의 프로젝트 — 전역 만들기 모달의 기본 프로젝트
   const currentProjectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
@@ -74,6 +96,19 @@ export function AppShell({ projects }: AppShellProps) {
                 만들기
               </Button>
             ) : null}
+            <Button
+              size="small"
+              variant="ghost"
+              className="notification-bell"
+              aria-label={unreadCount > 0 ? `알림 ${unreadCount}개 미읽음` : "알림"}
+              onClick={() => {
+                reloadNotifications(); // 열기 전 최신화
+                setNotificationsOpen(true);
+              }}
+            >
+              🔔
+              {unreadCount > 0 ? <Badge appearance="danger">{unreadCount}</Badge> : null}
+            </Button>
             <ThemeToggle />
             {authUser ? (
               <>
@@ -107,6 +142,15 @@ export function AppShell({ projects }: AppShellProps) {
         open={searchOpen}
         onOpenChange={setSearchOpen}
         onNavigate={openIssue}
+      />
+      <NotificationsModal
+        notifications={notifications}
+        open={notificationsOpen}
+        onOpenChange={setNotificationsOpen}
+        onNavigate={(n) => void openNotification(n)}
+        onMarkAllRead={() => {
+          void markAllNotificationsRead().then(reloadNotifications);
+        }}
       />
     </div>
   );

@@ -12,7 +12,10 @@ import {
   listActivity,
   listComments,
   listIssues,
+  listNotifications,
   listSprints,
+  markAllNotificationsRead,
+  markNotificationRead,
   moveIssue,
   searchIssues,
   startSprint,
@@ -323,5 +326,69 @@ describe("searchIssues (전역 검색)", () => {
     expect(await searchIssues("   ")).toEqual([]);
     const all = await searchIssues("ALM", 3);
     expect(all).toHaveLength(3);
+  });
+});
+
+describe("이슈 타입", () => {
+  it("createIssue 기본 타입은 task, 지정하면 그대로 저장한다 (status 지정도 지원)", async () => {
+    const plain = await createIssue({ projectId: PROJECT, title: "기본" });
+    expect(plain.type).toBe("task");
+    expect(plain.status).toBe("todo");
+    const bug = await createIssue({
+      projectId: PROJECT,
+      title: "버그",
+      type: "bug",
+      status: "inprogress",
+    });
+    expect(bug.type).toBe("bug");
+    expect(bug.status).toBe("inprogress");
+  });
+
+  it("타입 변경은 활동로그에 남는다", async () => {
+    const issue = await createIssue({ projectId: PROJECT, title: "타입 변경" });
+    await updateIssue(issue.id, { type: "story" });
+    const acts = await listActivity(issue.id);
+    expect(acts).toContainEqual(
+      expect.objectContaining({ type: "issuetype", detail: "작업 → 스토리" }),
+    );
+  });
+
+  it("listIssues는 타입 필터를 지원한다 (시드: bug = ALM-8)", async () => {
+    const bugs = await listIssues(PROJECT, { type: "bug" });
+    expect(bugs.map((i) => i.key)).toEqual(["ALM-8"]);
+  });
+});
+
+describe("notifications", () => {
+  it("시드 알림 2개가 현재 사용자(u1)에게 최신순으로 조회된다", async () => {
+    const notifications = await listNotifications();
+    expect(notifications).toHaveLength(2);
+    expect(notifications.every((n) => n.userId === "u1" && !n.read)).toBe(true);
+  });
+
+  it("담당자 변경/상태 변경/코멘트가 담당자에게 알림을 만든다 (본인 액션 제외)", async () => {
+    const issue = await createIssue({ projectId: PROJECT, title: "알림 대상" });
+    await updateIssue(issue.id, { assigneeId: "u2" }); // u1(actor) → u2 할당 알림
+    await updateIssue(issue.id, { status: "done" }); // u2에게 상태 알림
+    await addComment(issue.id, "확인 부탁"); // u2에게 코멘트 알림
+
+    const toU2 = await listNotifications("u2");
+    expect(toU2).toHaveLength(3);
+    expect(toU2.map((n) => n.issueKey)).toEqual([issue.key, issue.key, issue.key]);
+
+    // 자신에게 할당(u1 → u1)은 알림이 없다
+    const mine = await createIssue({ projectId: PROJECT, title: "본인 할당" });
+    await updateIssue(mine.id, { assigneeId: "u1" });
+    const toMe = await listNotifications();
+    expect(toMe.filter((n) => n.issueKey === mine.key)).toHaveLength(0);
+  });
+
+  it("읽음 처리: 개별/전체", async () => {
+    const [first] = await listNotifications();
+    await markNotificationRead(first.id);
+    expect((await listNotifications()).find((n) => n.id === first.id)?.read).toBe(true);
+
+    await markAllNotificationsRead();
+    expect((await listNotifications()).every((n) => n.read)).toBe(true);
   });
 });

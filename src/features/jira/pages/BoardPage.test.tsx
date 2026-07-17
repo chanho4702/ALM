@@ -75,3 +75,25 @@ describe("BoardPage", () => {
     });
   });
 });
+
+describe("보드 컬럼 인라인 생성", () => {
+  it("'+ 이슈 만들기'로 해당 컬럼(상태)·활성 스프린트에 이슈가 생긴다", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    const inprogress = await screen.findByRole("region", { name: "진행 중" });
+    await user.click(within(inprogress).getByRole("button", { name: "+ 이슈 만들기" }));
+    await user.type(
+      within(inprogress).getByLabelText("진행 중 컬럼에 이슈 만들기"),
+      "인라인 생성 이슈",
+    );
+    await user.click(within(inprogress).getByRole("button", { name: "만들기" }));
+
+    // 진행 중 컬럼에 새 카드(ALM-9)가 나타난다
+    expect(await within(screen.getByTestId("board-column-inprogress")).findByText("ALM-9"))
+      .toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("board-column-inprogress")).getByText("인라인 생성 이슈"),
+    ).toBeInTheDocument();
+  });
+});

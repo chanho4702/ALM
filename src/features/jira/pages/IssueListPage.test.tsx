@@ -150,3 +150,20 @@ describe("IssueListPage 확장 (설명 검색·라벨 필터·날짜 정렬)", (
     });
   });
 });
+
+describe("IssueListPage 타입", () => {
+  it("타입 글리프 컬럼이 보이고 타입 필터로 좁힐 수 있다 (시드: 버그 = ALM-8)", async () => {
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.click(screen.getByRole("combobox", { name: "타입" }));
+    await user.click(await screen.findByRole("option", { name: "버그" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("row")).toHaveLength(2); // 헤더 + ALM-8
+    });
+    const row = screen.getByText("ALM-8").closest("tr")!;
+    expect(within(row).getByRole("img", { name: "버그" })).toBeInTheDocument();
+  });
+});

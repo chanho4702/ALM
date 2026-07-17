@@ -11,15 +11,19 @@ import {
   TextField,
 } from "@chanho/react";
 import type { SortDirection, TableColumn } from "@chanho/react";
-import type { Issue, IssuePriority, IssueStatus, User } from "../store/types";
+import { Tag } from "@chanho/react";
+import type { Issue, IssuePriority, IssueStatus, IssueType, User } from "../store/types";
 import { listIssues, listUsers } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
+import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import {
   BOARD_STATUSES,
+  ISSUE_TYPES,
   PRIORITY_APPEARANCE,
   PRIORITY_LABELS,
   STATUS_APPEARANCE,
   STATUS_LABELS,
+  TYPE_LABELS,
 } from "../components/labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
@@ -39,6 +43,7 @@ export function IssueListPage() {
   const [priority, setPriority] = useState(ALL);
   const [assigneeId, setAssigneeId] = useState(ALL);
   const [label, setLabel] = useState(ALL);
+  const [type, setType] = useState(ALL);
   const [labelOptions, setLabelOptions] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -51,12 +56,13 @@ export function IssueListPage() {
       priority: priority === ALL ? undefined : (priority as IssuePriority),
       assigneeId: assigneeId === ALL ? undefined : assigneeId,
       label: label === ALL ? undefined : label,
+      type: type === ALL ? undefined : (type as IssueType),
     });
     setIssues(list);
     // 라벨 선택지는 필터와 무관한 프로젝트 전체 라벨 합집합
     const all = await listIssues(projectId);
     setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
-  }, [projectId, text, status, priority, assigneeId, label]);
+  }, [projectId, text, status, priority, assigneeId, label, type]);
 
   useEffect(() => {
     void listUsers().then(setUsers);
@@ -124,7 +130,18 @@ export function IssueListPage() {
     [issueKey, issues],
   );
 
+  // 지연: 마감일이 오늘 이전인데 완료가 아니다
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = (issue: Issue) =>
+    issue.dueDate !== null && issue.dueDate < today && issue.status !== "done";
+
   const columns: TableColumn<Issue>[] = [
+    {
+      key: "type",
+      header: "타입",
+      width: "48px",
+      render: (issue) => <IssueTypeGlyph type={issue.type} />,
+    },
     {
       key: "key",
       header: "키",
@@ -132,6 +149,19 @@ export function IssueListPage() {
       render: (issue) => <span className="issue-key-cell">{issue.key}</span>,
     },
     { key: "title", header: "제목", sortable: true },
+    {
+      key: "labels",
+      header: "라벨",
+      width: "160px",
+      render: (issue) =>
+        issue.labels.length > 0 ? (
+          <span className="issue-card-labels">
+            {issue.labels.map((l) => (
+              <Tag key={l} label={l} />
+            ))}
+          </span>
+        ) : null,
+    },
     {
       key: "status",
       header: "상태",
@@ -174,7 +204,13 @@ export function IssueListPage() {
       width: "112px",
       align: "right",
       render: (issue) =>
-        issue.dueDate ? new Date(issue.dueDate).toLocaleDateString("ko-KR") : "—",
+        issue.dueDate ? (
+          <span className={isOverdue(issue) ? "due-cell is-overdue" : "due-cell"}>
+            {new Date(issue.dueDate).toLocaleDateString("ko-KR")}
+          </span>
+        ) : (
+          "—"
+        ),
     },
     {
       key: "createdAt",
@@ -239,6 +275,15 @@ export function IssueListPage() {
             options={[
               { value: ALL, label: "전체" },
               ...labelOptions.map((l) => ({ value: l, label: l })),
+            ]}
+          />
+          <Select
+            label="타입"
+            value={type}
+            onValueChange={setType}
+            options={[
+              { value: ALL, label: "전체" },
+              ...ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] })),
             ]}
           />
         </div>

@@ -22,6 +22,7 @@ export interface Sprint {
 
 export type IssueStatus = "todo" | "inprogress" | "done";
 export type IssuePriority = "high" | "medium" | "low";
+export type IssueType = "task" | "story" | "bug" | "epic";
 
 export interface Issue {
   id: string;
@@ -29,6 +30,7 @@ export interface Issue {
   projectId: string;
   title: string;
   description: string;
+  type: IssueType;
   status: IssueStatus;
   priority: IssuePriority;
   assigneeId: string | null;
@@ -54,9 +56,31 @@ export interface Activity {
   id: string;
   issueId: string;
   actorId: string;
-  type: "created" | "status" | "assignee" | "priority" | "sprint" | "duedate" | "labels";
+  type:
+    | "created"
+    | "status"
+    | "assignee"
+    | "priority"
+    | "sprint"
+    | "duedate"
+    | "labels"
+    | "issuetype";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
+}
+
+/** 사용자에게 전달되는 알림 — 본인 액션은 알리지 않는다 (지라와 동일) */
+export interface Notification {
+  id: string;
+  /** 수신자 */
+  userId: string;
+  issueId: string;
+  issueKey: string;
+  /** 행위자 */
+  actorId: string;
+  message: string;
+  at: string;
+  read: boolean;
 }
 
 /** localStorage `alm.jira.v1`에 저장되는 루트 구조 */
@@ -67,6 +91,7 @@ export interface JiraData {
   issues: Issue[];
   comments: Comment[];
   activities: Activity[];
+  notifications: Notification[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */
   issueCounters: Record<string, number>;
 }
