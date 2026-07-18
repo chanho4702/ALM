@@ -145,6 +145,23 @@ export function createSeedData(): JiraData {
       { id: "w1", issueId: "i2", authorId: "u2", hours: 3, comment: "컬럼 드래그 구현", workedOn: now.slice(0, 10), at: now },
       { id: "w2", issueId: "i2", authorId: "u1", hours: 2, comment: "리뷰·리팩터링", workedOn: now.slice(0, 10), at: now },
     ],
+    // 지라식 설정 스킴 — 디폴트 스킴에 전 프로젝트 배정 (상태 id = 기존 status 값)
+    schemes: [
+      {
+        id: "scheme-default",
+        name: "기본 스킴",
+        isDefault: true,
+        body: {
+          statuses: [
+            { id: "todo", name: "할 일", category: "todo" as const, order: 1 },
+            { id: "inprogress", name: "진행 중", category: "inprogress" as const, order: 2 },
+            { id: "done", name: "완료", category: "done" as const, order: 3 },
+          ],
+          enabledTypes: ["task", "story", "bug", "epic", "subtask"] as const as import("../features/alm/store/types").IssueType[],
+        },
+      },
+    ],
+    projectSettings: [{ projectId: "p1", schemeId: "scheme-default", custom: null }],
     issueCounters: { p1: 8 },
   };
 }

@@ -12,6 +12,9 @@ import type {
   JiraData,
   Notification,
   Project,
+  ProjectSettingsEntry,
+  SettingsBody,
+  SettingsScheme,
   Sprint,
   User,
   Worklog,
@@ -25,6 +28,25 @@ import type { ProjectTemplateId } from "./projectTemplates";
 const STORAGE_KEY = "alm.jira.v1";
 
 let cache: JiraData | null = null;
+
+/** 디폴트 스킴 본문 — 상태 id를 기존 status 값과 동일하게 두어 저장 데이터와 100% 호환 */
+function defaultSettingsBody(): SettingsBody {
+  return {
+    statuses: [
+      { id: "todo", name: "할 일", category: "todo", order: 1 },
+      { id: "inprogress", name: "진행 중", category: "inprogress", order: 2 },
+      { id: "done", name: "완료", category: "done", order: 3 },
+    ],
+    enabledTypes: ["task", "story", "bug", "epic", "subtask"],
+  };
+}
+
+function cloneBody(body: SettingsBody): SettingsBody {
+  return {
+    statuses: body.statuses.map((s) => ({ ...s })),
+    enabledTypes: [...body.enabledTypes],
+  };
+}
 
 /** 기본 3컬럼(할 일/진행 중/완료, WIP 없음)의 보드를 만든다 */
 export function defaultBoard(
@@ -69,6 +91,23 @@ function normalize(data: JiraData): JiraData {
   for (const project of data.projects) {
     if (!data.boards.some((b) => b.projectId === project.id)) {
       data.boards.push(defaultBoard(project.id));
+    }
+  }
+  // 설정 스킴: 디폴트 스킴 1개 + 모든 프로젝트를 디폴트에 배정 (지라의 Default Scheme)
+  data.schemes ??= [];
+  if (!data.schemes.some((s) => s.isDefault)) {
+    data.schemes.unshift({
+      id: "scheme-default",
+      name: "기본 스킴",
+      isDefault: true,
+      body: defaultSettingsBody(),
+    });
+  }
+  data.projectSettings ??= [];
+  const defaultScheme = data.schemes.find((s) => s.isDefault)!;
+  for (const project of data.projects) {
+    if (!data.projectSettings.some((e) => e.projectId === project.id)) {
+      data.projectSettings.push({ projectId: project.id, schemeId: defaultScheme.id, custom: null });
     }
   }
   return data;
@@ -147,6 +186,9 @@ export async function createProject(input: {
   };
   data.projects.push(project);
   data.issueCounters[project.id] = 0;
+  // 새 프로젝트는 디폴트 스킴에 배정된다 (지라 Default Scheme)
+  const defaultScheme = data.schemes.find((s) => s.isDefault)!;
+  data.projectSettings.push({ projectId: project.id, schemeId: defaultScheme.id, custom: null });
 
   // 프로젝트는 항상 기본 보드를 갖는다 — 템플릿이 있으면 그 구성으로 교체
   const template = getTemplate(input.templateId ?? "blank");
@@ -215,6 +257,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.boards = data.boards.filter((b) => b.projectId !== id);
   data.links = data.links.filter((l) => !issueIds.has(l.sourceId) && !issueIds.has(l.targetId));
   data.worklogs = data.worklogs.filter((w) => !issueIds.has(w.issueId));
+  data.projectSettings = data.projectSettings.filter((e) => e.projectId !== id);
   delete data.issueCounters[id];
   persist();
 }
@@ -516,6 +559,17 @@ export async function createIssue(input: {
   if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
   const title = input.title.trim();
   if (!title) throw new Error("이슈 제목을 입력하세요");
+  // 타입은 프로젝트 설정(enabledTypes)을 따른다 — 미지정이면 task, task가 꺼져 있으면 첫 활성 타입
+  const settingsEntryForCreate = data.projectSettings.find((e) => e.projectId === project.id);
+  const enabledTypes =
+    settingsEntryForCreate?.custom?.enabledTypes ??
+    data.schemes.find((s) => s.id === settingsEntryForCreate?.schemeId)?.body.enabledTypes ??
+    defaultSettingsBody().enabledTypes;
+  const resolvedType =
+    input.type ?? (enabledTypes.includes("task") ? "task" : enabledTypes.find((t) => t !== "subtask")!);
+  if (resolvedType !== "subtask" && !enabledTypes.includes(resolvedType)) {
+    throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${TYPE_LABELS[resolvedType]}`);
+  }
   const seq = (data.issueCounters[project.id] ?? 0) + 1;
   data.issueCounters[project.id] = seq; // 삭제돼도 감소하지 않는다 → 키 미재사용
   const now = new Date().toISOString();
@@ -528,7 +582,7 @@ export async function createIssue(input: {
     projectId: project.id,
     title,
     description: input.description ?? "",
-    type: input.type ?? "task",
+    type: resolvedType,
     status: input.status ?? "todo",
     priority: input.priority ?? "medium",
     assigneeId: input.assigneeId ?? null,
@@ -586,6 +640,15 @@ export async function updateIssue(
   const before = { ...issue, labels: [...issue.labels] };
   // 타입 전환 정합성: 자식이 있는데 규칙 위반 타입이 되면 거부, 자신의 parent가 위반되면 자동 해제
   if (patch.type !== undefined && patch.type !== issue.type) {
+    // 프로젝트 설정(enabledTypes) 검증 — subtask는 계층 기능이라 예외
+    const entry = data.projectSettings.find((e) => e.projectId === issue.projectId);
+    const enabled =
+      entry?.custom?.enabledTypes ??
+      data.schemes.find((s) => s.id === entry?.schemeId)?.body.enabledTypes ??
+      defaultSettingsBody().enabledTypes;
+    if (patch.type !== "subtask" && !enabled.includes(patch.type)) {
+      throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${TYPE_LABELS[patch.type]}`);
+    }
     const children = data.issues.filter((i) => i.parentId === issue.id);
     if (children.length > 0) {
       const childrenAllowed =
@@ -933,6 +996,181 @@ export async function deleteComment(id: string): Promise<void> {
     throw new Error("본인 댓글만 삭제할 수 있습니다");
   }
   data.comments.splice(index, 1);
+  persist();
+}
+
+// ── settings schemes (지라 구조: 전역 정의 → 배정 → 프로젝트 커스텀) ──
+
+/** 카테고리별 최소 1개·이름 유일/필수·subtask 고정 + 비-subtask 최소 1개 */
+function validateSettingsBody(body: SettingsBody): void {
+  const names = new Set<string>();
+  for (const status of body.statuses) {
+    const name = status.name.trim();
+    if (!name) throw new Error("상태 이름을 입력하세요");
+    if (names.has(name)) throw new Error(`상태 이름이 중복됩니다: ${name}`);
+    names.add(name);
+  }
+  for (const category of ["todo", "inprogress", "done"] as const) {
+    if (!body.statuses.some((s) => s.category === category)) {
+      throw new Error("카테고리(할 일/진행 중/완료)마다 상태가 최소 1개 필요합니다");
+    }
+  }
+  if (!body.enabledTypes.includes("subtask")) {
+    throw new Error("하위 작업 타입은 비활성화할 수 없습니다");
+  }
+  if (!body.enabledTypes.some((t) => t !== "subtask")) {
+    throw new Error("이슈 타입은 최소 1개 활성화해야 합니다");
+  }
+}
+
+function settingsEntry(data: JiraData, projectId: string): ProjectSettingsEntry {
+  const entry = data.projectSettings.find((e) => e.projectId === projectId);
+  if (!entry) throw new Error("프로젝트를 찾을 수 없습니다");
+  return entry;
+}
+
+export interface ResolvedSettings {
+  body: SettingsBody;
+  source: "scheme" | "custom";
+  scheme: SettingsScheme;
+}
+
+/** 설정 해석의 단일 진실 — 모든 화면·검증은 이 함수만 통한다 */
+export async function resolveSettings(projectId: string): Promise<ResolvedSettings> {
+  const data = load();
+  const entry = settingsEntry(data, projectId);
+  const scheme = data.schemes.find((s) => s.id === entry.schemeId) ?? data.schemes.find((s) => s.isDefault)!;
+  return clone({
+    body: entry.custom ?? scheme.body,
+    source: entry.custom ? ("custom" as const) : ("scheme" as const),
+    scheme,
+  });
+}
+
+export async function listSchemes(): Promise<SettingsScheme[]> {
+  return clone(load().schemes);
+}
+
+/** 스킴별 배정(공유) 프로젝트 수 — 커스텀 전환한 프로젝트는 제외 */
+export async function countSchemeProjects(schemeId: string): Promise<number> {
+  return load().projectSettings.filter((e) => e.schemeId === schemeId && e.custom === null).length;
+}
+
+export async function createScheme(name: string): Promise<SettingsScheme> {
+  const data = load();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("스킴 이름을 입력하세요");
+  if (data.schemes.some((s) => s.name === trimmed)) {
+    throw new Error(`이미 존재하는 스킴 이름입니다: ${trimmed}`);
+  }
+  const scheme: SettingsScheme = {
+    id: nextId(),
+    name: trimmed,
+    isDefault: false,
+    body: defaultSettingsBody(), // 디폴트 구성 복사에서 시작
+  };
+  data.schemes.push(scheme);
+  persist();
+  return clone(scheme);
+}
+
+/** 스킴 수정 — 공유 중인 모든 프로젝트의 이슈를 새 상태 구성으로 이관한다 */
+export async function updateScheme(
+  id: string,
+  patch: { name?: string; body?: SettingsBody },
+): Promise<SettingsScheme> {
+  const data = load();
+  const scheme = data.schemes.find((s) => s.id === id);
+  if (!scheme) throw new Error("스킴을 찾을 수 없습니다");
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("스킴 이름을 입력하세요");
+    scheme.name = name;
+  }
+  if (patch.body !== undefined) {
+    validateSettingsBody(patch.body);
+    const sharedProjects = data.projectSettings
+      .filter((e) => e.schemeId === id && e.custom === null)
+      .map((e) => e.projectId);
+    migrateIssueStatuses(data, sharedProjects, patch.body);
+    scheme.body = cloneBody(patch.body);
+  }
+  persist();
+  return clone(scheme);
+}
+
+export async function deleteScheme(id: string): Promise<void> {
+  const data = load();
+  const scheme = data.schemes.find((s) => s.id === id);
+  if (!scheme) throw new Error("스킴을 찾을 수 없습니다");
+  if (scheme.isDefault) throw new Error("디폴트 스킴은 삭제할 수 없습니다");
+  if (data.projectSettings.some((e) => e.schemeId === id)) {
+    throw new Error("배정된 프로젝트가 있는 스킴은 삭제할 수 없습니다");
+  }
+  data.schemes = data.schemes.filter((s) => s.id !== id);
+  persist();
+}
+
+export async function setDefaultScheme(id: string): Promise<void> {
+  const data = load();
+  if (!data.schemes.some((s) => s.id === id)) throw new Error("스킴을 찾을 수 없습니다");
+  for (const scheme of data.schemes) scheme.isDefault = scheme.id === id;
+  persist();
+}
+
+/** 새 구성에 없는 상태의 이슈를 같은 카테고리의 첫 상태로 이관한다 */
+function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: SettingsBody): void {
+  if (projectIds.length === 0) return;
+  const valid = new Set(newBody.statuses.map((s) => s.id));
+  const targets = new Set(projectIds);
+  for (const issue of data.issues) {
+    if (!targets.has(issue.projectId) || valid.has(issue.status)) continue;
+    // 현행 라운드에서 issue.status는 카테고리 값과 동일 — 카테고리 매칭으로 이관 (③에서 일반화)
+    const fallback =
+      newBody.statuses.find((s) => s.category === issue.status) ?? newBody.statuses[0];
+    issue.status = fallback.id as IssueStatus;
+  }
+}
+
+/** 프로젝트에 스킴 재배정 — 커스텀은 해제되고 새 스킴 구성으로 이관된다 */
+export async function assignScheme(projectId: string, schemeId: string): Promise<void> {
+  const data = load();
+  const entry = settingsEntry(data, projectId);
+  const scheme = data.schemes.find((s) => s.id === schemeId);
+  if (!scheme) throw new Error("스킴을 찾을 수 없습니다");
+  migrateIssueStatuses(data, [projectId], scheme.body);
+  entry.schemeId = schemeId;
+  entry.custom = null;
+  persist();
+}
+
+/** 커스텀 전환(현재 구성 복사) / 스킴 복귀(이관 후 폐기) */
+export async function setProjectCustom(projectId: string, custom: boolean): Promise<void> {
+  const data = load();
+  const entry = settingsEntry(data, projectId);
+  if (custom) {
+    if (entry.custom) return;
+    const scheme = data.schemes.find((s) => s.id === entry.schemeId)!;
+    entry.custom = cloneBody(scheme.body);
+  } else {
+    if (!entry.custom) return;
+    const scheme = data.schemes.find((s) => s.id === entry.schemeId)!;
+    migrateIssueStatuses(data, [projectId], scheme.body);
+    entry.custom = null;
+  }
+  persist();
+}
+
+export async function updateProjectCustomSettings(
+  projectId: string,
+  body: SettingsBody,
+): Promise<void> {
+  const data = load();
+  const entry = settingsEntry(data, projectId);
+  if (!entry.custom) throw new Error("커스텀 설정을 사용 중일 때만 편집할 수 있습니다");
+  validateSettingsBody(body);
+  migrateIssueStatuses(data, [projectId], body);
+  entry.custom = cloneBody(body);
   persist();
 }
 

@@ -111,6 +111,35 @@ export interface Board {
   createdAt: string;
 }
 
+/** 워크플로 상태 — id는 불변(이슈가 참조), category가 색/완료 판정을 결정한다 */
+export interface WorkflowStatus {
+  id: string;
+  name: string;
+  category: IssueStatus; // "todo" | "inprogress" | "done"
+  order: number;
+}
+
+/** 설정 본문 — 스킴과 프로젝트 커스텀이 같은 형태를 공유한다 */
+export interface SettingsBody {
+  statuses: WorkflowStatus[];
+  /** 프로젝트에서 쓸 이슈 타입 — subtask는 항상 포함 */
+  enabledTypes: IssueType[];
+}
+
+/** 지라식 설정 스킴 — 전역 관리가 정의하고 프로젝트에 배정한다 */
+export interface SettingsScheme {
+  id: string;
+  name: string;
+  isDefault: boolean; // 새 프로젝트 자동 배정, 삭제 불가
+  body: SettingsBody;
+}
+
+export interface ProjectSettingsEntry {
+  projectId: string;
+  schemeId: string; // 배정된 스킴 (커스텀 중에도 복귀 대상으로 유지)
+  custom: SettingsBody | null; // null = 스킴 사용
+}
+
 /** 작업 시간 기록 — 시간(h) 단위, 소수 허용 */
 export interface Worklog {
   id: string;
@@ -160,6 +189,8 @@ export interface JiraData {
   boards: Board[];
   links: IssueLink[];
   worklogs: Worklog[];
+  schemes: SettingsScheme[];
+  projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */
   issueCounters: Record<string, number>;
 }
