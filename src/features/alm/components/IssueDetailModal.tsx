@@ -8,6 +8,7 @@ import {
   InlineEdit,
   Lozenge,
   Modal,
+  ProgressBar,
   Select,
   Tabs,
   Tag,
@@ -24,13 +25,16 @@ import type {
   IssueType,
   Sprint,
   User,
+  Worklog,
 } from "../store/types";
 import {
   addComment,
   addIssueLink,
+  addWorklog,
   createIssue,
   deleteComment,
   deleteIssue,
+  deleteWorklog,
   getCurrentUser,
   getIssueByKey,
   listActivity,
@@ -40,6 +44,7 @@ import {
   listIssues,
   listSprints,
   listUsers,
+  listWorklogs,
   removeIssueLink,
   setIssueParent,
   updateComment,
@@ -93,6 +98,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [projectIssues, setProjectIssues] = useState<Issue[]>([]);
   const [children, setChildren] = useState<Issue[]>([]);
   const [links, setLinks] = useState<IssueLinkView[]>([]);
+  const [worklogs, setWorklogs] = useState<Worklog[]>([]);
+  const [worklogHours, setWorklogHours] = useState("");
+  const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [worklogComment, setWorklogComment] = useState("");
+  const [estimateDraft, setEstimateDraft] = useState("");
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [linkKind, setLinkKind] = useState<LinkKind>("blocks-out");
   const [linkTargetId, setLinkTargetId] = useState<string | null>(null);
@@ -112,16 +122,18 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     setActivities(activityList);
   };
 
-  /** 관계(하위 이슈·링크) 재조회 */
+  /** 관계(하위 이슈·링크)·워크로그 재조회 */
   const refreshRelations = async (issueId: string, projectId: string) => {
-    const [childList, linkList, allIssues] = await Promise.all([
+    const [childList, linkList, allIssues, worklogList] = await Promise.all([
       listChildren(issueId),
       listIssueLinks(issueId),
       listIssues(projectId),
+      listWorklogs(issueId),
     ]);
     setChildren(childList);
     setLinks(linkList);
     setProjectIssues(allIssues);
+    setWorklogs(worklogList);
   };
 
   useEffect(() => {
@@ -144,6 +156,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       if (cancelled) return;
       setIssue(found);
       setDescriptionDraft(found.description);
+      setEstimateDraft(found.estimateHours === null ? "" : String(found.estimateHours));
       setUsers(userList);
       setSprints(sprintList);
       setComments(commentList);
@@ -173,6 +186,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         | "sprintId"
         | "dueDate"
         | "labels"
+        | "estimateHours"
       >
     >,
     successTitle: string,
@@ -353,6 +367,51 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     }
   };
 
+  const handleEstimateBlur = async () => {
+    if (!issue) return;
+    const next = estimateDraft.trim() === "" ? null : Number(estimateDraft);
+    if (next === issue.estimateHours) return;
+    await applyPatch({ estimateHours: next }, "예상 시간을 저장했습니다");
+  };
+
+  const handleWorklogSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!issue) return;
+    try {
+      await addWorklog(issue.id, {
+        hours: Number(worklogHours),
+        comment: worklogComment,
+        workedOn: worklogDate,
+      });
+      setWorklogHours("");
+      setWorklogComment("");
+      await refreshRelations(issue.id, issue.projectId);
+      await refreshLogs(issue.id);
+      toast({ title: "작업 시간을 기록했습니다", appearance: "success" });
+    } catch (error) {
+      toast({
+        title: "워크로그 기록 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+  };
+
+  const handleWorklogDelete = async (worklogId: string) => {
+    if (!issue) return;
+    try {
+      await deleteWorklog(worklogId);
+      await refreshRelations(issue.id, issue.projectId);
+      toast({ title: "워크로그를 삭제했습니다", appearance: "success" });
+    } catch (error) {
+      toast({
+        title: "워크로그 삭제 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+  };
+
   const handleCommentSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!issue) return;
@@ -398,6 +457,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   ];
 
   const doneChildren = children.filter((c) => c.status === "done").length;
+
+  /** 워크로그 합계 — 예상 시간과 함께 진행률을 만든다 */
+  const loggedHours = worklogs.reduce((sum, w) => sum + w.hours, 0);
+  const overEstimate = issue.estimateHours !== null && loggedHours > issue.estimateHours;
 
   return (
     <Modal
@@ -624,6 +687,31 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               </div>
             ) : null}
           </div>
+          <TextField
+            label="예상 시간 (h)"
+            type="number"
+            min={0.5}
+            step={0.5}
+            placeholder="미지정"
+            value={estimateDraft}
+            onChange={(e) => setEstimateDraft(e.target.value)}
+            onBlur={() => void handleEstimateBlur()}
+          />
+          {loggedHours > 0 || issue.estimateHours !== null ? (
+            <div className="issue-time-tracking" data-testid="issue-time-tracking">
+              <span className={overEstimate ? "issue-time-label is-over" : "issue-time-label"}>
+                기록 {loggedHours}h
+                {issue.estimateHours !== null ? ` / 예상 ${issue.estimateHours}h` : ""}
+              </span>
+              {issue.estimateHours !== null ? (
+                <ProgressBar
+                  label="시간 진행률"
+                  value={Math.min(100, Math.round((loggedHours / issue.estimateHours) * 100))}
+                  variant={overEstimate ? "danger" : "default"}
+                />
+              ) : null}
+            </div>
+          ) : null}
           <dl className="issue-dates">
             <dt>생성일</dt>
             <dd>{formatDateTime(issue.createdAt)}</dd>
@@ -738,6 +826,64 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                     코멘트 남기기
                   </Button>
                 </form>
+              </div>
+            ),
+          },
+          {
+            value: "worklog",
+            label: `워크로그 (${worklogs.length})`,
+            content: (
+              <div className="issue-worklogs" data-testid="issue-worklogs">
+                <form className="issue-worklog-form" onSubmit={handleWorklogSubmit}>
+                  <TextField
+                    label="시간 (h)"
+                    type="number"
+                    min={0.5}
+                    step={0.5}
+                    value={worklogHours}
+                    onChange={(e) => setWorklogHours(e.target.value)}
+                  />
+                  <TextField
+                    label="작업일"
+                    type="date"
+                    value={worklogDate}
+                    onChange={(e) => setWorklogDate(e.target.value)}
+                  />
+                  <TextField
+                    label="메모"
+                    placeholder="무슨 작업이었나요? (선택)"
+                    value={worklogComment}
+                    onChange={(e) => setWorklogComment(e.target.value)}
+                  />
+                  <Button type="submit" size="small" disabled={!(Number(worklogHours) > 0)}>
+                    기록
+                  </Button>
+                </form>
+                {worklogs.length === 0 ? (
+                  <p className="issue-comment-empty">아직 기록된 작업 시간이 없습니다</p>
+                ) : (
+                  <ul className="issue-worklog-list">
+                    {worklogs.map((worklog) => (
+                      <li key={worklog.id} className="issue-worklog-row">
+                        <Avatar name={userName(worklog.authorId)} size="small" />
+                        <span className="issue-worklog-author">{userName(worklog.authorId)}</span>
+                        <span className="issue-worklog-date">{worklog.workedOn}</span>
+                        <strong className="issue-worklog-hours">{worklog.hours}h</strong>
+                        <span className="issue-worklog-comment">{worklog.comment}</span>
+                        {me !== null && worklog.authorId === me.id ? (
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            aria-label="워크로그 삭제"
+                            onClick={() => void handleWorklogDelete(worklog.id)}
+                          >
+                            ×
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ),
           },

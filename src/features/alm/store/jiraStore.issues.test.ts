@@ -473,3 +473,49 @@ describe("queryIssues (상세 검색)", () => {
     expect(scoped).toHaveLength(0);
   });
 });
+
+describe("worklogs (시간 추적)", () => {
+  it("시드: ALM-2에 워크로그 2건(5h), 최신 작업일·기록 순으로 반환", async () => {
+    const { listWorklogs } = await import("./jiraStore");
+    const two = await getIssueByKey("ALM-2");
+    const logs = await listWorklogs(two!.id);
+    expect(logs).toHaveLength(2);
+    expect(logs.reduce((sum, w) => sum + w.hours, 0)).toBe(5);
+    expect(two!.estimateHours).toBe(8);
+  });
+
+  it("추가는 활동로그(worklog)를 남기고, 검증(시간>0·작업일)을 한다", async () => {
+    const { addWorklog, listWorklogs } = await import("./jiraStore");
+    const one = await getIssueByKey("ALM-1");
+    await addWorklog(one!.id, { hours: 1.5, comment: "테스트", workedOn: "2026-07-18" });
+    expect((await listWorklogs(one!.id))[0]).toMatchObject({ hours: 1.5, authorId: "u1" });
+    expect((await listActivity(one!.id)).at(-1)).toMatchObject({
+      type: "worklog",
+      detail: "1.5시간 기록",
+    });
+    await expect(addWorklog(one!.id, { hours: 0, workedOn: "2026-07-18" })).rejects.toThrow(
+      "시간은 0보다 커야 합니다",
+    );
+  });
+
+  it("본인 워크로그만 삭제할 수 있다 (시드 w1은 u2 작성)", async () => {
+    const { deleteWorklog, listWorklogs } = await import("./jiraStore");
+    const two = await getIssueByKey("ALM-2");
+    await expect(deleteWorklog("w1")).rejects.toThrow("본인 워크로그만 삭제할 수 있습니다");
+    await deleteWorklog("w2"); // u1 본인
+    expect(await listWorklogs(two!.id)).toHaveLength(1);
+  });
+
+  it("estimateHours patch 검증 + 이슈 삭제 시 워크로그 cascade", async () => {
+    const { listWorklogs } = await import("./jiraStore");
+    const two = await getIssueByKey("ALM-2");
+    await expect(updateIssue(two!.id, { estimateHours: -1 })).rejects.toThrow(
+      "예상 시간은 0보다 커야 합니다",
+    );
+    const updated = await updateIssue(two!.id, { estimateHours: 12 });
+    expect(updated.estimateHours).toBe(12);
+
+    await deleteIssue(two!.id);
+    expect(await listWorklogs(two!.id)).toHaveLength(0);
+  });
+});

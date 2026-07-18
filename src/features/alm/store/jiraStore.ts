@@ -14,6 +14,7 @@ import type {
   Project,
   Sprint,
   User,
+  Worklog,
 } from "./types";
 import { CURRENT_USER_ID } from "../../../mock/users";
 import { createSeedData } from "../../../mock/seed";
@@ -58,10 +59,12 @@ function normalize(data: JiraData): JiraData {
     issue.labels ??= [];
     issue.type ??= "task";
     issue.parentId ??= null;
+    issue.estimateHours ??= null;
   }
   data.notifications ??= [];
   data.boards ??= [];
   data.links ??= [];
+  data.worklogs ??= [];
   // 보드가 없는 프로젝트에는 기본 스크럼 보드를 만들어 기존 데이터/URL과 호환한다
   for (const project of data.projects) {
     if (!data.boards.some((b) => b.projectId === project.id)) {
@@ -211,6 +214,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.notifications = data.notifications.filter((n) => !issueIds.has(n.issueId));
   data.boards = data.boards.filter((b) => b.projectId !== id);
   data.links = data.links.filter((l) => !issueIds.has(l.sourceId) && !issueIds.has(l.targetId));
+  data.worklogs = data.worklogs.filter((w) => !issueIds.has(w.issueId));
   delete data.issueCounters[id];
   persist();
 }
@@ -532,6 +536,7 @@ export async function createIssue(input: {
     sprintId: input.sprintId ?? null,
     parentId: null, // 계층 검증 후 아래에서 지정
     dueDate: input.dueDate ?? null,
+    estimateHours: null,
     labels: input.labels ?? [],
     order: maxOrder + 1,
     createdAt: now,
@@ -568,11 +573,15 @@ export async function updateIssue(
       | "sprintId"
       | "dueDate"
       | "labels"
+      | "estimateHours"
     >
   >,
 ): Promise<Issue> {
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
+  if (patch.estimateHours !== undefined && patch.estimateHours !== null && !(patch.estimateHours > 0)) {
+    throw new Error("예상 시간은 0보다 커야 합니다");
+  }
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   const before = { ...issue, labels: [...issue.labels] };
   // 타입 전환 정합성: 자식이 있는데 규칙 위반 타입이 되면 거부, 자신의 parent가 위반되면 자동 해제
@@ -657,6 +666,59 @@ export async function moveIssue(
   recordChanges(data, before, issue, issue.updatedAt);
   persist();
   return clone(issue);
+}
+
+// ── worklogs ─────────────────────────────────────────────────
+
+/** 작업일 내림차순, 같은 날은 기록 시각 내림차순 */
+export async function listWorklogs(issueId: string): Promise<Worklog[]> {
+  return clone(
+    load()
+      .worklogs.filter((w) => w.issueId === issueId)
+      .sort((a, b) => b.workedOn.localeCompare(a.workedOn) || b.at.localeCompare(a.at)),
+  );
+}
+
+export async function addWorklog(
+  issueId: string,
+  input: { hours: number; comment?: string; workedOn: string },
+): Promise<Worklog> {
+  const data = load();
+  const issue = data.issues.find((i) => i.id === issueId);
+  if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  if (!(input.hours > 0)) throw new Error("시간은 0보다 커야 합니다");
+  if (!input.workedOn) throw new Error("작업일을 입력하세요");
+  const worklog: Worklog = {
+    id: nextId(),
+    issueId,
+    authorId: CURRENT_USER_ID,
+    hours: input.hours,
+    comment: input.comment?.trim() ?? "",
+    workedOn: input.workedOn,
+    at: new Date().toISOString(),
+  };
+  data.worklogs.push(worklog);
+  data.activities.push({
+    id: nextId(),
+    issueId,
+    actorId: CURRENT_USER_ID,
+    type: "worklog",
+    detail: `${input.hours}시간 기록`,
+    at: worklog.at,
+  });
+  persist();
+  return clone(worklog);
+}
+
+export async function deleteWorklog(id: string): Promise<void> {
+  const data = load();
+  const index = data.worklogs.findIndex((w) => w.id === id);
+  if (index === -1) throw new Error("워크로그를 찾을 수 없습니다");
+  if (data.worklogs[index].authorId !== CURRENT_USER_ID) {
+    throw new Error("본인 워크로그만 삭제할 수 있습니다");
+  }
+  data.worklogs.splice(index, 1);
+  persist();
 }
 
 // ── issue relations (parent / links) ─────────────────────────
@@ -802,6 +864,7 @@ export async function deleteIssue(id: string): Promise<void> {
   data.activities = data.activities.filter((a) => a.issueId !== id);
   data.notifications = data.notifications.filter((n) => n.issueId !== id);
   data.links = data.links.filter((l) => l.sourceId !== id && l.targetId !== id);
+  data.worklogs = data.worklogs.filter((w) => w.issueId !== id);
   for (const child of data.issues) {
     if (child.parentId === id) child.parentId = null; // 자식은 부모만 해제
   }

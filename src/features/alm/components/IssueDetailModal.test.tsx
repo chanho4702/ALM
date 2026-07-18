@@ -370,3 +370,49 @@ describe("IssueDetailModal 이슈 관계", () => {
     expect(await screen.findByText("부모를 변경했습니다")).toBeInTheDocument();
   });
 });
+
+describe("IssueDetailModal 워크로그", () => {
+  it("시드(ALM-2): 진행률 '기록 5h / 예상 8h', 워크로그 탭에 2건", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-2");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+
+    const tracking = await within(dialog).findByTestId("issue-time-tracking");
+    expect(tracking).toHaveTextContent("기록 5h / 예상 8h");
+
+    await user.click(within(dialog).getByRole("tab", { name: "워크로그 (2)" }));
+    const worklogs = within(dialog).getByTestId("issue-worklogs");
+    expect(within(worklogs).getByText("컬럼 드래그 구현")).toBeInTheDocument();
+    // 본인(u1) 것만 삭제 버튼
+    expect(within(worklogs).getAllByRole("button", { name: "워크로그 삭제" })).toHaveLength(1);
+  });
+
+  it("작업 시간을 기록하면 목록·탭 카운트·진행률이 갱신되고, 예상 초과 시 danger", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-2");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+
+    await user.click(await within(dialog).findByRole("tab", { name: "워크로그 (2)" }));
+    const worklogs = within(dialog).getByTestId("issue-worklogs");
+    await user.type(within(worklogs).getByLabelText("시간 (h)"), "4");
+    await user.type(within(worklogs).getByLabelText("메모"), "마무리 작업");
+    await user.click(within(worklogs).getByRole("button", { name: "기록" }));
+
+    expect(await within(dialog).findByRole("tab", { name: "워크로그 (3)" })).toBeInTheDocument();
+    // 5+4=9h > 예상 8h → 초과 표시
+    const tracking = within(dialog).getByTestId("issue-time-tracking");
+    expect(tracking).toHaveTextContent("기록 9h / 예상 8h");
+    expect(tracking.querySelector(".issue-time-label")).toHaveClass("is-over");
+  });
+
+  it("예상 시간을 바꾸면 저장된다 (blur)", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-1"); // 예상 없음
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+
+    const estimate = within(dialog).getByLabelText("예상 시간 (h)");
+    await user.type(estimate, "6");
+    await user.tab(); // blur → 저장
+    expect(await screen.findByText("예상 시간을 저장했습니다")).toBeInTheDocument();
+  });
+});

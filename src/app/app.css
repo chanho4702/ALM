@@ -1458,6 +1458,76 @@ body {
   align-items: end;
 }
 
+/* 워크로그 — 예상/기록 진행률 + 탭 목록 */
+.issue-time-tracking {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  width: 100%;
+}
+
+.issue-time-label {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-time-label.is-over {
+  color: var(--chanho-color-text-danger);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.issue-worklogs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  padding-top: var(--chanho-space-150);
+}
+
+.issue-worklog-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.issue-worklog-form > div:nth-child(3) {
+  flex: 1 1 200px; /* 메모가 남은 폭을 채운다 */
+}
+
+.issue-worklog-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issue-worklog-row {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-100);
+}
+
+.issue-worklog-date {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.issue-worklog-hours {
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-worklog-comment {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--chanho-color-text-subtle);
+}
+
 .issue-comment-edit {
   display: flex;
   flex-direction: column;

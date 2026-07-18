@@ -42,6 +42,8 @@ export interface Issue {
    */
   parentId: string | null;
   dueDate: string | null; // "YYYY-MM-DD", null = 미지정
+  /** 예상 시간(h, 소수 허용) — 워크로그 합계와 함께 진행률을 만든다 */
+  estimateHours: number | null;
   labels: string[]; // 자유 문자열 라벨
   order: number; // 컬럼/목록 내 정렬
   createdAt: string;
@@ -71,7 +73,8 @@ export interface Activity {
     | "labels"
     | "issuetype"
     | "parent"
-    | "link";
+    | "link"
+    | "worklog";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }
@@ -106,6 +109,17 @@ export interface Board {
   swimlane: BoardSwimlane; // 기본 스윔레인 (화면에서 임시 전환 가능)
   isDefault: boolean; // 뷰 탭 "보드"가 여는 보드
   createdAt: string;
+}
+
+/** 작업 시간 기록 — 시간(h) 단위, 소수 허용 */
+export interface Worklog {
+  id: string;
+  issueId: string;
+  authorId: string;
+  hours: number; // > 0
+  comment: string;
+  workedOn: string; // "YYYY-MM-DD" 작업일
+  at: string; // 기록 시각(ISO)
 }
 
 export type IssueLinkType = "blocks" | "relates";
@@ -145,6 +159,7 @@ export interface JiraData {
   notifications: Notification[];
   boards: Board[];
   links: IssueLink[];
+  worklogs: Worklog[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */
   issueCounters: Record<string, number>;
 }
