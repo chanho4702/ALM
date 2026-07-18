@@ -46,6 +46,7 @@ import {
   listUsers,
   listWorklogs,
   removeIssueLink,
+  resolveSettings,
   setIssueParent,
   updateComment,
   updateIssue,
@@ -99,6 +100,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [children, setChildren] = useState<Issue[]>([]);
   const [links, setLinks] = useState<IssueLinkView[]>([]);
   const [worklogs, setWorklogs] = useState<Worklog[]>([]);
+  const [enabledTypes, setEnabledTypes] = useState<IssueType[]>([...ISSUE_TYPES]);
   const [worklogHours, setWorklogHours] = useState("");
   const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [worklogComment, setWorklogComment] = useState("");
@@ -162,6 +164,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       setComments(commentList);
       setActivities(activityList);
       setMe(currentUser);
+      const settings = await resolveSettings(found.projectId);
+      if (!cancelled) setEnabledTypes(settings.body.enabledTypes);
       await refreshRelations(found.id, found.projectId);
     })();
     return () => {
@@ -610,7 +614,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <Select
             label="타입"
             value={issue.type}
-            options={ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+            // 프로젝트 설정의 활성 타입만 — 현재 값이 비활성이어도 표시를 위해 포함
+            options={ISSUE_TYPES.filter(
+              (t) => enabledTypes.includes(t) || t === issue.type,
+            ).map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
             onValueChange={(v) => void applyPatch({ type: v as IssueType }, "타입을 변경했습니다")}
           />
           <Select

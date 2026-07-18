@@ -770,6 +770,131 @@ body {
   color: var(--chanho-color-text-danger);
 }
 
+/* 프로젝트 설정 탭의 스킴 헤더 */
+.settings-scheme-header {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-150);
+  padding-bottom: var(--chanho-space-150);
+  margin-bottom: var(--chanho-space-150);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.settings-tabs {
+  margin-top: var(--chanho-space-100);
+}
+
+/* ── 전역 관리 (/settings) ──────────────────────────────── */
+
+.admin-layout {
+  display: flex;
+  gap: var(--chanho-space-300);
+  align-items: flex-start;
+}
+
+.admin-menu {
+  flex-shrink: 0;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-menu-item {
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 0;
+  border-radius: var(--chanho-radius-medium);
+  background: none;
+  font: inherit;
+  color: var(--chanho-color-text-default);
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-menu-item:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.admin-menu-item.is-active {
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-selected);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.admin-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.admin-create-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.admin-create-form > div {
+  flex: 1;
+}
+
+.admin-scheme-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-scheme-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.admin-scheme-head {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.admin-scheme-count {
+  margin-left: auto;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.admin-scheme-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-50);
+}
+
+.admin-scheme-actions {
+  display: flex;
+  gap: var(--chanho-space-100);
+}
+
+.admin-scheme-note {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+@media (max-width: 720px) {
+  .admin-layout {
+    flex-direction: column;
+  }
+
+  .admin-menu {
+    width: 100%;
+    flex-direction: row;
+  }
+}
+
 /* ── 알림 ───────────────────────────────────────────────── */
 
 .notification-bell {

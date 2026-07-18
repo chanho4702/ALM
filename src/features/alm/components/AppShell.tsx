@@ -109,6 +109,15 @@ export function AppShell({ projects }: AppShellProps) {
               🔔
               {unreadCount > 0 ? <Badge appearance="danger">{unreadCount}</Badge> : null}
             </Button>
+            <Button
+              size="small"
+              variant="ghost"
+              aria-label="전역 관리"
+              title="전역 관리"
+              onClick={() => navigate("/settings")}
+            >
+              ⚙
+            </Button>
             <ThemeToggle />
             {authUser ? (
               <>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Modal, Select, TextArea, TextField, useToast } from "@chanho/react";
 import type { Issue, IssuePriority, IssueType, Project, User } from "../store/types";
-import { createIssue, listUsers } from "../store/jiraStore";
+import { createIssue, listUsers, resolveSettings } from "../store/jiraStore";
 import { ISSUE_TYPES, PRIORITY_LABELS, TYPE_LABELS } from "./labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -33,6 +33,10 @@ export function CreateIssueModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<IssueType>("task");
+  /** 선택한 프로젝트의 활성 타입 (설정 스킴) — subtask는 상세에서만 */
+  const [enabledTypes, setEnabledTypes] = useState<IssueType[]>(
+    ISSUE_TYPES.filter((t) => t !== "subtask"),
+  );
   const [priority, setPriority] = useState<IssuePriority>("medium");
   const [assigneeId, setAssigneeId] = useState(UNASSIGNED);
   const [dueDate, setDueDate] = useState("");
@@ -46,6 +50,21 @@ export function CreateIssueModal({
   useEffect(() => {
     if (open) setProjectId(defaultProjectId ?? projects[0]?.id ?? "");
   }, [open, defaultProjectId, projects]);
+
+  // 프로젝트 설정(스킴)의 활성 타입 반영 — 현재 선택이 꺼져 있으면 첫 활성 타입으로
+  useEffect(() => {
+    if (!open || !projectId) return;
+    let cancelled = false;
+    void resolveSettings(projectId).then(({ body }) => {
+      if (cancelled) return;
+      const creatable: IssueType[] = body.enabledTypes.filter((t) => t !== "subtask");
+      setEnabledTypes(creatable);
+      setType((prev) => (creatable.includes(prev) ? prev : creatable[0]));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, projectId]);
 
   const reset = () => {
     setTitle("");
@@ -122,11 +141,8 @@ export function CreateIssueModal({
           <Select
             label="타입"
             value={type}
-            // 하위 작업은 부모가 필수라 이슈 상세의 "하위 작업 추가"에서만 만든다
-            options={ISSUE_TYPES.filter((t) => t !== "subtask").map((t) => ({
-              value: t,
-              label: TYPE_LABELS[t],
-            }))}
+            // 프로젝트 설정의 활성 타입만. 하위 작업은 부모 필수라 상세의 "하위 작업 추가" 전용
+            options={enabledTypes.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
             onValueChange={(v) => setType(v as IssueType)}
           />
           <Select

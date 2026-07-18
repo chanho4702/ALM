@@ -120,13 +120,13 @@ export function BoardSettingsModal({
                   key={user.id}
                   label={user.name}
                   checked={assigneeIds.includes(user.id)}
-                  onChange={() => setAssigneeIds((prev) => toggle(prev, user.id))}
+                  onCheckedChange={() => setAssigneeIds((prev) => toggle(prev, user.id))}
                 />
               ))}
               <Checkbox
                 label="미지정"
                 checked={assigneeIds.includes("unassigned")}
-                onChange={() => setAssigneeIds((prev) => toggle(prev, "unassigned"))}
+                onCheckedChange={() => setAssigneeIds((prev) => toggle(prev, "unassigned"))}
               />
             </div>
             <div className="board-settings-checks" role="group" aria-label="타입 필터">
@@ -135,7 +135,7 @@ export function BoardSettingsModal({
                   key={type}
                   label={TYPE_LABELS[type]}
                   checked={types.includes(type)}
-                  onChange={() => setTypes((prev) => toggle(prev, type))}
+                  onCheckedChange={() => setTypes((prev) => toggle(prev, type))}
                 />
               ))}
             </div>
@@ -146,7 +146,7 @@ export function BoardSettingsModal({
                     key={label}
                     label={label}
                     checked={labels.includes(label)}
-                    onChange={() => setLabels((prev) => toggle(prev, label))}
+                    onCheckedChange={() => setLabels((prev) => toggle(prev, label))}
                   />
                 ))}
               </div>

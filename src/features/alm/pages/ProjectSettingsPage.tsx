@@ -1,12 +1,37 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router";
-import { Button, Card, Modal, TextArea, TextField, useToast } from "@chanho/react";
-import type { JiraOutletContext } from "../components/ProjectLayout";
-import { deleteProject, listIssues, updateProject } from "../store/jiraStore";
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Lozenge,
+  Modal,
+  Select,
+  Switch,
+  Tabs,
+  TextArea,
+  TextField,
+  useToast,
+} from "@chanho/react";
+import type { IssueType, SettingsScheme } from "../store/types";
+import type { ResolvedSettings } from "../store/jiraStore";
+import {
+  assignScheme,
+  deleteProject,
+  listIssues,
+  listSchemes,
+  resolveSettings,
+  setProjectCustom,
+  updateProject,
+  updateProjectCustomSettings,
+} from "../store/jiraStore";
 import { pruneProject } from "../store/uiStore";
+import type { JiraOutletContext } from "../components/ProjectLayout";
+import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
 
-/** 프로젝트 이름/설명 수정과 삭제(위험 구역) — 키는 이슈 접두어라 불변 */
+/** 프로젝트 설정 — 지라식 탭: 일반 / 워크플로 / 이슈 타입 (스킴 사용·커스텀 전환) */
 export function ProjectSettingsPage() {
   const { projectId } = useParams();
   const { projects, onProjectsChanged } = useOutletContext<JiraOutletContext>();
@@ -18,6 +43,22 @@ export function ProjectSettingsPage() {
   const [descriptionDraft, setDescriptionDraft] = useState(project?.description ?? "");
   const [issueCount, setIssueCount] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [resolved, setResolved] = useState<ResolvedSettings | null>(null);
+  const [schemes, setSchemes] = useState<SettingsScheme[]>([]);
+  const [typesDraft, setTypesDraft] = useState<IssueType[]>([]);
+
+  const currentProjectId = project?.id;
+
+  const reloadSettings = useCallback(async () => {
+    if (!currentProjectId) return;
+    const [resolvedSettings, schemeList] = await Promise.all([
+      resolveSettings(currentProjectId),
+      listSchemes(),
+    ]);
+    setResolved(resolvedSettings);
+    setSchemes(schemeList);
+    setTypesDraft([...resolvedSettings.body.enabledTypes]);
+  }, [currentProjectId]);
 
   useEffect(() => {
     if (!project) return;
@@ -27,15 +68,30 @@ export function ProjectSettingsPage() {
     void listIssues(project.id).then((issues) => {
       if (!cancelled) setIssueCount(issues.length);
     });
+    void reloadSettings();
     return () => {
       cancelled = true;
     };
     // 프로젝트 전환 시에만 초안 리셋 (projects 재로드로 초안이 날아가면 안 된다)
-  }, [project?.id]);
+  }, [currentProjectId, reloadSettings]);
 
-  if (!project) return null; // JiraLayout이 이미 /projects로 보냈다
+  if (!project) return null; // ProjectLayout이 이미 /projects로 보냈다
 
   const dirty = nameDraft !== project.name || descriptionDraft !== project.description;
+
+  /** 설정 액션 공통 래퍼 — 실패 toast, 끝나면 설정 재조회 */
+  const run = async (failTitle: string, action: () => Promise<unknown>) => {
+    try {
+      await action();
+    } catch (error) {
+      toast({
+        title: failTitle,
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+    await reloadSettings();
+  };
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -68,44 +124,172 @@ export function ProjectSettingsPage() {
     }
   };
 
+  /** 스킴/커스텀 배지 + 전환 컨트롤 — 워크플로·이슈 타입 탭 공용 */
+  const schemeHeader = resolved ? (
+    <div className="settings-scheme-header" data-testid="settings-scheme-header">
+      {resolved.source === "scheme" ? (
+        <>
+          <Badge appearance="brand">스킴: {resolved.scheme.name}</Badge>
+          <Select
+            label="스킴 변경"
+            value={resolved.scheme.id}
+            options={schemes.map((s) => ({ value: s.id, label: s.name }))}
+            onValueChange={(v) =>
+              void run("스킴 변경 실패", async () => {
+                if (v === resolved.scheme.id) return;
+                await assignScheme(project.id, v);
+                toast({ title: "스킴을 변경했습니다", appearance: "success" });
+              })
+            }
+          />
+        </>
+      ) : (
+        <Badge>이 프로젝트만 커스텀</Badge>
+      )}
+      <Switch
+        label="이 프로젝트만 커스텀"
+        checked={resolved.source === "custom"}
+        onCheckedChange={(next) =>
+          void run(next ? "커스텀 전환 실패" : "스킴 복귀 실패", async () => {
+            await setProjectCustom(project.id, next);
+            toast({
+              title: next ? "커스텀 설정으로 전환했습니다" : "스킴 설정으로 복귀했습니다",
+              appearance: "success",
+            });
+          })
+        }
+      />
+    </div>
+  ) : null;
+
   return (
     <>
-      <div className="project-settings">
-        <Card padding="lg" title="일반">
-          <form className="project-create-form" onSubmit={handleSave}>
-            <div className="project-key-readonly">
-              <span className="project-key-readonly-label">키</span>
-              <span className="issue-key-cell">{project.key}</span>
-            </div>
-            <TextField
-              label="이름"
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-            />
-            <TextArea
-              label="설명"
-              rows={3}
-              placeholder="프로젝트 설명을 입력하세요"
-              value={descriptionDraft}
-              onChange={(e) => setDescriptionDraft(e.target.value)}
-            />
-            <div className="project-form-actions">
-              <Button type="submit" disabled={!dirty || !nameDraft.trim()}>
-                저장
-              </Button>
-            </div>
-          </form>
-        </Card>
-        <Card padding="lg" title="위험 구역" className="project-danger-zone">
-          <p className="project-danger-desc">
-            프로젝트를 삭제하면 이슈 {issueCount}개와 스프린트·코멘트·활동 기록이 함께 삭제됩니다.
-            되돌릴 수 없습니다.
-          </p>
-          <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
-            프로젝트 삭제
-          </Button>
-        </Card>
-      </div>
+      <Tabs
+        label="프로젝트 설정"
+        className="settings-tabs"
+        items={[
+          {
+            value: "general",
+            label: "일반",
+            content: (
+              <div className="project-settings">
+                <Card padding="lg" title="일반">
+                  <form className="project-create-form" onSubmit={handleSave}>
+                    <div className="project-key-readonly">
+                      <span className="project-key-readonly-label">키</span>
+                      <span className="issue-key-cell">{project.key}</span>
+                    </div>
+                    <TextField
+                      label="이름"
+                      value={nameDraft}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                    />
+                    <TextArea
+                      label="설명"
+                      rows={3}
+                      placeholder="프로젝트 설명을 입력하세요"
+                      value={descriptionDraft}
+                      onChange={(e) => setDescriptionDraft(e.target.value)}
+                    />
+                    <div className="project-form-actions">
+                      <Button type="submit" disabled={!dirty || !nameDraft.trim()}>
+                        저장
+                      </Button>
+                    </div>
+                  </form>
+                </Card>
+                <Card padding="lg" title="위험 구역" className="project-danger-zone">
+                  <p className="project-danger-desc">
+                    프로젝트를 삭제하면 이슈 {issueCount}개와 스프린트·코멘트·활동 기록이 함께
+                    삭제됩니다. 되돌릴 수 없습니다.
+                  </p>
+                  <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+                    프로젝트 삭제
+                  </Button>
+                </Card>
+              </div>
+            ),
+          },
+          {
+            value: "workflow",
+            label: "워크플로",
+            content: resolved ? (
+              <div className="project-settings">
+                <Card padding="lg" title="워크플로 상태">
+                  {schemeHeader}
+                  <div className="admin-scheme-preview">
+                    {[...resolved.body.statuses]
+                      .sort((a, b) => a.order - b.order)
+                      .map((status) => (
+                        <Lozenge key={status.id} appearance={STATUS_APPEARANCE[status.category]}>
+                          {status.name}
+                        </Lozenge>
+                      ))}
+                  </div>
+                  <p className="admin-scheme-note">
+                    상태 추가/이름 변경은 다음 라운드에서 열립니다. 스킴 자체 편집은 전역 관리(⚙).
+                  </p>
+                </Card>
+              </div>
+            ) : null,
+          },
+          {
+            value: "types",
+            label: "이슈 타입",
+            content: resolved ? (
+              <div className="project-settings">
+                <Card padding="lg" title="이슈 타입">
+                  {schemeHeader}
+                  {resolved.source === "custom" ? (
+                    <form
+                      className="project-create-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void run("저장 실패", async () => {
+                          await updateProjectCustomSettings(project.id, {
+                            ...resolved.body,
+                            enabledTypes: typesDraft,
+                          });
+                          toast({ title: "이슈 타입 구성을 저장했습니다", appearance: "success" });
+                        });
+                      }}
+                    >
+                      <div className="board-settings-checks" role="group" aria-label="이슈 타입">
+                        {ISSUE_TYPES.map((type) => (
+                          <Checkbox
+                            key={type}
+                            label={TYPE_LABELS[type]}
+                            checked={typesDraft.includes(type)}
+                            disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
+                            onChange={() =>
+                              setTypesDraft((prev) =>
+                                prev.includes(type)
+                                  ? prev.filter((t) => t !== type)
+                                  : [...prev, type],
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                      <Button type="submit" size="small">
+                        저장
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="admin-scheme-preview" data-testid="types-readonly">
+                      {resolved.body.enabledTypes.map((type) => (
+                        <Lozenge key={type} appearance="neutral">
+                          {TYPE_LABELS[type]}
+                        </Lozenge>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            ) : null,
+          },
+        ]}
+      />
 
       {confirmingDelete ? (
         <Modal
