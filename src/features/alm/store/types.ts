@@ -77,7 +77,7 @@ export interface Activity {
 }
 
 export type BoardType = "scrum" | "kanban";
-export type BoardSwimlane = "none" | "assignee";
+export type BoardSwimlane = "none" | "assignee" | "epic";
 
 export interface BoardColumn {
   status: IssueStatus; // 3개 고정 (todo/inprogress/done 각 1개)

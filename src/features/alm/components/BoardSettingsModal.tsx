@@ -9,6 +9,7 @@ import { ISSUE_TYPES, STATUS_LABELS, TYPE_LABELS } from "./labels";
 const SWIMLANE_OPTIONS: { value: BoardSwimlane; label: string }[] = [
   { value: "none", label: "없음" },
   { value: "assignee", label: "담당자별" },
+  { value: "epic", label: "에픽별" },
 ];
 
 export interface BoardSettingsModalProps {

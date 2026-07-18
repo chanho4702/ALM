@@ -19,6 +19,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0; /* 사이드바 옆에서 콘텐츠가 넘칠 때 찌그러짐/밀림 방지 */
 }
 
 .app-body {
@@ -358,6 +359,27 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-300);
+  min-width: 0; /* 자식 테이블/보드가 부모를 밀지 않게 */
+}
+
+/* 태블릿 이하: 좌우 여백 축소 */
+@media (max-width: 900px) {
+  .jira-content,
+  .project-list-content {
+    padding-left: var(--chanho-space-200);
+    padding-right: var(--chanho-space-200);
+  }
+
+  .project-header,
+  .project-tabs,
+  .breadcrumbs {
+    padding-left: var(--chanho-space-200);
+    padding-right: var(--chanho-space-200);
+  }
+
+  .timeline-side {
+    width: 200px;
+  }
 }
 
 .app-loading,
@@ -675,7 +697,11 @@ body {
 }
 
 .search-result-project {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }
@@ -688,11 +714,17 @@ body {
   gap: var(--chanho-space-50);
 }
 
+/* 고정 5컬럼 대신 랩 — 좁아지면 줄바꿈, Select가 안 찌그러진다 */
 .search-builders {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--chanho-space-150);
-  align-items: end;
+  align-items: flex-end;
+}
+
+.search-builders > div {
+  flex: 1 1 150px;
+  min-width: 150px;
 }
 
 .search-count {
@@ -898,11 +930,14 @@ body {
   padding: var(--chanho-space-600);
 }
 
+/* 컬럼 최소 폭을 보장하고, 모자라면 찌그러뜨리지 말고 가로 스크롤 (태블릿) */
 .board-columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
   gap: var(--chanho-space-200);
   align-items: start;
+  overflow-x: auto;
+  padding-bottom: var(--chanho-space-100);
 }
 
 .board-column {
@@ -1128,6 +1163,15 @@ body {
   background: var(--chanho-color-background-neutral-hovered);
 }
 
+/* 에픽 자식 행 들여쓰기 */
+.timeline-issue.is-child {
+  padding-left: var(--chanho-space-400);
+}
+
+.timeline-child-marker {
+  color: var(--chanho-color-text-subtle);
+}
+
 .timeline-issue-title {
   min-width: 0;
   overflow: hidden;
@@ -1243,6 +1287,17 @@ body {
   grid-template-columns: minmax(0, 1fr) 200px;
   gap: var(--chanho-space-300);
   margin-top: var(--chanho-space-200);
+}
+
+/* 좁은 화면: 속성 패널을 본문 아래로 스택 */
+@media (max-width: 640px) {
+  .issue-detail-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .issue-link-add {
+    grid-template-columns: 1fr;
+  }
 }
 
 .issue-detail-main {
@@ -1522,12 +1577,23 @@ body {
 
 /* ── 이슈 목록 ──────────────────────────────────────────── */
 
+/* 고정 그리드 대신 랩 — 검색은 넓게, Select들은 최소 폭 보장 */
 .issue-filter-bar {
-  display: grid;
-  grid-template-columns: 2fr repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--chanho-space-150);
-  align-items: end;
+  align-items: flex-end;
   margin-bottom: var(--chanho-space-300);
+}
+
+.issue-filter-bar > div:first-child {
+  flex: 2 1 240px;
+  min-width: 240px;
+}
+
+.issue-filter-bar > div {
+  flex: 1 1 130px;
+  min-width: 130px;
 }
 
 .issue-key-cell {
@@ -1545,17 +1611,12 @@ body {
 
 /* ── 홈 (For you) ───────────────────────────────────────── */
 
+/* 뷰포트가 아니라 컨테이너 폭 기준으로 접힌다 — 사이드바 폭 변화에도 안 찌그러짐 */
 .home-sections {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: var(--chanho-space-200);
   align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .home-sections {
-    grid-template-columns: 1fr;
-  }
 }
 
 .home-issue-list {
@@ -1575,16 +1636,11 @@ body {
   gap: var(--chanho-space-300);
 }
 
+/* 컨테이너 폭 기준 자동 접힘 — 4→2→1 */
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--chanho-space-200);
-}
-
-@media (max-width: 900px) {
-  .dashboard-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 /* 상태 카운트 타일 — 왼쪽 액센트가 상태 색 언어를 잇는다 */

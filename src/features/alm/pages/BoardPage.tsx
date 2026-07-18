@@ -113,20 +113,39 @@ export function BoardPage() {
     [issues],
   );
 
-  /** 담당자 스윔레인 밴드 — 이슈가 있는 담당자 순, 미지정 마지막 */
+  /**
+   * 스윔레인 밴드 — 담당자별(이슈 있는 담당자 순, 미지정 마지막) 또는
+   * 에픽별(자식이 보이는 에픽 순, "에픽 없음" 마지막 — 에픽 카드 자신도 여기).
+   */
   const bands = useMemo(() => {
-    if (groupBy !== "assignee") return null;
-    const result: { key: string; name: string; issues: Issue[] }[] = [];
-    for (const user of users) {
-      const userIssues = visibleIssues.filter((i) => i.assigneeId === user.id);
-      if (userIssues.length > 0) result.push({ key: user.id, name: user.name, issues: userIssues });
+    if (groupBy === "assignee") {
+      const result: { key: string; name: string; issues: Issue[] }[] = [];
+      for (const user of users) {
+        const userIssues = visibleIssues.filter((i) => i.assigneeId === user.id);
+        if (userIssues.length > 0) {
+          result.push({ key: user.id, name: user.name, issues: userIssues });
+        }
+      }
+      const unassigned = visibleIssues.filter((i) => i.assigneeId === null);
+      if (unassigned.length > 0) {
+        result.push({ key: "unassigned", name: "미지정", issues: unassigned });
+      }
+      return result;
     }
-    const unassigned = visibleIssues.filter((i) => i.assigneeId === null);
-    if (unassigned.length > 0) {
-      result.push({ key: "unassigned", name: "미지정", issues: unassigned });
+    if (groupBy === "epic") {
+      const result: { key: string; name: string; issues: Issue[] }[] = [];
+      for (const [epicId, epicName] of Object.entries(epicsById)) {
+        const children = visibleIssues.filter((i) => i.parentId === epicId);
+        if (children.length > 0) result.push({ key: epicId, name: epicName, issues: children });
+      }
+      const noEpic = visibleIssues.filter(
+        (i) => i.parentId === null || !epicsById[i.parentId],
+      );
+      if (noEpic.length > 0) result.push({ key: "noepic", name: "에픽 없음", issues: noEpic });
+      return result;
     }
-    return result;
-  }, [groupBy, users, visibleIssues]);
+    return null;
+  }, [groupBy, users, visibleIssues, epicsById]);
 
   /** status → order순 이슈 id 배열 (resolveMove 입력) */
   const columnIds = useMemo(() => {
@@ -222,7 +241,12 @@ export function BoardPage() {
                 data-testid={`swimlane-${band.key}`}
               >
                 <header className="board-swimlane-header">
-                  {band.key !== "unassigned" ? <Avatar name={band.name} size="small" /> : null}
+                  {groupBy === "assignee" && band.key !== "unassigned" ? (
+                    <Avatar name={band.name} size="small" />
+                  ) : null}
+                  {groupBy === "epic" && band.key !== "noepic" ? (
+                    <Lozenge appearance="warning">에픽</Lozenge>
+                  ) : null}
                   <strong>{band.name}</strong>
                   <span className="board-swimlane-count">{band.issues.length}개</span>
                 </header>
@@ -302,6 +326,7 @@ export function BoardPage() {
             options={[
               { value: "none", label: "없음" },
               { value: "assignee", label: "담당자별" },
+              { value: "epic", label: "에픽별" },
             ]}
             onValueChange={(v) => setGroupBy(v as BoardSwimlane)}
           />

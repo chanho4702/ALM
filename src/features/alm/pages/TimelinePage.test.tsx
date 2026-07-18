@@ -53,3 +53,21 @@ describe("TimelinePage", () => {
     expect(await screen.findByRole("dialog", { name: "ALM-2" })).toBeInTheDocument();
   });
 });
+
+describe("타임라인 에픽 그룹핑", () => {
+  it("에픽 행 바로 아래에 자식이 들여쓰기로 나열된다", async () => {
+    renderTimeline();
+    const timeline = await screen.findByTestId("timeline");
+
+    const rowButtons = Array.from(
+      timeline.querySelectorAll<HTMLButtonElement>(".timeline-issue"),
+    );
+    const keys = rowButtons.map((b) => b.textContent?.match(/ALM-\d+/)?.[0]);
+    // 에픽 ALM-4가 먼저, 자식 ALM-2가 바로 다음
+    const epicIndex = keys.indexOf("ALM-4");
+    expect(epicIndex).toBeGreaterThanOrEqual(0);
+    expect(keys[epicIndex + 1]).toBe("ALM-2");
+    expect(rowButtons[epicIndex + 1]).toHaveClass("is-child");
+    expect(rowButtons[epicIndex]).not.toHaveClass("is-child");
+  });
+});

@@ -62,19 +62,34 @@ export function TimelinePage() {
       if (date.getUTCDay() === 1) weekTicks.push({ index: i, label: String(date.getUTCDate()) });
     }
 
-    const rows = [...issues]
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .map((issue) => {
-        const startIndex = dayIndex(dayStamp(issue.createdAt));
-        const endIndex = issue.dueDate ? dayIndex(dayStamp(issue.dueDate)) : startIndex;
-        return {
-          issue,
-          startIndex,
-          // 마감일이 생성일보다 앞서도 최소 1일 폭을 보장한다
-          spanDays: Math.max(endIndex - startIndex + 1, 1),
-          hasDue: issue.dueDate !== null,
-        };
-      });
+    const toRow = (issue: Issue, isChild: boolean) => {
+      const startIndex = dayIndex(dayStamp(issue.createdAt));
+      const endIndex = issue.dueDate ? dayIndex(dayStamp(issue.dueDate)) : startIndex;
+      return {
+        issue,
+        isChild,
+        startIndex,
+        // 마감일이 생성일보다 앞서도 최소 1일 폭을 보장한다
+        spanDays: Math.max(endIndex - startIndex + 1, 1),
+        hasDue: issue.dueDate !== null,
+      };
+    };
+
+    // 에픽 그룹핑: 에픽 행 뒤에 자식을 들여쓰기로, 나머지는 그 아래 (각 그룹 생성순)
+    const sorted = [...issues].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const epics = sorted.filter((i) => i.type === "epic");
+    const grouped = new Set<string>(epics.map((e) => e.id));
+    const rows: ReturnType<typeof toRow>[] = [];
+    for (const epic of epics) {
+      rows.push(toRow(epic, false));
+      for (const child of sorted.filter((i) => i.parentId === epic.id)) {
+        rows.push(toRow(child, true));
+        grouped.add(child.id);
+      }
+    }
+    for (const issue of sorted) {
+      if (!grouped.has(issue.id)) rows.push(toRow(issue, false));
+    }
 
     return { totalDays, months, weekTicks, todayIndex: dayIndex(todayStamp), rows, rangeStart };
   }, [issues]);
@@ -99,13 +114,18 @@ export function TimelinePage() {
           {/* 좌측 고정: 이슈 목록 */}
           <div className="timeline-side">
             <div className="timeline-side-header">이슈</div>
-            {model.rows.map(({ issue }) => (
+            {model.rows.map(({ issue, isChild }) => (
               <button
                 key={issue.id}
                 type="button"
-                className="timeline-issue"
+                className={isChild ? "timeline-issue is-child" : "timeline-issue"}
                 onClick={() => openIssue(issue.key)}
               >
+                {isChild ? (
+                  <span className="timeline-child-marker" aria-hidden>
+                    ↳
+                  </span>
+                ) : null}
                 <IssueTypeGlyph type={issue.type} />
                 <span className="issue-key-cell">{issue.key}</span>
                 <span className="timeline-issue-title">{issue.title}</span>

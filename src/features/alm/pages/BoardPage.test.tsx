@@ -235,3 +235,24 @@ describe("카드 에픽 태그", () => {
     ).toBeInTheDocument(); // 에픽 태그 (i4 카드 자체는 todo 컬럼에 있다)
   });
 });
+
+describe("에픽 스윔레인", () => {
+  it("그룹=에픽별 전환 시 에픽 밴드에 자식만 모이고 '에픽 없음'이 마지막이다", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole("region", { name: "할 일" });
+
+    await user.click(screen.getByRole("combobox", { name: "그룹" }));
+    await user.click(await screen.findByRole("option", { name: "에픽별" }));
+
+    // 시드: 에픽 ALM-4(i4)의 자식 = ALM-2
+    const epicBand = await screen.findByTestId("swimlane-i4");
+    expect(within(epicBand).getByText("ALM-2")).toBeInTheDocument();
+    expect(within(epicBand).queryByText("ALM-3")).not.toBeInTheDocument();
+
+    const bands = screen.getAllByRole("region", { name: /스윔레인/ });
+    expect(bands[bands.length - 1]).toHaveAttribute("data-testid", "swimlane-noepic");
+    // 에픽 카드 자신(ALM-4)은 '에픽 없음' 밴드에
+    expect(within(screen.getByTestId("swimlane-noepic")).getByText("ALM-4")).toBeInTheDocument();
+  });
+});
