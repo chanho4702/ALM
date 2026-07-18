@@ -1178,17 +1178,20 @@ export async function setDefaultScheme(id: string): Promise<void> {
   persist();
 }
 
-/** 새 구성에 없는 상태의 이슈를 같은 카테고리의 첫 상태로 이관한다 */
+/**
+ * 새 구성에 없는 상태의 이슈를 같은 카테고리의 첫 상태(order순)로 이관한다.
+ * 호출자는 반드시 구성을 바꾸기 전에 호출해야 한다 — 옛 구성에서 카테고리를 읽는다.
+ */
 function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: SettingsBody): void {
   if (projectIds.length === 0) return;
   const valid = new Set(newBody.statuses.map((s) => s.id));
   const targets = new Set(projectIds);
+  const sorted = [...newBody.statuses].sort((a, b) => a.order - b.order);
   for (const issue of data.issues) {
     if (!targets.has(issue.projectId) || valid.has(issue.status)) continue;
-    // 현행 라운드에서 issue.status는 카테고리 값과 동일 — 카테고리 매칭으로 이관 (③에서 일반화)
-    const fallback =
-      newBody.statuses.find((s) => s.category === issue.status) ?? newBody.statuses[0];
-    issue.status = fallback.id as IssueStatus;
+    const oldCategory = statusCategoryOf(data, issue.projectId, issue.status);
+    const fallback = sorted.find((s) => s.category === oldCategory) ?? sorted[0];
+    issue.status = fallback.id;
   }
 }
 

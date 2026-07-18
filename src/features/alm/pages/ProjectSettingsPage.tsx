@@ -15,7 +15,7 @@ import {
   TextField,
   useToast,
 } from "@chanho/react";
-import type { IssueType, SettingsScheme } from "../store/types";
+import type { IssueType, SettingsScheme, WorkflowStatus } from "../store/types";
 import type { ResolvedSettings } from "../store/jiraStore";
 import {
   assignScheme,
@@ -29,6 +29,7 @@ import {
 } from "../store/jiraStore";
 import { pruneProject } from "../store/uiStore";
 import type { JiraOutletContext } from "../components/ProjectLayout";
+import { StatusEditor } from "../components/StatusEditor";
 import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
 
 /** 프로젝트 설정 — 지라식 탭: 일반 / 워크플로 / 이슈 타입 (스킴 사용·커스텀 전환) */
@@ -46,6 +47,7 @@ export function ProjectSettingsPage() {
   const [resolved, setResolved] = useState<ResolvedSettings | null>(null);
   const [schemes, setSchemes] = useState<SettingsScheme[]>([]);
   const [typesDraft, setTypesDraft] = useState<IssueType[]>([]);
+  const [statusesDraft, setStatusesDraft] = useState<WorkflowStatus[]>([]);
 
   const currentProjectId = project?.id;
 
@@ -58,6 +60,7 @@ export function ProjectSettingsPage() {
     setResolved(resolvedSettings);
     setSchemes(schemeList);
     setTypesDraft([...resolvedSettings.body.enabledTypes]);
+    setStatusesDraft([...resolvedSettings.body.statuses].sort((a, b) => a.order - b.order));
   }, [currentProjectId]);
 
   useEffect(() => {
@@ -217,18 +220,42 @@ export function ProjectSettingsPage() {
               <div className="project-settings">
                 <Card padding="lg" title="워크플로 상태">
                   {schemeHeader}
-                  <div className="admin-scheme-preview">
-                    {[...resolved.body.statuses]
-                      .sort((a, b) => a.order - b.order)
-                      .map((status) => (
-                        <Lozenge key={status.id} appearance={STATUS_APPEARANCE[status.category]}>
-                          {status.name}
-                        </Lozenge>
-                      ))}
-                  </div>
-                  <p className="admin-scheme-note">
-                    상태 추가/이름 변경은 다음 라운드에서 열립니다. 스킴 자체 편집은 전역 관리(⚙).
-                  </p>
+                  {resolved.source === "custom" ? (
+                    <form
+                      className="project-create-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void run("저장 실패", async () => {
+                          await updateProjectCustomSettings(project.id, {
+                            ...resolved.body,
+                            statuses: statusesDraft,
+                          });
+                          toast({ title: "워크플로 상태를 저장했습니다", appearance: "success" });
+                        });
+                      }}
+                    >
+                      <StatusEditor value={statusesDraft} onChange={setStatusesDraft} />
+                      <Button type="submit" size="small">
+                        저장
+                      </Button>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="admin-scheme-preview" data-testid="statuses-readonly">
+                        {[...resolved.body.statuses]
+                          .sort((a, b) => a.order - b.order)
+                          .map((status) => (
+                            <Lozenge key={status.id} appearance={STATUS_APPEARANCE[status.category]}>
+                              {status.name}
+                            </Lozenge>
+                          ))}
+                      </div>
+                      <p className="admin-scheme-note">
+                        스킴 자체 편집은 전역 관리(⚙), 이 프로젝트만 바꾸려면 커스텀으로
+                        전환하세요.
+                      </p>
+                    </>
+                  )}
                 </Card>
               </div>
             ) : null,
@@ -261,7 +288,7 @@ export function ProjectSettingsPage() {
                             label={TYPE_LABELS[type]}
                             checked={typesDraft.includes(type)}
                             disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
-                            onChange={() =>
+                            onCheckedChange={() =>
                               setTypesDraft((prev) =>
                                 prev.includes(type)
                                   ? prev.filter((t) => t !== type)

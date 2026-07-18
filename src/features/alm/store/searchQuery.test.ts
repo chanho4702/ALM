@@ -40,6 +40,23 @@ describe("parseSmartQuery", () => {
     expect(query.statuses).toEqual([]);
     expect(query.text).toBe("상태:몰라 담당:없는사람 진짜검색어");
   });
+
+  it("상태:커스텀이름은 statusIds로 매치된다 — 공백 제거 이름도 허용 (설계 v3 ④)", () => {
+    const withStatuses: QueryContext = {
+      ...ctx,
+      statuses: [
+        { id: "review", name: "리뷰" },
+        { id: "code-review", name: "코드 리뷰" },
+      ],
+    };
+    expect(parseSmartQuery("상태:리뷰", withStatuses).statusIds).toEqual(["review"]);
+    // 이름의 공백은 토큰에 담을 수 없다 → 공백 제거 형태로 매치
+    expect(parseSmartQuery("상태:코드리뷰", withStatuses).statusIds).toEqual(["code-review"]);
+    // 카테고리 라벨은 여전히 카테고리 매치가 우선
+    expect(parseSmartQuery("상태:진행중", withStatuses).statuses).toEqual(["inprogress"]);
+    // ctx에 상태가 없으면 텍스트로 남는다
+    expect(parseSmartQuery("상태:리뷰", ctx).text).toBe("상태:리뷰");
+  });
 });
 
 describe("serializeQuery 라운드트립", () => {
@@ -54,5 +71,15 @@ describe("serializeQuery 라운드트립", () => {
 
   it("기본 정렬(수정)은 직렬화에서 생략된다", () => {
     expect(serializeQuery({ ...EMPTY_QUERY, text: "abc" }, ctx)).toBe("abc");
+  });
+
+  it("statusIds는 공백 제거 이름 토큰으로 왕복한다", () => {
+    const withStatuses: QueryContext = {
+      ...ctx,
+      statuses: [{ id: "code-review", name: "코드 리뷰" }],
+    };
+    const original = parseSmartQuery("상태:코드리뷰 검색어", withStatuses);
+    expect(serializeQuery(original, withStatuses)).toBe("상태:코드리뷰 검색어");
+    expect(parseSmartQuery(serializeQuery(original, withStatuses), withStatuses)).toEqual(original);
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Badge, Button, Card, Checkbox, Lozenge, Modal, PageHeader, TextField, useToast } from "@chanho/react";
-import type { IssueType, SettingsScheme } from "../store/types";
+import type { IssueType, SettingsScheme, WorkflowStatus } from "../store/types";
 import {
   createScheme,
   deleteScheme,
@@ -9,14 +9,14 @@ import {
   setDefaultScheme,
   updateScheme,
 } from "../store/jiraStore";
+import { StatusEditor } from "../components/StatusEditor";
 import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
 
 type Aspect = "workflow" | "types";
 
 /**
  * 전역 관리(⚙ /settings) — 지라 관리자 화면 모방.
- * 스킴을 정의하고 프로젝트가 배정받는다. 이번 라운드는 이슈 타입 편집까지,
- * 워크플로 상태 편집은 다음 라운드(설계 v3의 ③).
+ * 스킴을 정의하고 프로젝트가 배정받는다. 이슈 타입·워크플로 상태 모두 여기서 편집한다.
  */
 export function GlobalSettingsPage() {
   const toast = useToast();
@@ -26,6 +26,8 @@ export function GlobalSettingsPage() {
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<SettingsScheme | null>(null);
   const [editTypes, setEditTypes] = useState<IssueType[]>([]);
+  const [editingWf, setEditingWf] = useState<SettingsScheme | null>(null);
+  const [editStatuses, setEditStatuses] = useState<WorkflowStatus[]>([]);
 
   const reload = useCallback(async () => {
     const list = await listSchemes();
@@ -75,6 +77,21 @@ export function GlobalSettingsPage() {
       await updateScheme(editing.id, { body: { ...editing.body, enabledTypes: editTypes } });
       toast({ title: "이슈 타입 구성을 저장했습니다", appearance: "success" });
       setEditing(null);
+    });
+  };
+
+  const openStatusEditor = (scheme: SettingsScheme) => {
+    setEditingWf(scheme);
+    setEditStatuses([...scheme.body.statuses].sort((a, b) => a.order - b.order));
+  };
+
+  const handleStatusesSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingWf) return;
+    await run("저장 실패", async () => {
+      await updateScheme(editingWf.id, { body: { ...editingWf.body, statuses: editStatuses } });
+      toast({ title: "워크플로 상태를 저장했습니다", appearance: "success" });
+      setEditingWf(null);
     });
   };
 
@@ -171,9 +188,36 @@ export function GlobalSettingsPage() {
                             </Lozenge>
                           ))}
                       </div>
-                      <p className="admin-scheme-note">
-                        워크플로 상태 편집은 다음 라운드에서 열립니다 (설계 v3 ③).
-                      </p>
+                      <div className="admin-scheme-actions">
+                        <Button
+                          size="small"
+                          variant="secondary"
+                          onClick={() => openStatusEditor(scheme)}
+                        >
+                          상태 편집
+                        </Button>
+                        {!scheme.isDefault ? (
+                          <>
+                            <Button
+                              size="small"
+                              variant="ghost"
+                              onClick={() =>
+                                void run("디폴트 지정 실패", () => setDefaultScheme(scheme.id))
+                              }
+                            >
+                              디폴트로 지정
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="ghost"
+                              aria-label={`스킴 ${scheme.name} 삭제`}
+                              onClick={() => void run("스킴 삭제 실패", () => deleteScheme(scheme.id))}
+                            >
+                              삭제
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
                     </>
                   )}
                 </Card>
@@ -209,6 +253,24 @@ export function GlobalSettingsPage() {
                 />
               ))}
             </div>
+            <Button type="submit">저장</Button>
+          </form>
+        </Modal>
+      ) : null}
+
+      {editingWf ? (
+        <Modal
+          trigger={<span hidden />}
+          title={`워크플로 상태 — ${editingWf.name}`}
+          description="저장하면 이 스킴을 쓰는 모든 프로젝트의 이슈가 새 구성으로 이관됩니다."
+          open
+          onOpenChange={(next) => {
+            if (!next) setEditingWf(null);
+          }}
+          className="status-editor-modal"
+        >
+          <form className="project-create-form" onSubmit={handleStatusesSave}>
+            <StatusEditor value={editStatuses} onChange={setEditStatuses} />
             <Button type="submit">저장</Button>
           </form>
         </Modal>

@@ -64,7 +64,7 @@ describe("전역 관리 (/settings)", () => {
     });
   });
 
-  it("워크플로 스킴 메뉴는 상태 미리보기를 읽기 전용으로 보여준다", async () => {
+  it("워크플로 스킴: 상태 편집으로 새 상태를 추가하면 미리보기에 반영된다", async () => {
     const user = userEvent.setup();
     renderSettings();
     await screen.findByRole("heading", { name: "전역 관리" });
@@ -73,7 +73,33 @@ describe("전역 관리 (/settings)", () => {
     const list = screen.getByTestId("scheme-list");
     expect(within(list).getByText("할 일")).toBeInTheDocument();
     expect(within(list).getByText("진행 중")).toBeInTheDocument();
-    expect(within(list).getByText(/다음 라운드/)).toBeInTheDocument();
+
+    await user.click(within(list).getByRole("button", { name: "상태 편집" }));
+    const dialog = await screen.findByRole("dialog", { name: /워크플로 상태 — 기본 스킴/ });
+    await user.type(within(dialog).getByLabelText("새 상태 이름"), "리뷰");
+    await user.click(within(dialog).getByRole("button", { name: "상태 추가" }));
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByText("워크플로 상태를 저장했습니다")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(screen.getByTestId("scheme-list")).getByText("리뷰")).toBeInTheDocument();
+    });
+  });
+
+  it("상태 편집기: 마지막 남은 카테고리 상태는 삭제 버튼이 비활성화된다", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    await screen.findByRole("heading", { name: "전역 관리" });
+
+    await user.click(screen.getByRole("button", { name: "워크플로 스킴" }));
+    await user.click(
+      within(screen.getByTestId("scheme-list")).getByRole("button", { name: "상태 편집" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: /워크플로 상태 — 기본 스킴/ });
+    // 기본 3상태는 각자 카테고리의 유일한 상태 — 전부 삭제 불가
+    expect(within(dialog).getByRole("button", { name: "할 일 삭제" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "진행 중 삭제" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "완료 삭제" })).toBeDisabled();
   });
 });
 
@@ -105,14 +131,30 @@ describe("프로젝트 설정 — 스킴/커스텀", () => {
     expect(within(readonly).getByText("에픽")).toBeInTheDocument();
   });
 
-  it("워크플로 탭은 현재 상태 구성을 보여준다", async () => {
+  it("워크플로 탭: 스킴은 읽기 전용, 커스텀 전환하면 상태 편집기로 추가/저장", async () => {
     const user = userEvent.setup();
     renderSettings("/projects/p1/settings");
     await screen.findByRole("tab", { name: "워크플로" });
 
     await user.click(screen.getByRole("tab", { name: "워크플로" }));
-    expect(await screen.findByText("할 일")).toBeInTheDocument();
-    expect(screen.getByText("진행 중")).toBeInTheDocument();
-    expect(screen.getByText("완료")).toBeInTheDocument();
+    const readonly = await screen.findByTestId("statuses-readonly");
+    expect(within(readonly).getByText("할 일")).toBeInTheDocument();
+    expect(within(readonly).getByText("진행 중")).toBeInTheDocument();
+    expect(within(readonly).getByText("완료")).toBeInTheDocument();
+
+    // 커스텀 전환 → 편집기 등장 → 코드 리뷰 추가 → 저장
+    await user.click(
+      within(screen.getByTestId("settings-scheme-header")).getByRole("switch", {
+        name: "이 프로젝트만 커스텀",
+      }),
+    );
+    expect(await screen.findByTestId("status-editor")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("새 상태 이름"), "코드 리뷰");
+    await user.click(screen.getByRole("button", { name: "상태 추가" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("워크플로 상태를 저장했습니다")).toBeInTheDocument();
+
+    // 저장 후 재조회된 편집기에 새 상태가 남아 있다
+    expect(await screen.findByDisplayValue("코드 리뷰")).toBeInTheDocument();
   });
 });

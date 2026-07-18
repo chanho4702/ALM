@@ -8,14 +8,20 @@ import {
   createScheme,
   deleteScheme,
   getIssueByKey,
+  listAllStatuses,
+  listProjectStatuses,
   listSchemes,
+  moveIssue,
+  queryIssues,
   resolveSettings,
   setDefaultScheme,
   setProjectCustom,
+  statusMetaByProject,
   updateIssue,
   updateProjectCustomSettings,
   updateScheme,
 } from "./jiraStore";
+import { EMPTY_QUERY } from "./searchQuery";
 import type { SettingsBody } from "./types";
 
 const PROJECT = "p1";
@@ -167,6 +173,50 @@ describe("프로젝트 커스텀 전환/복귀·스킴 재배정", () => {
     const resolved = await resolveSettings(PROJECT);
     expect(resolved.source).toBe("scheme");
     expect(resolved.body.statuses[1].name).toBe("진행 중");
+  });
+
+  it("커스텀 상태 추가: 목록·이동·검색·합집합에 모두 나타난다 (설계 v3 ③④)", async () => {
+    await setProjectCustom(PROJECT, true);
+    const body = customBody();
+    body.statuses.splice(2, 0, { id: "review", name: "코드 리뷰", category: "inprogress", order: 3 });
+    body.statuses[3] = { ...body.statuses[3], order: 4 };
+    await updateProjectCustomSettings(PROJECT, body);
+
+    // order순 상태 목록
+    expect((await listProjectStatuses(PROJECT)).map((s) => s.name)).toEqual([
+      "대기",
+      "작업 중",
+      "코드 리뷰",
+      "끝",
+    ]);
+
+    // 커스텀 상태로 이동 가능
+    const issue = await getIssueByKey("ALM-1");
+    await moveIssue(issue!.id, { status: "review" });
+    expect((await getIssueByKey("ALM-1"))!.status).toBe("review");
+
+    // 카테고리 검색(진행중)에 걸리고, 상태 id 직접 필터도 동작
+    const byCategory = await queryIssues({ ...EMPTY_QUERY, statuses: ["inprogress"] });
+    expect(byCategory.map((i) => i.key)).toContain("ALM-1");
+    const byId = await queryIssues({ ...EMPTY_QUERY, statusIds: ["review"] });
+    expect(byId.map((i) => i.key)).toEqual(["ALM-1"]);
+
+    // 크로스 프로젝트 메타·전체 합집합
+    expect((await statusMetaByProject())[PROJECT].review.name).toBe("코드 리뷰");
+    expect(await listAllStatuses()).toContainEqual({ id: "review", name: "코드 리뷰" });
+  });
+
+  it("커스텀 상태 제거: 그 상태의 이슈는 같은 카테고리의 첫 상태로 이관된다", async () => {
+    await setProjectCustom(PROJECT, true);
+    const withReview = customBody();
+    withReview.statuses.push({ id: "review", name: "리뷰", category: "inprogress", order: 4 });
+    await updateProjectCustomSettings(PROJECT, withReview);
+    const issue = await getIssueByKey("ALM-1");
+    await moveIssue(issue!.id, { status: "review" });
+
+    // review를 빼고 저장 — id가 카테고리 문자열이 아니어도 옛 구성의 카테고리로 이관
+    await updateProjectCustomSettings(PROJECT, customBody());
+    expect((await getIssueByKey("ALM-1"))!.status).toBe("inprogress");
   });
 
   it("스킴 재배정: 커스텀 해제 + 새 스킴 상태에 없는 이슈는 같은 카테고리로 이관", async () => {

@@ -4,7 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
-import { __resetForTest, completeSprint } from "../store/jiraStore";
+import {
+  __resetForTest,
+  completeSprint,
+  getIssueByKey,
+  moveIssue,
+  setProjectCustom,
+  updateProjectCustomSettings,
+} from "../store/jiraStore";
 
 /** 현재 pathname을 노출하는 테스트 프로브 */
 function LocationProbe() {
@@ -55,6 +62,30 @@ describe("BoardPage", () => {
     expect(within(todo).getByText("낮음")).toBeInTheDocument(); // ALM-5 low
     expect(within(todo).getByRole("img", { name: "박준영" })).toBeInTheDocument(); // ALM-4 담당자
     expect(within(done).getByText("높음")).toBeInTheDocument(); // ALM-1 high
+  });
+
+  it("커스텀 워크플로 상태는 보드에 컬럼으로 나타나고 그 상태의 카드가 담긴다", async () => {
+    // 커스텀 전환 후 진행 중 카테고리에 "코드 리뷰" 상태 추가, ALM-2를 그 상태로 이동
+    await setProjectCustom("p1", true);
+    await updateProjectCustomSettings("p1", {
+      statuses: [
+        { id: "todo", name: "할 일", category: "todo", order: 1 },
+        { id: "inprogress", name: "진행 중", category: "inprogress", order: 2 },
+        { id: "review", name: "코드 리뷰", category: "inprogress", order: 3 },
+        { id: "done", name: "완료", category: "done", order: 4 },
+      ],
+      enabledTypes: ["task", "story", "bug", "epic", "subtask"],
+    });
+    const issue = await getIssueByKey("ALM-2");
+    await moveIssue(issue!.id, { status: "review" });
+
+    renderBoard();
+    const review = await screen.findByRole("region", { name: "코드 리뷰" });
+    expect(within(review).getByText("ALM-2")).toBeInTheDocument();
+    // 원래 진행 중 컬럼에는 ALM-3만 남는다
+    const inprogress = screen.getByRole("region", { name: "진행 중" });
+    expect(within(inprogress).getByText("ALM-3")).toBeInTheDocument();
+    expect(within(inprogress).queryByText("ALM-2")).not.toBeInTheDocument();
   });
 
   it("활성 스프린트가 없으면 백로그로 유도하는 EmptyState를 보여준다", async () => {

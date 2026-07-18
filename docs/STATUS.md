@@ -1,4 +1,4 @@
-# ALM Front 현황 (2026-07-17 기준)
+# ALM Front 현황 (2026-07-18 기준)
 
 한눈에 보는 "어디까지 했고, 무엇이 남았나". 상세 설계는 `superpowers/specs/`, 태스크별
 계획은 `superpowers/plans/`, 백엔드 의존 항목은 `BACKLOG.md` 참고.
@@ -34,9 +34,22 @@
 프로젝트 셸(디렉터리·생성·설정·헤더+뷰 탭·컬러 아바타), 요약(대시보드), 타임라인(간트),
 이슈 목록/상세, 코멘트 편집, 이슈 타입, 알림 벨, 다크 모드.
 
+## 설정 시스템 (설계 v3 — 지라 스킴 구조 모방, 전부 완료)
+
+- **스킴 모델**: 전역 관리(⚙ `/settings`)에서 스킴 정의 → 프로젝트 배정 →
+  "이 프로젝트만 커스텀" 전환. `resolveSettings(projectId)`가 단일 진실
+- **워크로그(C)**: 예상+기록 2값, 이슈 상세 진행률/탭
+- **이슈 타입(B)**: 스킴/커스텀별 활성 타입 — 생성·전환 제약, subtask 항상 활성
+- **커스텀 워크플로(A)**: `Issue.status` = `WorkflowStatus.id`, `IssueStatus`는
+  카테고리(todo/inprogress/done)로 축소. 기본 상태 id=카테고리 문자열이라 기존 데이터
+  무마이그레이션 호환. StatusEditor(추가/이름/카테고리/순서/삭제)를 전역 스킴 모달과
+  프로젝트 커스텀 탭이 공유. 구성 변경 시 없어진 상태의 이슈는 같은 카테고리 첫 상태로
+  자동 이관. 보드 컬럼·상태 Select·Lozenge·통계·스마트 검색(`상태:커스텀이름`,
+  공백 제거 매치) 전부 동적 상태 기반
+
 ## 품질 상태
 
-- 테스트 **233 케이스 / 26 파일** — 스토어 단위 + Testing Library 통합(App 전체 마운트)
+- 테스트 **239 케이스 / 26 파일** — 스토어 단위 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 
@@ -52,4 +65,3 @@
    서버 검색/페이징·활동 스트림). 시작점: jiraStore를 fetch로 교체 + `queryIssues`를 GraphQL로
 2. 디자인 폴리시 잔여 — 빈 상태 일러스트, 로딩 스켈레톤 (반응형은 2026-07-18 완료)
 3. 컨플루언스(위키) 클론 — ALM 우산의 다음 조각
-4. **설정 시스템 잔여** — 설계 확정(specs/2026-07-18-workflow-design.md v2): **지라 구조 모방: 전역 스킴 배정+프로젝트 커스텀(v3)**, 카테고리 불변 전략. 구현 순서: 모델·resolveSettings → B(이슈 타입 탭) → A(워크플로). 워크로그(C)는 완료
