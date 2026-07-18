@@ -1055,10 +1055,11 @@ body {
   padding: var(--chanho-space-600);
 }
 
-/* 컬럼 최소 폭을 보장하고, 모자라면 찌그러뜨리지 말고 가로 스크롤 (태블릿) */
+/* 컬럼 수는 워크플로 상태 수를 따른다 — 최소 폭 보장, 모자라면 가로 스크롤 */
 .board-columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 1fr);
   gap: var(--chanho-space-200);
   align-items: start;
   overflow-x: auto;

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Card, EmptyState, Lozenge, PageHeader, Spinner } from "@chanho/react";
-import type { Issue, Project, User } from "../store/types";
-import { getCurrentUser, listIssues, listProjects } from "../store/jiraStore";
-import { STATUS_APPEARANCE, STATUS_LABELS } from "../components/labels";
+import type { Issue, Project, User, WorkflowStatus } from "../store/types";
+import { getCurrentUser, listIssues, listProjects, statusMetaByProject } from "../store/jiraStore";
+import { statusAppearance, statusName } from "../components/labels";
 
 /** 지라의 For you 홈 — 내 담당 이슈와 최근 업데이트를 전 프로젝트에서 모아 보여준다 */
 export function HomePage() {
@@ -11,15 +11,21 @@ export function HomePage() {
   const [me, setMe] = useState<User | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
+  const [statusMeta, setStatusMeta] = useState<Record<string, Record<string, WorkflowStatus>>>({});
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [currentUser, projectList] = await Promise.all([getCurrentUser(), listProjects()]);
+      const [currentUser, projectList, meta] = await Promise.all([
+        getCurrentUser(),
+        listProjects(),
+        statusMetaByProject(),
+      ]);
       const perProject = await Promise.all(projectList.map((p) => listIssues(p.id)));
       if (cancelled) return;
       setMe(currentUser);
       setProjects(projectList);
+      setStatusMeta(meta);
       setIssues(perProject.flat());
     })();
     return () => {
@@ -45,18 +51,22 @@ export function HomePage() {
     .slice(0, 10);
   const recent = [...issues].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
 
-  const issueRow = (issue: Issue) => (
-    <li key={issue.id}>
-      <button type="button" className="search-result-row" onClick={() => openIssue(issue)}>
-        <span className="issue-key-cell">{issue.key}</span>
-        <span className="search-result-title">{issue.title}</span>
-        <span className="search-result-project">{projectName(issue.projectId)}</span>
-        <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>
-          {STATUS_LABELS[issue.status]}
-        </Lozenge>
-      </button>
-    </li>
-  );
+  const issueRow = (issue: Issue) => {
+    const ws = statusMeta[issue.projectId]?.[issue.status];
+    const statusList = ws ? [ws] : undefined;
+    return (
+      <li key={issue.id}>
+        <button type="button" className="search-result-row" onClick={() => openIssue(issue)}>
+          <span className="issue-key-cell">{issue.key}</span>
+          <span className="search-result-title">{issue.title}</span>
+          <span className="search-result-project">{projectName(issue.projectId)}</span>
+          <Lozenge appearance={statusAppearance(statusList, issue.status)}>
+            {statusName(statusList, issue.status)}
+          </Lozenge>
+        </button>
+      </li>
+    );
+  };
 
   return (
     <main className="project-list-content">

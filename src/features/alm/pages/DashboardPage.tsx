@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { Avatar, Card, EmptyState, ProgressBar, Spinner } from "@chanho/react";
-import type { Issue, IssueStatus, User } from "../store/types";
-import { listIssues, listUsers } from "../store/jiraStore";
-import { STATUS_LABELS } from "../components/labels";
+import type { Issue, IssueStatus, User, WorkflowStatus } from "../store/types";
+import { listIssues, listProjectStatuses, listUsers } from "../store/jiraStore";
+import { STATUS_LABELS, statusCategory } from "../components/labels";
 
 /** 상태 카운트 타일 — 색 액센트는 상태 언어(neutral/info/success)를 따른다 */
 const STAT_TILES: { key: string; label: string; status: IssueStatus | null; tone: string }[] = [
@@ -18,15 +18,21 @@ export function DashboardPage() {
   const { projectId } = useParams();
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
   const [users, setUsers] = useState<User[]>([]);
+  const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
 
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
     void (async () => {
-      const [issueList, userList] = await Promise.all([listIssues(projectId), listUsers()]);
+      const [issueList, userList, statusList] = await Promise.all([
+        listIssues(projectId),
+        listUsers(),
+        listProjectStatuses(projectId),
+      ]);
       if (cancelled) return;
       setIssues(issueList);
       setUsers(userList);
+      setStatuses(statusList);
     })();
     return () => {
       cancelled = true;
@@ -34,10 +40,12 @@ export function DashboardPage() {
   }, [projectId]);
 
   const counts = useMemo(() => {
-    const byStatus: Record<IssueStatus, number> = { todo: 0, inprogress: 0, done: 0 };
-    for (const issue of issues ?? []) byStatus[issue.status] += 1;
-    return byStatus;
-  }, [issues]);
+    const byCategory: Record<IssueStatus, number> = { todo: 0, inprogress: 0, done: 0 };
+    for (const issue of issues ?? []) {
+      byCategory[statusCategory(statuses, issue.status)] += 1;
+    }
+    return byCategory;
+  }, [issues, statuses]);
 
   /** 담당자별 개수 — 유저 전원(0건 포함) + 미지정, 많은 순 정렬 */
   const assigneeRows = useMemo(() => {

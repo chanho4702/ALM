@@ -15,8 +15,14 @@ import {
   useToast,
 } from "@chanho/react";
 import type { TableColumn } from "@chanho/react";
-import type { Issue, Project, User } from "../store/types";
-import { listProjects, listUsers, queryIssues } from "../store/jiraStore";
+import type { Issue, Project, User, WorkflowStatus } from "../store/types";
+import {
+  listAllStatuses,
+  listProjects,
+  listUsers,
+  queryIssues,
+  statusMetaByProject,
+} from "../store/jiraStore";
 import { parseSmartQuery, queryTokens } from "../store/searchQuery";
 import { saveFilter } from "../store/uiStore";
 import { useIssueModal } from "../components/useIssueModal";
@@ -25,8 +31,8 @@ import {
   ISSUE_TYPES,
   PRIORITY_APPEARANCE,
   PRIORITY_LABELS,
-  STATUS_APPEARANCE,
-  STATUS_LABELS,
+  statusAppearance,
+  statusName,
   TYPE_LABELS,
 } from "../components/labels";
 
@@ -43,6 +49,8 @@ export function SearchPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
+  const [allStatuses, setAllStatuses] = useState<{ id: string; name: string }[]>([]);
+  const [statusMeta, setStatusMeta] = useState<Record<string, Record<string, WorkflowStatus>>>({});
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const toast = useToast();
@@ -50,9 +58,14 @@ export function SearchPage() {
   useEffect(() => {
     void listUsers().then(setUsers);
     void listProjects().then(setProjects);
+    void listAllStatuses().then(setAllStatuses); // 상태:이름 토큰이 커스텀 상태도 알아듣게
+    void statusMetaByProject().then(setStatusMeta);
   }, []);
 
-  const ctx = useMemo(() => ({ users, projects }), [users, projects]);
+  const ctx = useMemo(
+    () => ({ users, projects, statuses: allStatuses }),
+    [users, projects, allStatuses],
+  );
   const query = useMemo(() => parseSmartQuery(q, ctx), [q, ctx]);
 
   const reload = useCallback(async () => {
@@ -137,9 +150,15 @@ export function SearchPage() {
       key: "status",
       header: "상태",
       width: "104px",
-      render: (issue) => (
-        <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>{STATUS_LABELS[issue.status]}</Lozenge>
-      ),
+      render: (issue) => {
+        const ws = statusMeta[issue.projectId]?.[issue.status];
+        const statusList = ws ? [ws] : undefined;
+        return (
+          <Lozenge appearance={statusAppearance(statusList, issue.status)}>
+            {statusName(statusList, issue.status)}
+          </Lozenge>
+        );
+      },
     },
     {
       key: "priority",
@@ -211,9 +230,11 @@ export function SearchPage() {
           value={PICK}
           options={[
             { value: PICK, label: "선택" },
-            { value: "상태:할일", label: "할 일" },
-            { value: "상태:진행중", label: "진행 중" },
-            { value: "상태:완료", label: "완료" },
+            // 전 스킴·커스텀 상태 합집합 — 기본 3상태 이름은 카테고리 토큰으로 파싱된다
+            ...allStatuses.map((s) => ({
+              value: `상태:${s.name.replace(/\s+/g, "")}`,
+              label: s.name,
+            })),
           ]}
           onValueChange={(v) => v !== PICK && appendToken(v)}
         />

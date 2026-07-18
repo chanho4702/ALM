@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { EmptyState, Spinner } from "@chanho/react";
-import type { Issue } from "../store/types";
-import { listIssues } from "../store/jiraStore";
+import type { Issue, WorkflowStatus } from "../store/types";
+import { listIssues, listProjectStatuses } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { statusCategory } from "../components/labels";
 
 const DAY_WIDTH = 28;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -21,10 +22,16 @@ const toIsoDay = (stamp: number) => new Date(stamp).toISOString().slice(0, 10);
 export function TimelinePage() {
   const { projectId } = useParams();
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
+  const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
 
   const reload = useCallback(async () => {
     if (!projectId) return;
-    setIssues(await listIssues(projectId));
+    const [issueList, statusList] = await Promise.all([
+      listIssues(projectId),
+      listProjectStatuses(projectId),
+    ]);
+    setIssues(issueList);
+    setStatuses(statusList);
   }, [projectId]);
 
   useEffect(() => {
@@ -169,7 +176,7 @@ export function TimelinePage() {
                     type="button"
                     className={[
                       "timeline-bar",
-                      `is-${issue.status}`,
+                      `is-${statusCategory(statuses, issue.status)}`,
                       hasDue ? null : "no-due",
                     ]
                       .filter(Boolean)

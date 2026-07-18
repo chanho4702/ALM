@@ -11,12 +11,13 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Avatar, Button, Dropdown, EmptyState, Lozenge, Select, Spinner, useToast } from "@chanho/react";
-import type { Board, BoardSwimlane, Issue, IssueStatus, Sprint, User } from "../store/types";
+import type { Board, BoardSwimlane, Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   createIssue,
   getBoard,
   listBoardIssues,
   listIssues,
+  listProjectStatuses,
   listSprints,
   listUsers,
   moveIssue,
@@ -31,7 +32,7 @@ import {
 import type { QuickFilter } from "../components/BoardFilterBar";
 import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
-import { BOARD_STATUSES } from "../components/labels";
+import { STATUS_APPEARANCE } from "../components/labels";
 import { resolveMove } from "./boardDnd";
 
 const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
@@ -46,6 +47,8 @@ export function BoardPage() {
   const [sprint, setSprint] = useState<Sprint | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  /** 프로젝트 워크플로 상태 (order순) — 컬럼 구성의 원천 */
+  const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   /** epicId → 이름 (카드 에픽 태그) */
   const [epicsById, setEpicsById] = useState<Record<string, string>>({});
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
@@ -65,12 +68,14 @@ export function BoardPage() {
       setBoard(null);
       return;
     }
-    const [boardIssues, sprints, epics] = await Promise.all([
+    const [boardIssues, sprints, epics, statusList] = await Promise.all([
       listBoardIssues(found.id),
       found.type === "scrum" ? listSprints(projectId) : Promise.resolve([]),
       listIssues(projectId, { type: "epic" }),
+      listProjectStatuses(projectId),
     ]);
     setIssues(boardIssues);
+    setStatuses(statusList);
     setEpicsById(Object.fromEntries(epics.map((e) => [e.id, e.title])));
     setSprint(sprints.find((s) => s.state === "active") ?? null);
     setBoard((prev) => {
@@ -147,15 +152,16 @@ export function BoardPage() {
     return null;
   }, [groupBy, users, visibleIssues, epicsById]);
 
-  /** status → order순 이슈 id 배열 (resolveMove 입력) */
+  /** 상태 id → order순 이슈 id 배열 (resolveMove 입력) — 프로젝트 상태 전부가 키 */
   const columnIds = useMemo(() => {
-    const map: Record<IssueStatus, string[]> = { todo: [], inprogress: [], done: [] };
-    for (const issue of visibleIssues) map[issue.status].push(issue.id);
+    const map: Record<string, string[]> = {};
+    for (const status of statuses) map[status.id] = [];
+    for (const issue of visibleIssues) (map[issue.status] ??= []).push(issue.id);
     return map;
-  }, [visibleIssues]);
+  }, [visibleIssues, statuses]);
 
   /** 컬럼 하단 인라인 생성 — 스크럼: 활성 스프린트로, 칸반: 백로그로 */
-  const handleColumnCreate = async (status: IssueStatus, title: string) => {
+  const handleColumnCreate = async (status: string, title: string) => {
     if (!projectId || !board) return;
     if (board.type === "scrum" && !sprint) return;
     try {
@@ -251,18 +257,19 @@ export function BoardPage() {
                   <span className="board-swimlane-count">{band.issues.length}개</span>
                 </header>
                 <div className="board-columns">
-                  {BOARD_STATUSES.map((status) => {
-                    const column = board.columns.find((c) => c.status === status);
+                  {statuses.map((ws) => {
+                    const column = board.columns.find((c) => c.status === ws.id);
                     return (
                       <BoardColumn
-                        key={status}
-                        status={status}
-                        droppableId={`${band.key}:${status}`}
-                        issues={band.issues.filter((i) => i.status === status)}
+                        key={ws.id}
+                        status={ws.id}
+                        droppableId={`${band.key}:${ws.id}`}
+                        issues={band.issues.filter((i) => i.status === ws.id)}
                         userNames={userNames}
                         onOpenIssue={openIssue}
                         epicNames={epicNames}
-                        columnName={column?.name}
+                        columnName={column?.name ?? ws.name}
+                        appearance={STATUS_APPEARANCE[ws.category]}
                         // 밴드별 개수는 전체 WIP 기준과 달라 오해 소지 — 스윔레인에선 표시 생략
                         wipLimit={null}
                       />
@@ -273,18 +280,19 @@ export function BoardPage() {
             ))
           ) : (
             <div className="board-columns">
-              {BOARD_STATUSES.map((status) => {
-                const column = board.columns.find((c) => c.status === status);
+              {statuses.map((ws) => {
+                const column = board.columns.find((c) => c.status === ws.id);
                 return (
                   <BoardColumn
-                    key={status}
-                    status={status}
-                    issues={visibleIssues.filter((i) => i.status === status)}
+                    key={ws.id}
+                    status={ws.id}
+                    issues={visibleIssues.filter((i) => i.status === ws.id)}
                     userNames={userNames}
                     onOpenIssue={openIssue}
                     epicNames={epicNames}
                     onCreateIssue={handleColumnCreate}
-                    columnName={column?.name}
+                    columnName={column?.name ?? ws.name}
+                    appearance={STATUS_APPEARANCE[ws.category]}
                     wipLimit={column?.wipLimit ?? null}
                   />
                 );
@@ -350,6 +358,7 @@ export function BoardPage() {
       <BoardSettingsModal
         board={board}
         users={users}
+        statuses={statuses}
         labelOptions={labelOptions}
         open={settingsOpen}
         onOpenChange={setSettingsOpen}

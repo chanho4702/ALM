@@ -11,13 +11,14 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Badge, Button, Spinner, TextField, useToast } from "@chanho/react";
-import type { Issue, Sprint, User } from "../store/types";
+import type { Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   completeSprint,
   createIssue,
   createSprint,
   deleteIssue,
   listIssues,
+  listProjectStatuses,
   listSprints,
   listUsers,
   rankIssue,
@@ -35,6 +36,7 @@ export function BacklogPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const toast = useToast();
@@ -44,12 +46,14 @@ export function BacklogPage() {
 
   const reload = useCallback(async () => {
     if (!projectId) return;
-    const [sprintList, issueList] = await Promise.all([
+    const [sprintList, issueList, statusList] = await Promise.all([
       listSprints(projectId),
       listIssues(projectId), // order 오름차순
+      listProjectStatuses(projectId),
     ]);
     setSprints(sprintList);
     setIssues(issueList);
+    setStatuses(statusList);
     setLoading(false);
   }, [projectId]);
 
@@ -182,6 +186,7 @@ export function BacklogPage() {
             sprint={sprint}
             issues={issues.filter((i) => i.sprintId === sprint.id)}
             userNames={userNames}
+            statuses={statuses}
             moveTargets={moveTargets}
             onStart={(s) => void run("스프린트 시작 실패", "스프린트를 시작했습니다", () => startSprint(s.id))}
             onComplete={(s) =>
@@ -204,6 +209,7 @@ export function BacklogPage() {
                 key={issue.id}
                 issue={issue}
                 assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
+                statuses={statuses}
                 moveTargets={moveTargets}
                 onMove={handleMove}
                 onDelete={handleDelete}

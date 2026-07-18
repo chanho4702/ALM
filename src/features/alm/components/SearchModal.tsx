@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button, EmptyState, Lozenge, Modal, TextField } from "@chanho/react";
-import type { Issue, Project } from "../store/types";
-import { searchIssues } from "../store/jiraStore";
-import { STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
+import type { Issue, Project, WorkflowStatus } from "../store/types";
+import { searchIssues, statusMetaByProject } from "../store/jiraStore";
+import { statusAppearance, statusName } from "./labels";
 
 export interface SearchModalProps {
   projects: Project[];
@@ -27,6 +27,19 @@ export function SearchModal({
 }: SearchModalProps) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<Issue[]>([]);
+  const [statusMeta, setStatusMeta] = useState<Record<string, Record<string, WorkflowStatus>>>({});
+
+  // 프로젝트별 상태 메타 — 결과 행 Lozenge 이름/색의 원천
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void statusMetaByProject().then((meta) => {
+      if (!cancelled) setStatusMeta(meta);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // TopBar에서 새 검색어로 다시 열리면 이어받는다
   useEffect(() => {
@@ -69,22 +82,26 @@ export function SearchModal({
           />
         ) : (
           <ul className="search-results" data-testid="search-results">
-            {results.map((issue) => (
-              <li key={issue.id}>
-                <button
-                  type="button"
-                  className="search-result-row"
-                  onClick={() => onNavigate(issue)}
-                >
-                  <span className="issue-key-cell">{issue.key}</span>
-                  <span className="search-result-title">{issue.title}</span>
-                  <span className="search-result-project">{projectName(issue.projectId)}</span>
-                  <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>
-                    {STATUS_LABELS[issue.status]}
-                  </Lozenge>
-                </button>
-              </li>
-            ))}
+            {results.map((issue) => {
+              const ws = statusMeta[issue.projectId]?.[issue.status];
+              const statusList = ws ? [ws] : undefined;
+              return (
+                <li key={issue.id}>
+                  <button
+                    type="button"
+                    className="search-result-row"
+                    onClick={() => onNavigate(issue)}
+                  >
+                    <span className="issue-key-cell">{issue.key}</span>
+                    <span className="search-result-title">{issue.title}</span>
+                    <span className="search-result-project">{projectName(issue.projectId)}</span>
+                    <Lozenge appearance={statusAppearance(statusList, issue.status)}>
+                      {statusName(statusList, issue.status)}
+                    </Lozenge>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
         <div className="search-modal-footer">

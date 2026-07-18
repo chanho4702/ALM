@@ -26,6 +26,7 @@ import type {
   Sprint,
   User,
   Worklog,
+  WorkflowStatus,
 } from "../store/types";
 import {
   addComment,
@@ -54,11 +55,10 @@ import {
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import {
-  BOARD_STATUSES,
-  ISSUE_TYPES,
+    ISSUE_TYPES,
   PRIORITY_LABELS,
-  STATUS_APPEARANCE,
-  STATUS_LABELS,
+  statusAppearance,
+  statusName,
   TYPE_LABELS,
 } from "./labels";
 
@@ -101,6 +101,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [links, setLinks] = useState<IssueLinkView[]>([]);
   const [worklogs, setWorklogs] = useState<Worklog[]>([]);
   const [enabledTypes, setEnabledTypes] = useState<IssueType[]>([...ISSUE_TYPES]);
+  const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [worklogHours, setWorklogHours] = useState("");
   const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [worklogComment, setWorklogComment] = useState("");
@@ -165,7 +166,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       setActivities(activityList);
       setMe(currentUser);
       const settings = await resolveSettings(found.projectId);
-      if (!cancelled) setEnabledTypes(settings.body.enabledTypes);
+      if (!cancelled) {
+        setEnabledTypes(settings.body.enabledTypes);
+        setStatuses([...settings.body.statuses].sort((a, b) => a.order - b.order));
+      }
       await refreshRelations(found.id, found.projectId);
     })();
     return () => {
@@ -519,8 +523,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                       <IssueTypeGlyph type={child.type} />
                       <span className="issue-key-cell">{child.key}</span>
                       <span className="issue-relation-title">{child.title}</span>
-                      <Lozenge appearance={STATUS_APPEARANCE[child.status]}>
-                        {STATUS_LABELS[child.status]}
+                      <Lozenge appearance={statusAppearance(statuses, child.status)}>
+                        {statusName(statuses, child.status)}
                       </Lozenge>
                     </button>
                   </li>
@@ -560,8 +564,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                           <IssueTypeGlyph type={other.type} />
                           <span className="issue-key-cell">{other.key}</span>
                           <span className="issue-relation-title">{other.title}</span>
-                          <Lozenge appearance={STATUS_APPEARANCE[other.status]}>
-                            {STATUS_LABELS[other.status]}
+                          <Lozenge appearance={statusAppearance(statuses, other.status)}>
+                            {statusName(statuses, other.status)}
                           </Lozenge>
                         </button>
                         <Button
@@ -603,8 +607,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           </section>
         </div>
         <aside className="issue-props">
-          <Lozenge appearance={STATUS_APPEARANCE[issue.status]} data-testid="issue-status-lozenge">
-            {STATUS_LABELS[issue.status]}
+          <Lozenge
+            appearance={statusAppearance(statuses, issue.status)}
+            data-testid="issue-status-lozenge"
+          >
+            {statusName(statuses, issue.status)}
           </Lozenge>
           {isBlocked ? (
             <Lozenge appearance="danger" data-testid="issue-blocked-lozenge">
@@ -623,7 +630,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <Select
             label="상태"
             value={issue.status}
-            options={BOARD_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
+            options={statuses.map((s) => ({ value: s.id, label: s.name }))}
             onValueChange={(v) => void applyPatch({ status: v as IssueStatus }, "상태를 변경했습니다")}
           />
           {issue.type !== "epic" ? (

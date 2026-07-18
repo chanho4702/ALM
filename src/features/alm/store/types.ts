@@ -20,6 +20,10 @@ export interface Sprint {
   completedAt?: string;
 }
 
+/**
+ * 상태 카테고리 — 워크플로 커스텀 상태(WorkflowStatus)가 반드시 소속되는 3분류.
+ * 통계/색/완료 판정은 전부 카테고리 기준이다. (커스텀 상태 도입 후에도 불변)
+ */
 export type IssueStatus = "todo" | "inprogress" | "done";
 export type IssuePriority = "high" | "medium" | "low";
 export type IssueType = "task" | "story" | "bug" | "epic" | "subtask";
@@ -31,7 +35,8 @@ export interface Issue {
   title: string;
   description: string;
   type: IssueType;
-  status: IssueStatus;
+  /** WorkflowStatus.id 참조 — 기본 상태 id는 카테고리 값("todo" 등)과 동일 */
+  status: string;
   priority: IssuePriority;
   assigneeId: string | null;
   reporterId: string;
@@ -83,8 +88,9 @@ export type BoardType = "scrum" | "kanban";
 export type BoardSwimlane = "none" | "assignee" | "epic";
 
 export interface BoardColumn {
-  status: IssueStatus; // 3개 고정 (todo/inprogress/done 각 1개)
-  name: string; // 표시 이름 (기본: 할 일/진행 중/완료)
+  /** WorkflowStatus.id 참조 — 실제 컬럼 구성은 프로젝트 상태 목록에서 파생된다 */
+  status: string;
+  name: string; // 표시 이름 (기본: 상태 이름)
   wipLimit: number | null; // null = 제한 없음
 }
 

@@ -264,12 +264,6 @@ export async function deleteProject(id: string): Promise<void> {
 
 // ── 라벨 매핑 (활동로그 detail용) ─────────────────────────────
 
-const STATUS_LABELS: Record<IssueStatus, string> = {
-  todo: "할 일",
-  inprogress: "진행 중",
-  done: "완료",
-};
-
 const PRIORITY_LABELS: Record<IssuePriority, string> = {
   high: "높음",
   medium: "보통",
@@ -317,6 +311,24 @@ function sprintLabel(data: JiraData, sprintId: string | null): string {
 }
 
 /** 활동로그 부수효과: before/after를 비교해 변경 항목별 Activity를 쌓는다 */
+/** 프로젝트의 해석된 상태 목록 (내부 동기 버전 — 커스텀 > 스킴 > 기본) */
+function resolvedStatuses(data: JiraData, projectId: string): SettingsBody["statuses"] {
+  const entry = data.projectSettings.find((e) => e.projectId === projectId);
+  const scheme = data.schemes.find((s) => s.id === entry?.schemeId) ?? data.schemes.find((s) => s.isDefault);
+  const statuses = entry?.custom?.statuses ?? scheme?.body.statuses;
+  return statuses ?? defaultSettingsBody().statuses;
+}
+
+function statusNameOf(data: JiraData, projectId: string, statusId: string): string {
+  return resolvedStatuses(data, projectId).find((s) => s.id === statusId)?.name ?? statusId;
+}
+
+function statusCategoryOf(data: JiraData, projectId: string, statusId: string): IssueStatus {
+  const found = resolvedStatuses(data, projectId).find((s) => s.id === statusId);
+  if (found) return found.category;
+  return statusId === "inprogress" || statusId === "done" ? statusId : "todo";
+}
+
 function recordChanges(data: JiraData, before: Issue, after: Issue, at: string): void {
   const push = (type: Activity["type"], detail: string) => {
     data.activities.push({
@@ -329,7 +341,10 @@ function recordChanges(data: JiraData, before: Issue, after: Issue, at: string):
     });
   };
   if (before.status !== after.status) {
-    push("status", `${STATUS_LABELS[before.status]} → ${STATUS_LABELS[after.status]}`);
+    push(
+      "status",
+      `${statusNameOf(data, after.projectId, before.status)} → ${statusNameOf(data, after.projectId, after.status)}`,
+    );
   }
   if (before.assigneeId !== after.assigneeId) {
     push("assignee", `${userLabel(data, before.assigneeId)} → ${userLabel(data, after.assigneeId)}`);
@@ -377,7 +392,7 @@ function notifyIssueChanges(data: JiraData, before: Issue, after: Issue, at: str
   if (before.status !== after.status) {
     notify(
       after.assigneeId,
-      `${actorName} 님이 ${after.key}를 ${STATUS_LABELS[after.status]}(으)로 옮겼습니다`,
+      `${actorName} 님이 ${after.key}를 ${statusNameOf(data, after.projectId, after.status)}(으)로 옮겼습니다`,
     );
   }
 }
@@ -426,7 +441,7 @@ export async function completeSprint(id: string): Promise<Sprint> {
   if (sprint.state !== "active") throw new Error("진행 중인 스프린트만 완료할 수 있습니다");
   const now = new Date().toISOString();
   for (const issue of data.issues) {
-    if (issue.sprintId === id && issue.status !== "done") {
+    if (issue.sprintId === id && statusCategoryOf(data, issue.projectId, issue.status) !== "done") {
       issue.sprintId = null; // 미완료 이슈는 백로그로
       issue.updatedAt = now;
     }
@@ -443,7 +458,7 @@ export async function listIssues(
   projectId: string,
   filter?: {
     text?: string;
-    status?: IssueStatus;
+    status?: string; // WorkflowStatus.id
     priority?: IssuePriority;
     assigneeId?: string;
     label?: string;
@@ -474,7 +489,8 @@ export async function listIssues(
  * 추후 jira-service GraphQL 쿼리로 이 시그니처가 그대로 넘어간다.
  */
 export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
-  let issues = [...load().issues];
+  const data = load();
+  let issues = [...data.issues];
   const text = query.text.trim().toLowerCase();
   if (text) {
     issues = issues.filter(
@@ -487,7 +503,15 @@ export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
   if (query.projectIds.length > 0) {
     issues = issues.filter((i) => query.projectIds.includes(i.projectId));
   }
-  if (query.statuses.length > 0) issues = issues.filter((i) => query.statuses.includes(i.status));
+  if (query.statuses.length > 0) {
+    // 카테고리 기준 매치 — 프로젝트별 커스텀 상태도 카테고리로 걸린다
+    issues = issues.filter((i) =>
+      query.statuses.includes(statusCategoryOf(data, i.projectId, i.status)),
+    );
+  }
+  if (query.statusIds.length > 0) {
+    issues = issues.filter((i) => query.statusIds.includes(i.status));
+  }
   if (query.priorities.length > 0) {
     issues = issues.filter((i) => query.priorities.includes(i.priority));
   }
@@ -546,7 +570,7 @@ export async function createIssue(input: {
   title: string;
   description?: string;
   type?: IssueType;
-  status?: IssueStatus;
+  status?: string; // WorkflowStatus.id
   priority?: IssuePriority;
   assigneeId?: string | null;
   sprintId?: string | null;
@@ -583,7 +607,12 @@ export async function createIssue(input: {
     title,
     description: input.description ?? "",
     type: resolvedType,
-    status: input.status ?? "todo",
+    // 기본 상태 = 프로젝트 워크플로의 첫 todo 카테고리 상태
+    status:
+      input.status ??
+      (resolvedStatuses(data, project.id)
+        .sort((a, b) => a.order - b.order)
+        .find((s) => s.category === "todo")?.id ?? "todo"),
     priority: input.priority ?? "medium",
     assigneeId: input.assigneeId ?? null,
     reporterId: CURRENT_USER_ID,
@@ -700,7 +729,7 @@ export async function updateIssue(
 
 export async function moveIssue(
   id: string,
-  to: { status: IssueStatus; beforeId?: string },
+  to: { status: string; beforeId?: string },
 ): Promise<Issue> {
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
@@ -1047,6 +1076,37 @@ export async function resolveSettings(projectId: string): Promise<ResolvedSettin
   });
 }
 
+/** 프로젝트의 해석된 상태 목록 (order 오름차순) — 보드 컬럼·상태 Select의 원천 */
+export async function listProjectStatuses(projectId: string) {
+  const data = load();
+  return clone([...resolvedStatuses(data, projectId)].sort((a, b) => a.order - b.order));
+}
+
+/** projectId → (statusId → WorkflowStatus) — 크로스 프로젝트 화면(홈/검색)용 */
+export async function statusMetaByProject() {
+  const data = load();
+  const map: Record<string, Record<string, SettingsBody["statuses"][number]>> = {};
+  for (const project of data.projects) {
+    map[project.id] = Object.fromEntries(
+      resolvedStatuses(data, project.id).map((s) => [s.id, s]),
+    );
+  }
+  return clone(map);
+}
+
+/** 전 스킴+커스텀의 상태 합집합 (id 유일) — 스마트 검색 상태 이름 매칭용 */
+export async function listAllStatuses(): Promise<{ id: string; name: string }[]> {
+  const data = load();
+  const map = new Map<string, string>();
+  for (const scheme of data.schemes) {
+    for (const s of scheme.body.statuses) map.set(s.id, s.name);
+  }
+  for (const entry of data.projectSettings) {
+    for (const s of entry.custom?.statuses ?? []) map.set(s.id, s.name);
+  }
+  return [...map.entries()].map(([id, name]) => ({ id, name }));
+}
+
 export async function listSchemes(): Promise<SettingsScheme[]> {
   return clone(load().schemes);
 }
@@ -1214,12 +1274,12 @@ export async function createBoard(input: {
 }
 
 /** columns 패치는 status 3종 각 1개·WIP(null 또는 1 이상 정수)를 검증한다 */
+/** 컬럼은 상태별 최대 1개 오버라이드 — 실제 컬럼 구성은 프로젝트 상태 목록에서 파생된다 */
 function validateColumns(columns: Board["columns"]): void {
-  const statuses = columns.map((c) => c.status).sort();
-  if (columns.length !== 3 || statuses.join() !== ["done", "inprogress", "todo"].join()) {
-    throw new Error("컬럼은 할 일/진행 중/완료 각 1개여야 합니다");
-  }
+  const seen = new Set<string>();
   for (const column of columns) {
+    if (seen.has(column.status)) throw new Error("컬럼은 상태마다 하나여야 합니다");
+    seen.add(column.status);
     if (!column.name.trim()) throw new Error("컬럼 이름을 입력하세요");
     if (column.wipLimit !== null && (!Number.isInteger(column.wipLimit) || column.wipLimit < 1)) {
       throw new Error("WIP 제한은 1 이상의 정수여야 합니다");

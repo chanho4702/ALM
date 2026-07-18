@@ -7,7 +7,10 @@ import type { IssuePriority, IssueStatus, IssueType, Project, User } from "./typ
 export interface IssueQuery {
   text: string;
   projectIds: string[];
+  /** 카테고리 매치 (할일/진행중/완료) — 커스텀 상태도 카테고리로 걸린다 */
   statuses: IssueStatus[];
+  /** 상태 이름 매치 → 워크플로 상태 id 목록 (커스텀 상태 이름 검색) */
+  statusIds: string[];
   priorities: IssuePriority[];
   types: IssueType[];
   assigneeIds: string[]; // "unassigned" 센티널 = 미지정
@@ -19,6 +22,7 @@ export const EMPTY_QUERY: IssueQuery = {
   text: "",
   projectIds: [],
   statuses: [],
+  statusIds: [],
   priorities: [],
   types: [],
   assigneeIds: [],
@@ -29,6 +33,8 @@ export const EMPTY_QUERY: IssueQuery = {
 export interface QueryContext {
   users: User[];
   projects: Project[];
+  /** 전체 워크플로 상태(스킴+커스텀 합집합) — 상태 이름 검색용. 없으면 카테고리만 매치 */
+  statuses?: { id: string; name: string }[];
 }
 
 // 한국어 라벨 ↔ 값 매핑 (스마트 구문의 어휘)
@@ -97,7 +103,16 @@ const push = <T,>(list: T[], value: T) => {
  * 인식할 수 없는 토큰 값은 버리지 않고 텍스트 검색어로 취급한다 (입력을 잃지 않는다).
  */
 export function parseSmartQuery(input: string, ctx: QueryContext): IssueQuery {
-  const query: IssueQuery = { ...EMPTY_QUERY, projectIds: [], statuses: [], priorities: [], types: [], assigneeIds: [], labels: [] };
+  const query: IssueQuery = {
+    ...EMPTY_QUERY,
+    projectIds: [],
+    statuses: [],
+    statusIds: [],
+    priorities: [],
+    types: [],
+    assigneeIds: [],
+    labels: [],
+  };
   const textParts: string[] = [];
 
   for (const raw of input.split(/\s+/)) {
@@ -113,8 +128,21 @@ export function parseSmartQuery(input: string, ctx: QueryContext): IssueQuery {
     switch (prefix) {
       case "상태": {
         const status = STATUS_BY_LABEL[value];
-        if (status) push(query.statuses, status);
-        else textParts.push(raw);
+        if (status) {
+          push(query.statuses, status);
+          break;
+        }
+        // 커스텀 상태 이름 매치 (예: 상태:리뷰) — 같은 이름의 상태 id 전부
+        // 토큰은 공백을 못 담으므로 "코드 리뷰" → 상태:코드리뷰 형태도 받는다
+        const named =
+          ctx.statuses?.filter(
+            (s) => s.name === value || s.name.replace(/\s+/g, "") === value,
+          ) ?? [];
+        if (named.length > 0) {
+          for (const s of named) push(query.statusIds, s.id);
+        } else {
+          textParts.push(raw);
+        }
         break;
       }
       case "우선순위": {
@@ -170,6 +198,10 @@ export function serializeQuery(query: IssueQuery, ctx: QueryContext): string {
     if (project) parts.push(`프로젝트:${project.key}`);
   }
   for (const status of query.statuses) parts.push(`상태:${STATUS_LABELS[status]}`);
+  for (const id of query.statusIds) {
+    const named = ctx.statuses?.find((s) => s.id === id);
+    if (named) parts.push(`상태:${named.name.replace(/\s+/g, "")}`); // 토큰은 공백 불가 — 파서가 공백 제거 이름도 매치
+  }
   for (const priority of query.priorities) parts.push(`우선순위:${PRIORITY_LABELS[priority]}`);
   for (const type of query.types) parts.push(`타입:${TYPE_LABELS[type]}`);
   for (const id of query.assigneeIds) {

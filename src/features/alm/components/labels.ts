@@ -1,5 +1,5 @@
 import type { LozengeProps } from "@chanho/react";
-import type { IssuePriority, IssueStatus, IssueType } from "../store/types";
+import type { IssuePriority, IssueStatus, IssueType, WorkflowStatus } from "../store/types";
 
 type LozengeAppearance = NonNullable<LozengeProps["appearance"]>;
 
@@ -32,6 +32,39 @@ export const PRIORITY_APPEARANCE: Record<IssuePriority, LozengeAppearance> = {
 
 /** 보드 컬럼 순서 */
 export const BOARD_STATUSES: IssueStatus[] = ["todo", "inprogress", "done"];
+
+// ── 커스텀 워크플로 상태 헬퍼 ─────────────────────────────────
+// 상태 목록(resolveSettings 결과)이 없거나 못 찾으면 기본 3상태(id=카테고리)로 폴백한다.
+
+const CATEGORY_SET = new Set<string>(BOARD_STATUSES);
+
+/** 상태 id → 카테고리 (색·완료 판정·통계의 기준) */
+export function statusCategory(
+  statuses: WorkflowStatus[] | undefined,
+  statusId: string,
+): IssueStatus {
+  const found = statuses?.find((s) => s.id === statusId);
+  if (found) return found.category;
+  return CATEGORY_SET.has(statusId) ? (statusId as IssueStatus) : "todo";
+}
+
+/** 상태 id → 표시 이름 */
+export function statusName(statuses: WorkflowStatus[] | undefined, statusId: string): string {
+  const found = statuses?.find((s) => s.id === statusId);
+  if (found) return found.name;
+  return CATEGORY_SET.has(statusId) ? STATUS_LABELS[statusId as IssueStatus] : statusId;
+}
+
+/** 상태 id → Lozenge appearance (카테고리 색) */
+export function statusAppearance(
+  statuses: WorkflowStatus[] | undefined,
+  statusId: string,
+): LozengeAppearance {
+  return STATUS_APPEARANCE[statusCategory(statuses, statusId)];
+}
+
+/** 정렬용 카테고리 위계 (할 일 → 진행 중 → 완료) */
+export const CATEGORY_ORDER: Record<IssueStatus, number> = { todo: 0, inprogress: 1, done: 2 };
 
 // ── 이슈 타입 (지라: 작업 파랑 / 스토리 초록 / 버그 빨강 / 에픽 보라≈주황) ──
 

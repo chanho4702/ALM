@@ -72,7 +72,7 @@ describe("boards CRUD", () => {
           { status: "done", name: "c", wipLimit: null },
         ],
       }),
-    ).rejects.toThrow("컬럼은 할 일/진행 중/완료 각 1개여야 합니다");
+    ).rejects.toThrow("컬럼은 상태마다 하나여야 합니다");
     await expect(
       updateBoard(main.id, {
         columns: [

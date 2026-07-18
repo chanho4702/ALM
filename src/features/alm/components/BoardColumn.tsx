@@ -3,12 +3,14 @@ import type { FormEvent } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Badge, Button, Lozenge, TextField } from "@chanho/react";
+import type { LozengeProps } from "@chanho/react";
 import type { Issue, IssueStatus } from "../store/types";
 import { SortableIssueCard } from "./IssueCard";
 import { STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
 
 export interface BoardColumnProps {
-  status: IssueStatus;
+  /** 워크플로 상태 id */
+  status: string;
   /** 이 컬럼의 이슈 (order 오름차순) */
   issues: Issue[];
   /** userId → 이름 (Avatar용) */
@@ -16,9 +18,11 @@ export interface BoardColumnProps {
   /** 카드 클릭 시 이슈 상세 열기 */
   onOpenIssue?: (key: string) => void;
   /** 컬럼 하단 인라인 생성 — 지라의 "+ 만들기" (해당 상태로 바로 생성) */
-  onCreateIssue?: (status: IssueStatus, title: string) => void | Promise<void>;
-  /** 보드 컬럼 커스텀 이름 (미지정 시 상태 라벨) */
+  onCreateIssue?: (status: string, title: string) => void | Promise<void>;
+  /** 컬럼 표시 이름 (미지정 시 기본 상태 라벨 폴백) */
   columnName?: string;
+  /** 컬럼 Lozenge 색 — 상태 카테고리에서 파생 (기본: 카테고리 id 폴백) */
+  appearance?: NonNullable<LozengeProps["appearance"]>;
   /** WIP 제한 — 초과 시 danger 강조 (이동 자체는 허용) */
   wipLimit?: number | null;
   /** 스윔레인에서 밴드별 유니크 droppable id (기본: status) — "밴드키:status" 형식 */
@@ -34,11 +38,12 @@ export function BoardColumn({
   onOpenIssue,
   onCreateIssue,
   columnName,
+  appearance,
   wipLimit = null,
   droppableId,
   epicNames = {},
 }: BoardColumnProps) {
-  const label = columnName ?? STATUS_LABELS[status];
+  const label = columnName ?? STATUS_LABELS[status as IssueStatus] ?? status;
   const overWip = wipLimit !== null && issues.length > wipLimit;
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
@@ -62,7 +67,9 @@ export function BoardColumn({
       data-testid={`board-column-${status}`}
     >
       <header className="board-column-header">
-        <Lozenge appearance={STATUS_APPEARANCE[status]}>{label}</Lozenge>
+        <Lozenge appearance={appearance ?? STATUS_APPEARANCE[status as IssueStatus] ?? "neutral"}>
+          {label}
+        </Lozenge>
         <Badge appearance={overWip ? "danger" : "neutral"}>
           {wipLimit !== null ? `${issues.length}/${wipLimit}` : issues.length}
         </Badge>

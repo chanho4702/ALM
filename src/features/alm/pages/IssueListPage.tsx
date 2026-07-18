@@ -11,17 +11,18 @@ import {
 } from "@chanho/react";
 import type { SortDirection, TableColumn } from "@chanho/react";
 import { Tag } from "@chanho/react";
-import type { Issue, IssuePriority, IssueStatus, IssueType, User } from "../store/types";
-import { listIssues, listUsers } from "../store/jiraStore";
+import type { Issue, IssuePriority, IssueType, User, WorkflowStatus } from "../store/types";
+import { listIssues, listProjectStatuses, listUsers } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import {
-  BOARD_STATUSES,
+  CATEGORY_ORDER,
   ISSUE_TYPES,
   PRIORITY_APPEARANCE,
   PRIORITY_LABELS,
-  STATUS_APPEARANCE,
-  STATUS_LABELS,
+  statusAppearance,
+  statusCategory,
+  statusName,
   TYPE_LABELS,
 } from "../components/labels";
 
@@ -29,8 +30,7 @@ import {
 const ALL = "all";
 const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 
-// 정렬용 위계: 보드 컬럼 순서 / 우선순위 높음→낮음
-const STATUS_ORDER: Record<IssueStatus, number> = { todo: 0, inprogress: 1, done: 2 };
+// 정렬용 위계: 우선순위 높음→낮음 (상태는 카테고리 위계 CATEGORY_ORDER 사용)
 const PRIORITY_ORDER: Record<IssuePriority, number> = { high: 0, medium: 1, low: 2 };
 
 export function IssueListPage() {
@@ -44,6 +44,7 @@ export function IssueListPage() {
   const [label, setLabel] = useState(ALL);
   const [type, setType] = useState(ALL);
   const [labelOptions, setLabelOptions] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -51,7 +52,7 @@ export function IssueListPage() {
     if (!projectId) return;
     const list = await listIssues(projectId, {
       text: text.trim() || undefined,
-      status: status === ALL ? undefined : (status as IssueStatus),
+      status: status === ALL ? undefined : status,
       priority: priority === ALL ? undefined : (priority as IssuePriority),
       assigneeId: assigneeId === ALL ? undefined : assigneeId,
       label: label === ALL ? undefined : label,
@@ -61,6 +62,7 @@ export function IssueListPage() {
     // 라벨 선택지는 필터와 무관한 프로젝트 전체 라벨 합집합
     const all = await listIssues(projectId);
     setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
+    setStatuses(await listProjectStatuses(projectId));
   }, [projectId, text, status, priority, assigneeId, label, type]);
 
   useEffect(() => {
@@ -98,7 +100,9 @@ export function IssueListPage() {
           cmp = a.title.localeCompare(b.title, "ko");
           break;
         case "status":
-          cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          cmp =
+            CATEGORY_ORDER[statusCategory(statuses, a.status)] -
+            CATEGORY_ORDER[statusCategory(statuses, b.status)];
           break;
         case "priority":
           cmp = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
@@ -122,7 +126,7 @@ export function IssueListPage() {
       }
       return cmp * dir;
     });
-  }, [issues, sortKey, sortDirection, userNames]);
+  }, [issues, sortKey, sortDirection, userNames, statuses]);
 
   const selectedId = useMemo(
     () => (issueKey ? (issues?.find((i) => i.key === issueKey)?.id ?? undefined) : undefined),
@@ -132,7 +136,9 @@ export function IssueListPage() {
   // 지연: 마감일이 오늘 이전인데 완료가 아니다
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = (issue: Issue) =>
-    issue.dueDate !== null && issue.dueDate < today && issue.status !== "done";
+    issue.dueDate !== null &&
+    issue.dueDate < today &&
+    statusCategory(statuses, issue.status) !== "done";
 
   const columns: TableColumn<Issue>[] = [
     {
@@ -167,7 +173,9 @@ export function IssueListPage() {
       sortable: true,
       width: "104px",
       render: (issue) => (
-        <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>{STATUS_LABELS[issue.status]}</Lozenge>
+        <Lozenge appearance={statusAppearance(statuses, issue.status)}>
+          {statusName(statuses, issue.status)}
+        </Lozenge>
       ),
     },
     {
@@ -245,7 +253,7 @@ export function IssueListPage() {
             onValueChange={setStatus}
             options={[
               { value: ALL, label: "전체" },
-              ...BOARD_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] })),
+              ...statuses.map((s) => ({ value: s.id, label: s.name })),
             ]}
           />
           <Select

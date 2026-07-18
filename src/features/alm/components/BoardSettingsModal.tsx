@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Checkbox, Modal, Select, Switch, TextField, useToast } from "@chanho/react";
-import type { Board, BoardSwimlane, IssueType, User } from "../store/types";
+import type { Board, BoardSwimlane, IssueType, User, WorkflowStatus } from "../store/types";
 import { deleteBoard, updateBoard } from "../store/jiraStore";
 import { UI_CHANGED_EVENT } from "../store/uiStore";
-import { ISSUE_TYPES, STATUS_LABELS, TYPE_LABELS } from "./labels";
+import { ISSUE_TYPES, TYPE_LABELS } from "./labels";
 
 const SWIMLANE_OPTIONS: { value: BoardSwimlane; label: string }[] = [
   { value: "none", label: "없음" },
@@ -15,6 +15,8 @@ const SWIMLANE_OPTIONS: { value: BoardSwimlane; label: string }[] = [
 export interface BoardSettingsModalProps {
   board: Board;
   users: User[];
+  /** 프로젝트 워크플로 상태 (order순) — 컬럼 편집 행의 원천 */
+  statuses: WorkflowStatus[];
   /** 보드 이슈들의 라벨 합집합 — 저장 필터 라벨 선택지 */
   labelOptions: string[];
   open: boolean;
@@ -29,6 +31,7 @@ export interface BoardSettingsModalProps {
 export function BoardSettingsModal({
   board,
   users,
+  statuses,
   labelOptions,
   open,
   onOpenChange,
@@ -45,17 +48,26 @@ export function BoardSettingsModal({
   const [isDefault, setIsDefault] = useState(board.isDefault);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  // 다른 보드로 전환되거나 다시 열릴 때 초안 리셋
+  // 다른 보드로 전환되거나 다시 열릴 때 초안 리셋 — 컬럼은 프로젝트 상태 목록에서 파생
   useEffect(() => {
     if (!open) return;
     setName(board.name);
     setAssigneeIds(board.filter.assigneeIds);
     setTypes(board.filter.types);
     setLabels(board.filter.labels);
-    setColumns(board.columns);
+    setColumns(
+      statuses.map(
+        (ws) =>
+          board.columns.find((c) => c.status === ws.id) ?? {
+            status: ws.id,
+            name: ws.name,
+            wipLimit: null,
+          },
+      ),
+    );
     setSwimlane(board.swimlane);
     setIsDefault(board.isDefault);
-  }, [open, board]);
+  }, [open, board, statuses]);
 
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -158,7 +170,7 @@ export function BoardSettingsModal({
             {columns.map((column, index) => (
               <div key={column.status} className="board-settings-column-row">
                 <TextField
-                  label={`${STATUS_LABELS[column.status]} 컬럼 이름`}
+                  label={`${statuses.find((ws) => ws.id === column.status)?.name ?? column.status} 컬럼 이름`}
                   value={column.name}
                   onChange={(e) =>
                     setColumns((prev) =>
@@ -167,7 +179,7 @@ export function BoardSettingsModal({
                   }
                 />
                 <TextField
-                  label={`${STATUS_LABELS[column.status]} WIP`}
+                  label={`${statuses.find((ws) => ws.id === column.status)?.name ?? column.status} WIP`}
                   type="number"
                   min={1}
                   value={column.wipLimit === null ? "" : String(column.wipLimit)}

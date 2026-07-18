@@ -3,9 +3,14 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Avatar, Badge, Button, Dropdown, Lozenge } from "@chanho/react";
-import type { Issue, Sprint } from "../store/types";
+import type { Issue, Sprint, WorkflowStatus } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
-import { PRIORITY_APPEARANCE, PRIORITY_LABELS, STATUS_APPEARANCE, STATUS_LABELS } from "./labels";
+import {
+  PRIORITY_APPEARANCE,
+  PRIORITY_LABELS,
+  statusAppearance,
+  statusName,
+} from "./labels";
 
 /** 이슈를 옮길 수 있는 대상. sprintId null = 백로그 */
 export interface MoveTarget {
@@ -17,6 +22,8 @@ export interface BacklogIssueRowProps {
   issue: Issue;
   /** 담당자 이름. 미지정이면 undefined → Avatar 생략 */
   assigneeName?: string;
+  /** 프로젝트의 해석된 워크플로 상태 (이름/색 표시용) */
+  statuses?: WorkflowStatus[];
   moveTargets: MoveTarget[];
   onMove: (issue: Issue, sprintId: string | null) => void;
   onDelete: (issue: Issue) => void;
@@ -27,6 +34,7 @@ export interface BacklogIssueRowProps {
 export function BacklogIssueRow({
   issue,
   assigneeName,
+  statuses,
   moveTargets,
   onMove,
   onDelete,
@@ -37,7 +45,9 @@ export function BacklogIssueRow({
       <IssueTypeGlyph type={issue.type} />
       <span className="backlog-row-key">{issue.key}</span>
       <span className="backlog-row-title">{issue.title}</span>
-      <Lozenge appearance={STATUS_APPEARANCE[issue.status]}>{STATUS_LABELS[issue.status]}</Lozenge>
+      <Lozenge appearance={statusAppearance(statuses, issue.status)}>
+        {statusName(statuses, issue.status)}
+      </Lozenge>
       <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
         {PRIORITY_LABELS[issue.priority]}
       </Lozenge>
@@ -129,6 +139,8 @@ export interface SprintPanelProps {
   issues: Issue[];
   /** userId → 이름 (Avatar용) */
   userNames: Record<string, string>;
+  /** 프로젝트의 해석된 워크플로 상태 */
+  statuses?: WorkflowStatus[];
   moveTargets: MoveTarget[];
   onStart: (sprint: Sprint) => void;
   onComplete: (sprint: Sprint) => void;
@@ -142,6 +154,7 @@ export function SprintPanel({
   sprint,
   issues,
   userNames,
+  statuses,
   moveTargets,
   onStart,
   onComplete,
@@ -171,6 +184,7 @@ export function SprintPanel({
             key={issue.id}
             issue={issue}
             assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
+            statuses={statuses}
             moveTargets={moveTargets}
             onMove={onMove}
             onDelete={onDelete}
