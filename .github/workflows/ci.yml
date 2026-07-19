@@ -1,0 +1,56 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: alm-front
+      - uses: actions/checkout@v4
+        with:
+          repository: chanho4702/design-system
+          token: ${{ secrets.DISPATCH_PAT }}
+          path: design-system   # file:../design-system/... 상대경로를 그대로 만족
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11   # wiki/alm package.json에 packageManager 필드 없음 — 명시 필요 (DS는 pnpm@11.10.0)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build design-system artifacts (tgz)
+        working-directory: design-system
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:tokens
+          pnpm --filter @chanho/react build
+          mkdir -p artifacts
+          pnpm --filter @chanho/tokens pack --pack-destination "$GITHUB_WORKSPACE/design-system/artifacts"
+          pnpm --filter @chanho/react  pack --pack-destination "$GITHUB_WORKSPACE/design-system/artifacts"
+          ls artifacts   # chanho-react-0.3.0.tgz, chanho-tokens-0.2.0.tgz 확인
+
+      - name: Test & build
+        working-directory: alm-front
+        run: |
+          pnpm install --no-frozen-lockfile   # file: tgz 재생성으로 integrity가 lock과 다를 수 있음
+          pnpm test
+          pnpm build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: alm-front/dist
+
+      - name: Dispatch deploy
+        if: github.ref == 'refs/heads/main'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DISPATCH_PAT }}
+          repository: chanho4702/infra-settings
+          event-type: deploy
+          client-payload: '{"service":"alm","sha":"${{ github.sha }}","run_id":"${{ github.run_id }}","repo":"${{ github.repository }}"}'
