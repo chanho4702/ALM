@@ -1,7 +1,8 @@
 # ALM Front 현황 (2026-07-18 기준)
 
 한눈에 보는 "어디까지 했고, 무엇이 남았나". 상세 설계는 `superpowers/specs/`, 태스크별
-계획은 `superpowers/plans/`, 백엔드 의존 항목은 `BACKLOG.md` 참고.
+계획은 `superpowers/plans/`, 백엔드 의존 항목은 `BACKLOG.md`, **부위별 개발 가이드·알려진
+이슈 목록은 `areas/README.md`** 참고 (전역 규칙은 리포 루트 `CLAUDE.md`).
 
 ## 정체성
 

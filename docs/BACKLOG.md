@@ -1,7 +1,7 @@
 # 백엔드 의존 기능 백로그
 
 프론트만으로는 목업 수준을 넘을 수 없어 **jira-service(백엔드) 도입 시** 진행하기로 기록해 둔 항목.
-현재 화면은 전부 `src/features/jira/store/jiraStore.ts`(localStorage 목업)만 호출하므로,
+현재 화면은 전부 `src/features/alm/store/jiraStore.ts`(localStorage 목업)만 호출하므로,
 백엔드가 생기면 이 파일 내부를 fetch로 교체하는 것이 시작점이다.
 
 ## 1. 첨부파일 (요구사항 명세 "추가 아이디어")
