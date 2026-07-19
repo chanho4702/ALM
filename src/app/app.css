@@ -714,23 +714,80 @@ body {
   gap: var(--chanho-space-50);
 }
 
-/* 지라 이슈 검색식 단일 툴바 — 검색 입력 + 조건 Select 5개가 한 줄 */
-.search-toolbar {
-  display: grid;
-  grid-template-columns: minmax(260px, 1.8fr) repeat(5, minmax(120px, 1fr));
+/* 지라 이슈 검색식 기본 바 — 검색어 입력 + 필터 드롭다운 버튼 줄 */
+.search-basic-bar,
+.search-smart-bar {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--chanho-space-100);
-  align-items: end;
+  align-items: flex-end;
 }
 
-/* 좁아지면 검색 입력이 첫 줄 전체를 차지하고 Select들이 랩된다 */
-@media (max-width: 1100px) {
-  .search-toolbar {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
+.search-basic-input {
+  width: 260px;
+  min-width: 200px;
+}
 
-  .search-toolbar-input {
-    grid-column: 1 / -1;
-  }
+.search-smart-input {
+  flex: 1;
+  min-width: 260px;
+}
+
+/* 지라의 우측 "JQL로 전환" 자리 */
+.search-mode-toggle {
+  margin-left: auto;
+}
+
+/* 필터 드롭다운 (지라 Basic 필터 버튼) */
+.filter-dropdown {
+  position: relative;
+}
+
+.filter-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  padding: var(--chanho-space-75) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-dropdown-trigger:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.filter-dropdown-trigger.is-active {
+  border-color: var(--chanho-color-border-brand);
+  background: var(--chanho-color-background-brand-subtle);
+  color: var(--chanho-color-text-brand);
+}
+
+.filter-dropdown-caret {
+  font-size: 10px;
+  color: var(--chanho-color-text-subtle);
+}
+
+.filter-dropdown-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  padding: var(--chanho-space-100);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface-raised);
+  box-shadow: var(--chanho-shadow-overlay);
 }
 
 .search-count {

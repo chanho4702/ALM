@@ -32,14 +32,57 @@ beforeEach(() => {
   __resetForTest();
 });
 
-describe("SearchPage 스마트 검색", () => {
-  it("스마트 토큰 입력이 URL(q)과 결과를 좁히고 조건 칩으로 나타난다", async () => {
+describe("SearchPage 기본 검색 (지라 Basic)", () => {
+  it("담당자 필터 드롭다운 토글이 결과와 URL(q)을 좁힌다", async () => {
     const user = userEvent.setup();
     renderSearch();
 
     // 초기: 전체 8개
     expect(await screen.findByTestId("search-count")).toHaveTextContent("8개 이슈");
 
+    await user.click(screen.getByRole("button", { name: "담당자" }));
+    await user.click(await screen.findByRole("checkbox", { name: "김찬호" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("search-count")).toHaveTextContent("2개 이슈"); // ALM-1, ALM-3
+    });
+    expect(screen.getByTestId("location")).toHaveTextContent("/search?q=");
+    // 트리거가 선택 요약을 보여준다 (지라식)
+    expect(screen.getByRole("button", { name: "담당자: 김찬호" })).toBeInTheDocument();
+    expect(screen.getByText("ALM-1")).toBeInTheDocument();
+    expect(screen.queryByText("ALM-4")).not.toBeInTheDocument();
+  });
+
+  it("검색어+필터 조합 후 필터 초기화로 복원한다 (검색어는 유지)", async () => {
+    const user = userEvent.setup();
+    renderSearch();
+    await screen.findByTestId("search-count");
+
+    await user.type(screen.getByLabelText("검색어"), "구현");
+    await waitFor(() => {
+      expect(screen.getByTestId("search-count")).toHaveTextContent("5개 이슈"); // ALM-2·3·4·5·6
+    });
+    await user.click(screen.getByRole("button", { name: "담당자" }));
+    await user.click(await screen.findByRole("checkbox", { name: "김찬호" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("search-count")).toHaveTextContent("1개 이슈"); // ALM-3
+    });
+
+    await user.click(screen.getByRole("button", { name: "필터 초기화" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("search-count")).toHaveTextContent("5개 이슈");
+    });
+    expect(screen.queryByRole("button", { name: "필터 초기화" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("검색어")).toHaveValue("구현");
+  });
+});
+
+describe("SearchPage 스마트 검색", () => {
+  it("스마트 토큰 입력이 URL(q)과 결과를 좁히고 조건 칩으로 나타난다", async () => {
+    const user = userEvent.setup();
+    renderSearch();
+    await screen.findByTestId("search-count");
+
+    await user.click(screen.getByRole("button", { name: "스마트 구문으로 전환" }));
     await user.type(screen.getByLabelText("스마트 검색"), "상태:진행중");
     await waitFor(() => {
       expect(screen.getByTestId("search-count")).toHaveTextContent("2개 이슈"); // ALM-2, ALM-3
@@ -55,23 +98,11 @@ describe("SearchPage 스마트 검색", () => {
     renderSearch("/search?q=" + encodeURIComponent("상태:진행중 라벨:frontend 보드"));
     await screen.findByTestId("search-count");
 
+    await user.click(screen.getByRole("button", { name: "스마트 구문으로 전환" }));
     await user.click(screen.getByRole("button", { name: "상태:진행중 태그 제거" }));
     await waitFor(() => {
       expect(screen.getByLabelText("스마트 검색")).toHaveValue("라벨:frontend 보드");
     });
-  });
-
-  it("조건 추가 Select가 토큰을 붙인다", async () => {
-    const user = userEvent.setup();
-    renderSearch();
-    await screen.findByTestId("search-count");
-
-    await user.click(screen.getByRole("combobox", { name: "담당 추가" }));
-    await user.click(await screen.findByRole("option", { name: "김찬호" }));
-    await waitFor(() => {
-      expect(screen.getByLabelText("스마트 검색")).toHaveValue("담당:김찬호");
-    });
-    expect(screen.getByTestId("search-count")).toHaveTextContent("2개 이슈"); // ALM-1, ALM-3
   });
 
   it("결과 행 클릭 → 이슈 상세 모달 (q 파라미터 보존)", async () => {
@@ -130,6 +161,6 @@ describe("전역 검색 모달 → 고급 검색", () => {
     await waitFor(() => {
       expect(screen.getByTestId("location").textContent).toContain("/search?q=");
     });
-    expect(screen.getByLabelText("스마트 검색")).toHaveValue("칸반");
+    expect(screen.getByLabelText("검색어")).toHaveValue("칸반"); // 기본 모드 검색어로 이어받는다
   });
 });

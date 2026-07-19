@@ -1,21 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import {
   Avatar,
   Button,
+  Dropdown,
   EmptyState,
   Lozenge,
   Modal,
   PageHeader,
-  Select,
   Table,
   Tag,
   TextField,
   useToast,
 } from "@chanho/react";
 import type { TableColumn } from "@chanho/react";
-import type { Issue, Project, User, WorkflowStatus } from "../store/types";
+import type {
+  Issue,
+  IssuePriority,
+  IssueStatus,
+  IssueType,
+  Project,
+  User,
+  WorkflowStatus,
+} from "../store/types";
 import {
   listAllStatuses,
   listProjects,
@@ -23,10 +31,12 @@ import {
   queryIssues,
   statusMetaByProject,
 } from "../store/jiraStore";
-import { parseSmartQuery, queryTokens } from "../store/searchQuery";
+import type { IssueQuery } from "../store/searchQuery";
+import { EMPTY_QUERY, parseSmartQuery, queryTokens, serializeQuery } from "../store/searchQuery";
 import { saveFilter } from "../store/uiStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { FilterDropdown } from "../components/FilterDropdown";
 import {
   ISSUE_TYPES,
   PRIORITY_APPEARANCE,
@@ -36,16 +46,26 @@ import {
   TYPE_LABELS,
 } from "../components/labels";
 
-// 조건 추가 Select용 센티널
-const PICK = "pick";
+const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
+const CATEGORY_IDS = new Set(["todo", "inprogress", "done"]);
+
+const SORT_OPTIONS: { value: IssueQuery["sort"]; label: string }[] = [
+  { value: "updated", label: "수정일" },
+  { value: "created", label: "생성일" },
+  { value: "due", label: "마감일" },
+  { value: "priority", label: "우선순위" },
+];
 
 /**
- * ALM 상세 검색 — 진실은 URL의 스마트 문자열(q) 하나.
- * 입력창·조건 칩·조건 추가 Select는 전부 그 문자열의 편집기다.
+ * ALM 상세 검색 — 지라 이슈 검색 모방.
+ * 기본 모드: 검색어 입력 + 필터 드롭다운 버튼 줄 (지라 Basic).
+ * 스마트 모드: 한국어 스마트 문자열 직접 편집 (지라 JQL 대응, ALM 특색).
+ * 진실은 어느 모드든 URL의 q 문자열 하나다.
  */
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") ?? "";
+  const [mode, setMode] = useState<"basic" | "smart">("basic");
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
@@ -91,9 +111,19 @@ export function SearchPage() {
     );
   };
 
-  const appendToken = (token: string) => setQ(q.trim() ? `${q.trim()} ${token}` : token);
+  /** 기본 모드 필터 조작 — 쿼리 객체를 고쳐 스마트 문자열로 되쓴다 */
+  const setQuery = (next: IssueQuery) => setQ(serializeQuery(next, ctx));
+  const toggled = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
-  /** 조건 칩 제거 — 문자열에서 해당 토큰만 뺀다 */
+  // 기본 모드 검색어 입력 초안 — 포커스 중이 아닐 때만 q에서 동기화 (타이핑 클로버 방지)
+  const [textDraft, setTextDraft] = useState("");
+  const textRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (document.activeElement !== textRef.current) setTextDraft(query.text);
+  }, [query.text]);
+
+  /** 조건 칩 제거 — 문자열에서 해당 토큰만 뺀다 (스마트 모드) */
   const removeToken = (token: string) =>
     setQ(
       q
@@ -109,6 +139,30 @@ export function SearchPage() {
     () => Object.fromEntries(projects.map((p) => [p.id, p.name])),
     [projects],
   );
+
+  // 상태 필터: 카테고리 id는 statuses, 커스텀 id는 statusIds — 선택 목록은 합쳐 보여준다
+  const selectedStatusIds = useMemo(
+    () => [...query.statuses, ...query.statusIds],
+    [query.statuses, query.statusIds],
+  );
+  const toggleStatus = (id: string) => {
+    if (CATEGORY_IDS.has(id)) {
+      setQuery({ ...query, statuses: toggled(query.statuses, id) as IssueStatus[] });
+    } else {
+      setQuery({ ...query, statusIds: toggled(query.statusIds, id) });
+    }
+  };
+
+  const hasFilters =
+    query.projectIds.length > 0 ||
+    selectedStatusIds.length > 0 ||
+    query.assigneeIds.length > 0 ||
+    query.types.length > 0 ||
+    query.priorities.length > 0;
+
+  const clearFilters = () => setQuery({ ...EMPTY_QUERY, text: query.text, sort: query.sort });
+
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === query.sort)?.label ?? "수정일";
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -207,72 +261,103 @@ export function SearchPage() {
         }
       />
 
-      {/* 지라 이슈 검색처럼 검색 입력과 조건 Select를 한 줄 툴바로 묶는다 */}
-      <div className="search-toolbar">
-        <div className="search-toolbar-input">
-          <TextField
-            label="스마트 검색"
-            placeholder="예: 상태:진행중 담당:김찬호 타입:버그 로그인 — 토큰과 검색어를 섞어 쓰세요"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+      {mode === "basic" ? (
+        // 지라 Basic 검색 — 검색어 입력 + 필터 드롭다운 버튼 줄
+        <div className="search-basic-bar" data-testid="search-basic-bar">
+          <div className="search-basic-input">
+            <TextField
+              ref={textRef}
+              label="검색어"
+              placeholder="이슈 검색"
+              value={textDraft}
+              onChange={(e) => {
+                setTextDraft(e.target.value);
+                setQuery({ ...query, text: e.target.value });
+              }}
+            />
+          </div>
+          <FilterDropdown
+            label="프로젝트"
+            options={projects.map((p) => ({ value: p.id, label: p.name }))}
+            selected={query.projectIds}
+            onToggle={(v) => setQuery({ ...query, projectIds: toggled(query.projectIds, v) })}
           />
+          <FilterDropdown
+            label="상태"
+            options={allStatuses.map((s) => ({ value: s.id, label: s.name }))}
+            selected={selectedStatusIds}
+            onToggle={toggleStatus}
+          />
+          <FilterDropdown
+            label="담당자"
+            options={[
+              ...users.map((u) => ({ value: u.id, label: u.name })),
+              { value: "unassigned", label: "미지정" },
+            ]}
+            selected={query.assigneeIds}
+            onToggle={(v) => setQuery({ ...query, assigneeIds: toggled(query.assigneeIds, v) })}
+          />
+          <FilterDropdown
+            label="타입"
+            options={ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+            selected={query.types}
+            onToggle={(v) =>
+              setQuery({ ...query, types: toggled(query.types, v) as IssueType[] })
+            }
+          />
+          <FilterDropdown
+            label="우선순위"
+            options={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
+            selected={query.priorities}
+            onToggle={(v) =>
+              setQuery({ ...query, priorities: toggled(query.priorities, v) as IssuePriority[] })
+            }
+          />
+          <Dropdown
+            trigger={
+              <button type="button" className="filter-dropdown-trigger">
+                정렬: {sortLabel}
+                <span className="filter-dropdown-caret" aria-hidden>
+                  ▾
+                </span>
+              </button>
+            }
+            items={SORT_OPTIONS.map((option) => ({
+              label: option.label,
+              onSelect: () => setQuery({ ...query, sort: option.value }),
+            }))}
+          />
+          {hasFilters ? (
+            <Button variant="ghost" size="small" onClick={clearFilters}>
+              필터 초기화
+            </Button>
+          ) : null}
+          <span className="search-mode-toggle">
+            <Button variant="ghost" size="small" onClick={() => setMode("smart")}>
+              스마트 구문으로 전환
+            </Button>
+          </span>
         </div>
-        <Select
-          label="상태 추가"
-          value={PICK}
-          options={[
-            { value: PICK, label: "선택" },
-            // 전 스킴·커스텀 상태 합집합 — 기본 3상태 이름은 카테고리 토큰으로 파싱된다
-            ...allStatuses.map((s) => ({
-              value: `상태:${s.name.replace(/\s+/g, "")}`,
-              label: s.name,
-            })),
-          ]}
-          onValueChange={(v) => v !== PICK && appendToken(v)}
-        />
-        <Select
-          label="담당 추가"
-          value={PICK}
-          options={[
-            { value: PICK, label: "선택" },
-            ...users.map((u) => ({ value: `담당:${u.name}`, label: u.name })),
-            { value: "담당:미지정", label: "미지정" },
-          ]}
-          onValueChange={(v) => v !== PICK && appendToken(v)}
-        />
-        <Select
-          label="타입 추가"
-          value={PICK}
-          options={[
-            { value: PICK, label: "선택" },
-            ...ISSUE_TYPES.map((t) => ({ value: `타입:${TYPE_LABELS[t].replace(" ", "")}`, label: TYPE_LABELS[t] })),
-          ]}
-          onValueChange={(v) => v !== PICK && appendToken(v)}
-        />
-        <Select
-          label="프로젝트 추가"
-          value={PICK}
-          options={[
-            { value: PICK, label: "선택" },
-            ...projects.map((p) => ({ value: `프로젝트:${p.key}`, label: p.name })),
-          ]}
-          onValueChange={(v) => v !== PICK && appendToken(v)}
-        />
-        <Select
-          label="정렬"
-          value={PICK}
-          options={[
-            { value: PICK, label: "선택" },
-            { value: "정렬:수정", label: "수정일" },
-            { value: "정렬:생성", label: "생성일" },
-            { value: "정렬:마감", label: "마감일" },
-            { value: "정렬:우선순위", label: "우선순위" },
-          ]}
-          onValueChange={(v) => v !== PICK && appendToken(v)}
-        />
-      </div>
+      ) : (
+        // 지라 JQL 모드 대응 — 한국어 스마트 문자열 직접 편집 (ALM 특색)
+        <div className="search-smart-bar">
+          <div className="search-smart-input">
+            <TextField
+              label="스마트 검색"
+              placeholder="예: 상태:진행중 담당:김찬호 타입:버그 로그인 — 토큰과 검색어를 섞어 쓰세요"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <span className="search-mode-toggle">
+            <Button variant="ghost" size="small" onClick={() => setMode("basic")}>
+              기본 검색으로 전환
+            </Button>
+          </span>
+        </div>
+      )}
 
-      {tokens.length > 0 ? (
+      {mode === "smart" && tokens.length > 0 ? (
         <div className="search-chips" data-testid="search-chips">
           {tokens.map((token) => (
             <Tag key={token} label={token} onRemove={() => removeToken(token)} />
@@ -283,7 +368,7 @@ export function SearchPage() {
       {issues === null ? null : issues.length === 0 ? (
         <EmptyState
           title="결과가 없습니다"
-          description="조건을 바꾸거나 칩을 제거해 보세요."
+          description="조건을 바꾸거나 필터를 초기화해 보세요."
         />
       ) : (
         <>
