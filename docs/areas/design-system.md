@@ -24,7 +24,6 @@
 
 - 존재하는 토큰만 쓸 것. **`var(--chanho-color-border)`는 존재하지 않는다**(bare) —
   `--chanho-color-border-default` 등 변형만 있다. 잘못 쓰면 그 선언 전체가 조용히 무효화된다.
-  (알려진 잔존 1건: app.css의 StatusEditor 구분선 — 수정 대상)
 - 색은 semantic 토큰(text-subtle, background-neutral-hovered, border-brand…), 흰색은
   `--chanho-color-text-inverse`(`#fff` 하드코딩 금지), 간격은 `--chanho-space-*`,
   폰트 크기는 `--chanho-font-size-*`(50/75/100/200/300/400/500/600).

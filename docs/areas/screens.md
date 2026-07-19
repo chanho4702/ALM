@@ -36,8 +36,8 @@
 
 ## 화면 관련 알려진 이슈 (2026-07-19 리뷰)
 
-- **SprintPanel의 백로그 행이 클릭 div** — 키보드로 이슈 상세를 못 연다(프로젝트 유일의
-  클릭 div). button화 필요. 나머지 행/카드는 전부 button이라 이 파일만 고치면 됨.
+- 클릭 가능한 요소는 button (백로그 행만 예외적으로 내부에 Dropdown 버튼이 있어
+  `role="button"`+tabIndex+Enter/Space 처리 — button-in-button 방지 패턴).
 - 시간 표기 혼재: 상대시간 `relTime`은 HomePage 로컬 함수. 다른 화면은 toLocaleDateString/
   toLocaleString/원본 ISO 혼용 — 공용 시간 유틸로 추출 후보.
 - `/projects/:projectId` 인덱스 라우트가 없어 bare URL은 빈 아울렛(수동 진입 시에만 해당).

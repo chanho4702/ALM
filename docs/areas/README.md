@@ -26,14 +26,12 @@
 ## 알려진 미해결 이슈 (2026-07-19 전체 리뷰 기준)
 
 우선순위 순. 고치면 이 목록과 해당 부위 문서에서 지운다.
+(리뷰 당일 해결됨: 보드 컬럼 orphan 이관, status 쓰기 검증, issueCounters normalize 가드,
+백로그 행 키보드 접근, 죽은 토큰 변수)
 
-1. **보드 컬럼 orphan** — 상태 구성 변경 시 `migrateIssueStatuses`가 이슈만 이관하고
-   `board.columns`의 삭제된 상태 참조는 남긴다 (store.md 참고)
-2. **이슈 status 무검증 쓰기** — create/update/moveIssue가 상태 id의 유효성을 검증하지 않음
-3. **normalize에 `issueCounters ??= {}` 가드 누락** — 구버전 데이터 로드 시 크래시 가능
-4. **백로그 행 키보드 접근 불가** — `SprintPanel.tsx`의 클릭 div (프로젝트 유일)
-5. **죽은 토큰 `--chanho-color-border`** — `app.css` StatusEditor 구분선 무효화
-6. **스마트 검색 공백/센티널 한계** — 공백 포함 라벨·담당 이름, "완료" 등 카테고리 라벨과
+1. **스마트 검색 공백/센티널 한계** — 공백 포함 라벨·담당 이름, "완료" 등 카테고리 라벨과
    같은 이름의 커스텀 상태 (search.md 참고)
-7. **N+1 패턴** — 홈/디렉터리가 프로젝트마다 `listIssues` 호출, 카운트 전용 API 부재
-8. **시간 표기 4종 혼재** — 상대시간 헬퍼(`relTime`)가 HomePage 로컬에만 있음
+2. **N+1 패턴** — 홈/디렉터리가 프로젝트마다 `listIssues` 호출, 카운트 전용 API 부재
+3. **시간 표기 4종 혼재** — 상대시간 헬퍼(`relTime`)가 HomePage 로컬에만 있음
+4. (소소) BoardColumn의 도달 불가 폴백·`.issue-card-epic` 죽은 클래스·`#fff` 하드코딩·
+   인라인 빈상태 문구 제각각 — 정리 수준

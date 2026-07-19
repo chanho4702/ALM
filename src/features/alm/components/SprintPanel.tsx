@@ -41,7 +41,19 @@ export function BacklogIssueRow({
   onOpen,
 }: BacklogIssueRowProps) {
   return (
-    <div className="backlog-row" onClick={() => onOpen(issue.key)}>
+    // 행 안에 Dropdown 버튼이 중첩되므로 <button>이 아니라 role="button"으로 (button-in-button 방지)
+    <div
+      className="backlog-row"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(issue.key)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(issue.key);
+        }
+      }}
+    >
       <IssueTypeGlyph type={issue.type} />
       <span className="backlog-row-key">{issue.key}</span>
       <span className="backlog-row-title">{issue.title}</span>

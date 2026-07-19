@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { __resetForTest, listIssues, listProjects } from "./jiraStore";
+import { __resetForTest, createIssue, listIssues, listProjects } from "./jiraStore";
 
 beforeEach(() => {
   localStorage.clear();
@@ -53,5 +53,16 @@ describe("v1 normalize 마이그레이션", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].dueDate).toBeNull();
     expect(issues[0].labels).toEqual([]);
+  });
+
+  it("issueCounters가 없는 데이터도 이슈 생성이 크래시하지 않는다", async () => {
+    seedLegacyV1();
+    const raw = JSON.parse(localStorage.getItem("alm.jira.v1")!) as Record<string, unknown>;
+    delete raw.issueCounters;
+    localStorage.setItem("alm.jira.v1", JSON.stringify(raw));
+    __resetForTest();
+
+    const issue = await createIssue({ projectId: "p1", title: "카운터 없던 시절" });
+    expect(issue.key).toBe("ALM-1"); // 카운터가 {}로 승격돼 1부터 발번
   });
 });

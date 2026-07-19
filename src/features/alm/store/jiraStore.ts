@@ -87,6 +87,7 @@ function normalize(data: JiraData): JiraData {
   data.boards ??= [];
   data.links ??= [];
   data.worklogs ??= [];
+  data.issueCounters ??= {};
   // 보드가 없는 프로젝트에는 기본 스크럼 보드를 만들어 기존 데이터/URL과 호환한다
   for (const project of data.projects) {
     if (!data.boards.some((b) => b.projectId === project.id)) {
@@ -321,6 +322,13 @@ function resolvedStatuses(data: JiraData, projectId: string): SettingsBody["stat
 
 function statusNameOf(data: JiraData, projectId: string, statusId: string): string {
   return resolvedStatuses(data, projectId).find((s) => s.id === statusId)?.name ?? statusId;
+}
+
+/** 상태 id가 프로젝트 워크플로에 존재하는지 검증 — create/update/moveIssue의 쓰기 가드 */
+function assertValidStatus(data: JiraData, projectId: string, statusId: string): void {
+  if (!resolvedStatuses(data, projectId).some((s) => s.id === statusId)) {
+    throw new Error(`이 프로젝트에 없는 상태입니다: ${statusId}`);
+  }
 }
 
 function statusCategoryOf(data: JiraData, projectId: string, statusId: string): IssueStatus {
@@ -594,6 +602,7 @@ export async function createIssue(input: {
   if (resolvedType !== "subtask" && !enabledTypes.includes(resolvedType)) {
     throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${TYPE_LABELS[resolvedType]}`);
   }
+  if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
   const seq = (data.issueCounters[project.id] ?? 0) + 1;
   data.issueCounters[project.id] = seq; // 삭제돼도 감소하지 않는다 → 키 미재사용
   const now = new Date().toISOString();
@@ -662,10 +671,11 @@ export async function updateIssue(
 ): Promise<Issue> {
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
+  if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   if (patch.estimateHours !== undefined && patch.estimateHours !== null && !(patch.estimateHours > 0)) {
     throw new Error("예상 시간은 0보다 커야 합니다");
   }
-  if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  if (patch.status !== undefined) assertValidStatus(data, issue.projectId, patch.status);
   const before = { ...issue, labels: [...issue.labels] };
   // 타입 전환 정합성: 자식이 있는데 규칙 위반 타입이 되면 거부, 자신의 parent가 위반되면 자동 해제
   if (patch.type !== undefined && patch.type !== issue.type) {
@@ -734,6 +744,7 @@ export async function moveIssue(
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertValidStatus(data, issue.projectId, to.status);
   const before = { ...issue };
   issue.status = to.status;
   // 대상 컬럼: 같은 프로젝트·같은 스프린트·대상 상태 (이동 이슈 제외, order 순)
@@ -1192,6 +1203,11 @@ function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: Set
     const oldCategory = statusCategoryOf(data, issue.projectId, issue.status);
     const fallback = sorted.find((s) => s.category === oldCategory) ?? sorted[0];
     issue.status = fallback.id;
+  }
+  // 보드 컬럼도 함께 정리 — 사라진 상태의 컬럼(이름/WIP 오버라이드)이 잔존하지 않게
+  for (const board of data.boards) {
+    if (!targets.has(board.projectId)) continue;
+    board.columns = board.columns.filter((c) => valid.has(c.status));
   }
 }
 

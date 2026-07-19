@@ -1025,7 +1025,7 @@ body {
   gap: var(--chanho-space-100);
   align-items: end;
   padding-top: var(--chanho-space-100);
-  border-top: 1px solid var(--chanho-color-border);
+  border-top: 1px solid var(--chanho-color-border-default);
 }
 
 @media (max-width: 720px) {
@@ -1891,6 +1891,12 @@ body {
   background: var(--chanho-color-background-surface);
   cursor: pointer;
   transition: background 120ms ease;
+}
+
+/* role="button" 행 — 키보드 포커스 표시 */
+.backlog-row:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: -2px;
 }
 
 .backlog-row:hover {

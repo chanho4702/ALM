@@ -126,4 +126,18 @@ describe("BacklogPage", () => {
     expect(await screen.findByRole("dialog", { name: "ALM-6" })).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/backlog?issue=ALM-6");
   });
+
+  it("행은 키보드로도 열린다 (role=button + Enter)", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    const backlog = await screen.findByRole("region", { name: "백로그 목록" });
+    const row = within(backlog)
+      .getByText("코멘트 기능 구현")
+      .closest(".backlog-row") as HTMLElement;
+    row.focus();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByRole("dialog", { name: "ALM-6" })).toBeInTheDocument();
+  });
 });

@@ -34,7 +34,7 @@ UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이�
 ```bash
 pnpm install                       # ../design-system/artifacts 의 tarball 필요
 pnpm dev --port 5175 --strictPort  # http://localhost:5175/alm/
-pnpm test                          # vitest run (242 test cases)
+pnpm test                          # vitest run (245 test cases)
 pnpm typecheck                     # tsc --noEmit
 pnpm build                         # vite build (→ dist/)
 ```

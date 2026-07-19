@@ -9,6 +9,7 @@ import {
   deleteScheme,
   getIssueByKey,
   listAllStatuses,
+  listBoards,
   listProjectStatuses,
   listSchemes,
   moveIssue,
@@ -17,6 +18,7 @@ import {
   setDefaultScheme,
   setProjectCustom,
   statusMetaByProject,
+  updateBoard,
   updateIssue,
   updateProjectCustomSettings,
   updateScheme,
@@ -214,9 +216,31 @@ describe("프로젝트 커스텀 전환/복귀·스킴 재배정", () => {
     const issue = await getIssueByKey("ALM-1");
     await moveIssue(issue!.id, { status: "review" });
 
+    // review 상태의 보드 컬럼(이름/WIP 오버라이드)도 만들어 둔다
+    const [board] = await listBoards(PROJECT);
+    await updateBoard(board.id, {
+      columns: [...board.columns, { status: "review", name: "리뷰 컬럼", wipLimit: 2 }],
+    });
+
     // review를 빼고 저장 — id가 카테고리 문자열이 아니어도 옛 구성의 카테고리로 이관
     await updateProjectCustomSettings(PROJECT, customBody());
     expect((await getIssueByKey("ALM-1"))!.status).toBe("inprogress");
+    // 보드 컬럼도 함께 정리된다 (orphan 컬럼 잔존 금지)
+    const [after] = await listBoards(PROJECT);
+    expect(after.columns.some((c) => c.status === "review")).toBe(false);
+  });
+
+  it("존재하지 않는 상태로는 생성/수정/이동할 수 없다", async () => {
+    const issue = await getIssueByKey("ALM-1");
+    await expect(moveIssue(issue!.id, { status: "ghost" })).rejects.toThrow(
+      "이 프로젝트에 없는 상태입니다",
+    );
+    await expect(updateIssue(issue!.id, { status: "ghost" })).rejects.toThrow(
+      "이 프로젝트에 없는 상태입니다",
+    );
+    await expect(
+      createIssue({ projectId: PROJECT, title: "유령 상태", status: "ghost" }),
+    ).rejects.toThrow("이 프로젝트에 없는 상태입니다");
   });
 
   it("스킴 재배정: 커스텀 해제 + 새 스킴 상태에 없는 이슈는 같은 카테고리로 이관", async () => {
