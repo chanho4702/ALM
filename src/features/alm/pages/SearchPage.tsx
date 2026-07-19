@@ -207,24 +207,16 @@ export function SearchPage() {
         }
       />
 
-      <TextField
-        label="스마트 검색"
-        placeholder="예: 상태:진행중 담당:김찬호 타입:버그 로그인"
-        description="상태·우선순위·타입·담당·라벨·프로젝트·정렬 토큰과 검색어를 섞어 쓸 수 있습니다"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-
-      {tokens.length > 0 ? (
-        <div className="search-chips" data-testid="search-chips">
-          {tokens.map((token) => (
-            <Tag key={token} label={token} onRemove={() => removeToken(token)} />
-          ))}
+      {/* 지라 이슈 검색처럼 검색 입력과 조건 Select를 한 줄 툴바로 묶는다 */}
+      <div className="search-toolbar">
+        <div className="search-toolbar-input">
+          <TextField
+            label="스마트 검색"
+            placeholder="예: 상태:진행중 담당:김찬호 타입:버그 로그인 — 토큰과 검색어를 섞어 쓰세요"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
-      ) : null}
-
-      {/* 조건 추가 — 선택 즉시 토큰이 문자열에 붙는다 */}
-      <div className="search-builders">
         <Select
           label="상태 추가"
           value={PICK}
@@ -279,6 +271,14 @@ export function SearchPage() {
           onValueChange={(v) => v !== PICK && appendToken(v)}
         />
       </div>
+
+      {tokens.length > 0 ? (
+        <div className="search-chips" data-testid="search-chips">
+          {tokens.map((token) => (
+            <Tag key={token} label={token} onRemove={() => removeToken(token)} />
+          ))}
+        </div>
+      ) : null}
 
       {issues === null ? null : issues.length === 0 ? (
         <EmptyState
