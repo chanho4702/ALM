@@ -423,12 +423,52 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--chanho-space-200);
+  align-items: stretch;
 }
 
+/* 자체 타일 마크업 — DS Card 내부 레이아웃과의 충돌(카드 겹침)을 피한다 */
 .project-card {
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-150);
+  min-width: 0;
+  padding: var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+}
+
+/* 지라 프로젝트 디렉터리 — 검색 + 뷰 토글 툴바 */
+.project-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-100);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.project-list-search {
+  width: 260px;
+  min-width: 200px;
+}
+
+.project-view-toggle {
+  display: flex;
+  gap: var(--chanho-space-50);
+}
+
+.project-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  min-width: 0;
+}
+
+.project-name-cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .project-card-head {

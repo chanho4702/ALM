@@ -49,7 +49,7 @@
 
 ## 품질 상태
 
-- 테스트 **241 케이스 / 26 파일** — 스토어 단위 + Testing Library 통합(App 전체 마운트)
+- 테스트 **242 케이스 / 26 파일** — 스토어 단위 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 

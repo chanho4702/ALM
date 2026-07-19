@@ -127,7 +127,7 @@ describe("App 라우팅과 전역 셸", () => {
   it("디렉터리에서 별표를 켜면 사이드바 '별표' 섹션에 나타나고, 끄면 사라진다", async () => {
     const user = userEvent.setup();
     renderApp("/projects");
-    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+    await screen.findByRole("table", { name: "프로젝트 목록" });
 
     await user.click(screen.getByRole("button", { name: "ALM 플랫폼 별표" }));
     const starred = await within(globalNav()).findByTestId("nav-starred");

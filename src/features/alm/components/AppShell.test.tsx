@@ -32,7 +32,7 @@ describe("AppShell 전역 만들기", () => {
   it("어느 화면에서든 이슈를 만들고 상세로 이동한다 (디렉터리에서)", async () => {
     const user = userEvent.setup();
     renderShell("/projects");
-    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+    await screen.findByRole("table", { name: "프로젝트 목록" });
 
     await user.click(screen.getByRole("button", { name: "만들기" }));
     const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
@@ -69,7 +69,7 @@ describe("AppShell 전역 검색", () => {
   it("검색 인풋 입력 → 결과 모달 → 클릭 시 이슈 상세로 이동한다", async () => {
     const user = userEvent.setup();
     renderShell("/projects");
-    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+    await screen.findByRole("table", { name: "프로젝트 목록" });
 
     fireEvent.change(screen.getByLabelText("전역 검색"), { target: { value: "칸반" } });
 
@@ -88,7 +88,7 @@ describe("AppShell 전역 검색", () => {
 
   it("결과가 없으면 빈 상태를 보여준다", async () => {
     renderShell("/projects");
-    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+    await screen.findByRole("table", { name: "프로젝트 목록" });
 
     fireEvent.change(screen.getByLabelText("전역 검색"), { target: { value: "존재하지않는이슈" } });
     const dialog = await screen.findByRole("dialog", { name: "이슈 검색" });
@@ -100,7 +100,7 @@ describe("AppShell 알림 벨", () => {
   it("미읽음 배지를 보여주고, 알림 클릭 시 해당 이슈 상세로 이동하며 읽음 처리된다", async () => {
     const user = userEvent.setup();
     renderShell("/projects");
-    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+    await screen.findByRole("table", { name: "프로젝트 목록" });
 
     // 시드 미읽음 2개
     const bell = await screen.findByRole("button", { name: "알림 2개 미읽음" });
@@ -126,7 +126,7 @@ describe("AppShell 알림 벨", () => {
   it("모두 읽음을 누르면 배지가 사라진다", async () => {
     const user = userEvent.setup();
     renderShell("/projects");
-    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+    await screen.findByRole("table", { name: "프로젝트 목록" });
 
     await user.click(await screen.findByRole("button", { name: "알림 2개 미읽음" }));
     const dialog = await screen.findByRole("dialog", { name: "알림" });
@@ -142,7 +142,7 @@ describe("전역 만들기 타입 선택지", () => {
   it("하위 작업 타입은 전역 만들기에서 제외된다 (상세의 '하위 작업 추가' 전용)", async () => {
     const user = userEvent.setup();
     renderShell("/projects");
-    await screen.findByRole("heading", { name: "ALM 플랫폼" });
+    await screen.findByRole("table", { name: "프로젝트 목록" });
 
     await user.click(screen.getByRole("button", { name: "만들기" }));
     const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
