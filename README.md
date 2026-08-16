@@ -7,11 +7,11 @@ MSA 템플릿의 프론트 3종 중 하나로 게이트웨이(:8000) 뒤, Keyclo
 
 - 개발: `http://localhost:5175/alm/` (Vite dev, `--strictPort`)
 - 통합 배포: nginx 경로 기반 `http://localhost/alm/` (`base: "/alm/"`, 라우터 `basename="/alm"`)
-- 데이터: 현재 **localStorage 목업**(`alm.jira.v1`). 백엔드(jira-service) 도입 시 store 파일만 교체하는 구조.
+- 데이터: 현재 **localStorage 목업**(`alm.jira.v1`). `alm-backend` 연동 시 store 파일만 교체하는 구조.
 
 ---
 
-## 기술 스택 (실측)
+## 기술 스택
 
 | 항목 | 버전/내용 |
 |---|---|
@@ -29,7 +29,7 @@ UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이�
 
 ---
 
-## 실행 방법 (실측)
+## 빠른 시작
 
 ```bash
 pnpm install                       # ../design-system/artifacts 의 tarball 필요
@@ -54,7 +54,7 @@ pnpm build                         # vite build (→ dist/)
 
 ---
 
-## 인증/SSO 흐름 (실측)
+## 인증/SSO 흐름
 
 인증은 `src/auth/`의 재사용 모듈이 담당하며, **최상위 `AuthGate`가 앱 전체를 감싼다**(`main.tsx`).
 
@@ -79,7 +79,7 @@ pnpm build                         # vite build (→ dist/)
 
 ---
 
-## 주요 기능/화면 (실측)
+## 주요 기능/화면
 
 - **전역 셸(`AppShell`)** — 상단바(브랜드·전역 검색·"만들기" 이슈 생성 모달·알림 벨·테마 토글) + 상주 전역 사이드바(`GlobalSideNav`: 홈/프로젝트·최근·별표). UI 상태는 `alm.jira.ui.v1`에 저장.
 - **홈 `HomePage`(For you)** — 내 담당 이슈 + 최근 업데이트 모음.
@@ -95,13 +95,15 @@ pnpm build                         # vite build (→ dist/)
 - **알림 `NotificationsModal`** — 상단 벨 미읽음 Badge, 개별/전체 읽음.
 - **검색 `SearchModal`** · **만들기 `CreateIssueModal`** — 전역 상단바에서 호출.
 - **상세 검색 `SearchPage`(/search) — ALM 특색** — JQL 대신 **한국어 스마트 검색**(`상태:진행중 담당:김찬호 타입:버그 로그인`), 조건 칩·Select 빌더와 양방향 동기화(진실은 URL `q` 하나 → **링크만 보내면 같은 검색, 필터 URL 공유**), 저장 필터는 사이드바 "필터" 섹션 상주(원클릭 적용). 쿼리 모델(`IssueQuery`)은 추후 GraphQL 인자로 1:1 매핑.
+- **전역 관리 `GlobalSettingsPage`** — 이슈 타입·워크플로 스킴을 만들고 편집하며, 프로젝트별로 공용 스킴과 커스텀 설정을 전환.
 - **프로젝트 디렉터리** — `ProjectListPage`(카드) · `ProjectCreatePage`(영문 이름→키 자동 제안, **생성 템플릿**: 빈/스크럼/칸반/버그 트래킹 — 카드 미리보기가 실제 만들어질 컬럼 구성(WIP 포함) 그대로, 샘플 이슈·Sprint 1 자동 세팅) · `ProjectSettingsPage`(수정·삭제).
+- **작업 시간** — 이슈 상세에서 워크로그를 기록하고 예상 시간 대비 진행률·초과 상태를 표시.
 
 목업 사용자는 4명 고정(`김찬호`/`이서연`/`박준영`/`최다인`), 현재 사용자는 `u1`(김찬호).
 
 ---
 
-## 라우트 목록 (실측)
+## 라우트
 
 모든 라우트는 `AppShell` 레이아웃 아래에 놓인다(`src/app/App.tsx`, `basename="/alm"`).
 
@@ -109,6 +111,7 @@ pnpm build                         # vite build (→ dist/)
 |---|---|
 | `/home` | `HomePage` (For you) |
 | `/search` | `SearchPage` (스마트 검색, `?q=`) |
+| `/settings` | `GlobalSettingsPage` (이슈 타입·워크플로 스킴) |
 | `/projects` | `ProjectListPage` |
 | `/projects/new` | `ProjectCreatePage` |
 | `/projects/:projectId/dashboard` | `DashboardPage` |
@@ -153,4 +156,4 @@ alm-front/
 - **현황 스냅샷: `docs/STATUS.md`** — 어디까지 했고 무엇이 남았나 (여기부터 읽기)
 - 설계: `docs/superpowers/specs/` (셸 리디자인·다중 보드·백로그 DnD·이슈 관계·상세 검색·템플릿)
 - 구현 계획(태스크별): `docs/superpowers/plans/`
-- 백엔드 의존 기능 백로그: `docs/BACKLOG.md` (첨부·실시간 협업·알림 푸시·권한 — jira-service 도입 시)
+- 백엔드 의존 기능 백로그: `docs/BACKLOG.md` (첨부·실시간 협업·알림 푸시·권한)
