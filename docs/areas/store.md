@@ -1,8 +1,9 @@
 # 스토어 (도메인 데이터 계층)
 
-**파일**: `src/features/alm/store/jiraStore.ts` (~1400줄, 유일한 백엔드 교체 지점),
-`types.ts`(도메인 타입), `uiStore.ts`(내비 UI 상태), `searchQuery.ts`(스마트 쿼리),
-`src/mock/seed.ts`(시드).
+**파일**: `src/features/alm/store/jiraStore.ts` (~1400줄, 현재 localStorage 구현),
+`jiraApi.ts`(Project/Issue REST 어댑터, 아직 런타임 미연결), `apiClient.ts`(AuthGate와 공유하는
+인증 클라이언트), `mapping.ts`(DTO 변환), `types.ts`(도메인 타입), `uiStore.ts`(내비 UI 상태),
+`searchQuery.ts`(스마트 쿼리), `src/mock/seed.ts`(시드).
 
 ## 구조 원칙
 
@@ -37,7 +38,12 @@
 
 ## 백엔드 교체 체크리스트 (jira-service 착수 시)
 
-1. 함수 시그니처는 유지하고 내부만 fetch로 — 화면은 손대지 않는 것이 목표.
+1. 함수 시그니처는 유지하고 내부만 fetch로 — 화면은 손대지 않는 것이 목표. Project/Issue REST
+   계약과 인증 클라이언트 공유는 `jiraApi.ts`에 준비됐다. 단, 아래 필드가 서버에 생기기 전에는
+   런타임 전환하지 않는다.
+   - 이슈: sprintId, parentId, dueDate, labels, estimateHours, order
+   - 프로젝트: 템플릿이 만드는 보드·스프린트·샘플 이슈와 설정 스킴
+   - 사용자: 현재 목업의 `u1` 형식 대신 서버 숫자 ID를 제공하는 디렉터리
 2. **카운트/집계 엔드포인트 신설 필요**: 홈(`HomePage`)·디렉터리(`ProjectListPage`)가
    프로젝트마다 `listIssues`를 불러 N+1이다. `countIssuesByProject`, 전 프로젝트 이슈 조회
    (`listAllIssues`) 같은 API를 만들고 화면 호출을 교체할 것.

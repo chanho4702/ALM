@@ -1,0 +1,222 @@
+// alm-backend Project/Issue REST 계약 어댑터.
+// 서버가 아직 저장하지 않는 ALM 확장 필드는 조용히 유실시키지 않고 명시적으로 거부한다.
+import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
+import { sharedApiFetch } from "./apiClient";
+import {
+  extractApiError,
+  mapIssue,
+  mapProject,
+  toApiIssuePriority,
+  toApiIssueType,
+  toBackendId,
+  type IssueDto,
+  type ProjectDto,
+} from "./mapping";
+import type { Issue, IssuePriority, IssueType, Project } from "./types";
+
+async function json<T>(response: Response): Promise<T> {
+  const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) throw new Error(extractApiError(response.status, body));
+  return body as T;
+}
+
+async function projectDto(id: string): Promise<ProjectDto> {
+  return json(await sharedApiFetch(`/api/alm/projects/${toBackendId(id)}`));
+}
+
+async function issueDto(id: string): Promise<IssueDto> {
+  return json(await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}`));
+}
+
+export async function listProjects(): Promise<Project[]> {
+  const rows = await json<ProjectDto[]>(await sharedApiFetch("/api/alm/projects"));
+  return rows.map(mapProject);
+}
+
+export async function createProject(input: {
+  key: string;
+  name: string;
+  description?: string;
+  templateId?: ProjectTemplateId;
+}): Promise<Project> {
+  const template = getTemplate(input.templateId ?? "blank");
+  if (template.withSprint || template.samples.length > 0 || template.board) {
+    throw new Error("백엔드 모드에서는 아직 빈 프로젝트 템플릿만 지원합니다.");
+  }
+  const response = await sharedApiFetch("/api/alm/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      key: input.key.trim().toUpperCase(),
+      name: input.name.trim(),
+      description: input.description?.trim() ?? "",
+    }),
+  });
+  return mapProject(await json(response));
+}
+
+export async function updateProject(
+  id: string,
+  patch: { name?: string; description?: string },
+): Promise<Project> {
+  const current = await projectDto(id);
+  const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: (patch.name ?? current.name).trim(),
+      description: (patch.description ?? current.description ?? "").trim(),
+      expectedVersion: current.version,
+    }),
+  });
+  return mapProject(await json(response));
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await json(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(id)}`, { method: "DELETE" }),
+  );
+}
+
+export interface IssueFilter {
+  text?: string;
+  status?: string;
+  priority?: IssuePriority;
+  assigneeId?: string;
+  label?: string;
+  type?: IssueType;
+}
+
+function filterIssues(issues: Issue[], filter?: IssueFilter): Issue[] {
+  if (!filter) return issues;
+  let result = issues;
+  if (filter.text) {
+    const text = filter.text.toLowerCase();
+    result = result.filter(
+      (issue) =>
+        issue.title.toLowerCase().includes(text) ||
+        issue.key.toLowerCase().includes(text) ||
+        issue.description.toLowerCase().includes(text),
+    );
+  }
+  if (filter.status) result = result.filter((issue) => issue.status === filter.status);
+  if (filter.priority) result = result.filter((issue) => issue.priority === filter.priority);
+  if (filter.assigneeId) result = result.filter((issue) => issue.assigneeId === filter.assigneeId);
+  if (filter.label) result = result.filter((issue) => issue.labels.includes(filter.label!));
+  if (filter.type) result = result.filter((issue) => issue.type === filter.type);
+  return result;
+}
+
+export async function listIssues(projectId: string, filter?: IssueFilter): Promise<Issue[]> {
+  const rows = await json<IssueDto[]>(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/issues`),
+  );
+  return filterIssues(rows.map((row, index) => mapIssue(row, index + 1)), filter);
+}
+
+/** 백엔드에 key 단건 조회가 생기기 전까지 접근 가능한 프로젝트를 순회한다. */
+export async function getIssueByKey(key: string): Promise<Issue | null> {
+  const normalized = key.trim().toUpperCase();
+  const projects = await listProjects();
+  for (const project of projects) {
+    const issue = (await listIssues(project.id)).find((candidate) => candidate.key === normalized);
+    if (issue) return issue;
+  }
+  return null;
+}
+
+export interface IssueCreateInput {
+  projectId: string;
+  title: string;
+  description?: string;
+  type?: IssueType;
+  status?: string;
+  priority?: IssuePriority;
+  assigneeId?: string | null;
+  sprintId?: string | null;
+  parentId?: string | null;
+  dueDate?: string | null;
+  labels?: string[];
+}
+
+function assertCreateFieldsSupported(input: IssueCreateInput): void {
+  if (
+    input.sprintId != null ||
+    input.parentId != null ||
+    input.dueDate != null ||
+    (input.labels?.length ?? 0) > 0
+  ) {
+    throw new Error("스프린트·부모·마감일·라벨은 아직 백엔드에 저장할 수 없습니다.");
+  }
+}
+
+export async function createIssue(input: IssueCreateInput): Promise<Issue> {
+  assertCreateFieldsSupported(input);
+  const response = await sharedApiFetch(
+    `/api/alm/projects/${toBackendId(input.projectId)}/issues`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: input.title.trim(),
+        description: input.description ?? "",
+        type: input.type ? toApiIssueType(input.type) : undefined,
+        status: input.status,
+        priority: input.priority ? toApiIssuePriority(input.priority) : undefined,
+        assigneeId: input.assigneeId == null ? null : toBackendId(input.assigneeId),
+      }),
+    },
+  );
+  return mapIssue(await json(response));
+}
+
+type IssuePatch = Partial<
+  Pick<
+    Issue,
+    | "title"
+    | "description"
+    | "type"
+    | "status"
+    | "priority"
+    | "assigneeId"
+    | "sprintId"
+    | "dueDate"
+    | "labels"
+    | "estimateHours"
+  >
+>;
+
+function assertPatchFieldsSupported(patch: IssuePatch): void {
+  const unsupported = ["sprintId", "dueDate", "labels", "estimateHours"] as const;
+  if (unsupported.some((field) => Object.prototype.hasOwnProperty.call(patch, field))) {
+    throw new Error("스프린트·마감일·라벨·예상 시간은 아직 백엔드에 저장할 수 없습니다.");
+  }
+}
+
+export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue> {
+  assertPatchFieldsSupported(patch);
+  const current = await issueDto(id);
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: (patch.title ?? current.title).trim(),
+      description: patch.description ?? current.description ?? "",
+      type: patch.type ? toApiIssueType(patch.type) : current.type,
+      status: patch.status ?? current.status,
+      priority: patch.priority ? toApiIssuePriority(patch.priority) : current.priority,
+      assigneeId:
+        patch.assigneeId === undefined
+          ? current.assigneeId
+          : patch.assigneeId === null
+            ? null
+            : toBackendId(patch.assigneeId),
+      expectedVersion: current.version,
+    }),
+  });
+  return mapIssue(await json(response));
+}
+
+export async function deleteIssue(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}`, { method: "DELETE" }));
+}

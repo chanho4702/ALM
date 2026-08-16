@@ -1,4 +1,4 @@
-# ALM Front 현황 (2026-07-18 기준)
+# ALM Front 현황 (2026-08-16 기준)
 
 한눈에 보는 "어디까지 했고, 무엇이 남았나". 상세 설계는 `superpowers/specs/`, 태스크별
 계획은 `superpowers/plans/`, 백엔드 의존 항목은 `BACKLOG.md`, **부위별 개발 가이드·알려진
@@ -48,9 +48,18 @@
   자동 이관. 보드 컬럼·상태 Select·Lozenge·통계·스마트 검색(`상태:커스텀이름`,
   공백 제거 매치) 전부 동적 상태 기반
 
+## 백엔드 연결 상태
+
+- `store/apiClient.ts`: AuthGate와 REST 어댑터가 같은 메모리 access token·refresh 요청을 공유
+- `store/mapping.ts`: alm-backend 숫자 ID와 대문자 enum을 화면 모델로 변환
+- `store/jiraApi.ts`: 프로젝트·이슈 CRUD, 최신 version 조회 후 `expectedVersion`을 보내는 REST 어댑터
+- **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 현재 alm-backend가 스프린트·부모·마감일·
+  라벨·예상 시간·정렬과 프로젝트 템플릿을 저장하지 않기 때문이다. 어댑터는 이 값을 조용히
+  버리지 않고 명시적 오류로 차단한다.
+
 ## 품질 상태
 
-- 테스트 **245 케이스 / 26 파일** — 스토어 단위 + Testing Library 통합(App 전체 마운트)
+- 테스트 **258 케이스 / 28 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 
@@ -62,7 +71,8 @@
 
 ## 다음 후보
 
-1. **jira-service 백엔드 착수** — `BACKLOG.md`의 6개 항목(첨부·실시간·알림 푸시·권한·
-   서버 검색/페이징·활동 스트림). 시작점: jiraStore를 fetch로 교체 + `queryIssues`를 GraphQL로
+1. **alm-backend 필드 확장 후 store 전환** — 이슈의 스프린트·부모·마감일·라벨·예상 시간·
+   정렬, 프로젝트 템플릿/설정과 사용자 디렉터리 계약을 먼저 채운다. 이후 `jiraStore.ts`를
+   `jiraApi.ts`로 전환하고 `queryIssues`를 통합 검색 GraphQL로 교체한다.
 2. 디자인 폴리시 잔여 — 빈 상태 일러스트, 로딩 스켈레톤 (반응형은 2026-07-18 완료)
 3. 컨플루언스(위키) 클론 — ALM 우산의 다음 조각
