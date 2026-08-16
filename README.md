@@ -1,5 +1,11 @@
 # ALM Front
 
+[![CI](https://github.com/chanho4702/ALM/actions/workflows/ci.yml/badge.svg)](https://github.com/chanho4702/ALM/actions/workflows/ci.yml)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)
+![Chanho Design System](https://img.shields.io/badge/Chanho%20DS-0.5.0-1B66C9)
+
 Chanho Design System(`@chanho/react`·`@chanho/tokens`)을 100% 소비하는 독립 프론트 앱.
 **자체 ALM(Application Lifecycle Management) 제품** — 지라에서 영감을 받았지만 그대로 복제하지
 않고, 한국어 스마트 검색·필터 URL 공유 같은 ALM 고유의 편의 기능을 얹는다.
