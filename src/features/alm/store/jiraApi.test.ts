@@ -31,6 +31,11 @@ const ISSUE: IssueDto = {
   priority: "HIGH",
   assigneeId: null,
   reporterId: 1,
+  parentId: null,
+  dueDate: null,
+  estimateHours: null,
+  labels: [],
+  order: 4,
   version: 2,
   createdAt: "2026-08-16T00:00:00Z",
   updatedAt: "2026-08-16T01:00:00Z",
@@ -97,7 +102,7 @@ describe("jiraApi issues", () => {
     const result = await listIssues("3", { type: "bug", text: "callback" });
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "7", type: "bug", priority: "high", order: 1 });
+    expect(result[0]).toMatchObject({ id: "7", type: "bug", priority: "high", order: 4 });
   });
 
   it("생성 요청의 enum과 assignee id를 백엔드 계약으로 바꾼다", async () => {
@@ -111,6 +116,8 @@ describe("jiraApi issues", () => {
       type: "bug",
       priority: "high",
       assigneeId: "2",
+      dueDate: "2026-08-20",
+      labels: ["security"],
     });
 
     const body = JSON.parse(spy.mock.calls[0][1]!.body as string);
@@ -119,6 +126,12 @@ describe("jiraApi issues", () => {
       type: "BUG",
       priority: "HIGH",
       assigneeId: 2,
+      details: {
+        parentId: null,
+        dueDate: "2026-08-20",
+        estimateHours: null,
+        labels: ["security"],
+      },
     });
   });
 
@@ -130,7 +143,13 @@ describe("jiraApi issues", () => {
         response(200, { ...ISSUE, status: "inprogress", priority: "MEDIUM", version: 3 }),
       );
 
-    await updateIssue("7", { status: "inprogress", priority: "medium" });
+    await updateIssue("7", {
+      status: "inprogress",
+      priority: "medium",
+      dueDate: "2026-08-21",
+      estimateHours: 2.5,
+      labels: ["backend"],
+    });
 
     const body = JSON.parse(spy.mock.calls[1][1]!.body as string);
     expect(body).toEqual({
@@ -140,18 +159,22 @@ describe("jiraApi issues", () => {
       status: "inprogress",
       priority: "MEDIUM",
       assigneeId: null,
+      details: {
+        parentId: null,
+        dueDate: "2026-08-21",
+        estimateHours: 2.5,
+        labels: ["backend"],
+      },
       expectedVersion: 2,
     });
   });
 
   it("서버 미지원 확장 필드는 네트워크 요청 전에 거부해 데이터 유실을 막는다", async () => {
     const spy = vi.spyOn(client, "sharedApiFetch");
-    await expect(createIssue({ projectId: "3", title: "T", labels: ["security"] })).rejects.toThrow(
-      "아직 백엔드에 저장할 수 없습니다",
+    await expect(createIssue({ projectId: "3", title: "T", sprintId: "1" })).rejects.toThrow(
+      "스프린트는 아직",
     );
-    await expect(updateIssue("7", { dueDate: "2026-08-20" })).rejects.toThrow(
-      "아직 백엔드에 저장할 수 없습니다",
-    );
+    await expect(updateIssue("7", { sprintId: "1" })).rejects.toThrow("스프린트는 아직");
     expect(spy).not.toHaveBeenCalled();
   });
 

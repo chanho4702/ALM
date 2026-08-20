@@ -53,9 +53,10 @@
 - `store/apiClient.ts`: AuthGate와 REST 어댑터가 같은 메모리 access token·refresh 요청을 공유
 - `store/mapping.ts`: alm-backend 숫자 ID와 대문자 enum을 화면 모델로 변환
 - `store/jiraApi.ts`: 프로젝트·이슈 CRUD, 최신 version 조회 후 `expectedVersion`을 보내는 REST 어댑터
-- **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 현재 alm-backend가 스프린트·부모·마감일·
-  라벨·예상 시간·정렬과 프로젝트 템플릿을 저장하지 않기 때문이다. 어댑터는 이 값을 조용히
-  버리지 않고 명시적 오류로 차단한다.
+- alm-backend V2의 부모·마감일·라벨·예상 시간·정렬 응답을 매핑하고 `details` 요청으로 보존
+- **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 스프린트 엔티티/API, 프로젝트 템플릿·
+  설정, 사용자 디렉터리와 서버 순위 변경 API가 남아 있다. 어댑터는 `sprintId`를 조용히 버리지
+  않고 명시적 오류로 차단한다.
 
 ## 품질 상태
 
@@ -71,8 +72,8 @@
 
 ## 다음 후보
 
-1. **alm-backend 필드 확장 후 store 전환** — 이슈의 스프린트·부모·마감일·라벨·예상 시간·
-   정렬, 프로젝트 템플릿/설정과 사용자 디렉터리 계약을 먼저 채운다. 이후 `jiraStore.ts`를
-   `jiraApi.ts`로 전환하고 `queryIssues`를 통합 검색 GraphQL로 교체한다.
+1. **스프린트·순위 변경 API 후 store 전환** — Sprint CRUD/시작/완료와 이슈 이동·재정렬을
+   서버 트랜잭션으로 만들고, 프로젝트 템플릿/설정·사용자 디렉터리 계약을 채운다. 이후
+   `jiraStore.ts`를 `jiraApi.ts`로 전환하고 `queryIssues`를 통합 검색 GraphQL로 교체한다.
 2. 디자인 폴리시 잔여 — 빈 상태 일러스트, 로딩 스켈레톤 (반응형은 2026-07-18 완료)
 3. 컨플루언스(위키) 클론 — ALM 우산의 다음 조각

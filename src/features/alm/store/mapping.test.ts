@@ -20,6 +20,11 @@ const ISSUE_DTO: IssueDto = {
   priority: "HIGH",
   assigneeId: 2,
   reporterId: 1,
+  parentId: 6,
+  dueDate: "2026-08-20",
+  estimateHours: 3.5,
+  labels: ["security", "backend"],
+  order: 9,
   version: 4,
   createdAt: "2026-08-16T00:00:00Z",
   updatedAt: "2026-08-16T01:00:00Z",
@@ -56,11 +61,11 @@ describe("alm-backend DTO mapping", () => {
       reporterId: "1",
       description: "",
       sprintId: null,
-      parentId: null,
-      dueDate: null,
-      estimateHours: null,
-      labels: [],
-      order: 5,
+      parentId: "6",
+      dueDate: "2026-08-20",
+      estimateHours: 3.5,
+      labels: ["security", "backend"],
+      order: 9,
     });
   });
 

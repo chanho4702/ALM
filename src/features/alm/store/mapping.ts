@@ -24,6 +24,11 @@ export interface IssueDto {
   priority: IssuePriorityDto;
   assigneeId: number | null;
   reporterId: number;
+  parentId?: number | null;
+  dueDate?: string | null;
+  estimateHours?: number | null;
+  labels?: string[] | null;
+  order?: number;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -84,8 +89,8 @@ export function toApiIssuePriority(priority: IssuePriority): IssuePriorityDto {
 }
 
 /**
- * 현재 alm-backend가 아직 저장하지 않는 필드는 화면 계약을 깨지 않도록 기본값으로 채운다.
- * 이 기본값 때문에 jiraStore 런타임 전환은 서버 필드 확장 전까지 활성화하지 않는다.
+ * V2 이전 응답에 확장 필드가 없으면 화면 계약을 깨지 않도록 기본값으로 채운다.
+ * sprintId는 별도 Sprint API가 생기기 전까지 null이다.
  */
 export function mapIssue(dto: IssueDto, order = 1): Issue {
   const type = ISSUE_TYPES_FROM_API[dto.type];
@@ -104,11 +109,11 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     assigneeId: dto.assigneeId === null ? null : String(dto.assigneeId),
     reporterId: String(dto.reporterId),
     sprintId: null,
-    parentId: null,
-    dueDate: null,
-    estimateHours: null,
-    labels: [],
-    order,
+    parentId: dto.parentId == null ? null : String(dto.parentId),
+    dueDate: dto.dueDate ?? null,
+    estimateHours: dto.estimateHours ?? null,
+    labels: dto.labels ? [...dto.labels] : [],
+    order: dto.order ?? order,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
   };

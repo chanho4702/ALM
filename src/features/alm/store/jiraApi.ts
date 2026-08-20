@@ -140,13 +140,8 @@ export interface IssueCreateInput {
 }
 
 function assertCreateFieldsSupported(input: IssueCreateInput): void {
-  if (
-    input.sprintId != null ||
-    input.parentId != null ||
-    input.dueDate != null ||
-    (input.labels?.length ?? 0) > 0
-  ) {
-    throw new Error("스프린트·부모·마감일·라벨은 아직 백엔드에 저장할 수 없습니다.");
+  if (input.sprintId != null) {
+    throw new Error("스프린트는 아직 백엔드에 저장할 수 없습니다.");
   }
 }
 
@@ -164,6 +159,12 @@ export async function createIssue(input: IssueCreateInput): Promise<Issue> {
         status: input.status,
         priority: input.priority ? toApiIssuePriority(input.priority) : undefined,
         assigneeId: input.assigneeId == null ? null : toBackendId(input.assigneeId),
+        details: {
+          parentId: input.parentId == null ? null : toBackendId(input.parentId),
+          dueDate: input.dueDate ?? null,
+          estimateHours: null,
+          labels: input.labels ?? [],
+        },
       }),
     },
   );
@@ -179,6 +180,7 @@ type IssuePatch = Partial<
     | "status"
     | "priority"
     | "assigneeId"
+    | "parentId"
     | "sprintId"
     | "dueDate"
     | "labels"
@@ -187,9 +189,8 @@ type IssuePatch = Partial<
 >;
 
 function assertPatchFieldsSupported(patch: IssuePatch): void {
-  const unsupported = ["sprintId", "dueDate", "labels", "estimateHours"] as const;
-  if (unsupported.some((field) => Object.prototype.hasOwnProperty.call(patch, field))) {
-    throw new Error("스프린트·마감일·라벨·예상 시간은 아직 백엔드에 저장할 수 없습니다.");
+  if (Object.prototype.hasOwnProperty.call(patch, "sprintId")) {
+    throw new Error("스프린트는 아직 백엔드에 저장할 수 없습니다.");
   }
 }
 
@@ -211,6 +212,20 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
           : patch.assigneeId === null
             ? null
             : toBackendId(patch.assigneeId),
+      details: {
+        parentId:
+          patch.parentId === undefined
+            ? (current.parentId ?? null)
+            : patch.parentId === null
+              ? null
+              : toBackendId(patch.parentId),
+        dueDate: patch.dueDate === undefined ? (current.dueDate ?? null) : patch.dueDate,
+        estimateHours:
+          patch.estimateHours === undefined
+            ? (current.estimateHours ?? null)
+            : patch.estimateHours,
+        labels: patch.labels === undefined ? (current.labels ?? []) : patch.labels,
+      },
       expectedVersion: current.version,
     }),
   });

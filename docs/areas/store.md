@@ -40,8 +40,8 @@
 
 1. 함수 시그니처는 유지하고 내부만 fetch로 — 화면은 손대지 않는 것이 목표. Project/Issue REST
    계약과 인증 클라이언트 공유는 `jiraApi.ts`에 준비됐다. 단, 아래 필드가 서버에 생기기 전에는
-   런타임 전환하지 않는다.
-   - 이슈: sprintId, parentId, dueDate, labels, estimateHours, order
+   런타임 전환하지 않는다. 부모·마감일·라벨·예상 시간·정렬의 기본 저장 계약은 V2에 반영됐다.
+   - 이슈: Sprint 엔티티/API와 sprintId, 상태·스프린트 그룹 내 원자적 순위 변경
    - 프로젝트: 템플릿이 만드는 보드·스프린트·샘플 이슈와 설정 스킴
    - 사용자: 현재 목업의 `u1` 형식 대신 서버 숫자 ID를 제공하는 디렉터리
 2. **카운트/집계 엔드포인트 신설 필요**: 홈(`HomePage`)·디렉터리(`ProjectListPage`)가
