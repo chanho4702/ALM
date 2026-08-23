@@ -1,4 +1,4 @@
-import type { Issue, IssuePriority, IssueType, Project } from "./types";
+import type { Issue, IssuePriority, IssueType, Project, Sprint } from "./types";
 
 export interface ProjectDto {
   id: number;
@@ -25,6 +25,7 @@ export interface IssueDto {
   assigneeId: number | null;
   reporterId: number;
   parentId?: number | null;
+  sprintId?: number | null;
   dueDate?: string | null;
   estimateHours?: number | null;
   labels?: string[] | null;
@@ -84,13 +85,42 @@ export function toApiIssueType(type: IssueType): IssueTypeDto {
   return ISSUE_TYPES_TO_API[type];
 }
 
+export interface SprintDto {
+  id: number;
+  projectId: number;
+  name: string;
+  state: "PLANNED" | "ACTIVE" | "DONE";
+  startedAt?: string | null;
+  completedAt?: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const SPRINT_STATES_FROM_API: Record<SprintDto["state"], Sprint["state"]> = {
+  PLANNED: "planned",
+  ACTIVE: "active",
+  DONE: "done",
+};
+
+export function mapSprint(dto: SprintDto): Sprint {
+  const sprint: Sprint = {
+    id: String(dto.id),
+    projectId: String(dto.projectId),
+    name: dto.name,
+    state: SPRINT_STATES_FROM_API[dto.state],
+  };
+  if (dto.startedAt) sprint.startedAt = dto.startedAt;
+  if (dto.completedAt) sprint.completedAt = dto.completedAt;
+  return sprint;
+}
+
 export function toApiIssuePriority(priority: IssuePriority): IssuePriorityDto {
   return PRIORITIES_TO_API[priority];
 }
 
 /**
  * V2 이전 응답에 확장 필드가 없으면 화면 계약을 깨지 않도록 기본값으로 채운다.
- * sprintId는 별도 Sprint API가 생기기 전까지 null이다.
  */
 export function mapIssue(dto: IssueDto, order = 1): Issue {
   const type = ISSUE_TYPES_FROM_API[dto.type];
@@ -108,7 +138,7 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     priority,
     assigneeId: dto.assigneeId === null ? null : String(dto.assigneeId),
     reporterId: String(dto.reporterId),
-    sprintId: null,
+    sprintId: dto.sprintId == null ? null : String(dto.sprintId),
     parentId: dto.parentId == null ? null : String(dto.parentId),
     dueDate: dto.dueDate ?? null,
     estimateHours: dto.estimateHours ?? null,

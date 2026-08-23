@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
 import {
+  completeSprint,
   createIssue,
   createProject,
   deleteIssue,
   listIssues,
+  moveIssue,
+  rankIssue,
   updateIssue,
   updateProject,
 } from "./jiraApi";
@@ -128,6 +131,7 @@ describe("jiraApi issues", () => {
       assigneeId: 2,
       details: {
         parentId: null,
+        sprintId: null,
         dueDate: "2026-08-20",
         estimateHours: null,
         labels: ["security"],
@@ -160,6 +164,7 @@ describe("jiraApi issues", () => {
       priority: "MEDIUM",
       assigneeId: null,
       details: {
+        sprintId: null,
         parentId: null,
         dueDate: "2026-08-21",
         estimateHours: 2.5,
@@ -169,13 +174,72 @@ describe("jiraApi issues", () => {
     });
   });
 
-  it("서버 미지원 확장 필드는 네트워크 요청 전에 거부해 데이터 유실을 막는다", async () => {
-    const spy = vi.spyOn(client, "sharedApiFetch");
-    await expect(createIssue({ projectId: "3", title: "T", sprintId: "1" })).rejects.toThrow(
-      "스프린트는 아직",
-    );
-    await expect(updateIssue("7", { sprintId: "1" })).rejects.toThrow("스프린트는 아직");
-    expect(spy).not.toHaveBeenCalled();
+  it("스프린트 배정은 details로 보내고, 부분 patch는 현재 값을 채운다", async () => {
+    const spy = vi
+      .spyOn(client, "sharedApiFetch")
+      .mockResolvedValueOnce(response(201, { ...ISSUE, sprintId: 5 }))
+      .mockResolvedValueOnce(response(200, { ...ISSUE, sprintId: 5 }))
+      .mockResolvedValueOnce(response(200, { ...ISSUE, sprintId: null, version: 3 }));
+
+    const created = await createIssue({ projectId: "3", title: "T", sprintId: "5" });
+    expect(created.sprintId).toBe("5");
+    expect(JSON.parse(spy.mock.calls[0][1]!.body as string).details.sprintId).toBe(5);
+
+    // 스프린트 해제는 null을 명시해야 서버가 미변경과 구분한다.
+    await updateIssue("7", { sprintId: null });
+    expect(JSON.parse(spy.mock.calls[2][1]!.body as string).details.sprintId).toBeNull();
+  });
+
+  it("보드 이동과 랭크 이동은 전용 엔드포인트로 보낸다", async () => {
+    const spy = vi
+      .spyOn(client, "sharedApiFetch")
+      .mockResolvedValueOnce(response(200, { ...ISSUE, status: "done", order: 2 }))
+      .mockResolvedValueOnce(response(200, { ...ISSUE, sprintId: 5, order: 1 }));
+
+    const moved = await moveIssue("7", { status: "done", beforeId: "9" });
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/issues/7/move");
+    expect(JSON.parse(spy.mock.calls[0][1]!.body as string)).toEqual({
+      status: "done",
+      beforeId: 9,
+    });
+    expect(moved.order).toBe(2);
+
+    await rankIssue("7", { sprintId: "5" });
+    expect(spy.mock.calls[1][0]).toBe("/api/alm/issues/7/rank");
+    expect(JSON.parse(spy.mock.calls[1][1]!.body as string)).toEqual({
+      sprintId: 5,
+      beforeId: null,
+    });
+  });
+
+  it("스프린트 완료는 프론트가 판단한 완료 상태 목록을 함께 보낸다", async () => {
+    const sprintDto = {
+      id: 5,
+      projectId: 3,
+      name: "Sprint 1",
+      state: "DONE",
+      startedAt: "2026-08-20T00:00:00Z",
+      completedAt: "2026-08-23T00:00:00Z",
+      version: 3,
+      createdAt: "2026-08-20T00:00:00Z",
+      updatedAt: "2026-08-23T00:00:00Z",
+    };
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(response(200, sprintDto));
+
+    const sprint = await completeSprint("5", ["done", "released"]);
+
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/sprints/5/complete");
+    expect(JSON.parse(spy.mock.calls[0][1]!.body as string)).toEqual({
+      doneStatuses: ["done", "released"],
+    });
+    expect(sprint).toEqual({
+      id: "5",
+      projectId: "3",
+      name: "Sprint 1",
+      state: "done",
+      startedAt: "2026-08-20T00:00:00Z",
+      completedAt: "2026-08-23T00:00:00Z",
+    });
   });
 
   it("204 삭제와 서버 오류 문구를 처리한다", async () => {

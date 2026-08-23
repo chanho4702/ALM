@@ -1,4 +1,4 @@
-// alm-backend Project/Issue REST 계약 어댑터.
+// alm-backend Project/Issue/Sprint REST 계약 어댑터.
 // 서버가 아직 저장하지 않는 ALM 확장 필드는 조용히 유실시키지 않고 명시적으로 거부한다.
 import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
 import { sharedApiFetch } from "./apiClient";
@@ -6,13 +6,15 @@ import {
   extractApiError,
   mapIssue,
   mapProject,
+  mapSprint,
   toApiIssuePriority,
   toApiIssueType,
   toBackendId,
   type IssueDto,
   type ProjectDto,
+  type SprintDto,
 } from "./mapping";
-import type { Issue, IssuePriority, IssueType, Project } from "./types";
+import type { Issue, IssuePriority, IssueType, Project, Sprint } from "./types";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -139,10 +141,8 @@ export interface IssueCreateInput {
   labels?: string[];
 }
 
-function assertCreateFieldsSupported(input: IssueCreateInput): void {
-  if (input.sprintId != null) {
-    throw new Error("스프린트는 아직 백엔드에 저장할 수 없습니다.");
-  }
+function assertCreateFieldsSupported(_input: IssueCreateInput): void {
+  // V3에서 스프린트까지 서버가 저장한다. 남은 미지원 필드가 생기면 여기서 막는다.
 }
 
 export async function createIssue(input: IssueCreateInput): Promise<Issue> {
@@ -161,6 +161,7 @@ export async function createIssue(input: IssueCreateInput): Promise<Issue> {
         assigneeId: input.assigneeId == null ? null : toBackendId(input.assigneeId),
         details: {
           parentId: input.parentId == null ? null : toBackendId(input.parentId),
+          sprintId: input.sprintId == null ? null : toBackendId(input.sprintId),
           dueDate: input.dueDate ?? null,
           estimateHours: null,
           labels: input.labels ?? [],
@@ -188,10 +189,8 @@ type IssuePatch = Partial<
   >
 >;
 
-function assertPatchFieldsSupported(patch: IssuePatch): void {
-  if (Object.prototype.hasOwnProperty.call(patch, "sprintId")) {
-    throw new Error("스프린트는 아직 백엔드에 저장할 수 없습니다.");
-  }
+function assertPatchFieldsSupported(_patch: IssuePatch): void {
+  // V3에서 스프린트까지 서버가 저장한다. 남은 미지원 필드가 생기면 여기서 막는다.
 }
 
 export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue> {
@@ -213,6 +212,12 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
             ? null
             : toBackendId(patch.assigneeId),
       details: {
+        sprintId:
+          patch.sprintId === undefined
+            ? (current.sprintId ?? null)
+            : patch.sprintId === null
+              ? null
+              : toBackendId(patch.sprintId),
         parentId:
           patch.parentId === undefined
             ? (current.parentId ?? null)
@@ -227,6 +232,76 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
         labels: patch.labels === undefined ? (current.labels ?? []) : patch.labels,
       },
       expectedVersion: current.version,
+    }),
+  });
+  return mapIssue(await json(response));
+}
+
+// ── sprints ──────────────────────────────────────────────────
+
+export async function listSprints(projectId: string): Promise<Sprint[]> {
+  const rows = await json<SprintDto[]>(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/sprints`),
+  );
+  return rows.map(mapSprint);
+}
+
+export async function createSprint(projectId: string): Promise<Sprint> {
+  const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/sprints`, {
+    method: "POST",
+  });
+  return mapSprint(await json(response));
+}
+
+export async function startSprint(id: string): Promise<Sprint> {
+  const response = await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}/start`, {
+    method: "POST",
+  });
+  return mapSprint(await json(response));
+}
+
+/**
+ * 무엇을 완료로 볼지는 워크플로 스킴을 가진 프론트가 알려준다 — 서버는 아직 상태 카테고리를
+ * 모른다. doneStatuses에 없는 이슈는 백로그로 돌아간다.
+ */
+export async function completeSprint(id: string, doneStatuses: string[]): Promise<Sprint> {
+  const response = await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ doneStatuses }),
+  });
+  return mapSprint(await json(response));
+}
+
+// ── 순서 ─────────────────────────────────────────────────────
+
+/** 보드 컬럼 이동. 서버가 대상 컬럼 전체 순서를 다시 매기므로 화면은 이동 후 재조회한다. */
+export async function moveIssue(
+  id: string,
+  to: { status: string; beforeId?: string },
+): Promise<Issue> {
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}/move`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      status: to.status,
+      beforeId: to.beforeId == null ? null : toBackendId(to.beforeId),
+    }),
+  });
+  return mapIssue(await json(response));
+}
+
+/** 백로그/스프린트 랭크 이동. sprintId가 null이면 백로그다. */
+export async function rankIssue(
+  id: string,
+  to: { sprintId: string | null; beforeId?: string },
+): Promise<Issue> {
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}/rank`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sprintId: to.sprintId == null ? null : toBackendId(to.sprintId),
+      beforeId: to.beforeId == null ? null : toBackendId(to.beforeId),
     }),
   });
   return mapIssue(await json(response));
