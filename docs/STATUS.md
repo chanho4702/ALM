@@ -52,7 +52,7 @@
 
 - `store/apiClient.ts`: AuthGate와 REST 어댑터가 같은 메모리 access token·refresh 요청을 공유
 - `store/mapping.ts`: alm-backend 숫자 ID와 대문자 enum을 화면 모델로 변환
-- `store/jiraApi.ts`: 프로젝트·이슈 CRUD, 최신 version 조회 후 `expectedVersion`을 보내는 REST 어댑터
+- `store/jiraApi.ts`: 프로젝트·이슈 CRUD, 변경 이력 조회(`listProjectChanges`), 최신 version 조회 후 `expectedVersion`을 보내는 REST 어댑터
 - alm-backend V2의 부모·마감일·라벨·예상 시간·정렬 응답을 매핑하고 `details` 요청으로 보존
 - V3의 Sprint 수명주기(`listSprints`/`createSprint`/`startSprint`/`completeSprint`)와
   `moveIssue`/`rankIssue` 전용 엔드포인트까지 어댑터에 연결. 순서 재계산은 서버가 한 트랜잭션에서
@@ -66,7 +66,7 @@
 
 ## 품질 상태
 
-- 테스트 **298 케이스 / 30 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **322 케이스 / 32 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 
@@ -86,8 +86,10 @@
 마감 임박/지연·최근 업데이트 6카드. 설계와 색 결정 근거는
 `superpowers/specs/2026-08-28-project-summary-dashboard-design.md`.
 
-**R1 진행**: S1 목표·기간, S2 계획 합계, S3 완료 시 이관 선택 **완료**(2026-08-28) →
-남은 것은 S4·S5 리포트(차트는 MIT 라이브러리로 결정, 그 문서 §10-2)와 S6 상태 이력 서버 보존.
+**R1 완료**(2026-08-29): S1 목표·기간 · S2 계획 합계 · S3 완료 시 이관 선택 · S4 번다운 ·
+S5 스프린트 리포트 · S6 서버 이력 기록. 스크럼 한 사이클이 화면만으로 완주된다.
+리포트는 `/projects/:id/reports`(뷰 탭 "리포트"), 차트는 Recharts(MIT)이며 라우트 단위로
+코드 스플리팅해 첫 화면 번들에 들어가지 않는다.
 
 1. **프로젝트 설정 스킴·사용자 디렉터리 후 store 전환** — 워크플로 상태와 카테고리를 서버가
    소유하게 하고(그래야 `completeSprint`가 완료 판정을 프론트에서 받지 않는다), 템플릿이 만드는

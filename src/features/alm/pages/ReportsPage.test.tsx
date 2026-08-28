@@ -1,0 +1,101 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
+import { ToastProvider } from "@chanho/react";
+import { App } from "../../../app/App";
+import { __resetForTest, createSprint, listSprints } from "../store/jiraStore";
+
+/** 이력 기능 도입 전 데이터를 흉내 — localStorage의 changes만 비운다 */
+async function dropChangeHistory() {
+  await listSprints("p1"); // 시드를 만들어 localStorage에 쓰게 한다
+  const raw = localStorage.getItem("alm.jira.v1");
+  if (!raw) throw new Error("시드가 없습니다");
+  const data = JSON.parse(raw) as { changes: unknown[] };
+  data.changes = [];
+  localStorage.setItem("alm.jira.v1", JSON.stringify(data));
+  __resetForTest(); // 스토어 메모리 캐시를 버려 저장소에서 다시 읽게 한다
+}
+
+function renderReports() {
+  return render(
+    <ToastProvider>
+      <MemoryRouter initialEntries={["/projects/p1/reports"]}>
+        <App />
+      </MemoryRouter>
+    </ToastProvider>,
+  );
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  __resetForTest();
+});
+
+describe("ReportsPage", () => {
+  it("활성 스프린트의 번다운을 표로도 제공하고 미입력을 경고한다", async () => {
+    renderReports();
+
+    const burndown = await screen.findByRole("region", { name: "번다운" });
+    // 시드: 5일 전 시작, 이슈 5건 중 1건이 1일 전 완료 → 이슈 수 기준 5 → 4
+    expect(within(burndown).getByText(/예상 미입력 4건/)).toBeInTheDocument();
+
+    // 기본 단위는 예상 시간이고 시드는 ALM-2의 8h만 입력돼 있다 — 그래서 경고가 필요하다
+    const table = within(burndown).getByRole("table", { name: "번다운 값" });
+    const rows = within(table).getAllByRole("row").slice(1); // 머리글 제외
+    expect(rows.length).toBeGreaterThanOrEqual(6);
+    expect(rows[0]).toHaveTextContent("8h");
+  });
+
+  it("단위를 이슈 수로 바꾸면 잔여가 건수로 계산된다", async () => {
+    renderReports();
+    const user = userEvent.setup();
+
+    const burndown = await screen.findByRole("region", { name: "번다운" });
+    await user.click(within(burndown).getByRole("radio", { name: "이슈 수" }));
+
+    const table = within(burndown).getByRole("table", { name: "번다운 값" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("5");
+  });
+
+  it("이슈가 한 번도 없던 스프린트는 차트 대신 사유를 말한다", async () => {
+    const sprint = await createSprint("p1"); // 이슈가 없는 계획 스프린트
+    renderReports();
+    const user = userEvent.setup();
+
+    await screen.findByRole("region", { name: "번다운" });
+    await user.click(screen.getByRole("combobox", { name: "스프린트" }));
+    await user.click(await screen.findByRole("option", { name: new RegExp(sprint.name) }));
+
+    expect(await screen.findByText("이 스프린트에는 이슈가 없습니다.")).toBeInTheDocument();
+  });
+
+  it("창설 이력이 없는 이슈가 있으면 평평한 선의 사유를 알린다", async () => {
+    // 이력 없이 이슈만 있는 상태를 만든다 (기능 도입 전 데이터를 흉내)
+    await dropChangeHistory();
+    renderReports();
+
+    const burndown = await screen.findByRole("region", { name: "번다운" });
+    expect(within(burndown).getByText(/변경 이력이 없어/)).toBeInTheDocument();
+  });
+
+  it("스프린트 리포트가 완료·미완료·스코프 변경을 나눠 보여준다", async () => {
+    renderReports();
+
+    const report = await screen.findByRole("region", { name: "스프린트 리포트" });
+    expect(within(report).getByText("완료 1건")).toBeInTheDocument();
+    expect(within(report).getByText("미완료 4건")).toBeInTheDocument();
+    expect(within(report).getByText("ALM-1")).toBeInTheDocument();
+  });
+
+  it("리포트의 이슈를 누르면 상세 모달이 열린다", async () => {
+    renderReports();
+    const user = userEvent.setup();
+
+    const report = await screen.findByRole("region", { name: "스프린트 리포트" });
+    await user.click(within(report).getByRole("button", { name: /ALM-1/ }));
+
+    expect(await screen.findByRole("dialog")).toHaveTextContent("프로젝트 스캐폴드 구성");
+  });
+});

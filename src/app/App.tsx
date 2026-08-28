@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { Spinner } from "@chanho/react";
 import type { Project } from "../features/alm/store/types";
@@ -17,6 +17,13 @@ import { HomePage } from "../features/alm/pages/HomePage";
 import { TimelinePage } from "../features/alm/pages/TimelinePage";
 import { SearchPage } from "../features/alm/pages/SearchPage";
 import { GlobalSettingsPage } from "../features/alm/pages/GlobalSettingsPage";
+
+/**
+ * 리포트만 차트 라이브러리(recharts)를 쓴다 — 첫 화면 번들에 넣지 않고 라우트 단위로 쪼갠다.
+ */
+const ReportsPage = lazy(() =>
+  import("../features/alm/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })),
+);
 
 export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -55,6 +62,20 @@ export function App() {
           element={<ProjectLayout projects={projects} onProjectsChanged={reload} />}
         >
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            path="reports"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="리포트 불러오는 중" />
+                  </div>
+                }
+              >
+                <ReportsPage />
+              </Suspense>
+            }
+          />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="board" element={<BoardRedirect />} />
           <Route path="boards/:boardId" element={<BoardPage />} />

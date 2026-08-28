@@ -1,4 +1,4 @@
-import type { Issue, IssuePriority, IssueType, Project, Sprint } from "./types";
+import type { ChangeField, Issue, IssueChange, IssuePriority, IssueType, Project, Sprint } from "./types";
 
 export interface ProjectDto {
   id: number;
@@ -120,6 +120,42 @@ export function mapSprint(dto: SprintDto): Sprint {
   if (dto.startedAt) sprint.startedAt = dto.startedAt;
   if (dto.completedAt) sprint.completedAt = dto.completedAt;
   return sprint;
+}
+
+export interface IssueChangeDto {
+  id: number;
+  issueId: number;
+  projectId: number;
+  sprintId?: number | null;
+  field: "STATUS" | "SPRINT";
+  fromValue?: string | null;
+  toValue?: string | null;
+  actorId: number;
+  changedAt: string;
+}
+
+const CHANGE_FIELDS_FROM_API: Record<IssueChangeDto["field"], ChangeField> = {
+  STATUS: "status",
+  SPRINT: "sprint",
+};
+
+/** 서버 이력 → 화면 모델. id는 문자열로, 시각 필드 이름은 `at`으로 맞춘다 */
+export function mapIssueChange(dto: IssueChangeDto): IssueChange {
+  return {
+    id: String(dto.id),
+    issueId: String(dto.issueId),
+    projectId: String(dto.projectId),
+    sprintId: dto.sprintId == null ? null : String(dto.sprintId),
+    field: CHANGE_FIELDS_FROM_API[dto.field],
+    fromValue: dto.fromValue ?? null,
+    toValue: dto.toValue ?? null,
+    actorId: String(dto.actorId),
+    at: dto.changedAt,
+  };
+}
+
+export function toApiChangeField(field: ChangeField): IssueChangeDto["field"] {
+  return field === "status" ? "STATUS" : "SPRINT";
 }
 
 export function toApiIssuePriority(priority: IssuePriority): IssuePriorityDto {

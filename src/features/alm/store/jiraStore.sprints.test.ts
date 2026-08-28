@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   __resetForTest,
   completeSprint,
+  deleteIssue,
+  deleteProject,
+  getIssueByKey,
+  listProjectChanges,
+  moveIssue,
+  setProjectCustom,
+  resolveSettings,
+  updateProjectCustomSettings,
   createIssue,
   createProject,
   createSprint,
@@ -160,5 +168,49 @@ describe("스프린트 완료 시 미완료 이슈 이관", () => {
     await expect(completeSprint(current.id, { moveUnfinishedTo: otherSprint.id })).rejects.toThrow(
       "다른 프로젝트의 스프린트입니다",
     );
+  });
+});
+
+describe("변경 이력 유지보수", () => {
+  it("워크플로 구성 변경으로 상태가 이관되면 이력에도 남는다", async () => {
+    // 시드 프로젝트에 커스텀 상태를 만들고 그 상태의 이슈를 만든 뒤, 상태를 지운다
+    await setProjectCustom("p1", true);
+    const { body } = await resolveSettings("p1");
+    const withReview = {
+      statuses: [...body.statuses, { id: "review", name: "리뷰", category: "inprogress" as const, order: 9 }],
+      enabledTypes: body.enabledTypes,
+    };
+    await updateProjectCustomSettings("p1", withReview);
+    const issue = await getIssueByKey("ALM-6");
+    await moveIssue(issue!.id, { status: "review" });
+
+    await updateProjectCustomSettings("p1", { statuses: body.statuses, enabledTypes: body.enabledTypes });
+
+    const changes = await listProjectChanges("p1", { field: "status" });
+    const forIssue = changes.filter((change) => change.issueId === issue!.id);
+    // review로 옮긴 이력 + 구성 변경으로 되돌아온 이력이 모두 남아야 리포트 재생이 어긋나지 않는다
+    expect(forIssue.at(-1)).toMatchObject({ fromValue: "review", toValue: "inprogress" });
+  });
+
+  it("이슈를 지우면 그 이슈의 이력도 사라진다", async () => {
+    const issue = await getIssueByKey("ALM-7");
+    await moveIssue(issue!.id, { status: "done" });
+    expect(await listProjectChanges("p1")).not.toHaveLength(0);
+
+    await deleteIssue(issue!.id);
+
+    const remaining = await listProjectChanges("p1");
+    expect(remaining.some((change) => change.issueId === issue!.id)).toBe(false);
+  });
+
+  it("프로젝트를 지우면 그 프로젝트의 이력도 사라진다", async () => {
+    const project = await createProject({ key: "TMP", name: "임시" });
+    const issue = await createIssue({ projectId: project.id, title: "임시 이슈" });
+    expect(await listProjectChanges(project.id)).not.toHaveLength(0);
+
+    await deleteProject(project.id);
+
+    expect(await listProjectChanges(project.id)).toHaveLength(0);
+    expect(issue.projectId).toBe(project.id);
   });
 });

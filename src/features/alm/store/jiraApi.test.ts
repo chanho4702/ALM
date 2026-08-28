@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
 import {
   completeSprint,
+  listProjectChanges,
   updateSprint,
   createIssue,
   createProject,
@@ -354,5 +355,52 @@ describe("jiraApi sprints", () => {
     await expect(updateSprint("12", { goal: "x" })).rejects.toThrow(
       "다른 사용자가 먼저 스프린트를 수정했습니다",
     );
+  });
+});
+
+describe("jiraApi changes", () => {
+  it("필터를 쿼리로 넘기고 DTO를 화면 모델로 바꾼다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      response(200, [
+        {
+          id: 5,
+          issueId: 7,
+          projectId: 3,
+          sprintId: 12,
+          field: "STATUS" as const,
+          fromValue: "todo",
+          toValue: "done",
+          actorId: 1,
+          changedAt: "2026-08-28T10:00:00Z",
+        },
+      ]),
+    );
+
+    const rows = await listProjectChanges("3", { field: "sprint", sprintId: "12", since: "2026-08-01T00:00:00Z" });
+
+    expect(spy.mock.calls[0][0]).toBe(
+      "/api/alm/projects/3/changes?field=SPRINT&sprintId=12&since=2026-08-01T00%3A00%3A00Z",
+    );
+    expect(rows).toEqual([
+      {
+        id: "5",
+        issueId: "7",
+        projectId: "3",
+        sprintId: "12",
+        field: "status",
+        fromValue: "todo",
+        toValue: "done",
+        actorId: "1",
+        at: "2026-08-28T10:00:00Z",
+      },
+    ]);
+  });
+
+  it("필터가 없으면 쿼리도 없다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(response(200, []));
+
+    await listProjectChanges("3");
+
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/projects/3/changes");
   });
 });

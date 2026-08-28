@@ -3,6 +3,7 @@ import type {
   Board,
   Comment,
   Issue,
+  IssueChange,
   JiraData,
   Notification,
   Project,
@@ -21,12 +22,25 @@ export function createSeedData(): JiraData {
     createdAt: now,
   };
 
+  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  // 로컬 달력 기준 날짜 — 리포트 집계도 로컬 경계를 쓴다. UTC로 만들면 자정 근처에서 하루 밀린다.
+  const dayKey = (offsetDays: number) => {
+    const date = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+  };
+
+  // 5일 전에 시작해 9일 뒤 끝나는 2주 스프린트 — 번다운이 실제 구간을 그리도록 기간을 준다
   const sprint: Sprint = {
     id: "s1",
     projectId: "p1",
     name: "Sprint 1",
     state: "active",
-    startedAt: now,
+    goal: "보드와 백로그를 실제로 쓸 수 있게 만든다",
+    plannedStart: dayKey(-5),
+    plannedEnd: dayKey(9),
+    startedAt: daysAgo(5),
   };
 
   const base = {
@@ -129,6 +143,42 @@ export function createSeedData(): JiraData {
     },
   ];
 
+  /**
+   * 변경 이력 시드 — 번다운이 그릴 계단이 있어야 데모가 의미를 갖는다.
+   * 스프린트 시작(5일 전) 시점 편입 + 그 뒤 실제 전이 3건.
+   */
+  const changes: IssueChange[] = [];
+  const pushChange = (
+    issueId: string,
+    field: IssueChange["field"],
+    fromValue: string | null,
+    toValue: string | null,
+    at: string,
+    sprintId: string | null,
+  ) => {
+    changes.push({
+      id: `ch${changes.length + 1}`,
+      issueId,
+      projectId: "p1",
+      sprintId,
+      field,
+      fromValue,
+      toValue,
+      actorId: "u1",
+      at,
+    });
+  };
+
+  for (const issue of issues) {
+    const inSprint = issue.sprintId === "s1";
+    // 스프린트 이슈는 전부 "할 일"로 시작했다 — 이후 전이는 아래에서 준다
+    pushChange(issue.id, "status", null, inSprint ? "todo" : issue.status, daysAgo(5), issue.sprintId);
+    if (inSprint) pushChange(issue.id, "sprint", null, "s1", daysAgo(5), "s1");
+  }
+  pushChange("i3", "status", "todo", "inprogress", daysAgo(3), "s1");
+  pushChange("i2", "status", "todo", "inprogress", daysAgo(2), "s1");
+  pushChange("i1", "status", "todo", "done", daysAgo(1), "s1");
+
   return {
     users: [...MOCK_USERS],
     projects: [project],
@@ -145,6 +195,7 @@ export function createSeedData(): JiraData {
       { id: "w1", issueId: "i2", authorId: "u2", hours: 3, comment: "컬럼 드래그 구현", workedOn: now.slice(0, 10), at: now },
       { id: "w2", issueId: "i2", authorId: "u1", hours: 2, comment: "리뷰·리팩터링", workedOn: now.slice(0, 10), at: now },
     ],
+    changes,
     // 지라식 설정 스킴 — 디폴트 스킴에 전 프로젝트 배정 (상태 id = 기존 status 값)
     schemes: [
       {

@@ -20,6 +20,7 @@ export interface JiraOutletContext {
 /** 지라의 프로젝트 뷰 탭 — 요약이 첫 탭 */
 const VIEW_TABS = [
   { id: "dashboard", label: "요약" },
+  { id: "reports", label: "리포트" },
   { id: "timeline", label: "타임라인" },
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },

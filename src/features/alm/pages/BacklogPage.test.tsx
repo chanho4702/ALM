@@ -35,7 +35,9 @@ describe("BacklogPage", () => {
 
     const panel = await screen.findByRole("region", { name: "Sprint 1" });
     await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
-    await user.type(await screen.findByLabelText("시작 예정일"), "2026-09-12");
+    await user.clear(await screen.findByLabelText("시작 예정일"));
+    await user.type(screen.getByLabelText("시작 예정일"), "2026-09-12");
+    await user.clear(screen.getByLabelText("종료 예정일"));
     await user.type(screen.getByLabelText("종료 예정일"), "2026-09-01");
     await user.click(screen.getByRole("button", { name: "저장" }));
 
@@ -82,8 +84,13 @@ describe("BacklogPage", () => {
     const panel = await screen.findByRole("region", { name: "Sprint 1" });
     await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
 
-    await user.type(await screen.findByLabelText("스프린트 목표"), "결제 실패율 절반으로");
+    // 시드 스프린트는 목표·기간을 이미 갖고 있다 — 비우고 새로 넣는다
+    const goal = await screen.findByLabelText("스프린트 목표");
+    await user.clear(goal);
+    await user.type(goal, "결제 실패율 절반으로");
+    await user.clear(screen.getByLabelText("시작 예정일"));
     await user.type(screen.getByLabelText("시작 예정일"), "2026-09-01");
+    await user.clear(screen.getByLabelText("종료 예정일"));
     await user.type(screen.getByLabelText("종료 예정일"), "2026-09-12");
     await user.click(screen.getByRole("button", { name: "저장" }));
 

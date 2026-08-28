@@ -2,8 +2,10 @@ import type {
   Activity,
   Board,
   BoardType,
+  ChangeField,
   Comment,
   Issue,
+  IssueChange,
   IssueLink,
   IssueLinkType,
   IssuePriority,
@@ -87,6 +89,7 @@ function normalize(data: JiraData): JiraData {
   data.boards ??= [];
   data.links ??= [];
   data.worklogs ??= [];
+  data.changes ??= [];
   data.issueCounters ??= {};
   // 보드가 없는 프로젝트에는 기본 스크럼 보드를 만들어 기존 데이터/URL과 호환한다
   for (const project of data.projects) {
@@ -258,6 +261,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.boards = data.boards.filter((b) => b.projectId !== id);
   data.links = data.links.filter((l) => !issueIds.has(l.sourceId) && !issueIds.has(l.targetId));
   data.worklogs = data.worklogs.filter((w) => !issueIds.has(w.issueId));
+  data.changes = data.changes.filter((c) => c.projectId !== id);
   data.projectSettings = data.projectSettings.filter((e) => e.projectId !== id);
   delete data.issueCounters[id];
   persist();
@@ -337,6 +341,31 @@ function statusCategoryOf(data: JiraData, projectId: string, statusId: string): 
   return statusId === "inprogress" || statusId === "done" ? statusId : "todo";
 }
 
+/**
+ * 구조화 변경 이력 — 사람이 읽는 활동로그(activities)와 별도로, 리포트가 집계하는 원천이다.
+ * 서버 `issue_change_log`와 같은 모양이라 REST 전환 때 계약이 바뀌지 않는다.
+ */
+function logChange(
+  data: JiraData,
+  issue: Issue,
+  field: ChangeField,
+  fromValue: string | null,
+  toValue: string | null,
+  at: string,
+): void {
+  data.changes.push({
+    id: nextId(),
+    issueId: issue.id,
+    projectId: issue.projectId,
+    sprintId: issue.sprintId,
+    field,
+    fromValue,
+    toValue,
+    actorId: CURRENT_USER_ID,
+    at,
+  });
+}
+
 function recordChanges(data: JiraData, before: Issue, after: Issue, at: string): void {
   const push = (type: Activity["type"], detail: string) => {
     data.activities.push({
@@ -353,6 +382,7 @@ function recordChanges(data: JiraData, before: Issue, after: Issue, at: string):
       "status",
       `${statusNameOf(data, after.projectId, before.status)} → ${statusNameOf(data, after.projectId, after.status)}`,
     );
+    logChange(data, after, "status", before.status, after.status, at);
   }
   if (before.assigneeId !== after.assigneeId) {
     push("assignee", `${userLabel(data, before.assigneeId)} → ${userLabel(data, after.assigneeId)}`);
@@ -362,6 +392,7 @@ function recordChanges(data: JiraData, before: Issue, after: Issue, at: string):
   }
   if (before.sprintId !== after.sprintId) {
     push("sprint", `${sprintLabel(data, before.sprintId)} → ${sprintLabel(data, after.sprintId)}`);
+    logChange(data, after, "sprint", before.sprintId, after.sprintId, at);
   }
   if (before.dueDate !== after.dueDate) {
     push("duedate", `${before.dueDate ?? "미지정"} → ${after.dueDate ?? "미지정"}`);
@@ -518,6 +549,7 @@ export async function completeSprint(
     if (issue.sprintId === id && statusCategoryOf(data, issue.projectId, issue.status) !== "done") {
       issue.sprintId = targetId; // null = 백로그
       issue.updatedAt = now;
+      logChange(data, issue, "sprint", id, targetId, now);
     }
   }
   sprint.state = "done";
@@ -713,6 +745,8 @@ export async function createIssue(input: {
     detail: "이슈 생성",
     at: now,
   });
+  logChange(data, issue, "status", null, issue.status, now);
+  if (issue.sprintId !== null) logChange(data, issue, "sprint", null, issue.sprintId, now);
   persist();
   return clone(issue);
 }
@@ -1034,6 +1068,7 @@ export async function deleteIssue(id: string): Promise<void> {
   data.notifications = data.notifications.filter((n) => n.issueId !== id);
   data.links = data.links.filter((l) => l.sourceId !== id && l.targetId !== id);
   data.worklogs = data.worklogs.filter((w) => w.issueId !== id);
+  data.changes = data.changes.filter((c) => c.issueId !== id);
   for (const child of data.issues) {
     if (child.parentId === id) child.parentId = null; // 자식은 부모만 해제
   }
@@ -1264,11 +1299,15 @@ function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: Set
   const valid = new Set(newBody.statuses.map((s) => s.id));
   const targets = new Set(projectIds);
   const sorted = [...newBody.statuses].sort((a, b) => a.order - b.order);
+  const at = new Date().toISOString();
   for (const issue of data.issues) {
     if (!targets.has(issue.projectId) || valid.has(issue.status)) continue;
     const oldCategory = statusCategoryOf(data, issue.projectId, issue.status);
     const fallback = sorted.find((s) => s.category === oldCategory) ?? sorted[0];
+    const previous = issue.status;
     issue.status = fallback.id;
+    // 구성 변경 이관도 이력에 남긴다 — 남기지 않으면 리포트 재생이 사라진 상태를 계속 되살린다
+    logChange(data, issue, "status", previous, issue.status, at);
   }
   // 보드 컬럼도 함께 정리 — 사라진 상태의 컬럼(이름/WIP 오버라이드)이 잔존하지 않게
   for (const board of data.boards) {
@@ -1468,6 +1507,32 @@ export async function markAllNotificationsRead(
     if (notification.userId === userId) notification.read = true;
   }
   persist();
+}
+
+/**
+ * 프로젝트 변경 이력 — 리포트가 집계하는 원천. 시간 오름차순이며 필터는 전부 선택이다.
+ * 스프린트 필터는 **전이의 양쪽**을 잡는다(서버와 같은 규칙) — 떠난 줄을 놓치면 원래 스프린트의
+ * "빠진 이슈"를 셀 수 없다.
+ */
+export async function listProjectChanges(
+  projectId: string,
+  filter: { field?: ChangeField; sprintId?: string; since?: string } = {},
+): Promise<IssueChange[]> {
+  const data = load();
+  const rows = data.changes.filter((change) => {
+    if (change.projectId !== projectId) return false;
+    if (filter.field && change.field !== filter.field) return false;
+    if (filter.since && change.at < filter.since) return false;
+    if (filter.sprintId) {
+      const touchesSprint =
+        change.sprintId === filter.sprintId ||
+        (change.field === "sprint" &&
+          (change.fromValue === filter.sprintId || change.toValue === filter.sprintId));
+      if (!touchesSprint) return false;
+    }
+    return true;
+  });
+  return clone(rows.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)));
 }
 
 export async function listActivity(issueId: string): Promise<Activity[]> {

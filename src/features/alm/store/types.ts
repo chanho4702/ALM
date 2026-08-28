@@ -162,6 +162,26 @@ export interface Worklog {
   at: string; // 기록 시각(ISO)
 }
 
+/** 이력으로 남기는 필드 — 서버 V5 issue_change_log와 같은 범위(상태·스프린트 소속) */
+export type ChangeField = "status" | "sprint";
+
+/**
+ * 이슈 변경 이력 한 줄. 번다운·스프린트 리포트가 "언제 완료됐고 스코프가 어떻게 바뀌었나"를
+ * 재구성하는 원천이며, 서버 `GET /api/alm/projects/{id}/changes`와 같은 모양이다.
+ */
+export interface IssueChange {
+  id: string;
+  issueId: string;
+  projectId: string;
+  /** 변경 시점의 소속 스프린트 (sprint 변경이면 옮겨간 쪽). null = 백로그 */
+  sprintId: string | null;
+  field: ChangeField;
+  fromValue: string | null;
+  toValue: string | null;
+  actorId: string;
+  at: string;
+}
+
 export type IssueLinkType = "blocks" | "relates";
 
 /**
@@ -200,6 +220,8 @@ export interface JiraData {
   boards: Board[];
   links: IssueLink[];
   worklogs: Worklog[];
+  /** 상태·스프린트 변경 이력 (리포트 원천) */
+  changes: IssueChange[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

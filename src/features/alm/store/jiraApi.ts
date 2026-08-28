@@ -6,15 +6,18 @@ import {
   extractApiError,
   mapIssue,
   mapProject,
+  mapIssueChange,
   mapSprint,
+  toApiChangeField,
   toApiIssuePriority,
   toApiIssueType,
   toBackendId,
+  type IssueChangeDto,
   type IssueDto,
   type ProjectDto,
   type SprintDto,
 } from "./mapping";
-import type { Issue, IssuePriority, IssueType, Project, Sprint } from "./types";
+import type { ChangeField, Issue, IssueChange, IssuePriority, IssueType, Project, Sprint } from "./types";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -310,6 +313,26 @@ export async function completeSprint(
     ),
   });
   return mapSprint(await json(response));
+}
+
+// ── 변경 이력 ────────────────────────────────────────────────
+
+/** 리포트 원천. 필터는 서버와 같은 의미이며 스프린트 필터는 전이 양쪽을 잡는다(서버 규칙). */
+export async function listProjectChanges(
+  projectId: string,
+  filter: { field?: ChangeField; sprintId?: string; since?: string } = {},
+): Promise<IssueChange[]> {
+  const params = new URLSearchParams();
+  if (filter.field) params.set("field", toApiChangeField(filter.field));
+  if (filter.sprintId) params.set("sprintId", String(toBackendId(filter.sprintId)));
+  if (filter.since) params.set("since", filter.since);
+  const query = params.toString();
+  const rows = await json<IssueChangeDto[]>(
+    await sharedApiFetch(
+      `/api/alm/projects/${toBackendId(projectId)}/changes${query ? `?${query}` : ""}`,
+    ),
+  );
+  return rows.map(mapIssueChange);
 }
 
 // ── 순서 ─────────────────────────────────────────────────────

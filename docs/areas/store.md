@@ -70,6 +70,21 @@
 이슈를 받아 화면에서 세므로, `BACKLOG.md` 5번(서버 검색·페이징)과 이 문서 아래 "카운트/집계
 엔드포인트 신설 필요" 항목에 요약 집계 API가 함께 들어간다.
 
+## 변경 이력 (2026-08-29)
+
+`changes: IssueChange[]`가 상태·스프린트 소속 변경을 남긴다. 서버 `issue_change_log`와 같은 모양이라
+REST 전환 때 계약이 바뀌지 않는다. `listProjectChanges(projectId, {field, sprintId, since})`로 읽는다.
+
+- 기록 지점: `createIssue`(최초 상태·편입), `recordChanges`(수정·보드 이동·랭크 이동),
+  `completeSprint`(이관), `migrateIssueStatuses`(구성 변경 이관). **새 상태 쓰기 경로를 만들면
+  여기도 남긴다** — 빠지면 리포트 재생이 사라진 상태를 계속 되살린다.
+- 삭제 연쇄: `deleteIssue`·`deleteProject`가 `changes`도 지운다.
+- **완료 이관 식별 규칙**: 스프린트 완료로 한꺼번에 옮긴 이력은 `at === sprint.completedAt`이다.
+  리포트가 이 동일성으로 "완료로 옮긴 것"과 "사람이 도중에 뺀 것"을 구분한다. 서버도 같은 규칙이며
+  한 트랜잭션이 한 시각을 공유하도록 맞춰져 있다(백엔드 `SprintService.complete`).
+- 날짜 경계는 **로컬 달력** 기준이다(`reportMetrics`). 시드의 기간 문자열도 로컬 기준으로 만든다 —
+  UTC로 섞으면 자정 근처에서 계단이 하루 밀린다.
+
 ## 알려진 이슈 (2026-07-19 리뷰)
 
 - 상태 쓰기(create/update/moveIssue)는 `assertValidStatus`로 검증된다 — 새 쓰기 경로를
