@@ -2210,6 +2210,167 @@ body {
   color: var(--chanho-color-text-subtlest, var(--chanho-color-text-subtle));
 }
 
+/* ── 요약(대시보드) 카드 ────────────────────────────────── */
+
+/* 2열 → 컨테이너 900px 미만에서 1열 */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: var(--chanho-space-200);
+  align-items: start;
+}
+
+.dash-empty {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 분포 막대 — 색이 아니라 라벨이 신원을 진다 (설계 §4) */
+.dash-dist,
+.dash-issues {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-dist-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 104px) minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  font-size: var(--chanho-font-size-100);
+}
+
+.dash-dist-row.has-lead {
+  grid-template-columns: 24px minmax(64px, 96px) minmax(0, 1fr) 44px;
+}
+
+.dash-dist-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-dist-track {
+  height: 8px;
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  overflow: hidden;
+}
+
+/* 데이터 끝을 둥글게 — 0건이면 폭 0이라 아무것도 그리지 않는다 */
+.dash-dist-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-brand);
+}
+
+.dash-dist-count {
+  text-align: right;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-dist-lead-neutral {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+/* 이슈 목록 행 — 전체가 버튼 */
+.dash-issue-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  width: 100%;
+  padding: var(--chanho-space-75) var(--chanho-space-100);
+  border: 1px solid transparent;
+  border-radius: var(--chanho-radius-medium);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dash-issue-row:hover {
+  background: var(--chanho-color-background-neutral);
+}
+
+.dash-issue-key {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-issue-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-issue-meta {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 활성 스프린트·완료 진행 */
+.dash-sprint,
+.dash-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.dash-sprint-name {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.dash-sprint-goal {
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+}
+
+.dash-sprint-meta,
+.dash-sprint-progress {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.dash-progress-value {
+  font-size: var(--chanho-font-size-500);
+  font-weight: var(--chanho-font-weight-bold);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-progress-sub {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.dash-progress-flags {
+  display: flex;
+  gap: var(--chanho-space-100);
+  margin-top: var(--chanho-space-50);
+}
+
 .assignee-stats {
   display: flex;
   flex-direction: column;

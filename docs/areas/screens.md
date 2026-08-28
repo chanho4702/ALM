@@ -18,7 +18,7 @@
 | `/projects/:id/backlog` | BacklogPage | 스프린트 패널 + 백로그, DnD 랭크/이동 |
 | `/projects/:id/issues` | IssueListPage | 목록: 필터 6종 + 정렬 테이블, ?issue=키로 상세 모달 |
 | `/projects/:id/timeline` | TimelinePage | 간트: 생성일→마감일 막대, 에픽 그룹핑 |
-| `/projects/:id/dashboard` | DashboardPage | 상태 카운트 타일 + 담당자별 분포 |
+| `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
 | `/projects/:id/settings` | ProjectSettingsPage | 일반/워크플로/이슈 타입 탭, 스킴↔커스텀 전환 |
 | 그 외 전부 | → `/home` | |
 

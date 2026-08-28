@@ -64,7 +64,7 @@
 
 ## 품질 상태
 
-- 테스트 **274 케이스 / 29 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **289 케이스 / 30 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 
@@ -79,6 +79,10 @@
 지라 코어 대비 갭 분석·우선순위(MoSCoW)·R1 유저스토리는
 `roadmap/2026-08-28-jira-parity-requirements.md`에 정본화되어 있다. 아래 목록과 함께 읽는다.
 제품 포지셔닝은 **온프렘 지라 대체 + 클라우드 좋은 기능 흡수**(2026-08-28 확정, 그 문서 §0).
+
+**요약 화면 리뉴얼 완료**(2026-08-28): 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·
+마감 임박/지연·최근 업데이트 6카드. 설계와 색 결정 근거는
+`superpowers/specs/2026-08-28-project-summary-dashboard-design.md`.
 
 **R1 진행**: S1 스프린트 목표·기간 **완료**, S2 계획 합계 표시 **완료**(둘 다 2026-08-28) →
 다음은 S3 완료 시 이관 선택, S4·S5 리포트(차트 수단 결정 필요, 그 문서 §10-2), S6 상태 이력 서버 보존.
