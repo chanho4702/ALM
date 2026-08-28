@@ -59,6 +59,8 @@
   한다 — 화면은 이동 후 재조회한다.
 - V4의 스프린트 계획 메타(`goal`/`plannedStart`/`plannedEnd`)를 `GET`·`PUT /api/alm/sprints/{id}`로
   주고받는다. 어댑터는 최신 version을 먼저 읽어 `expectedVersion`을 채운다(이슈 수정과 같은 규칙).
+- V5부터 서버가 이슈 변경 이력(상태·스프린트 소속)을 남긴다. 리포트는 이 이력을 집계할 예정이며
+  프론트 목업은 아직 `activities`로 같은 역할을 한다.
 - **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 프로젝트 템플릿·설정 스킴과 사용자
   디렉터리가 남아 있다.
 
