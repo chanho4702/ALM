@@ -16,6 +16,11 @@ export interface Sprint {
   projectId: string;
   name: string; // "Sprint N" 자동 명명
   state: "planned" | "active" | "done";
+  /** 스프린트 목표 — "무엇을 위한 스프린트인가". 비어 있으면 필드 자체가 없다 */
+  goal?: string;
+  /** 계획 기간 "YYYY-MM-DD". 실제 시작·완료 시각과 별개로 번다운의 시간축이 된다 */
+  plannedStart?: string;
+  plannedEnd?: string;
   startedAt?: string;
   completedAt?: string;
 }

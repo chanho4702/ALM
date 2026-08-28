@@ -94,3 +94,36 @@ export const TYPE_GLYPHS: Record<IssueType, string> = {
   epic: "⚡",
   subtask: "☑",
 };
+
+/**
+ * 계획 기간 표기 — "9월 1일 – 9월 12일". 한쪽만 있으면 그쪽만, 둘 다 없으면 빈 문자열.
+ * 로케일 API 대신 고정 형식을 쓴다(환경별 표기 흔들림·테스트 취약 방지).
+ */
+export function formatPlannedRange(start?: string, end?: string): string {
+  const day = (iso: string) => {
+    const [, month, date] = iso.split("-");
+    return `${Number(month)}월 ${Number(date)}일`;
+  };
+  if (start && end) return `${day(start)} – ${day(end)}`;
+  if (start) return `${day(start)}부터`;
+  if (end) return `${day(end)}까지`;
+  return "";
+}
+
+/**
+ * 패널 계획 합계 — 예상 시간(h) 합과 미입력 건수. 추정 단위는 ALM 확정 결정(예상+기록 2값)에
+ * 따라 시간이며, 스토리 포인트는 도입하지 않았다(roadmap 2026-08-28 §10-1).
+ */
+export function estimateSummary(issues: { estimateHours: number | null }[]): {
+  totalHours: number;
+  missing: number;
+} {
+  let totalHours = 0;
+  let missing = 0;
+  for (const issue of issues) {
+    if (issue.estimateHours == null) missing += 1;
+    else totalHours += issue.estimateHours;
+  }
+  // 0.1h 단위까지만 — 부동소수 누적 오차가 "8.000000000000002h"로 새지 않게 한다
+  return { totalHours: Math.round(totalHours * 10) / 10, missing };
+}

@@ -90,6 +90,10 @@ export interface SprintDto {
   projectId: number;
   name: string;
   state: "PLANNED" | "ACTIVE" | "DONE";
+  goal?: string | null;
+  /** "YYYY-MM-DD" — 서버 LocalDate */
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
   startedAt?: string | null;
   completedAt?: string | null;
   version: number;
@@ -110,6 +114,9 @@ export function mapSprint(dto: SprintDto): Sprint {
     name: dto.name,
     state: SPRINT_STATES_FROM_API[dto.state],
   };
+  if (dto.goal) sprint.goal = dto.goal;
+  if (dto.plannedStart) sprint.plannedStart = dto.plannedStart;
+  if (dto.plannedEnd) sprint.plannedEnd = dto.plannedEnd;
   if (dto.startedAt) sprint.startedAt = dto.startedAt;
   if (dto.completedAt) sprint.completedAt = dto.completedAt;
   return sprint;

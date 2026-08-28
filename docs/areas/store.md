@@ -25,6 +25,24 @@
   (옛 구성에서 카테고리를 읽기 때문). 이슈와 함께 `board.columns`의 사라진 상태 컬럼도
   이 함수가 정리한다.
 
+## 스프린트 계획 메타 (2026-08-28)
+
+`Sprint`에 `goal`/`plannedStart`/`plannedEnd`(전부 optional, "YYYY-MM-DD")가 있다.
+`updateSprint(id, patch)`가 유일한 쓰기 경로다.
+
+- 패치 규칙: 키를 생략하면 유지, 빈 문자열·공백·null을 보내면 **그 필드를 지운다**(키 자체 삭제)
+  — 화면·테스트가 "없음"을 `undefined` 하나로 판단하게 하려는 의도다.
+- 기간 역전(`plannedStart > plannedEnd`)은 저장 전에 거부한다. 문구는 백엔드 도메인과 동일:
+  "시작 예정일은 종료 예정일보다 늦을 수 없습니다".
+- 상태와 무관하게 허용한다 — 진행 중 스프린트의 목표도 고칠 수 있다.
+- REST 어댑터(`jiraApi.updateSprint`)는 서버가 전체 본문을 받으므로 `GET /api/alm/sprints/{id}`로
+  최신 값을 읽어 건드리지 않은 필드를 되돌려 보내고 그때의 `version`을 `expectedVersion`으로 쓴다.
+- 계획 합계는 `components/labels.ts`의 `estimateSummary(issues)` — 예상 시간(h) 합과 미입력 건수를
+  돌려주고, 스프린트·백로그 머리글이 같은 `PanelEstimateSummary`로 렌더한다. 추정 단위는 시간이며
+  스토리 포인트는 도입하지 않았다(roadmap 2026-08-28 §10-1).
+- 표시는 `components/labels.ts`의 `formatPlannedRange`(고정 형식 "9월 1일 – 9월 12일") —
+  로케일 API를 쓰지 않는다(환경별 표기 흔들림 방지).
+
 ## 알려진 이슈 (2026-07-19 리뷰)
 
 - 상태 쓰기(create/update/moveIssue)는 `assertValidStatus`로 검증된다 — 새 쓰기 경로를

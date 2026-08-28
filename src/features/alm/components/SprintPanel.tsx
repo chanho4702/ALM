@@ -6,6 +6,8 @@ import { Avatar, Badge, Button, Dropdown, Lozenge } from "@chanho/react";
 import type { Issue, Sprint, WorkflowStatus } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import {
+  estimateSummary,
+  formatPlannedRange,
   PRIORITY_APPEARANCE,
   PRIORITY_LABELS,
   statusAppearance,
@@ -145,6 +147,20 @@ export function BacklogDropZone({
   );
 }
 
+/**
+ * 패널 계획 합계 — 스프린트 패널과 백로그 패널이 같은 표기를 공유한다.
+ * 미입력이 없으면 그 칩은 렌더하지 않는다(잡음 제거).
+ */
+export function PanelEstimateSummary({ issues }: { issues: Issue[] }) {
+  const { totalHours, missing } = estimateSummary(issues);
+  return (
+    <>
+      <span className="sprint-panel-estimate">예상 {totalHours}h</span>
+      {missing > 0 ? <span className="sprint-panel-estimate">미입력 {missing}건</span> : null}
+    </>
+  );
+}
+
 export interface SprintPanelProps {
   sprint: Sprint;
   /** 이 스프린트의 이슈 (order 오름차순) */
@@ -156,6 +172,8 @@ export interface SprintPanelProps {
   moveTargets: MoveTarget[];
   onStart: (sprint: Sprint) => void;
   onComplete: (sprint: Sprint) => void;
+  /** 계획 메타(이름·목표·기간) 편집 열기 */
+  onEditPlan: (sprint: Sprint) => void;
   onMove: (issue: Issue, sprintId: string | null) => void;
   onDelete: (issue: Issue) => void;
   onOpen: (key: string) => void;
@@ -170,15 +188,27 @@ export function SprintPanel({
   moveTargets,
   onStart,
   onComplete,
+  onEditPlan,
   onMove,
   onDelete,
   onOpen,
 }: SprintPanelProps) {
+  const period = formatPlannedRange(sprint.plannedStart, sprint.plannedEnd);
   return (
     <section className="sprint-panel" aria-label={sprint.name}>
       <header className="sprint-panel-header">
         <h3>{sprint.name}</h3>
+        {period ? <span className="sprint-panel-period">{period}</span> : null}
         <Badge appearance={sprint.state === "active" ? "brand" : "neutral"}>{issues.length}</Badge>
+        <PanelEstimateSummary issues={issues} />
+        <Button
+          variant="subtle"
+          size="small"
+          aria-label={`${sprint.name} 계획 수정`}
+          onClick={() => onEditPlan(sprint)}
+        >
+          계획 수정
+        </Button>
         {sprint.state === "planned" ? (
           <Button size="small" onClick={() => onStart(sprint)}>
             스프린트 시작
@@ -190,6 +220,7 @@ export function SprintPanel({
           </Button>
         ) : null}
       </header>
+      {sprint.goal ? <p className="sprint-panel-goal">{sprint.goal}</p> : null}
       <BacklogDropZone panelId={sprint.id} issueIds={issues.map((i) => i.id)}>
         {issues.map((issue) => (
           <SortableBacklogRow

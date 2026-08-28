@@ -3,6 +3,7 @@ import {
   extractApiError,
   mapIssue,
   mapProject,
+  mapSprint,
   toApiIssuePriority,
   toApiIssueType,
   toBackendId,
@@ -84,5 +85,42 @@ describe("alm-backend DTO mapping", () => {
     expect(extractApiError(400, { error: "프로젝트 키 오류" })).toBe("프로젝트 키 오류");
     expect(extractApiError(409, null)).toContain("다른 사용자");
     expect(extractApiError(401, null)).toContain("로그인이 만료");
+  });
+});
+
+describe("mapSprint", () => {
+  const BASE = {
+    id: 12,
+    projectId: 3,
+    name: "Sprint 1",
+    state: "PLANNED" as const,
+    version: 1,
+    createdAt: "2026-08-28T00:00:00Z",
+    updatedAt: "2026-08-28T00:00:00Z",
+  };
+
+  it("계획 메타(목표·예정 기간)를 화면 모델로 옮긴다", () => {
+    const sprint = mapSprint({
+      ...BASE,
+      goal: "결제 실패율 절반으로",
+      plannedStart: "2026-09-01",
+      plannedEnd: "2026-09-12",
+    });
+
+    expect(sprint).toMatchObject({
+      id: "12",
+      projectId: "3",
+      goal: "결제 실패율 절반으로",
+      plannedStart: "2026-09-01",
+      plannedEnd: "2026-09-12",
+    });
+  });
+
+  it("서버가 비워 보낸 계획 메타는 필드 자체를 만들지 않는다", () => {
+    const sprint = mapSprint({ ...BASE, goal: null, plannedStart: null, plannedEnd: null });
+
+    expect(sprint.goal).toBeUndefined();
+    expect(sprint.plannedStart).toBeUndefined();
+    expect(sprint.plannedEnd).toBeUndefined();
   });
 });

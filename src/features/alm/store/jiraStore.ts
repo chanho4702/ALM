@@ -428,6 +428,55 @@ export async function createSprint(projectId: string): Promise<Sprint> {
   return clone(sprint);
 }
 
+/** 계획 메타 패치 — 빈 문자열·공백은 "지움"(undefined)으로 정규화한다 */
+export interface SprintPlanPatch {
+  name?: string;
+  goal?: string | null;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+}
+
+function planValue(next: string | null | undefined, current: string | undefined) {
+  if (next === undefined) return current;
+  const trimmed = (next ?? "").trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/**
+ * 스프린트 계획 메타(이름·목표·예정 기간) 수정. 상태와 무관하게 허용한다 — 진행 중에도
+ * 목표를 다시 쓰는 일이 실제로 일어난다. 기간 역전은 저장 전에 막는다.
+ */
+export async function updateSprint(id: string, patch: SprintPlanPatch): Promise<Sprint> {
+  const data = load();
+  const sprint = data.sprints.find((s) => s.id === id);
+  if (!sprint) throw new Error("스프린트를 찾을 수 없습니다");
+
+  const name = patch.name === undefined ? sprint.name : patch.name.trim();
+  if (!name) throw new Error("스프린트 이름을 입력하세요");
+  const goal = planValue(patch.goal, sprint.goal);
+  const plannedStart = planValue(patch.plannedStart, sprint.plannedStart);
+  const plannedEnd = planValue(patch.plannedEnd, sprint.plannedEnd);
+  if (plannedStart && plannedEnd && plannedStart > plannedEnd) {
+    throw new Error("시작 예정일은 종료 예정일보다 늦을 수 없습니다");
+  }
+
+  sprint.name = name;
+  assignOrDelete(sprint, "goal", goal);
+  assignOrDelete(sprint, "plannedStart", plannedStart);
+  assignOrDelete(sprint, "plannedEnd", plannedEnd);
+  persist();
+  return clone(sprint);
+}
+
+/** 값이 없으면 키 자체를 지운다 — 화면·테스트가 "없음"을 undefined 하나로 판단하게 한다 */
+function assignOrDelete(sprint: Sprint, key: "goal" | "plannedStart" | "plannedEnd", value?: string) {
+  if (value === undefined) {
+    delete sprint[key];
+  } else {
+    sprint[key] = value;
+  }
+}
+
 export async function startSprint(id: string): Promise<Sprint> {
   const data = load();
   const sprint = data.sprints.find((s) => s.id === id);

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
 import {
   completeSprint,
+  updateSprint,
   createIssue,
   createProject,
   deleteIssue,
@@ -251,5 +252,83 @@ describe("jiraApi issues", () => {
     await expect(deleteIssue("7")).resolves.toBeUndefined();
     await expect(deleteIssue("8")).rejects.toThrow("PROJECT EDIT 권한이 필요합니다");
     expect(spy.mock.calls.map(([path]) => path)).toEqual(["/api/alm/issues/7", "/api/alm/issues/8"]);
+  });
+});
+
+describe("jiraApi sprints", () => {
+  const SPRINT = {
+    id: 12,
+    projectId: 3,
+    name: "Sprint 1",
+    state: "PLANNED" as const,
+    goal: null,
+    plannedStart: null,
+    plannedEnd: null,
+    startedAt: null,
+    completedAt: null,
+    version: 4,
+    createdAt: "2026-08-28T00:00:00Z",
+    updatedAt: "2026-08-28T00:00:00Z",
+  };
+
+  it("최신 version을 조회한 뒤 계획 메타를 expectedVersion과 함께 보낸다", async () => {
+    const spy = vi
+      .spyOn(client, "sharedApiFetch")
+      .mockResolvedValueOnce(response(200, SPRINT))
+      .mockResolvedValueOnce(
+        response(200, {
+          ...SPRINT,
+          goal: "결제 실패율 절반으로",
+          plannedStart: "2026-09-01",
+          plannedEnd: "2026-09-12",
+          version: 5,
+        }),
+      );
+
+    const updated = await updateSprint("12", {
+      goal: "결제 실패율 절반으로",
+      plannedStart: "2026-09-01",
+      plannedEnd: "2026-09-12",
+    });
+
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/sprints/12");
+    const [path, init] = spy.mock.calls[1];
+    expect(path).toBe("/api/alm/sprints/12");
+    expect(init?.method).toBe("PUT");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      name: "Sprint 1",
+      goal: "결제 실패율 절반으로",
+      plannedStart: "2026-09-01",
+      plannedEnd: "2026-09-12",
+      expectedVersion: 4,
+    });
+    expect(updated.goal).toBe("결제 실패율 절반으로");
+  });
+
+  it("건드리지 않은 필드는 서버의 현재 값을 그대로 되돌려 보낸다", async () => {
+    const spy = vi
+      .spyOn(client, "sharedApiFetch")
+      .mockResolvedValueOnce(response(200, { ...SPRINT, goal: "유지할 목표", plannedEnd: "2026-09-12" }))
+      .mockResolvedValueOnce(response(200, { ...SPRINT, goal: "유지할 목표", version: 5 }));
+
+    await updateSprint("12", { plannedEnd: null });
+
+    expect(JSON.parse(String(spy.mock.calls[1][1]?.body))).toEqual({
+      name: "Sprint 1",
+      goal: "유지할 목표",
+      plannedStart: null,
+      plannedEnd: null,
+      expectedVersion: 4,
+    });
+  });
+
+  it("서버 오류 메시지를 그대로 올린다", async () => {
+    vi.spyOn(client, "sharedApiFetch")
+      .mockResolvedValueOnce(response(200, SPRINT))
+      .mockResolvedValueOnce(response(409, { error: "다른 사용자가 먼저 스프린트를 수정했습니다" }));
+
+    await expect(updateSprint("12", { goal: "x" })).rejects.toThrow(
+      "다른 사용자가 먼저 스프린트를 수정했습니다",
+    );
   });
 });

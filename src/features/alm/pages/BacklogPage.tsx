@@ -24,9 +24,17 @@ import {
   rankIssue,
   startSprint,
   updateIssue,
+  updateSprint,
 } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
-import { BacklogDropZone, BacklogIssueRow, SortableBacklogRow, SprintPanel } from "../components/SprintPanel";
+import {
+  BacklogDropZone,
+  BacklogIssueRow,
+  PanelEstimateSummary,
+  SortableBacklogRow,
+  SprintPanel,
+} from "../components/SprintPanel";
+import { SprintEditModal } from "../components/SprintEditModal";
 import type { MoveTarget } from "../components/SprintPanel";
 import { BACKLOG_PANEL, resolveBacklogMove } from "./backlogDnd";
 
@@ -39,6 +47,7 @@ export function BacklogPage() {
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
   const toast = useToast();
 
   // 행 클릭(상세)과 드래그 구분: 5px 이상 움직여야 드래그 시작
@@ -172,6 +181,22 @@ export function BacklogPage() {
           스프린트 만들기
         </Button>
       </div>
+      <SprintEditModal
+        sprint={editingSprint}
+        onClose={() => setEditingSprint(null)}
+        onSave={(sprint, draft) => {
+          // 성공했을 때만 닫는다 — 거부(기간 역전·버전 충돌)당한 초안을 삼키지 않기 위해.
+          void run("스프린트 수정 실패", "스프린트를 수정했습니다", async () => {
+            await updateSprint(sprint.id, {
+              name: draft.name,
+              goal: draft.goal,
+              plannedStart: draft.plannedStart,
+              plannedEnd: draft.plannedEnd,
+            });
+            setEditingSprint(null);
+          });
+        }}
+      />
       <section className="backlog-page">
         <DndContext
           sensors={sensors}
@@ -192,6 +217,7 @@ export function BacklogPage() {
             onComplete={(s) =>
               void run("스프린트 완료 실패", "스프린트를 완료했습니다", () => completeSprint(s.id))
             }
+            onEditPlan={setEditingSprint}
             onMove={handleMove}
             onDelete={handleDelete}
             onOpen={openIssue}
@@ -202,6 +228,7 @@ export function BacklogPage() {
           <header className="sprint-panel-header">
             <h3>백로그</h3>
             <Badge>{backlogIssues.length}</Badge>
+            <PanelEstimateSummary issues={backlogIssues} />
           </header>
           <BacklogDropZone panelId={BACKLOG_PANEL} issueIds={backlogIssues.map((i) => i.id)}>
             {backlogIssues.map((issue) => (

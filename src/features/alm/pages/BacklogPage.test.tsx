@@ -29,6 +29,71 @@ beforeEach(() => {
 });
 
 describe("BacklogPage", () => {
+  it("계획 저장이 거부되면 모달이 열린 채 입력이 남는다", async () => {
+    renderBacklog();
+    const user = userEvent.setup();
+
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
+    await user.type(await screen.findByLabelText("시작 예정일"), "2026-09-12");
+    await user.type(screen.getByLabelText("종료 예정일"), "2026-09-01");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    // 기간 역전은 스토어가 거부 → danger Toast, 모달은 닫히지 않고 초안도 유지
+    expect(
+      await screen.findByText("시작 예정일은 종료 예정일보다 늦을 수 없습니다"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("시작 예정일")).toHaveValue("2026-09-12");
+    expect(screen.getByLabelText("종료 예정일")).toHaveValue("2026-09-01");
+  });
+
+  it("스프린트·백로그 머리글에 예상 시간 합계와 미입력 건수를 보여준다", async () => {
+    renderBacklog();
+
+    // 시드 Sprint 1: 이슈 5건 중 ALM-2만 예상 8h
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    expect(within(panel).getByText("예상 8h")).toBeInTheDocument();
+    expect(within(panel).getByText("미입력 4건")).toBeInTheDocument();
+
+    // 백로그 3건은 전부 예상 미입력
+    const backlog = screen.getByRole("region", { name: "백로그 목록" });
+    expect(within(backlog).getByText("예상 0h")).toBeInTheDocument();
+    expect(within(backlog).getByText("미입력 3건")).toBeInTheDocument();
+  });
+
+  it("이슈를 스프린트로 옮기면 합계가 갱신된다", async () => {
+    renderBacklog();
+    const user = userEvent.setup();
+
+    const backlog = await screen.findByRole("region", { name: "백로그 목록" });
+    await user.click(within(backlog).getByRole("button", { name: "ALM-6 액션" }));
+    await user.click(await screen.findByText("Sprint 1로 이동"));
+
+    await waitFor(() => {
+      const panel = screen.getByRole("region", { name: "Sprint 1" });
+      expect(within(panel).getByText("미입력 5건")).toBeInTheDocument();
+    });
+  });
+
+  it("스프린트 목표와 예정 기간을 편집하면 머리글에 표시된다", async () => {
+    renderBacklog();
+    const user = userEvent.setup();
+
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
+
+    await user.type(await screen.findByLabelText("스프린트 목표"), "결제 실패율 절반으로");
+    await user.type(screen.getByLabelText("시작 예정일"), "2026-09-01");
+    await user.type(screen.getByLabelText("종료 예정일"), "2026-09-12");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => {
+      const header = screen.getByRole("region", { name: "Sprint 1" });
+      expect(within(header).getByText("결제 실패율 절반으로")).toBeInTheDocument();
+      expect(within(header).getByText("9월 1일 – 9월 12일")).toBeInTheDocument();
+    });
+  });
+
   it("활성 스프린트 패널과 백로그 목록을 렌더한다", async () => {
     renderBacklog();
 

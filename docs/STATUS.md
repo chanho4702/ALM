@@ -57,12 +57,14 @@
 - V3의 Sprint 수명주기(`listSprints`/`createSprint`/`startSprint`/`completeSprint`)와
   `moveIssue`/`rankIssue` 전용 엔드포인트까지 어댑터에 연결. 순서 재계산은 서버가 한 트랜잭션에서
   한다 — 화면은 이동 후 재조회한다.
+- V4의 스프린트 계획 메타(`goal`/`plannedStart`/`plannedEnd`)를 `GET`·`PUT /api/alm/sprints/{id}`로
+  주고받는다. 어댑터는 최신 version을 먼저 읽어 `expectedVersion`을 채운다(이슈 수정과 같은 규칙).
 - **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 프로젝트 템플릿·설정 스킴과 사용자
   디렉터리가 남아 있다.
 
 ## 품질 상태
 
-- 테스트 **258 케이스 / 28 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **274 케이스 / 29 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 
@@ -73,6 +75,13 @@
 - UI는 100% `@chanho/react` — 커스텀 마크업도 토큰만 사용
 
 ## 다음 후보
+
+지라 코어 대비 갭 분석·우선순위(MoSCoW)·R1 유저스토리는
+`roadmap/2026-08-28-jira-parity-requirements.md`에 정본화되어 있다. 아래 목록과 함께 읽는다.
+제품 포지셔닝은 **온프렘 지라 대체 + 클라우드 좋은 기능 흡수**(2026-08-28 확정, 그 문서 §0).
+
+**R1 진행**: S1 스프린트 목표·기간 **완료**, S2 계획 합계 표시 **완료**(둘 다 2026-08-28) →
+다음은 S3 완료 시 이관 선택, S4·S5 리포트(차트 수단 결정 필요, 그 문서 §10-2), S6 상태 이력 서버 보존.
 
 1. **프로젝트 설정 스킴·사용자 디렉터리 후 store 전환** — 워크플로 상태와 카테고리를 서버가
    소유하게 하고(그래야 `completeSprint`가 완료 판정을 프론트에서 받지 않는다), 템플릿이 만드는

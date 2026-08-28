@@ -253,6 +253,35 @@ export async function createSprint(projectId: string): Promise<Sprint> {
   return mapSprint(await json(response));
 }
 
+async function sprintDto(id: string): Promise<SprintDto> {
+  return json(await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}`));
+}
+
+/**
+ * 계획 메타 수정. 서버는 전체 본문을 받으므로 최신 값을 먼저 읽어 건드리지 않은 필드를
+ * 그대로 되돌려 보내고, 그때 읽은 version을 expectedVersion으로 쓴다(이슈 수정과 같은 규칙).
+ */
+export async function updateSprint(
+  id: string,
+  patch: { name?: string; goal?: string | null; plannedStart?: string | null; plannedEnd?: string | null },
+): Promise<Sprint> {
+  const current = await sprintDto(id);
+  const pick = (next: string | null | undefined, currentValue?: string | null) =>
+    next === undefined ? (currentValue ?? null) : next === null || next.trim() === "" ? null : next.trim();
+  const response = await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: patch.name === undefined ? current.name : patch.name.trim(),
+      goal: pick(patch.goal, current.goal),
+      plannedStart: pick(patch.plannedStart, current.plannedStart),
+      plannedEnd: pick(patch.plannedEnd, current.plannedEnd),
+      expectedVersion: current.version,
+    }),
+  });
+  return mapSprint(await json(response));
+}
+
 export async function startSprint(id: string): Promise<Sprint> {
   const response = await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}/start`, {
     method: "POST",

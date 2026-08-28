@@ -4,6 +4,9 @@
 현재 화면은 전부 `src/features/alm/store/jiraStore.ts`(localStorage 목업)만 호출하므로,
 백엔드가 생기면 이 파일 내부를 fetch로 교체하는 것이 시작점이다.
 
+관련: `roadmap/2026-08-28-jira-parity-requirements.md` — 아래 1~6번 항목은 그 문서에서
+지라 갭 인벤토리의 Should/Could 항목으로 편성돼 있다.
+
 ## 1. 첨부파일 (요구사항 명세 "추가 아이디어")
 
 - 필요한 것: 파일 스토리지(S3/MinIO 등) + 업로드 API(멀티파트), 다운로드 서명 URL

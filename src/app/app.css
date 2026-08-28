@@ -1854,6 +1854,37 @@ body {
   margin-left: auto;
 }
 
+/* 계획 기간 — 이름 옆 보조 정보로 읽히도록 subtle */
+.sprint-panel-period {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 계획 합계(예상 h·미입력) — 기간과 같은 보조 정보 레벨 */
+.sprint-panel-estimate {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 스프린트 목표 — 머리글 아래 한 줄, 패널 폭 전체 */
+.sprint-panel-goal {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-default);
+}
+
+.sprint-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.sprint-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--chanho-space-150);
+}
+
 .sprint-panel-issues {
   display: flex;
   flex-direction: column;
