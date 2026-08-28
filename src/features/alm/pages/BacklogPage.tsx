@@ -35,7 +35,9 @@ import {
   SprintPanel,
 } from "../components/SprintPanel";
 import { SprintEditModal } from "../components/SprintEditModal";
+import { SprintCompleteModal } from "../components/SprintCompleteModal";
 import type { MoveTarget } from "../components/SprintPanel";
+import { statusCategory } from "../components/labels";
 import { BACKLOG_PANEL, resolveBacklogMove } from "./backlogDnd";
 
 export function BacklogPage() {
@@ -48,6 +50,7 @@ export function BacklogPage() {
   const [newTitle, setNewTitle] = useState("");
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
+  const [completingSprint, setCompletingSprint] = useState<Sprint | null>(null);
   const toast = useToast();
 
   // 행 클릭(상세)과 드래그 구분: 5px 이상 움직여야 드래그 시작
@@ -181,6 +184,30 @@ export function BacklogPage() {
           스프린트 만들기
         </Button>
       </div>
+      <SprintCompleteModal
+        sprint={completingSprint}
+        unfinished={
+          completingSprint
+            ? issues.filter(
+                (issue) =>
+                  issue.sprintId === completingSprint.id &&
+                  statusCategory(statuses, issue.status) !== "done",
+              )
+            : []
+        }
+        // 이관 후보: 같은 프로젝트에서 완료되지 않은 다른 스프린트
+        targets={sprints.filter(
+          (sprint) => sprint.id !== completingSprint?.id && sprint.state !== "done",
+        )}
+        statuses={statuses}
+        onClose={() => setCompletingSprint(null)}
+        onConfirm={(sprint, moveUnfinishedTo) => {
+          setCompletingSprint(null);
+          void run("스프린트 완료 실패", "스프린트를 완료했습니다", () =>
+            completeSprint(sprint.id, { moveUnfinishedTo }),
+          );
+        }}
+      />
       <SprintEditModal
         sprint={editingSprint}
         onClose={() => setEditingSprint(null)}
@@ -214,9 +241,7 @@ export function BacklogPage() {
             statuses={statuses}
             moveTargets={moveTargets}
             onStart={(s) => void run("스프린트 시작 실패", "스프린트를 시작했습니다", () => startSprint(s.id))}
-            onComplete={(s) =>
-              void run("스프린트 완료 실패", "스프린트를 완료했습니다", () => completeSprint(s.id))
-            }
+            onComplete={setCompletingSprint}
             onEditPlan={setEditingSprint}
             onMove={handleMove}
             onDelete={handleDelete}

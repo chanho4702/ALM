@@ -293,11 +293,21 @@ export async function startSprint(id: string): Promise<Sprint> {
  * 무엇을 완료로 볼지는 워크플로 스킴을 가진 프론트가 알려준다 — 서버는 아직 상태 카테고리를
  * 모른다. doneStatuses에 없는 이슈는 백로그로 돌아간다.
  */
-export async function completeSprint(id: string, doneStatuses: string[]): Promise<Sprint> {
+export async function completeSprint(
+  id: string,
+  doneStatuses: string[],
+  options: { moveUnfinishedTo?: string | null } = {},
+): Promise<Sprint> {
+  const target = options.moveUnfinishedTo ?? null;
   const response = await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ doneStatuses }),
+    // 대상이 없으면 필드를 빼서 서버 기본값(백로그)에 맡긴다.
+    body: JSON.stringify(
+      target === null
+        ? { doneStatuses }
+        : { doneStatuses, moveUnfinishedToSprintId: toBackendId(target) },
+    ),
   });
   return mapSprint(await json(response));
 }

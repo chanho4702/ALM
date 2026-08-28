@@ -141,24 +141,51 @@ describe("BacklogPage", () => {
     expect(await screen.findByText("이미 진행 중인 스프린트가 있습니다")).toBeInTheDocument();
   });
 
-  it("스프린트 완료: 미완료 이슈는 백로그로 돌아오고 done 이슈는 스프린트에 남는다", async () => {
+  it("스프린트 완료: 확인 모달에서 백로그를 고르면 미완료 이슈가 백로그로 돌아온다", async () => {
     const user = userEvent.setup();
     renderBacklog();
 
     const sprint = await screen.findByRole("region", { name: "Sprint 1" });
     await user.click(within(sprint).getByRole("button", { name: "스프린트 완료" }));
 
+    // 모달이 미완료 4건을 먼저 보여준다 (침묵 처리 금지)
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("미완료 이슈 4건");
+    await user.click(within(dialog).getByRole("button", { name: "완료 처리" }));
+
     // done 스프린트 패널은 렌더하지 않는다
     await waitFor(() => {
       expect(screen.queryByRole("region", { name: "Sprint 1" })).not.toBeInTheDocument();
     });
-    // 미완료(todo/inprogress) 이슈 4개가 백로그로 복귀
     const backlog = screen.getByRole("region", { name: "백로그 목록" });
     for (const key of ["ALM-2", "ALM-3", "ALM-4", "ALM-5"]) {
       expect(within(backlog).getByText(key)).toBeInTheDocument();
     }
     // ALM-1(done)은 완료된 스프린트에 남아 화면에서 사라진다
     expect(screen.queryByText("ALM-1")).not.toBeInTheDocument();
+  });
+
+  it("스프린트 완료: 다음 스프린트를 고르면 미완료 이슈가 그 스프린트로 넘어간다", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    // 이관 대상이 되도록 계획 스프린트를 하나 만든다
+    await user.click(await screen.findByRole("button", { name: "스프린트 만들기" }));
+    await screen.findByRole("region", { name: "Sprint 2" });
+
+    const sprint = screen.getByRole("region", { name: "Sprint 1" });
+    await user.click(within(sprint).getByRole("button", { name: "스프린트 완료" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("radio", { name: "Sprint 2" }));
+    await user.click(within(dialog).getByRole("button", { name: "완료 처리" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("region", { name: "Sprint 1" })).not.toBeInTheDocument();
+    });
+    const next = screen.getByRole("region", { name: "Sprint 2" });
+    for (const key of ["ALM-2", "ALM-3", "ALM-4", "ALM-5"]) {
+      expect(within(next).getByText(key)).toBeInTheDocument();
+    }
   });
 
   it("Dropdown 액션: 스프린트로 이동과 삭제(확인 없이 Toast)", async () => {

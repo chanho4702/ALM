@@ -322,6 +322,30 @@ describe("jiraApi sprints", () => {
     });
   });
 
+  it("완료 요청은 이관 대상 스프린트를 서버 id로 보낸다", async () => {
+    const spy = vi
+      .spyOn(client, "sharedApiFetch")
+      .mockResolvedValueOnce(response(200, { ...SPRINT, state: "DONE" as const }));
+
+    await completeSprint("12", ["done"], { moveUnfinishedTo: "13" });
+
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/sprints/12/complete");
+    expect(JSON.parse(String(spy.mock.calls[0][1]?.body))).toEqual({
+      doneStatuses: ["done"],
+      moveUnfinishedToSprintId: 13,
+    });
+  });
+
+  it("이관 대상이 없으면 필드를 보내지 않는다 (서버 기본값 = 백로그)", async () => {
+    const spy = vi
+      .spyOn(client, "sharedApiFetch")
+      .mockResolvedValueOnce(response(200, { ...SPRINT, state: "DONE" as const }));
+
+    await completeSprint("12", ["done"]);
+
+    expect(JSON.parse(String(spy.mock.calls[0][1]?.body))).toEqual({ doneStatuses: ["done"] });
+  });
+
   it("서버 오류 메시지를 그대로 올린다", async () => {
     vi.spyOn(client, "sharedApiFetch")
       .mockResolvedValueOnce(response(200, SPRINT))

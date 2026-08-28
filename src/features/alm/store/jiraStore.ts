@@ -491,15 +491,32 @@ export async function startSprint(id: string): Promise<Sprint> {
   return clone(sprint);
 }
 
-export async function completeSprint(id: string): Promise<Sprint> {
+/**
+ * 스프린트 완료. 미완료 이슈는 `moveUnfinishedTo`가 가리키는 스프린트로, 지정이 없으면
+ * 백로그로 옮긴다(지라와 같은 선택지). 대상 검증이 실패하면 완료 자체가 일어나지 않는다.
+ */
+export async function completeSprint(
+  id: string,
+  options: { moveUnfinishedTo?: string | null } = {},
+): Promise<Sprint> {
   const data = load();
   const sprint = data.sprints.find((s) => s.id === id);
   if (!sprint) throw new Error("스프린트를 찾을 수 없습니다");
   if (sprint.state !== "active") throw new Error("진행 중인 스프린트만 완료할 수 있습니다");
+
+  const targetId = options.moveUnfinishedTo ?? null;
+  if (targetId !== null) {
+    if (targetId === id) throw new Error("완료하는 스프린트로는 이관할 수 없습니다");
+    const target = data.sprints.find((s) => s.id === targetId);
+    if (!target) throw new Error("스프린트를 찾을 수 없습니다");
+    if (target.projectId !== sprint.projectId) throw new Error("다른 프로젝트의 스프린트입니다");
+    if (target.state === "done") throw new Error("완료된 스프린트로는 이관할 수 없습니다");
+  }
+
   const now = new Date().toISOString();
   for (const issue of data.issues) {
     if (issue.sprintId === id && statusCategoryOf(data, issue.projectId, issue.status) !== "done") {
-      issue.sprintId = null; // 미완료 이슈는 백로그로
+      issue.sprintId = targetId; // null = 백로그
       issue.updatedAt = now;
     }
   }

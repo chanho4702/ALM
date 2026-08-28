@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   __resetForTest,
+  completeSprint,
+  createIssue,
   createProject,
   createSprint,
+  listIssues,
   listSprints,
   startSprint,
   updateSprint,
@@ -78,6 +81,84 @@ describe("스프린트 계획 메타", () => {
   it("없는 스프린트는 거부한다", async () => {
     await expect(updateSprint("없는-id", { goal: "x" })).rejects.toThrow(
       "스프린트를 찾을 수 없습니다",
+    );
+  });
+});
+
+describe("스프린트 완료 시 미완료 이슈 이관", () => {
+  async function activeSprintWithIssues() {
+    const project = await createProject({ key: "MOV", name: "이관 검증" });
+    const current = await createSprint(project.id);
+    await startSprint(current.id);
+    const next = await createSprint(project.id);
+    const done = await createIssue({
+      projectId: project.id,
+      title: "끝난 것",
+      sprintId: current.id,
+      status: "done",
+    });
+    const left = await createIssue({
+      projectId: project.id,
+      title: "남은 것",
+      sprintId: current.id,
+      status: "inprogress",
+    });
+    return { project, current, next, done, left };
+  }
+
+  it("대상을 지정하면 미완료 이슈가 그 스프린트로 넘어간다", async () => {
+    const { project, current, next, done, left } = await activeSprintWithIssues();
+
+    await completeSprint(current.id, { moveUnfinishedTo: next.id });
+
+    const issues = await listIssues(project.id);
+    expect(issues.find((i) => i.id === left.id)?.sprintId).toBe(next.id);
+    expect(issues.find((i) => i.id === done.id)?.sprintId).toBe(current.id);
+  });
+
+  it("대상을 생략하면 백로그로 되돌린다", async () => {
+    const { project, current, left } = await activeSprintWithIssues();
+
+    await completeSprint(current.id);
+
+    const issues = await listIssues(project.id);
+    expect(issues.find((i) => i.id === left.id)?.sprintId).toBeNull();
+  });
+
+  it("완료하는 스프린트 자신으로는 옮길 수 없다", async () => {
+    const { current } = await activeSprintWithIssues();
+
+    await expect(completeSprint(current.id, { moveUnfinishedTo: current.id })).rejects.toThrow(
+      "완료하는 스프린트로는 이관할 수 없습니다",
+    );
+    expect((await listSprints(current.projectId)).find((s) => s.id === current.id)?.state).toBe(
+      "active",
+    );
+  });
+
+  it("이미 끝난 스프린트로는 옮길 수 없다", async () => {
+    const { project, current, next } = await activeSprintWithIssues();
+    await completeSprint(current.id); // current가 done이 된다
+    await startSprint(next.id);
+    await createIssue({
+      projectId: project.id,
+      title: "다음 스프린트의 남은 것",
+      sprintId: next.id,
+      status: "todo",
+    });
+
+    await expect(completeSprint(next.id, { moveUnfinishedTo: current.id })).rejects.toThrow(
+      "완료된 스프린트로는 이관할 수 없습니다",
+    );
+  });
+
+  it("다른 프로젝트의 스프린트로는 옮길 수 없다", async () => {
+    const { current } = await activeSprintWithIssues();
+    const other = await createProject({ key: "OTH", name: "다른 제품" });
+    const otherSprint = await createSprint(other.id);
+
+    await expect(completeSprint(current.id, { moveUnfinishedTo: otherSprint.id })).rejects.toThrow(
+      "다른 프로젝트의 스프린트입니다",
     );
   });
 });
