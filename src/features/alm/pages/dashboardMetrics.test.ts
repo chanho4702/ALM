@@ -99,6 +99,17 @@ describe("dueRows", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("상한을 주지 않으면 위험한 이슈를 전부 돌려준다 (배지 카운트가 잘리지 않는다)", () => {
+    const many = ["1", "2", "3", "4", "5", "6", "7"].map((id) =>
+      issue({ id, dueDate: id <= "3" ? "2026-08-20" : "2026-08-30" }),
+    );
+
+    const rows = dueRows(many, STATUSES, today);
+
+    expect(rows).toHaveLength(7);
+    expect(rows.filter((r) => r.overdue)).toHaveLength(3);
+  });
+
   it("건수 상한을 지킨다", () => {
     const many = ["1", "2", "3", "4", "5", "6"].map((id) =>
       issue({ id, dueDate: "2026-08-29" }),

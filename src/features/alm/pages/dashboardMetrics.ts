@@ -36,6 +36,9 @@ function dayDiff(from: string, to: string): number {
 /**
  * 마감 위험 목록 — 지난 마감이 먼저, 그다음 임박한 순.
  * 완료된 이슈와 창(window) 밖 마감은 제외한다.
+ *
+ * 기본으로 자르지 않는다 — 화면 배지가 "지연 N건"을 세는 원천이라 상한을 걸면 수치가 거짓이 된다.
+ * 목록 표시용 상한은 호출자가 slice로 정한다.
  */
 export function dueRows(
   issues: Issue[],
@@ -43,7 +46,7 @@ export function dueRows(
   today: string,
   options: { windowDays?: number; limit?: number } = {},
 ): DueRow[] {
-  const { windowDays = 7, limit = 5 } = options;
+  const { windowDays = 7, limit } = options;
   return issues
     .filter((issue) => issue.dueDate && statusCategory(statuses, issue.status) !== "done")
     .map((issue) => {
@@ -52,7 +55,7 @@ export function dueRows(
     })
     .filter((row) => row.daysLeft <= windowDays)
     .sort((a, b) => a.daysLeft - b.daysLeft || a.issue.key.localeCompare(b.issue.key))
-    .slice(0, limit);
+    .slice(0, limit ?? undefined);
 }
 
 export interface CountRow {

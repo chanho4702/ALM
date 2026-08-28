@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { Card, EmptyState, Lozenge, ProgressBar, Spinner } from "@chanho/react";
 import type { Issue, IssueStatus, Sprint, User, WorkflowStatus } from "../store/types";
@@ -61,14 +61,19 @@ export function DashboardPage() {
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
 
+  // 프로젝트를 바꾸는 중에 먼저 시작한 조회가 늦게 끝나면 이전 프로젝트 데이터로 화면을 덮는다.
+  // 세대 번호로 마지막 요청만 반영한다(모달 저장 후 재조회도 같은 경로를 쓴다).
+  const generation = useRef(0);
   const reload = useCallback(async () => {
     if (!projectId) return;
+    const mine = ++generation.current;
     const [issueList, userList, statusList, sprintList] = await Promise.all([
       listIssues(projectId),
       listUsers(),
       listProjectStatuses(projectId),
       listSprints(projectId),
     ]);
+    if (mine !== generation.current) return;
     setIssues(issueList);
     setUsers(userList);
     setStatuses(statusList);
@@ -76,6 +81,7 @@ export function DashboardPage() {
   }, [projectId]);
 
   useEffect(() => {
+    setIssues(null); // 프로젝트가 바뀌면 이전 데이터를 보여주지 않고 로딩으로 되돌린다
     void reload();
   }, [reload]);
 
@@ -216,7 +222,7 @@ export function DashboardPage() {
 
           <Card padding="md" title="마감 임박·지연" role="region" aria-label="마감 임박·지연">
             <IssueMiniList
-              rows={risky.map<IssueMiniRow>((row) => ({
+              rows={risky.slice(0, 5).map<IssueMiniRow>((row) => ({
                 issue: row.issue,
                 meta: (
                   <Lozenge appearance={row.overdue ? "danger" : "warning"}>

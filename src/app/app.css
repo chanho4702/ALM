@@ -2257,10 +2257,10 @@ body {
 
 /* ── 요약(대시보드) 카드 ────────────────────────────────── */
 
-/* 2열 → 컨테이너 900px 미만에서 1열 */
+/* 두 열이 들어갈 폭(약 740px)부터 2열, 그 아래는 1열. min()으로 좁은 폭에서도 넘치지 않는다 */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
   gap: var(--chanho-space-200);
   align-items: start;
 }

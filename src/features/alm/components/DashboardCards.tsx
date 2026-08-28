@@ -83,12 +83,11 @@ export function IssueMiniList({
     <ul className="dash-issues">
       {rows.map(({ issue, meta }) => (
         <li key={issue.id}>
-          <button
-            type="button"
-            className="dash-issue-row"
-            onClick={() => onOpen(issue.key)}
-            aria-label={`${issue.key} ${issue.title}`}
-          >
+          {/*
+            aria-label을 주지 않는다 — 명시하면 자손 텍스트를 대체해 상태 Lozenge와 마감
+            정보(지연·상대시간)가 낭독에서 빠진다. 버튼 이름은 자손 텍스트로 조립된다.
+          */}
+          <button type="button" className="dash-issue-row" onClick={() => onOpen(issue.key)}>
             <span className="dash-issue-key">{issue.key}</span>
             <span className="dash-issue-title">{issue.title}</span>
             <Lozenge appearance={statusAppearance(statuses, issue.status)}>
