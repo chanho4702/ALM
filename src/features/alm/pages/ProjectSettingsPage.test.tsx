@@ -133,3 +133,30 @@ describe("프로젝트 사용자·권한", () => {
     });
   });
 });
+
+describe("워크플로 전이 편집", () => {
+  it("커스텀 전환 후 전이를 추가·삭제하고 저장하면 규칙이 적용된다", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.click(await screen.findByRole("tab", { name: "워크플로" }));
+    await user.click(await screen.findByRole("switch", { name: "이 프로젝트만 커스텀" }));
+
+    // 기본 상태는 전이가 없다 — 자유 이동
+    const list = await screen.findByRole("list", { name: "전이 목록" });
+    expect(within(list).getByText(/전이를 정하지 않으면/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "출발 상태" }));
+    await user.click(await screen.findByRole("option", { name: "할 일" }));
+    await user.click(screen.getByRole("combobox", { name: "도착 상태" }));
+    await user.click(await screen.findByRole("option", { name: "진행 중" }));
+    await user.click(screen.getByRole("button", { name: "전이 추가" }));
+
+    await waitFor(() => {
+      expect(within(list).queryByText(/전이를 정하지 않으면/)).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("워크플로를 저장했습니다")).toBeInTheDocument();
+  });
+});

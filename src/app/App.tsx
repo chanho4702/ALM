@@ -11,7 +11,6 @@ import { BacklogPage } from "../features/alm/pages/BacklogPage";
 import { IssueListPage } from "../features/alm/pages/IssueListPage";
 import { ProjectListPage } from "../features/alm/pages/ProjectListPage";
 import { ProjectCreatePage } from "../features/alm/pages/ProjectCreatePage";
-import { ProjectSettingsPage } from "../features/alm/pages/ProjectSettingsPage";
 import { DashboardPage } from "../features/alm/pages/DashboardPage";
 import { HomePage } from "../features/alm/pages/HomePage";
 import { SearchPage } from "../features/alm/pages/SearchPage";
@@ -20,6 +19,13 @@ import { GlobalSettingsPage } from "../features/alm/pages/GlobalSettingsPage";
 /**
  * 리포트만 차트 라이브러리(recharts)를 쓴다 — 첫 화면 번들에 넣지 않고 라우트 단위로 쪼갠다.
  */
+/** 프로젝트 설정은 워크플로 캔버스(@xyflow/react)를 쓴다 — 설정에 들어온 사람만 내려받는다 */
+const ProjectSettingsPage = lazy(() =>
+  import("../features/alm/pages/ProjectSettingsPage").then((module) => ({
+    default: module.ProjectSettingsPage,
+  })),
+);
+
 /** 타임라인도 차트 라이브러리(frappe-gantt)를 쓴다 — 방문자만 내려받게 라우트를 쪼갠다 */
 const TimelinePage = lazy(() =>
   import("../features/alm/pages/TimelinePage").then((module) => ({ default: module.TimelinePage })),
@@ -98,7 +104,20 @@ export function App() {
           <Route path="boards/:boardId" element={<BoardPage />} />
           <Route path="backlog" element={<BacklogPage />} />
           <Route path="issues" element={<IssueListPage />} />
-          <Route path="settings" element={<ProjectSettingsPage />} />
+          <Route
+            path="settings"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="설정 불러오는 중" />
+                  </div>
+                }
+              >
+                <ProjectSettingsPage />
+              </Suspense>
+            }
+          />
         </Route>
         {/* "/" 포함 그 외 전부 → 홈 */}
         <Route path="*" element={<Navigate to="/home" replace />} />

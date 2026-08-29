@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Badge, Button, Card, Checkbox, Lozenge, Modal, PageHeader, TextField, useToast } from "@chanho/react";
-import type { IssueType, SettingsScheme, WorkflowStatus } from "../store/types";
+import type { IssueType, SettingsScheme, WorkflowStatus, WorkflowTransition } from "../store/types";
 import {
   createScheme,
   deleteScheme,
@@ -10,6 +10,7 @@ import {
   updateScheme,
 } from "../store/jiraStore";
 import { StatusEditor } from "../components/StatusEditor";
+import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
 
 type Aspect = "workflow" | "types";
@@ -28,6 +29,7 @@ export function GlobalSettingsPage() {
   const [editTypes, setEditTypes] = useState<IssueType[]>([]);
   const [editingWf, setEditingWf] = useState<SettingsScheme | null>(null);
   const [editStatuses, setEditStatuses] = useState<WorkflowStatus[]>([]);
+  const [editTransitions, setEditTransitions] = useState<WorkflowTransition[]>([]);
 
   const reload = useCallback(async () => {
     const list = await listSchemes();
@@ -83,13 +85,16 @@ export function GlobalSettingsPage() {
   const openStatusEditor = (scheme: SettingsScheme) => {
     setEditingWf(scheme);
     setEditStatuses([...scheme.body.statuses].sort((a, b) => a.order - b.order));
+    setEditTransitions(scheme.body.transitions ?? []);
   };
 
   const handleStatusesSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editingWf) return;
     await run("저장 실패", async () => {
-      await updateScheme(editingWf.id, { body: { ...editingWf.body, statuses: editStatuses } });
+      await updateScheme(editingWf.id, {
+        body: { ...editingWf.body, statuses: editStatuses, transitions: editTransitions },
+      });
       toast({ title: "워크플로 상태를 저장했습니다", appearance: "success" });
       setEditingWf(null);
     });
@@ -192,9 +197,10 @@ export function GlobalSettingsPage() {
                         <Button
                           size="small"
                           variant="secondary"
+                          aria-label={`${scheme.name} 워크플로 편집`}
                           onClick={() => openStatusEditor(scheme)}
                         >
-                          상태 편집
+                          워크플로 편집
                         </Button>
                         {!scheme.isDefault ? (
                           <>
@@ -271,6 +277,13 @@ export function GlobalSettingsPage() {
         >
           <form className="project-create-form" onSubmit={handleStatusesSave}>
             <StatusEditor value={editStatuses} onChange={setEditStatuses} />
+            {/* 스킴 전이도 여기서 고친다 — 스킴을 쓰는 프로젝트는 설정 화면이 읽기 전용이라
+                여기 없으면 전이를 바꾸려고 프로젝트마다 커스텀으로 돌려야 한다 */}
+            <WorkflowCanvas
+              statuses={editStatuses}
+              transitions={editTransitions}
+              onChange={setEditTransitions}
+            />
             <Button type="submit">저장</Button>
           </form>
         </Modal>

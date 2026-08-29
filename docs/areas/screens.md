@@ -20,7 +20,7 @@
 | `/projects/:id/timeline` | TimelinePage | 간트: frappe-gantt(MIT) 막대 + 일/주/월 보기, 차단 링크가 의존선. 좌측 이슈 목록과 일정 표는 우리 DOM(그래픽 없이도 성립). 라우트는 지연 로딩(차트 청크 분리), Gantt 인스턴스는 하나만 만들어 갱신한다(생성자마다 document 리스너가 붙는다) |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
-| `/projects/:id/settings` | ProjectSettingsPage | 일반/사용자·권한/워크플로/이슈 타입 탭, 스킴↔커스텀 전환 |
+| `/projects/:id/settings` | ProjectSettingsPage(lazy) | 일반/사용자·권한/워크플로(전이 캔버스)/이슈 타입 탭. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
 | 그 외 전부 | → `/home` | |
 
 이슈 상세는 페이지가 아니라 **`?issue=ALM-3` 쿼리로 여는 모달**(`useIssueModal` +
@@ -28,7 +28,7 @@
 
 ## 셸 관례
 
-- 전역 사이드바: 최근/별표/프로젝트(보드 중첩)/필터 섹션, 접기(플로팅 엣지 셰브런),
+- 전역 사이드바: 최근/별표/프로젝트(보드 중첩)/필터 섹션. 프로젝트 행은 호버 시 ⋯ 메뉴(설정·이슈 목록), 접기(플로팅 엣지 셰브런),
   드래그 너비 조절(role="separator"). uiStore + `UI_CHANGED_EVENT` 구독으로 갱신.
 - 상단바: 전역 검색(SearchModal), 전역 만들기(CreateIssueModal, subtask 제외),
   알림 벨, 전역 관리(⚙), 다크 모드, 사용자/로그아웃.

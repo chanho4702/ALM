@@ -74,7 +74,7 @@ describe("전역 관리 (/settings)", () => {
     expect(within(list).getByText("할 일")).toBeInTheDocument();
     expect(within(list).getByText("진행 중")).toBeInTheDocument();
 
-    await user.click(within(list).getByRole("button", { name: "상태 편집" }));
+    await user.click(within(list).getByRole("button", { name: "기본 스킴 워크플로 편집" }));
     const dialog = await screen.findByRole("dialog", { name: /워크플로 상태 — 기본 스킴/ });
     await user.type(within(dialog).getByLabelText("새 상태 이름"), "리뷰");
     await user.click(within(dialog).getByRole("button", { name: "상태 추가" }));
@@ -93,13 +93,39 @@ describe("전역 관리 (/settings)", () => {
 
     await user.click(screen.getByRole("button", { name: "워크플로 스킴" }));
     await user.click(
-      within(screen.getByTestId("scheme-list")).getByRole("button", { name: "상태 편집" }),
+      within(screen.getByTestId("scheme-list")).getByRole("button", { name: "기본 스킴 워크플로 편집" }),
     );
     const dialog = await screen.findByRole("dialog", { name: /워크플로 상태 — 기본 스킴/ });
     // 기본 3상태는 각자 카테고리의 유일한 상태 — 전부 삭제 불가
     expect(within(dialog).getByRole("button", { name: "할 일 삭제" })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "진행 중 삭제" })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "완료 삭제" })).toBeDisabled();
+  });
+});
+
+describe("스킴 워크플로 전이", () => {
+  it("스킴 편집 모달에서 전이를 추가해 저장한다 (프로젝트를 커스텀으로 돌리지 않고)", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    await screen.findByRole("heading", { name: "전역 관리" });
+    await user.click(screen.getByRole("button", { name: "워크플로 스킴" }));
+
+    await user.click(await screen.findByRole("button", { name: "기본 스킴 워크플로 편집" }));
+    const dialog = await screen.findByRole("dialog", { name: /워크플로 상태 — 기본 스킴/ });
+
+    await user.click(within(dialog).getByRole("combobox", { name: "출발 상태" }));
+    await user.click(await screen.findByRole("option", { name: "할 일" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "도착 상태" }));
+    await user.click(await screen.findByRole("option", { name: "진행 중" }));
+    await user.click(within(dialog).getByRole("button", { name: "전이 추가" }));
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByText("워크플로 상태를 저장했습니다")).toBeInTheDocument();
+
+    // 다시 열면 저장된 전이가 남아 있다
+    await user.click(screen.getByRole("button", { name: "기본 스킴 워크플로 편집" }));
+    const reopened = await screen.findByRole("list", { name: "전이 목록" });
+    expect(within(reopened).queryByText(/전이를 정하지 않으면/)).not.toBeInTheDocument();
   });
 });
 
@@ -152,7 +178,7 @@ describe("프로젝트 설정 — 스킴/커스텀", () => {
     await user.type(screen.getByLabelText("새 상태 이름"), "코드 리뷰");
     await user.click(screen.getByRole("button", { name: "상태 추가" }));
     await user.click(screen.getByRole("button", { name: "저장" }));
-    expect(await screen.findByText("워크플로 상태를 저장했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("워크플로를 저장했습니다")).toBeInTheDocument();
 
     // 저장 후 재조회된 편집기에 새 상태가 남아 있다
     expect(await screen.findByDisplayValue("코드 리뷰")).toBeInTheDocument();

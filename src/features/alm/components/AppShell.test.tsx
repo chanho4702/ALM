@@ -152,3 +152,19 @@ describe("전역 만들기 타입 선택지", () => {
     expect(screen.queryByRole("option", { name: "하위 작업" })).not.toBeInTheDocument();
   });
 });
+
+describe("사이드바 프로젝트 메뉴", () => {
+  it("프로젝트 행의 ⋯ 메뉴로 설정에 들어간다 (뷰 탭에는 설정이 없다)", async () => {
+    const user = userEvent.setup();
+    renderShell("/projects/p1/board");
+
+    const nav = await screen.findByTestId("nav-projects");
+    await user.click(within(nav).getByRole("button", { name: "ALM 플랫폼 메뉴" }));
+    await user.click(await screen.findByRole("menuitem", { name: "프로젝트 설정" }));
+
+    expect(await screen.findByRole("tab", { name: "일반" })).toBeInTheDocument();
+    // 프로젝트 뷰 탭에서는 설정을 뺐다 — 진입점은 사이드바 메뉴 하나다
+    const viewTabs = screen.getByRole("navigation", { name: "프로젝트 뷰" });
+    expect(within(viewTabs).queryByText("설정")).not.toBeInTheDocument();
+  });
+});

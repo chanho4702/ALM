@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { Dropdown } from "@chanho/react";
 import type { Board, Project } from "../store/types";
 import { listBoards } from "../store/jiraStore";
 import { BoardCreateModal } from "./BoardCreateModal";
@@ -31,7 +32,6 @@ const PROJECT_PAGES = [
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },
   { id: "issues", label: "이슈" },
-  { id: "settings", label: "설정" },
 ];
 
 export interface GlobalSideNavProps {
@@ -144,18 +144,46 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
   const recentProjects = recentIds.map(byId).filter((p): p is Project => Boolean(p));
   const starredProjects = starredIds.map(byId).filter((p): p is Project => Boolean(p));
 
-  /** 프로젝트 행 — 아바타 + 이름 (접힘이면 아바타만) */
+  /**
+   * 프로젝트 행 — 아바타 + 이름, 호버하면 ⋯ 메뉴가 드러난다.
+   * 설정은 프로젝트 뷰 탭이 아니라 이 메뉴로 들어간다(뷰 탭은 "보는 화면"만 남긴다).
+   */
   const projectRow = (project: Project, active: boolean) => (
-    <button
-      type="button"
-      className={itemClass(active)}
-      aria-label={project.name}
-      title={project.name}
-      onClick={() => navigate(`/projects/${project.id}/board`)}
-    >
-      <ProjectAvatar project={project} size="sm" />
-      <span className="global-nav-label global-nav-project-name">{project.name}</span>
-    </button>
+    <span className="global-nav-project-row">
+      <button
+        type="button"
+        className={itemClass(active)}
+        aria-label={project.name}
+        title={project.name}
+        onClick={() => navigate(`/projects/${project.id}/board`)}
+      >
+        <ProjectAvatar project={project} size="sm" />
+        <span className="global-nav-label global-nav-project-name">{project.name}</span>
+      </button>
+      {collapsed ? null : (
+        <Dropdown
+          trigger={
+            <button
+              type="button"
+              className="global-nav-project-menu"
+              aria-label={`${project.name} 메뉴`}
+            >
+              ⋯
+            </button>
+          }
+          items={[
+            {
+              label: "프로젝트 설정",
+              onSelect: () => navigate(`/projects/${project.id}/settings`),
+            },
+            {
+              label: "이슈 목록",
+              onSelect: () => navigate(`/projects/${project.id}/issues`),
+            },
+          ]}
+        />
+      )}
+    </span>
   );
 
   /** 섹션 렌더 — 접힘 상태에서는 섹션을 통째로 숨긴다 (아이콘 레일) */

@@ -66,7 +66,7 @@
 
 ## 품질 상태
 
-- 테스트 **341 케이스 / 34 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **344 케이스 / 34 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 
@@ -87,7 +87,7 @@
 `superpowers/specs/2026-08-28-project-summary-dashboard-design.md`.
 
 **R2 착수**(2026-08-29): 프로젝트 멤버·역할(설정 → 사용자·권한 탭). 역할은 org-service
-GrantRole과 1:1이며, 마지막 관리자 보호와 역할별 쓰기 가드를 스토어가 강제한다. 남은 R2는 워크플로 전이 편집기(React Flow),
+GrantRole과 1:1이며, 마지막 관리자 보호와 역할별 쓰기 가드를 스토어가 강제한다. 남은 R2는
 해결(Resolution), 버전/릴리스, 첨부파일, 대량 변경, 서버 검색, 온프렘 이관 도구.
 
 **R1 완료**(2026-08-29): S1 목표·기간 · S2 계획 합계 · S3 완료 시 이관 선택 · S4 번다운 ·

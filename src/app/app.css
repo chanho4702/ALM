@@ -844,6 +844,41 @@ body {
 }
 
 /* 사이드바 저장 필터 행 — hover 시 삭제 × */
+.global-nav-project-row {
+  position: relative;
+  display: block;
+}
+
+/* 호버·포커스에서만 드러나는 ⋯ — 저장 필터 행의 × 와 같은 패턴 */
+/* 키보드 사용자를 위해 **탭 순서에는 남기고** 시각적으로만 감춘다 —
+   display:none이면 포커스를 받을 수 없어 설정에 들어갈 길이 사라진다(이 메뉴가 유일한 진입점) */
+.global-nav-project-menu {
+  position: absolute;
+  top: 50%;
+  right: var(--chanho-space-50);
+  transform: translateY(-50%);
+  opacity: 0;
+  padding: 0 var(--chanho-space-50);
+  border: none;
+  border-radius: var(--chanho-radius-small);
+  background: transparent;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-100);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.global-nav-project-row:hover .global-nav-project-menu,
+.global-nav-project-menu:focus-visible,
+.global-nav-project-menu[data-state="open"] {
+  opacity: 1;
+}
+
+.global-nav-project-menu:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+  color: var(--chanho-color-text-default);
+}
+
 .global-nav-filter-row {
   display: flex;
   align-items: center;
@@ -2157,6 +2192,79 @@ body {
 .stat-tile-sub {
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtlest, var(--chanho-color-text-subtle));
+}
+
+/* ── 워크플로 전이 편집기(@xyflow/react) ────────────────── */
+
+.workflow-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.workflow-flow {
+  height: 280px;
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-subtle);
+}
+
+/* 노드 색은 상태 카테고리 언어를 따른다 — 라이브러리 기본값을 쓰지 않는다 */
+.workflow-flow .react-flow__node.workflow-node {
+  padding: var(--chanho-space-75) var(--chanho-space-150);
+  border-radius: var(--chanho-radius-medium);
+  border: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-surface);
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-75);
+}
+
+.workflow-flow .react-flow__node.is-inprogress {
+  border-color: var(--chanho-color-background-info);
+}
+
+.workflow-flow .react-flow__node.is-done {
+  border-color: var(--chanho-color-background-success);
+}
+
+.workflow-flow .react-flow__edge-path {
+  stroke: var(--chanho-color-text-subtle);
+}
+
+.workflow-transitions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-transition-row {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  flex-wrap: wrap;
+}
+
+.workflow-transition-from {
+  display: inline-flex;
+  gap: var(--chanho-space-50);
+  flex-wrap: wrap;
+}
+
+.workflow-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-150);
+}
+
+@media (max-width: 640px) {
+  .workflow-add {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
 }
 
 /* ── 타임라인(frappe-gantt) ─────────────────────────────── */

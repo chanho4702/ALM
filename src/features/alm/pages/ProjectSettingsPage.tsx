@@ -15,7 +15,7 @@ import {
   TextField,
   useToast,
 } from "@chanho/react";
-import type { IssueType, SettingsScheme, WorkflowStatus } from "../store/types";
+import type { IssueType, SettingsScheme, WorkflowStatus, WorkflowTransition } from "../store/types";
 import type { ResolvedSettings } from "../store/jiraStore";
 import {
   assignScheme,
@@ -30,6 +30,7 @@ import {
 import { pruneProject } from "../store/uiStore";
 import type { JiraOutletContext } from "../components/ProjectLayout";
 import { StatusEditor } from "../components/StatusEditor";
+import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
 import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
 
@@ -49,6 +50,7 @@ export function ProjectSettingsPage() {
   const [schemes, setSchemes] = useState<SettingsScheme[]>([]);
   const [typesDraft, setTypesDraft] = useState<IssueType[]>([]);
   const [statusesDraft, setStatusesDraft] = useState<WorkflowStatus[]>([]);
+  const [transitionsDraft, setTransitionsDraft] = useState<WorkflowTransition[]>([]);
 
   const currentProjectId = project?.id;
 
@@ -62,6 +64,7 @@ export function ProjectSettingsPage() {
     setSchemes(schemeList);
     setTypesDraft([...resolvedSettings.body.enabledTypes]);
     setStatusesDraft([...resolvedSettings.body.statuses].sort((a, b) => a.order - b.order));
+    setTransitionsDraft(resolvedSettings.body.transitions ?? []);
   }, [currentProjectId]);
 
   useEffect(() => {
@@ -235,12 +238,18 @@ export function ProjectSettingsPage() {
                           await updateProjectCustomSettings(project.id, {
                             ...resolved.body,
                             statuses: statusesDraft,
+                            transitions: transitionsDraft,
                           });
-                          toast({ title: "워크플로 상태를 저장했습니다", appearance: "success" });
+                          toast({ title: "워크플로를 저장했습니다", appearance: "success" });
                         });
                       }}
                     >
                       <StatusEditor value={statusesDraft} onChange={setStatusesDraft} />
+                      <WorkflowCanvas
+                        statuses={statusesDraft}
+                        transitions={transitionsDraft}
+                        onChange={setTransitionsDraft}
+                      />
                       <Button type="submit" size="small">
                         저장
                       </Button>
@@ -256,6 +265,11 @@ export function ProjectSettingsPage() {
                             </Lozenge>
                           ))}
                       </div>
+                      <WorkflowCanvas
+                        statuses={resolved.body.statuses}
+                        transitions={resolved.body.transitions ?? []}
+                        readOnly
+                      />
                       <p className="admin-scheme-note">
                         스킴 자체 편집은 전역 관리(⚙), 이 프로젝트만 바꾸려면 커스텀으로
                         전환하세요.
