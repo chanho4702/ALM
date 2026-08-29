@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Bell, Settings } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Avatar, Badge, Button, TopBar } from "@chanho/react";
 import type { Issue, Notification, Project, User } from "../store/types";
@@ -99,24 +100,26 @@ export function AppShell({ projects }: AppShellProps) {
             <Button
               size="small"
               variant="ghost"
-              className="notification-bell"
+              className="notification-bell topbar-icon"
               aria-label={unreadCount > 0 ? `알림 ${unreadCount}개 미읽음` : "알림"}
               onClick={() => {
                 reloadNotifications(); // 열기 전 최신화
                 setNotificationsOpen(true);
               }}
             >
-              🔔
+              <Bell size={18} />
               {unreadCount > 0 ? <Badge appearance="danger">{unreadCount}</Badge> : null}
             </Button>
             <Button
               size="small"
               variant="ghost"
+              iconOnly
+              className="topbar-icon"
               aria-label="전역 관리"
               title="전역 관리"
               onClick={() => navigate("/settings")}
             >
-              ⚙
+              <Settings size={18} />
             </Button>
             <ThemeToggle />
             {authUser ? (

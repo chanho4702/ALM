@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -81,7 +82,7 @@ export function BacklogIssueRow({
         <Dropdown
           trigger={
             <Button variant="subtle" size="small" aria-label={`${issue.key} 액션`}>
-              ⋯
+              <MoreHorizontal size={16} />
             </Button>
           }
           items={[

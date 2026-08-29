@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import {
@@ -341,7 +342,7 @@ export function BoardPage() {
           <Dropdown
             trigger={
               <Button variant="ghost" size="small" aria-label="보드 메뉴">
-                ⋯
+                <MoreHorizontal size={16} />
               </Button>
             }
             items={[{ label: "보드 설정", onSelect: () => setSettingsOpen(true) }]}

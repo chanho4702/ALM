@@ -124,7 +124,10 @@ export function TimelinePage() {
     if (!container || tasks.length === 0) return;
     // 라이브러리는 생성 뒤 타이머에서도 SVG 계측(getBBox)을 부른다 — 그 호출은 아래 try 밖이라
     // 잡히지 않고 미처리 오류가 된다. 계측이 없는 환경(jsdom)은 그리기 전에 대체본으로 보낸다.
-    if (typeof SVGElement === "undefined" || !("getBBox" in SVGElement.prototype)) {
+    if (
+      typeof SVGGraphicsElement === "undefined" ||
+      !("getBBox" in SVGGraphicsElement.prototype)
+    ) {
       setChartFailed(true);
       return;
     }
@@ -134,6 +137,14 @@ export function TimelinePage() {
           view_mode: viewMode,
           readonly: true,
           popup: false,
+          // 범위를 실제 이슈 기간에 맞춘다 — 무한 여백이면 한 달 전 빈 격자가 첫 화면을 차지한다
+          infinite_padding: false,
+          scroll_to: "start",
+          // 라이브러리의 영어 Today 버튼·뷰 선택은 우리 라디오가 대신한다
+          today_button: false,
+          view_mode_select: false,
+          bar_height: 24,
+          padding: 12,
           on_click: (task) => {
             const issue = rowsRef.current.find((row) => row.issue.id === task.id)?.issue;
             if (issue) openIssue(issue.key);

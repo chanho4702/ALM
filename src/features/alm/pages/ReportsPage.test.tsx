@@ -43,11 +43,12 @@ describe("ReportsPage", () => {
     // 시드: 5일 전 시작, 이슈 5건 중 1건이 1일 전 완료 → 이슈 수 기준 5 → 4
     expect(within(burndown).getByText(/예상 미입력 4건/)).toBeInTheDocument();
 
-    // 기본 단위는 예상 시간이고 시드는 ALM-2의 8h만 입력돼 있다 — 그래서 경고가 필요하다
+    // 시드는 ALM-2의 8h만 입력돼 있어 미입력 4건 — 그러면 이슈 수 기준이 기본이다(시간 기준은 빈 이슈를 0으로 센다)
     const table = within(burndown).getByRole("table", { name: "번다운 값" });
     const rows = within(table).getAllByRole("row").slice(1); // 머리글 제외
     expect(rows.length).toBeGreaterThanOrEqual(6);
-    expect(rows[0]).toHaveTextContent("8h");
+    expect(rows[0]).toHaveTextContent("5건");
+    expect(within(burndown).getByRole("radio", { name: "이슈 수" })).toBeChecked();
   });
 
   it("단위를 이슈 수로 바꾸면 잔여가 건수로 계산된다", async () => {

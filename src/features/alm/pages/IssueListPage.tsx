@@ -157,7 +157,7 @@ export function IssueListPage() {
     {
       key: "labels",
       header: "라벨",
-      width: "160px",
+      width: "130px",
       render: (issue) =>
         issue.labels.length > 0 ? (
           <span className="issue-card-labels">
@@ -171,7 +171,7 @@ export function IssueListPage() {
       key: "status",
       header: "상태",
       sortable: true,
-      width: "104px",
+      width: "96px",
       render: (issue) => (
         <Lozenge appearance={statusAppearance(statuses, issue.status)}>
           {statusName(statuses, issue.status)}
@@ -182,7 +182,7 @@ export function IssueListPage() {
       key: "priority",
       header: "우선순위",
       sortable: true,
-      width: "104px",
+      width: "96px",
       render: (issue) => (
         <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
           {PRIORITY_LABELS[issue.priority]}
@@ -193,7 +193,7 @@ export function IssueListPage() {
       key: "assignee",
       header: "담당자",
       sortable: true,
-      width: "160px",
+      width: "140px",
       render: (issue) =>
         issue.assigneeId ? (
           <span className="issue-assignee-cell">
@@ -208,7 +208,7 @@ export function IssueListPage() {
       key: "dueDate",
       header: "마감일",
       sortable: true,
-      width: "112px",
+      width: "96px",
       align: "right",
       render: (issue) =>
         issue.dueDate ? (
@@ -223,7 +223,7 @@ export function IssueListPage() {
       key: "createdAt",
       header: "생성일",
       sortable: true,
-      width: "112px",
+      width: "96px",
       align: "right",
       render: (issue) => new Date(issue.createdAt).toLocaleDateString("ko-KR"),
     },
@@ -231,7 +231,7 @@ export function IssueListPage() {
       key: "updatedAt",
       header: "수정일",
       sortable: true,
-      width: "112px",
+      width: "96px",
       align: "right",
       render: (issue) => new Date(issue.updatedAt).toLocaleDateString("ko-KR"),
     },
@@ -303,16 +303,18 @@ export function IssueListPage() {
             description="검색어나 필터를 조정해 보세요."
           />
         ) : (
-          <Table
-            aria-label="이슈 목록"
-            columns={columns}
-            rows={sortedIssues}
-            sortKey={sortKey}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onRowClick={(issue) => openIssue(issue.key)}
-            selectedId={selectedId}
-          />
+          <div className="issue-table-scroll">
+            <Table
+              aria-label="이슈 목록"
+              columns={columns}
+              rows={sortedIssues}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              onRowClick={(issue) => openIssue(issue.key)}
+              selectedId={selectedId}
+            />
+          </div>
         )}
       </section>
       {issueModal}

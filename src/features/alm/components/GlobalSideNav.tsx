@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Filter, FolderKanban, Home, MoreHorizontal, Search } from "lucide-react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Dropdown } from "@chanho/react";
@@ -168,7 +169,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
               className="global-nav-project-menu"
               aria-label={`${project.name} 메뉴`}
             >
-              ⋯
+              <MoreHorizontal size={16} />
             </button>
           }
           items={[
@@ -218,7 +219,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
             onClick={() => navigate("/home")}
           >
             <span className="global-nav-glyph" aria-hidden>
-              홈
+              <Home />
             </span>
             <span className="global-nav-label">홈</span>
           </button>
@@ -232,7 +233,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
             onClick={() => navigate("/projects")}
           >
             <span className="global-nav-glyph" aria-hidden>
-              프
+              <FolderKanban />
             </span>
             <span className="global-nav-label">프로젝트</span>
           </button>
@@ -246,7 +247,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
             onClick={() => navigate("/search")}
           >
             <span className="global-nav-glyph" aria-hidden>
-              검
+              <Search />
             </span>
             <span className="global-nav-label">검색</span>
           </button>
@@ -267,7 +268,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
                   onClick={() => navigate(`/search?q=${encodeURIComponent(filter.query)}`)}
                 >
                   <span className="global-nav-glyph" aria-hidden>
-                    ⌕
+                    <Filter />
                   </span>
                   <span className="global-nav-label global-nav-project-name">{filter.name}</span>
                 </button>
@@ -355,7 +356,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
         title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
         onClick={() => void setSideNavCollapsed(!collapsed)}
       >
-        <span aria-hidden>{collapsed ? "›" : "‹"}</span>
+        <span aria-hidden>{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</span>
       </button>
       {currentProjectId ? (
         <BoardCreateModal

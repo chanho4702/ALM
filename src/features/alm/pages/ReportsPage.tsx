@@ -29,6 +29,7 @@ import {
 } from "../store/jiraStore";
 import type { User } from "../store/types";
 import { useIssueModal } from "../components/useIssueModal";
+import { useTokenColors } from "../components/useTokenColors";
 import { IssueMiniList, type IssueMiniRow } from "../components/DashboardCards";
 import { estimateSummary, formatPlannedRange, RESOLUTION_LABELS } from "../components/labels";
 import { todayKey } from "./dashboardMetrics";
@@ -58,7 +59,8 @@ export function ReportsPage() {
   const [changes, setChanges] = useState<IssueChange[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [sprintId, setSprintId] = useState<string | null>(null);
-  const [unit, setUnit] = useState<BurndownUnit>("hours");
+  // null = 아직 고르지 않음. 예상 미입력이 있으면 이슈 수 기준이 정직하다 — 시간 기준은 빈 이슈를 0으로 센다
+  const [unit, setUnit] = useState<BurndownUnit | null>(null);
 
   const generation = useRef(0);
   const reload = useCallback(async () => {
@@ -87,13 +89,28 @@ export function ReportsPage() {
   }, [reload]);
 
   const { openIssue, issueModal } = useIssueModal(reload);
+  // SVG 속성은 var()를 못 읽는다 — 토큰을 실제 색으로 풀어 Recharts에 넘긴다(테마 전환에 따라 갱신)
+  const colors = useTokenColors([
+    "color-border-default",
+    "color-text-subtle",
+    "color-background-brand",
+  ] as const);
   const today = todayKey();
   const sprint = sprints.find((s) => s.id === sprintId) ?? null;
 
+  const sprintMissingEstimates = useMemo(
+    () =>
+      sprint && issues
+        ? issues.filter((issue) => issue.sprintId === sprint.id && issue.estimateHours == null).length
+        : 0,
+    [sprint, issues],
+  );
+  const effectiveUnit: BurndownUnit = unit ?? (sprintMissingEstimates > 0 ? "count" : "hours");
+
   const series = useMemo(() => {
     if (!sprint || !issues) return null;
-    return burndownSeries({ sprint, issues, changes, statuses, unit, today });
-  }, [sprint, issues, changes, statuses, unit, today]);
+    return burndownSeries({ sprint, issues, changes, statuses, unit: effectiveUnit, today });
+  }, [sprint, issues, changes, statuses, effectiveUnit, today]);
 
   const report = useMemo(() => {
     if (!sprint || !issues) return null;
@@ -154,7 +171,7 @@ export function ReportsPage() {
         <Card padding="md" title="번다운" role="region" aria-label="번다운">
           <div className="reports-burndown">
             <RadioGroup
-              value={unit}
+              value={effectiveUnit}
               onValueChange={(next) => setUnit(next as BurndownUnit)}
               aria-label="번다운 단위"
               className="reports-units"
@@ -166,6 +183,11 @@ export function ReportsPage() {
             {series.unit === "hours" && series.missingEstimates > 0 ? (
               <p className="reports-warning">
                 {`예상 미입력 ${series.missingEstimates}건 — 이 이슈는 시간 합계에 들어가지 않습니다. 이슈 수 기준으로도 확인하세요.`}
+              </p>
+            ) : null}
+            {unit === null && series.unit === "count" && series.missingEstimates > 0 ? (
+              <p className="dash-empty">
+                {`예상 미입력 ${series.missingEstimates}건이라 이슈 수 기준으로 보여줍니다. 예상 시간을 채우면 시간 기준이 기본이 됩니다.`}
               </p>
             ) : null}
 
@@ -188,14 +210,14 @@ export function ReportsPage() {
                 >
                   <ResponsiveContainer width="100%" height={240}>
                     <LineChart data={series.points} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                      <CartesianGrid stroke="var(--chanho-color-border-default)" vertical={false} />
+                      <CartesianGrid stroke={colors["color-border-default"]} vertical={false} />
                       <XAxis
                         dataKey="date"
                         tickFormatter={(value: string) => value.slice(5)}
-                        stroke="var(--chanho-color-text-subtle)"
+                        stroke={colors["color-text-subtle"]}
                         fontSize={12}
                       />
-                      <YAxis stroke="var(--chanho-color-text-subtle)" fontSize={12} width={36} />
+                      <YAxis stroke={colors["color-text-subtle"]} fontSize={12} width={36} />
                       <Tooltip
                         contentStyle={{
                           background: "var(--chanho-color-background-surface-overlay)",
@@ -214,18 +236,24 @@ export function ReportsPage() {
                         name="기준선"
                         type="linear"
                         dataKey="ideal"
-                        stroke="var(--chanho-color-text-subtle)"
+                        stroke={colors["color-text-subtle"]}
                         strokeDasharray="4 4"
                         strokeWidth={2}
                         dot={false}
+                        // 그리기 애니메이션은 dasharray로 선을 숨겼다 드러낸다 — 백그라운드 탭처럼
+                        // rAF가 멈춘 환경에서는 영영 투명하게 남는다. 정적으로 그린다(모션 최소화)
+                        isAnimationActive={false}
                       />
                       <Line
                         name="잔여"
                         type="stepAfter"
                         dataKey="remaining"
-                        stroke="var(--chanho-color-background-brand)"
+                        stroke={colors["color-background-brand"]}
                         strokeWidth={2}
                         dot={false}
+                        // 그리기 애니메이션은 dasharray로 선을 숨겼다 드러낸다 — 백그라운드 탭처럼
+                        // rAF가 멈춘 환경에서는 영영 투명하게 남는다. 정적으로 그린다(모션 최소화)
+                        isAnimationActive={false}
                         connectNulls={false}
                       />
                     </LineChart>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { useNavigate } from "react-router";
 import {
   Button,
@@ -104,7 +105,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
       <Dropdown
         trigger={
           <Button variant="ghost" size="small" aria-label={`${project.name} 관리`}>
-            ⋯
+            <MoreHorizontal size={16} />
           </Button>
         }
         items={[

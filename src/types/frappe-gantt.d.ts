@@ -20,6 +20,15 @@ declare module "frappe-gantt" {
     readonly?: boolean;
     popup?: boolean | ((...args: unknown[]) => unknown);
     on_click?: (task: GanttTask) => void;
+    /** 초기 스크롤 위치 — "today" | "start" | "end" | 날짜 */
+    scroll_to?: "today" | "start" | "end" | string;
+    bar_height?: number;
+    /** 막대 사이 세로 여백(px) */
+    padding?: number;
+    /** true면 범위 앞뒤로 긴 여백을 붙인다 — 첫 화면이 빈 격자가 되므로 끈다 */
+    infinite_padding?: boolean;
+    today_button?: boolean;
+    view_mode_select?: boolean;
   }
 
   export default class Gantt {

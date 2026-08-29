@@ -1,3 +1,10 @@
+/* 모든 박스를 border-box로 — @chanho/react Card가 width:100%+padding이라 그리드 셀을 넘친다 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family: var(--chanho-font-family-sans);
@@ -147,10 +154,12 @@ body {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  border-radius: var(--chanho-radius-small);
-  background: var(--chanho-color-background-neutral);
   color: var(--chanho-color-text-subtle);
-  font-size: var(--chanho-font-size-75);
+}
+
+.global-nav-glyph svg {
+  width: 18px;
+  height: 18px;
 }
 
 .global-nav-item.is-active .global-nav-glyph {
@@ -278,6 +287,7 @@ body {
   padding: var(--chanho-space-100) var(--chanho-space-400) 0;
   border-bottom: 1px solid var(--chanho-color-border-default);
   overflow-x: auto;
+  overflow-y: hidden; /* auto면 -1px 마진 트릭 때문에 세로 스크롤바가 생긴다 */
 }
 
 .project-tab {
@@ -1961,8 +1971,8 @@ body {
 }
 
 .issue-filter-bar > div {
-  flex: 1 1 130px;
-  min-width: 130px;
+  flex: 0 1 200px; /* 자라지 않는다 — 줄이 넘어간 마지막 Select가 한 줄을 다 차지하지 않게 */
+  min-width: 180px; /* DS Select 트리거 최소폭과 같아야 셰브런이 이웃과 겹치지 않는다 */
 }
 
 .issue-key-cell {
@@ -2303,7 +2313,7 @@ body {
 }
 
 .timeline-chart .gantt .grid-row:nth-child(even) {
-  fill: var(--chanho-color-background-subtle);
+  fill: var(--chanho-color-background-surface-raised);
 }
 
 .timeline-chart .gantt .row-line,
@@ -2657,4 +2667,95 @@ body {
   margin-left: var(--chanho-space-100);
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
+}
+
+/* ── UX 정비 (2026-08-30) ──────────────────────────────── */
+
+/* 상단바 아이콘 버튼 — 글자 기호 대신 lucide 아이콘, 크기 통일 */
+.topbar-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 단위 라디오는 가로로 — DS RadioGroup 기본이 세로라 같은 클래스를 두 번 써 우선한다 */
+.reports-units.reports-units {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-200);
+}
+
+.timeline-toolbar {
+  justify-content: flex-start;
+}
+
+/* 이슈 목록 표 — 열 폭 합이 화면보다 크면 제목이 한 글자씩 세로로 깨진다. 표 자체가 가로 스크롤을 갖고
+   제목 열에 최소폭을 준다 */
+.issue-table-scroll {
+  overflow-x: auto;
+}
+
+.issue-table-scroll table {
+  min-width: 1040px;
+}
+
+.issue-table-scroll th:nth-child(3),
+.issue-table-scroll td:nth-child(3) {
+  min-width: 260px;
+}
+
+.issue-table-scroll td {
+  white-space: nowrap;
+}
+
+.issue-table-scroll td:nth-child(3) {
+  white-space: normal;
+}
+
+/* 이슈 상세 — 키는 작게(눈썹), 제목이 크게. 지라와 같은 위계 */
+.issue-detail-modal h2 {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-subtle);
+  letter-spacing: 0.02em;
+}
+
+.issue-detail-modal .issue-title-view {
+  font-size: var(--chanho-font-size-300);
+  font-weight: var(--chanho-font-weight-semibold);
+  line-height: 1.3;
+}
+
+/* 보드 툴바 — 제목 줄과 필터 줄 사이 간격을 줄여 한 덩어리로 읽히게 */
+.board-toolbar {
+  gap: var(--chanho-space-100);
+}
+
+/* 사이드바 활성 항목의 아이콘은 브랜드 색 */
+.global-nav-item.is-active .global-nav-glyph {
+  color: var(--chanho-color-text-brand);
+}
+
+/* 간트 헤더 텍스트·오늘 버튼도 토큰으로 */
+.timeline-chart .gantt-container .grid-header,
+.timeline-chart .gantt-container {
+  background: var(--chanho-color-background-surface);
+}
+
+.timeline-chart .gantt-container .upper-text,
+.timeline-chart .gantt-container .lower-text {
+  color: var(--chanho-color-text-default);
+}
+
+.timeline-chart .gantt-container .today-button,
+.timeline-chart .gantt-container .viewmode-select {
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-default);
+  border-radius: var(--chanho-radius-small);
+}
+
+/* 활성 항목의 옛 규칙(채운 사각형)을 되돌린다 — 아이콘은 색만 바뀐다 */
+.global-nav-item.is-active .global-nav-glyph {
+  background: transparent;
+  color: var(--chanho-color-text-brand);
 }

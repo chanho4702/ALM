@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { Button } from "@chanho/react";
 
 const THEME_KEY = "alm.theme";
@@ -28,13 +29,13 @@ export function ThemeToggle() {
   };
 
   return (
-    <Button
+    <Button iconOnly className="topbar-icon"
       variant="ghost"
       size="small"
       onClick={toggle}
       aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
     >
-      {theme === "dark" ? "☀" : "☾"}
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
     </Button>
   );
 }
