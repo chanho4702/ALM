@@ -64,6 +64,13 @@
 - **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 프로젝트 템플릿·설정 스킴과 사용자
   디렉터리가 남아 있다.
 
+## 디자인시스템 버전
+
+`@chanho/react` **0.5.0** · `@chanho/tokens` **0.3.0** (2026-08-29 승격, wiki-front와 동일). 파일 경로 고정은
+`package.json`과 `pnpm-workspace.yaml` overrides **두 곳**에 있다 — 하나만 올리면 무시된다.
+CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만들므로, 고정 버전이 뒤처지면
+파일이 없어 설치 단계에서 끊긴다(8-20~8-29 실패 원인).
+
 ## 품질 상태
 
 - 테스트 **344 케이스 / 34 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)

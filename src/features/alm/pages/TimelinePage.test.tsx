@@ -4,6 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
+// 이 화면은 App에서 lazy()로 쪼개져 있다. 전체 스위트를 병렬로 돌릴 때 첫 findBy가 청크 로딩까지
+// 기다리다 한도(5s)를 넘기므로, 수집 시점에 미리 올려 lazy 해석이 즉시 끝나게 한다.
+import "./TimelinePage";
 import { __resetForTest } from "../store/jiraStore";
 
 function renderTimeline() {
