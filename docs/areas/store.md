@@ -88,6 +88,20 @@
 - 이력 정렬은 `at`만으로 한다(안정 정렬로 기록 순서 유지). id가 UUID라 동률에서 id로 비교하면
   "마지막 변경"이 실행마다 달라져 테스트가 간헐 실패한다.
 
+## 해결(Resolution) (2026-08-29)
+
+`Issue.resolution: IssueResolution | null` — "왜 끝났는가". 값은 지라 기본 4종(`done`/`wont_do`/
+`duplicate`/`cannot_reproduce`)이고 규칙은 `applyResolutionRule` 한 곳에 있다.
+
+- 완료 카테고리로 **들어가면** `"done"`이 기본값, 완료에서 **벗어나면** `null`(다시 열기).
+- 명시한 값은 기본값보다 우선하되, 완료가 아닌 이슈에 설정하면 거부한다
+  ("완료된 이슈에만 해결을 설정할 수 있습니다").
+- 적용 지점: `createIssue`·`updateIssue`·`moveIssue`(보드 드래그). 새 상태 쓰기 경로를 만들면 여기도 태운다.
+- `normalize`가 도입 전 데이터의 완료 이슈를 `"done"`으로 백필한다(설정 정규화 뒤에 판정).
+- 활동로그 `type: "resolution"`으로 이전값 → 새값을 남긴다.
+- REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
+  규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
+
 ## 변경 이력 (2026-08-29)
 
 `changes: IssueChange[]`가 상태·스프린트 소속 변경을 남긴다. 서버 `issue_change_log`와 같은 모양이라

@@ -1,5 +1,5 @@
 import type { LozengeProps } from "@chanho/react";
-import type { IssuePriority, IssueStatus, IssueType, WorkflowStatus } from "../store/types";
+import type { IssuePriority, IssueResolution, IssueStatus, IssueType, WorkflowStatus } from "../store/types";
 
 type LozengeAppearance = NonNullable<LozengeProps["appearance"]>;
 
@@ -127,3 +127,14 @@ export function estimateSummary(issues: { estimateHours: number | null }[]): {
   // 0.1h 단위까지만 — 부동소수 누적 오차가 "8.000000000000002h"로 새지 않게 한다
   return { totalHours: Math.round(totalHours * 10) / 10, missing };
 }
+
+// ── 해결(Resolution) ─────────────────────────────────────
+
+export const RESOLUTIONS: IssueResolution[] = ["done", "wont_do", "duplicate", "cannot_reproduce"];
+
+export const RESOLUTION_LABELS: Record<IssueResolution, string> = {
+  done: "완료됨",
+  wont_do: "하지 않음",
+  duplicate: "중복",
+  cannot_reproduce: "재현 불가",
+};

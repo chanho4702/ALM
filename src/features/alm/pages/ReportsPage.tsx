@@ -30,7 +30,7 @@ import {
 import type { User } from "../store/types";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueMiniList, type IssueMiniRow } from "../components/DashboardCards";
-import { estimateSummary, formatPlannedRange } from "../components/labels";
+import { estimateSummary, formatPlannedRange, RESOLUTION_LABELS } from "../components/labels";
 import { todayKey } from "./dashboardMetrics";
 import { burndownSeries, sprintReport, type BurndownUnit } from "./reportMetrics";
 
@@ -277,7 +277,10 @@ export function ReportsPage() {
               <IssueMiniList
                 rows={report.completed.map<IssueMiniRow>((issue) => ({
                   issue,
-                  meta: issue.assigneeId ? userNames[issue.assigneeId] : "미지정",
+                  // "왜 끝났는가"가 회고의 재료다 — 완료됨이 아닌 해결은 눈에 띄게
+                  meta: issue.resolution && issue.resolution !== "done"
+                    ? `${userNames[issue.assigneeId ?? ""] ?? "미지정"} · ${RESOLUTION_LABELS[issue.resolution]}`
+                    : (issue.assigneeId ? userNames[issue.assigneeId] : "미지정"),
                 }))}
                 statuses={statuses}
                 emptyText="완료된 이슈가 없습니다."

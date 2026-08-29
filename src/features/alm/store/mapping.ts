@@ -1,4 +1,13 @@
-import type { ChangeField, Issue, IssueChange, IssuePriority, IssueType, Project, Sprint } from "./types";
+import type {
+  ChangeField,
+  Issue,
+  IssueChange,
+  IssuePriority,
+  IssueResolution,
+  IssueType,
+  Project,
+  Sprint,
+} from "./types";
 
 export interface ProjectDto {
   id: number;
@@ -28,6 +37,7 @@ export interface IssueDto {
   sprintId?: number | null;
   dueDate?: string | null;
   estimateHours?: number | null;
+  resolution?: IssueResolutionDto | null;
   labels?: string[] | null;
   order?: number;
   version: number;
@@ -122,6 +132,20 @@ export function mapSprint(dto: SprintDto): Sprint {
   return sprint;
 }
 
+export type IssueResolutionDto = "DONE" | "WONT_DO" | "DUPLICATE" | "CANNOT_REPRODUCE";
+
+const RESOLUTIONS_FROM_API: Record<IssueResolutionDto, IssueResolution> = {
+  DONE: "done",
+  WONT_DO: "wont_do",
+  DUPLICATE: "duplicate",
+  CANNOT_REPRODUCE: "cannot_reproduce",
+};
+
+export function toApiResolution(resolution: IssueResolution | null): IssueResolutionDto | null {
+  if (resolution === null) return null;
+  return resolution.toUpperCase() as IssueResolutionDto;
+}
+
 export interface IssueChangeDto {
   id: number;
   issueId: number;
@@ -185,6 +209,7 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     parentId: dto.parentId == null ? null : String(dto.parentId),
     dueDate: dto.dueDate ?? null,
     estimateHours: dto.estimateHours ?? null,
+    resolution: dto.resolution ? RESOLUTIONS_FROM_API[dto.resolution] : null,
     labels: dto.labels ? [...dto.labels] : [],
     order: dto.order ?? order,
     createdAt: dto.createdAt,

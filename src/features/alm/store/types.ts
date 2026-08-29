@@ -32,6 +32,8 @@ export interface Sprint {
 export type IssueStatus = "todo" | "inprogress" | "done";
 export type IssuePriority = "high" | "medium" | "low";
 export type IssueType = "task" | "story" | "bug" | "epic" | "subtask";
+/** 해결 — "왜 끝났는가". 지라 기본 4종. 완료 카테고리에서만 값을 갖고, 다시 열면 비워진다 */
+export type IssueResolution = "done" | "wont_do" | "duplicate" | "cannot_reproduce";
 
 export interface Issue {
   id: string;
@@ -54,6 +56,8 @@ export interface Issue {
   dueDate: string | null; // "YYYY-MM-DD", null = 미지정
   /** 예상 시간(h, 소수 허용) — 워크로그 합계와 함께 진행률을 만든다 */
   estimateHours: number | null;
+  /** 완료 카테고리일 때만 non-null. 완료로 들어가면 "done"이 기본값, 벗어나면 null */
+  resolution: IssueResolution | null;
   labels: string[]; // 자유 문자열 라벨
   order: number; // 컬럼/목록 내 정렬
   createdAt: string;
@@ -84,7 +88,8 @@ export interface Activity {
     | "issuetype"
     | "parent"
     | "link"
-    | "worklog";
+    | "worklog"
+    | "resolution";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }

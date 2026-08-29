@@ -10,6 +10,7 @@ import {
   mapSprint,
   toApiChangeField,
   toApiIssuePriority,
+  toApiResolution,
   toApiIssueType,
   toBackendId,
   type IssueChangeDto,
@@ -189,6 +190,7 @@ type IssuePatch = Partial<
     | "dueDate"
     | "labels"
     | "estimateHours"
+    | "resolution"
   >
 >;
 
@@ -233,6 +235,9 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
             ? (current.estimateHours ?? null)
             : patch.estimateHours,
         labels: patch.labels === undefined ? (current.labels ?? []) : patch.labels,
+        // 기본값·해제 규칙은 목업 스토어와 같이 프론트 몫이다 — 여기서는 값만 옮긴다
+        resolution:
+          patch.resolution === undefined ? (current.resolution ?? null) : toApiResolution(patch.resolution),
       },
       expectedVersion: current.version,
     }),

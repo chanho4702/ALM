@@ -21,12 +21,13 @@ import type {
   Comment,
   Issue,
   IssuePriority,
+  IssueResolution,
   IssueStatus,
   IssueType,
   Sprint,
   User,
-  Worklog,
   WorkflowStatus,
+  Worklog,
 } from "../store/types";
 import {
   addComment,
@@ -55,11 +56,14 @@ import {
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import {
-    ISSUE_TYPES,
+  ISSUE_TYPES,
   PRIORITY_LABELS,
-  statusAppearance,
-  statusName,
+  RESOLUTIONS,
+  RESOLUTION_LABELS,
   TYPE_LABELS,
+  statusAppearance,
+  statusCategory,
+  statusName,
 } from "./labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -195,6 +199,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         | "dueDate"
         | "labels"
         | "estimateHours"
+      | "resolution"
       >
     >,
     successTitle: string,
@@ -633,6 +638,17 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             options={statuses.map((s) => ({ value: s.id, label: s.name }))}
             onValueChange={(v) => void applyPatch({ status: v as IssueStatus }, "상태를 변경했습니다")}
           />
+          {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}
+          {statusCategory(statuses, issue.status) === "done" ? (
+            <Select
+              label="해결"
+              value={issue.resolution ?? "done"}
+              options={RESOLUTIONS.map((r) => ({ value: r, label: RESOLUTION_LABELS[r] }))}
+              onValueChange={(v) =>
+                void applyPatch({ resolution: v as IssueResolution }, "해결을 변경했습니다")
+              }
+            />
+          ) : null}
           {issue.type !== "epic" ? (
             <Select
               label="부모"

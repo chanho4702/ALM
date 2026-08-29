@@ -371,6 +371,37 @@ describe("IssueDetailModal 이슈 관계", () => {
   });
 });
 
+describe("IssueDetailModal 해결", () => {
+  it("완료 이슈에만 해결 Select가 보이고, 값을 바꾸면 저장된다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-1"); // 시드: 완료, 해결 = 완료됨
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    const select = within(dialog).getByRole("combobox", { name: "해결" });
+    expect(select).toHaveTextContent("완료됨");
+
+    await user.click(select);
+    await user.click(await screen.findByRole("option", { name: "하지 않음" }));
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole("combobox", { name: "해결" })).toHaveTextContent("하지 않음");
+    });
+  });
+
+  it("완료가 아닌 이슈에는 해결 Select가 없고, 완료로 바꾸면 '완료됨'으로 나타난다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-5"); // 시드: 할 일
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-5" });
+    expect(within(dialog).queryByRole("combobox", { name: "해결" })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
+    await user.click(await screen.findByRole("option", { name: "완료" }));
+
+    expect(await within(dialog).findByRole("combobox", { name: "해결" })).toHaveTextContent("완료됨");
+  });
+});
+
 describe("IssueDetailModal 워크로그", () => {
   it("시드(ALM-2): 진행률 '기록 5h / 예상 8h', 워크로그 탭에 2건", async () => {
     const user = userEvent.setup();

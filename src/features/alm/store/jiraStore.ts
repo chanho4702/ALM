@@ -9,6 +9,7 @@ import type {
   IssueLink,
   IssueLinkType,
   IssuePriority,
+  IssueResolution,
   IssueStatus,
   IssueType,
   JiraData,
@@ -90,6 +91,7 @@ function normalize(data: JiraData): JiraData {
     issue.type ??= "task";
     issue.parentId ??= null;
     issue.estimateHours ??= null;
+    issue.resolution ??= null;
   }
   data.notifications ??= [];
   data.boards ??= [];
@@ -125,6 +127,12 @@ function normalize(data: JiraData): JiraData {
   for (const project of data.projects) {
     if (!data.projectSettings.some((e) => e.projectId === project.id)) {
       data.projectSettings.push({ projectId: project.id, schemeId: defaultScheme.id, custom: null });
+    }
+  }
+  // 해결 도입 전 데이터: 이미 완료 카테고리인 이슈는 "완료됨"으로 백필한다(설정 정규화 뒤에 판정)
+  for (const issue of data.issues) {
+    if (issue.resolution === null && statusCategoryOf(data, issue.projectId, issue.status) === "done") {
+      issue.resolution = "done";
     }
   }
   return data;
@@ -292,6 +300,13 @@ const PRIORITY_LABELS: Record<IssuePriority, string> = {
   low: "낮음",
 };
 
+const RESOLUTION_LABELS: Record<IssueResolution, string> = {
+  done: "완료됨",
+  wont_do: "하지 않음",
+  duplicate: "중복",
+  cannot_reproduce: "재현 불가",
+};
+
 const TYPE_LABELS: Record<IssueType, string> = {
   task: "작업",
   story: "스토리",
@@ -390,6 +405,33 @@ function pruneTransitions(body: SettingsBody): WorkflowTransition[] | undefined 
   });
 }
 
+/**
+ * 해결 규칙(지라와 동일): 완료 카테고리로 **들어가면** "완료됨"이 기본값, 벗어나면 비운다.
+ * 명시한 값은 기본값보다 우선하되 완료가 아닌 이슈에는 설정할 수 없다.
+ * @param explicit undefined = 지정 안 함
+ */
+function applyResolutionRule(
+  data: JiraData,
+  issue: Issue,
+  previousStatus: string,
+  explicit: IssueResolution | null | undefined,
+): void {
+  const wasDone = statusCategoryOf(data, issue.projectId, previousStatus) === "done";
+  const isDone = statusCategoryOf(data, issue.projectId, issue.status) === "done";
+  if (!isDone) {
+    if (explicit !== undefined && explicit !== null) {
+      throw new Error("완료된 이슈에만 해결을 설정할 수 있습니다");
+    }
+    issue.resolution = null;
+    return;
+  }
+  if (explicit !== undefined) {
+    issue.resolution = explicit ?? "done";
+  } else if (!wasDone || issue.resolution === null) {
+    issue.resolution = "done";
+  }
+}
+
 function assertValidStatus(data: JiraData, projectId: string, statusId: string): void {
   if (!resolvedStatuses(data, projectId).some((s) => s.id === statusId)) {
     throw new Error(`이 프로젝트에 없는 상태입니다: ${statusId}`);
@@ -463,6 +505,10 @@ function recordChanges(data: JiraData, before: Issue, after: Issue, at: string):
   }
   if (before.type !== after.type) {
     push("issuetype", `${TYPE_LABELS[before.type]} → ${TYPE_LABELS[after.type]}`);
+  }
+  if (before.resolution !== after.resolution) {
+    const label = (r: IssueResolution | null) => (r ? RESOLUTION_LABELS[r] : "없음");
+    push("resolution", `${label(before.resolution)} → ${label(after.resolution)}`);
   }
   notifyIssueChanges(data, before, after, at);
 }
@@ -907,6 +953,7 @@ export async function createIssue(input: {
     parentId: null, // 계층 검증 후 아래에서 지정
     dueDate: input.dueDate ?? null,
     estimateHours: null,
+    resolution: null,
     labels: input.labels ?? [],
     order: maxOrder + 1,
     createdAt: now,
@@ -916,6 +963,7 @@ export async function createIssue(input: {
     assertParentAllowed(data, issue, input.parentId);
     issue.parentId = input.parentId;
   }
+  applyResolutionRule(data, issue, "todo", undefined);
   data.issues.push(issue);
   data.activities.push({
     id: nextId(),
@@ -946,6 +994,7 @@ export async function updateIssue(
       | "dueDate"
       | "labels"
       | "estimateHours"
+      | "resolution"
     >
   >,
 ): Promise<Issue> {
@@ -983,7 +1032,9 @@ export async function updateIssue(
       if (!childrenAllowed) throw new Error("하위 이슈가 있어 타입을 변경할 수 없습니다");
     }
   }
-  Object.assign(issue, patch);
+  const { resolution: explicitResolution, ...rest } = patch;
+  Object.assign(issue, rest);
+  applyResolutionRule(data, issue, before.status, explicitResolution);
   if (patch.type !== undefined && issue.parentId !== null) {
     try {
       assertParentAllowed(data, issue, issue.parentId);
@@ -1033,6 +1084,7 @@ export async function moveIssue(
   assertTransitionAllowed(data, issue.projectId, issue.status, to.status);
   const before = { ...issue };
   issue.status = to.status;
+  applyResolutionRule(data, issue, before.status, undefined);
   // 대상 컬럼: 같은 프로젝트·같은 스프린트·대상 상태 (이동 이슈 제외, order 순)
   const column = data.issues
     .filter(
