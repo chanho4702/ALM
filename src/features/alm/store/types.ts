@@ -162,6 +162,18 @@ export interface Worklog {
   at: string; // 기록 시각(ISO)
 }
 
+/**
+ * 프로젝트 역할 — org-service `GrantRole`(VIEWER/EDITOR/ADMIN)과 1:1이다.
+ * 권한의 단일 진실 소스는 org-service이며 여기 값은 그 계약을 화면 모델로 옮긴 것이다.
+ */
+export type ProjectRole = "viewer" | "editor" | "admin";
+
+export interface ProjectMember {
+  projectId: string;
+  userId: string;
+  role: ProjectRole;
+}
+
 /** 이력으로 남기는 필드 — 서버 V5 issue_change_log와 같은 범위(상태·스프린트 소속) */
 export type ChangeField = "status" | "sprint";
 
@@ -222,6 +234,8 @@ export interface JiraData {
   worklogs: Worklog[];
   /** 상태·스프린트 변경 이력 (리포트 원천) */
   changes: IssueChange[];
+  /** 프로젝트 멤버십과 역할 */
+  members: ProjectMember[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

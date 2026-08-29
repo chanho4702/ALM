@@ -2255,6 +2255,29 @@ body {
   color: var(--chanho-color-text-subtlest, var(--chanho-color-text-subtle));
 }
 
+/* ── 프로젝트 멤버·역할 ─────────────────────────────────── */
+
+.member-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.member-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-150);
+}
+
+/* DS Select 트리거가 180px 최소폭이라 좁은 화면에서는 3열이 카드를 넘친다 */
+@media (max-width: 640px) {
+  .member-add {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
 /* ── 리포트(번다운·스프린트 리포트) ─────────────────────── */
 
 .reports-toolbar {

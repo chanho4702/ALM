@@ -30,6 +30,7 @@ import {
 import { pruneProject } from "../store/uiStore";
 import type { JiraOutletContext } from "../components/ProjectLayout";
 import { StatusEditor } from "../components/StatusEditor";
+import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
 import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
 
 /** 프로젝트 설정 — 지라식 탭: 일반 / 워크플로 / 이슈 타입 (스킴 사용·커스텀 전환) */
@@ -212,6 +213,11 @@ export function ProjectSettingsPage() {
                 </Card>
               </div>
             ),
+          },
+          {
+            value: "members",
+            label: "사용자·권한",
+            content: <ProjectMembersPanel projectId={project.id} />,
           },
           {
             value: "workflow",

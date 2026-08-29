@@ -20,7 +20,7 @@
 | `/projects/:id/timeline` | TimelinePage | 간트: 생성일→마감일 막대, 에픽 그룹핑 |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
-| `/projects/:id/settings` | ProjectSettingsPage | 일반/워크플로/이슈 타입 탭, 스킴↔커스텀 전환 |
+| `/projects/:id/settings` | ProjectSettingsPage | 일반/사용자·권한/워크플로/이슈 타입 탭, 스킴↔커스텀 전환 |
 | 그 외 전부 | → `/home` | |
 
 이슈 상세는 페이지가 아니라 **`?issue=ALM-3` 쿼리로 여는 모달**(`useIssueModal` +

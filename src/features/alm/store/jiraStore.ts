@@ -14,6 +14,8 @@ import type {
   JiraData,
   Notification,
   Project,
+  ProjectMember,
+  ProjectRole,
   ProjectSettingsEntry,
   SettingsBody,
   SettingsScheme,
@@ -90,6 +92,13 @@ function normalize(data: JiraData): JiraData {
   data.links ??= [];
   data.worklogs ??= [];
   data.changes ??= [];
+  data.members ??= [];
+  // 멤버가 없는 프로젝트에는 현재 사용자를 관리자로 넣는다 — 관리자 없는 프로젝트를 만들지 않는다
+  for (const project of data.projects) {
+    if (!data.members.some((m) => m.projectId === project.id)) {
+      data.members.push({ projectId: project.id, userId: CURRENT_USER_ID, role: "admin" });
+    }
+  }
   data.issueCounters ??= {};
   // 보드가 없는 프로젝트에는 기본 스크럼 보드를 만들어 기존 데이터/URL과 호환한다
   for (const project of data.projects) {
@@ -189,6 +198,7 @@ export async function createProject(input: {
     createdAt: new Date().toISOString(),
   };
   data.projects.push(project);
+  data.members.push({ projectId: project.id, userId: CURRENT_USER_ID, role: "admin" });
   data.issueCounters[project.id] = 0;
   // 새 프로젝트는 디폴트 스킴에 배정된다 (지라 Default Scheme)
   const defaultScheme = data.schemes.find((s) => s.isDefault)!;
@@ -234,6 +244,7 @@ export async function updateProject(
   const data = load();
   const project = data.projects.find((p) => p.id === id);
   if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
+  assertCanAdmin(data, id);
   if (patch.name !== undefined) {
     const name = patch.name.trim();
     if (!name) throw new Error("프로젝트 이름을 입력하세요");
@@ -251,6 +262,7 @@ export async function deleteProject(id: string): Promise<void> {
   const data = load();
   const index = data.projects.findIndex((p) => p.id === id);
   if (index === -1) throw new Error("프로젝트를 찾을 수 없습니다");
+  assertCanAdmin(data, id);
   const issueIds = new Set(data.issues.filter((i) => i.projectId === id).map((i) => i.id));
   data.projects.splice(index, 1);
   data.sprints = data.sprints.filter((s) => s.projectId !== id);
@@ -262,6 +274,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.links = data.links.filter((l) => !issueIds.has(l.sourceId) && !issueIds.has(l.targetId));
   data.worklogs = data.worklogs.filter((w) => !issueIds.has(w.issueId));
   data.changes = data.changes.filter((c) => c.projectId !== id);
+  data.members = data.members.filter((m) => m.projectId !== id);
   data.projectSettings = data.projectSettings.filter((e) => e.projectId !== id);
   delete data.issueCounters[id];
   persist();
@@ -436,6 +449,120 @@ function notifyIssueChanges(data: JiraData, before: Issue, after: Issue, at: str
   }
 }
 
+// ── 멤버·역할 ────────────────────────────────────────────────
+
+const ROLE_RANK: Record<ProjectRole, number> = { viewer: 1, editor: 2, admin: 3 };
+
+export interface ProjectMemberView {
+  user: User;
+  role: ProjectRole;
+}
+
+/** 역할 높은 순 → 이름순. 디렉터리에서 사라진 사용자는 목록에서 뺀다 */
+export async function listProjectMembers(projectId: string): Promise<ProjectMemberView[]> {
+  const data = load();
+  return clone(
+    data.members
+      .filter((member) => member.projectId === projectId)
+      .map((member) => ({
+        user: data.users.find((u) => u.id === member.userId),
+        role: member.role,
+      }))
+      .filter((row): row is ProjectMemberView => row.user !== undefined)
+      .sort(
+        (a, b) => ROLE_RANK[b.role] - ROLE_RANK[a.role] || a.user.name.localeCompare(b.user.name),
+      ),
+  );
+}
+
+export async function addProjectMember(
+  projectId: string,
+  userId: string,
+  role: ProjectRole,
+): Promise<void> {
+  const data = load();
+  if (!data.projects.some((p) => p.id === projectId)) {
+    throw new Error("프로젝트를 찾을 수 없습니다");
+  }
+  assertCanAdmin(data, projectId);
+  if (!data.users.some((u) => u.id === userId)) throw new Error("사용자를 찾을 수 없습니다");
+  if (data.members.some((m) => m.projectId === projectId && m.userId === userId)) {
+    throw new Error("이미 프로젝트 멤버입니다");
+  }
+  data.members.push({ projectId, userId, role });
+  persist();
+}
+
+export async function updateProjectMemberRole(
+  projectId: string,
+  userId: string,
+  role: ProjectRole,
+): Promise<void> {
+  const data = load();
+  assertCanAdmin(data, projectId);
+  const member = requireMember(data, projectId, userId);
+  if (member.role === "admin" && role !== "admin") assertNotLastAdmin(data, projectId, userId);
+  member.role = role;
+  persist();
+}
+
+export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
+  const data = load();
+  assertCanAdmin(data, projectId);
+  const member = requireMember(data, projectId, userId);
+  if (member.role === "admin") assertNotLastAdmin(data, projectId, userId);
+  data.members = data.members.filter(
+    (m) => !(m.projectId === projectId && m.userId === userId),
+  );
+  persist();
+}
+
+/** 현재 사용자의 역할 — 화면이 편집 UI를 보일지 판단한다. 멤버가 아니면 null */
+export async function getMyProjectRole(projectId: string): Promise<ProjectRole | null> {
+  return myRole(load(), projectId);
+}
+
+/**
+ * 쓰기 권한 가드 — 역할 계층은 org-service와 같다(뷰어 ⊂ 편집자 ⊂ 관리자).
+ * 목업이 백엔드 대역이므로 여기서 막지 않으면 "뷰어 = 읽기만"이 화면의 빈말이 된다.
+ * 서버 전환 후에는 org-service gRPC 판정이 이 자리를 대신한다.
+ */
+function assertCanEdit(data: JiraData, projectId: string): void {
+  const role = myRole(data, projectId);
+  if (role === null || role === "viewer") {
+    throw new Error("이 프로젝트를 편집할 권한이 없습니다");
+  }
+}
+
+function assertCanAdmin(data: JiraData, projectId: string): void {
+  if (myRole(data, projectId) !== "admin") {
+    throw new Error("프로젝트 관리자만 할 수 있습니다");
+  }
+}
+
+function myRole(data: JiraData, projectId: string): ProjectRole | null {
+  return (
+    data.members.find((m) => m.projectId === projectId && m.userId === CURRENT_USER_ID)?.role ??
+    null
+  );
+}
+
+function requireMember(data: JiraData, projectId: string, userId: string): ProjectMember {
+  const member = data.members.find((m) => m.projectId === projectId && m.userId === userId);
+  if (!member) throw new Error("프로젝트 멤버가 아닙니다");
+  return member;
+}
+
+/** 관리자가 0명인 프로젝트를 만들지 않는다 — 아무도 설정을 못 고치는 상태를 막는다 */
+function assertNotLastAdmin(data: JiraData, projectId: string, userId: string): void {
+  const otherAdmins = data.members.filter(
+    (m) => m.projectId === projectId && m.role === "admin" && m.userId !== userId,
+  );
+  if (otherAdmins.length === 0) {
+    throw new Error("프로젝트에는 관리자가 최소 한 명 필요합니다");
+  }
+}
+
 // ── sprints ──────────────────────────────────────────────────
 
 export async function listSprints(projectId: string): Promise<Sprint[]> {
@@ -444,6 +571,7 @@ export async function listSprints(projectId: string): Promise<Sprint[]> {
 
 export async function createSprint(projectId: string): Promise<Sprint> {
   const data = load();
+  assertCanEdit(data, projectId);
   if (!data.projects.some((p) => p.id === projectId)) {
     throw new Error("프로젝트를 찾을 수 없습니다");
   }
@@ -481,6 +609,7 @@ export async function updateSprint(id: string, patch: SprintPlanPatch): Promise<
   const data = load();
   const sprint = data.sprints.find((s) => s.id === id);
   if (!sprint) throw new Error("스프린트를 찾을 수 없습니다");
+  assertCanEdit(data, sprint.projectId);
 
   const name = patch.name === undefined ? sprint.name : patch.name.trim();
   if (!name) throw new Error("스프린트 이름을 입력하세요");
@@ -512,6 +641,7 @@ export async function startSprint(id: string): Promise<Sprint> {
   const data = load();
   const sprint = data.sprints.find((s) => s.id === id);
   if (!sprint) throw new Error("스프린트를 찾을 수 없습니다");
+  assertCanEdit(data, sprint.projectId);
   if (sprint.state !== "planned") throw new Error("계획 상태의 스프린트만 시작할 수 있습니다");
   if (data.sprints.some((s) => s.projectId === sprint.projectId && s.state === "active")) {
     throw new Error("이미 진행 중인 스프린트가 있습니다");
@@ -533,6 +663,7 @@ export async function completeSprint(
   const data = load();
   const sprint = data.sprints.find((s) => s.id === id);
   if (!sprint) throw new Error("스프린트를 찾을 수 없습니다");
+  assertCanEdit(data, sprint.projectId);
   if (sprint.state !== "active") throw new Error("진행 중인 스프린트만 완료할 수 있습니다");
 
   const targetId = options.moveUnfinishedTo ?? null;
@@ -700,6 +831,7 @@ export async function createIssue(input: {
   if (resolvedType !== "subtask" && !enabledTypes.includes(resolvedType)) {
     throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${TYPE_LABELS[resolvedType]}`);
   }
+  assertCanEdit(data, project.id);
   if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
   const seq = (data.issueCounters[project.id] ?? 0) + 1;
   data.issueCounters[project.id] = seq; // 삭제돼도 감소하지 않는다 → 키 미재사용
@@ -775,6 +907,7 @@ export async function updateIssue(
   if (patch.estimateHours !== undefined && patch.estimateHours !== null && !(patch.estimateHours > 0)) {
     throw new Error("예상 시간은 0보다 커야 합니다");
   }
+  assertCanEdit(data, issue.projectId);
   if (patch.status !== undefined) assertValidStatus(data, issue.projectId, patch.status);
   const before = { ...issue, labels: [...issue.labels] };
   // 타입 전환 정합성: 자식이 있는데 규칙 위반 타입이 되면 거부, 자신의 parent가 위반되면 자동 해제
@@ -844,6 +977,7 @@ export async function moveIssue(
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertCanEdit(data, issue.projectId);
   assertValidStatus(data, issue.projectId, to.status);
   const before = { ...issue };
   issue.status = to.status;
@@ -1038,6 +1172,7 @@ export async function rankIssue(
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertCanEdit(data, issue.projectId);
   if (to.sprintId !== null && !data.sprints.some((s) => s.id === to.sprintId)) {
     throw new Error("스프린트를 찾을 수 없습니다");
   }
@@ -1062,6 +1197,7 @@ export async function deleteIssue(id: string): Promise<void> {
   const data = load();
   const index = data.issues.findIndex((i) => i.id === id);
   if (index === -1) throw new Error("이슈를 찾을 수 없습니다");
+  assertCanEdit(data, data.issues[index].projectId);
   data.issues.splice(index, 1);
   data.comments = data.comments.filter((c) => c.issueId !== id);
   data.activities = data.activities.filter((a) => a.issueId !== id);
@@ -1319,6 +1455,7 @@ function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: Set
 /** 프로젝트에 스킴 재배정 — 커스텀은 해제되고 새 스킴 구성으로 이관된다 */
 export async function assignScheme(projectId: string, schemeId: string): Promise<void> {
   const data = load();
+  assertCanAdmin(data, projectId);
   const entry = settingsEntry(data, projectId);
   const scheme = data.schemes.find((s) => s.id === schemeId);
   if (!scheme) throw new Error("스킴을 찾을 수 없습니다");
@@ -1331,6 +1468,7 @@ export async function assignScheme(projectId: string, schemeId: string): Promise
 /** 커스텀 전환(현재 구성 복사) / 스킴 복귀(이관 후 폐기) */
 export async function setProjectCustom(projectId: string, custom: boolean): Promise<void> {
   const data = load();
+  assertCanAdmin(data, projectId);
   const entry = settingsEntry(data, projectId);
   if (custom) {
     if (entry.custom) return;
@@ -1350,6 +1488,7 @@ export async function updateProjectCustomSettings(
   body: SettingsBody,
 ): Promise<void> {
   const data = load();
+  assertCanAdmin(data, projectId);
   const entry = settingsEntry(data, projectId);
   if (!entry.custom) throw new Error("커스텀 설정을 사용 중일 때만 편집할 수 있습니다");
   validateSettingsBody(body);
@@ -1532,7 +1671,9 @@ export async function listProjectChanges(
     }
     return true;
   });
-  return clone(rows.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)));
+  // 같은 밀리초에 쌓인 줄은 **기록 순서**로 남긴다. id는 UUID라 문자열 비교가 무작위가 되고,
+  // 그러면 "마지막 변경"이 실행마다 달라진다. Array.sort는 안정 정렬이라 동률은 삽입 순서를 지킨다.
+  return clone(rows.sort((a, b) => a.at.localeCompare(b.at)));
 }
 
 export async function listActivity(issueId: string): Promise<Activity[]> {

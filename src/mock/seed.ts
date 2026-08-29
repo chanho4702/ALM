@@ -4,6 +4,7 @@ import type {
   Comment,
   Issue,
   IssueChange,
+  ProjectMember,
   JiraData,
   Notification,
   Project,
@@ -179,6 +180,13 @@ export function createSeedData(): JiraData {
   pushChange("i2", "status", "todo", "inprogress", daysAgo(2), "s1");
   pushChange("i1", "status", "todo", "done", daysAgo(1), "s1");
 
+  // 데모: 팀 전원이 시드 프로젝트 멤버 (u1 관리자, 나머지 편집자)
+  const members: ProjectMember[] = MOCK_USERS.map((user, index) => ({
+    projectId: "p1",
+    userId: user.id,
+    role: index === 0 ? ("admin" as const) : ("editor" as const),
+  }));
+
   return {
     users: [...MOCK_USERS],
     projects: [project],
@@ -196,6 +204,7 @@ export function createSeedData(): JiraData {
       { id: "w2", issueId: "i2", authorId: "u1", hours: 2, comment: "리뷰·리팩터링", workedOn: now.slice(0, 10), at: now },
     ],
     changes,
+    members,
     // 지라식 설정 스킴 — 디폴트 스킴에 전 프로젝트 배정 (상태 id = 기존 status 값)
     schemes: [
       {
