@@ -56,6 +56,7 @@ export function createSeedData(): JiraData {
     dueDate: null,
     estimateHours: null as number | null,
     resolution: null as Issue["resolution"],
+    fixVersionId: null as string | null,
     labels: [] as string[],
     createdAt: now,
     updatedAt: now,
@@ -209,6 +210,7 @@ export function createSeedData(): JiraData {
     ],
     changes,
     members,
+    versions: [],
     // 지라식 설정 스킴 — 디폴트 스킴에 전 프로젝트 배정 (상태 id = 기존 status 값)
     schemes: [
       {

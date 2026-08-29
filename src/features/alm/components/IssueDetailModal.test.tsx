@@ -402,6 +402,26 @@ describe("IssueDetailModal 해결", () => {
   });
 });
 
+describe("IssueDetailModal 수정 버전", () => {
+  it("수정 버전 Select에서 버전을 고르면 저장되고, 보관된 버전은 목록에 없다", async () => {
+    const user = userEvent.setup();
+    const { createVersion, archiveVersion, getIssueByKey } = await import("../store/jiraStore");
+    await createVersion("p1", { name: "1.0" });
+    const old = await createVersion("p1", { name: "0.9" });
+    await archiveVersion(old.id);
+    renderBoard("/projects/p1/board?issue=ALM-5");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-5" });
+    await user.click(within(dialog).getByRole("combobox", { name: "수정 버전" }));
+    expect(screen.queryByRole("option", { name: "0.9" })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("option", { name: "1.0" }));
+
+    await waitFor(async () => {
+      expect((await getIssueByKey("ALM-5"))!.fixVersionId).not.toBeNull();
+    });
+  });
+});
+
 describe("IssueDetailModal 워크로그", () => {
   it("시드(ALM-2): 진행률 '기록 5h / 예상 8h', 워크로그 탭에 2건", async () => {
     const user = userEvent.setup();

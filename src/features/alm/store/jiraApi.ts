@@ -8,6 +8,7 @@ import {
   mapProject,
   mapIssueChange,
   mapSprint,
+  mapVersion,
   toApiChangeField,
   toApiIssuePriority,
   toApiResolution,
@@ -17,8 +18,18 @@ import {
   type IssueDto,
   type ProjectDto,
   type SprintDto,
+  type VersionDto,
 } from "./mapping";
-import type { ChangeField, Issue, IssueChange, IssuePriority, IssueType, Project, Sprint } from "./types";
+import type {
+  ChangeField,
+  Issue,
+  IssueChange,
+  IssuePriority,
+  IssueType,
+  Project,
+  ProjectVersion,
+  Sprint,
+} from "./types";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -191,6 +202,7 @@ type IssuePatch = Partial<
     | "labels"
     | "estimateHours"
     | "resolution"
+    | "fixVersionId"
   >
 >;
 
@@ -238,6 +250,12 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
         // 기본값·해제 규칙은 목업 스토어와 같이 프론트 몫이다 — 여기서는 값만 옮긴다
         resolution:
           patch.resolution === undefined ? (current.resolution ?? null) : toApiResolution(patch.resolution),
+        fixVersionId:
+          patch.fixVersionId === undefined
+            ? (current.fixVersionId ?? null)
+            : patch.fixVersionId === null
+              ? null
+              : toBackendId(patch.fixVersionId),
       },
       expectedVersion: current.version,
     }),
@@ -318,6 +336,86 @@ export async function completeSprint(
     ),
   });
   return mapSprint(await json(response));
+}
+
+// ── 버전(릴리스) ──────────────────────────────────────────────
+
+export async function listVersions(projectId: string): Promise<ProjectVersion[]> {
+  const rows = await json<VersionDto[]>(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/versions`),
+  );
+  return rows.map(mapVersion);
+}
+
+export async function createVersion(
+  projectId: string,
+  input: { name: string; description?: string | null; startDate?: string | null; releaseDate?: string | null },
+): Promise<ProjectVersion> {
+  const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/versions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name.trim(),
+      description: input.description ?? null,
+      startDate: input.startDate || null,
+      releaseDate: input.releaseDate || null,
+    }),
+  });
+  return mapVersion(await json(response));
+}
+
+/** 서버는 전체 본문을 받으므로 목록에서 최신 값을 읽어 채우고 그 version을 expectedVersion으로 쓴다 */
+export async function updateVersion(
+  id: string,
+  projectId: string,
+  patch: { name?: string; description?: string | null; startDate?: string | null; releaseDate?: string | null },
+): Promise<ProjectVersion> {
+  const current = (
+    await json<VersionDto[]>(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/versions`))
+  ).find((row) => String(row.id) === id);
+  if (!current) throw new Error("버전을 찾을 수 없습니다");
+  const pick = (next: string | null | undefined, currentValue?: string | null) =>
+    next === undefined ? (currentValue ?? null) : next === null || next.trim() === "" ? null : next.trim();
+  const response = await sharedApiFetch(`/api/alm/versions/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: patch.name === undefined ? current.name : patch.name.trim(),
+      description: pick(patch.description, current.description),
+      startDate: pick(patch.startDate, current.startDate),
+      releaseDate: pick(patch.releaseDate, current.releaseDate),
+      expectedVersion: current.version,
+    }),
+  });
+  return mapVersion(await json(response));
+}
+
+/** 완료 판정은 프론트가 알려준다(스프린트 완료와 같은 규칙). 대상이 없으면 이슈는 그대로 둔다. */
+export async function releaseVersion(
+  id: string,
+  doneStatuses: string[],
+  options: { moveUnresolvedTo?: string | null } = {},
+): Promise<ProjectVersion> {
+  const target = options.moveUnresolvedTo ?? null;
+  const response = await sharedApiFetch(`/api/alm/versions/${toBackendId(id)}/release`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      target === null
+        ? { doneStatuses }
+        : { doneStatuses, moveUnresolvedToVersionId: toBackendId(target) },
+    ),
+  });
+  return mapVersion(await json(response));
+}
+
+export async function archiveVersion(id: string): Promise<ProjectVersion> {
+  const response = await sharedApiFetch(`/api/alm/versions/${toBackendId(id)}/archive`, { method: "POST" });
+  return mapVersion(await json(response));
+}
+
+export async function deleteVersion(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/versions/${toBackendId(id)}`, { method: "DELETE" }));
 }
 
 // ── 변경 이력 ────────────────────────────────────────────────

@@ -172,6 +172,7 @@ describe("jiraApi issues", () => {
         estimateHours: 2.5,
         labels: ["backend"],
         resolution: null,
+        fixVersionId: null,
       },
       expectedVersion: 2,
     });

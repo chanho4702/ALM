@@ -2759,3 +2759,44 @@ body {
   background: transparent;
   color: var(--chanho-color-text-brand);
 }
+
+/* ── 릴리스 허브 ─────────────────────────────────────────── */
+
+.release-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-large);
+  background: var(--chanho-color-background-surface-raised);
+}
+
+.release-row.is-archived {
+  opacity: 0.7;
+}
+
+.release-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  flex-wrap: wrap;
+}
+
+.release-row-spacer {
+  flex: 1;
+}
+
+.release-name {
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}

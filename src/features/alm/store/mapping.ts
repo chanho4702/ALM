@@ -6,6 +6,7 @@ import type {
   IssueResolution,
   IssueType,
   Project,
+  ProjectVersion,
   Sprint,
 } from "./types";
 
@@ -38,6 +39,7 @@ export interface IssueDto {
   dueDate?: string | null;
   estimateHours?: number | null;
   resolution?: IssueResolutionDto | null;
+  fixVersionId?: number | null;
   labels?: string[] | null;
   order?: number;
   version: number;
@@ -146,6 +148,41 @@ export function toApiResolution(resolution: IssueResolution | null): IssueResolu
   return resolution.toUpperCase() as IssueResolutionDto;
 }
 
+export interface VersionDto {
+  id: number;
+  projectId: number;
+  name: string;
+  description?: string | null;
+  startDate?: string | null;
+  releaseDate?: string | null;
+  status: "UNRELEASED" | "RELEASED" | "ARCHIVED";
+  releasedAt?: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const VERSION_STATUS_FROM_API: Record<VersionDto["status"], ProjectVersion["status"]> = {
+  UNRELEASED: "unreleased",
+  RELEASED: "released",
+  ARCHIVED: "archived",
+};
+
+export function mapVersion(dto: VersionDto): ProjectVersion {
+  const version: ProjectVersion = {
+    id: String(dto.id),
+    projectId: String(dto.projectId),
+    name: dto.name,
+    description: dto.description ?? "",
+    status: VERSION_STATUS_FROM_API[dto.status],
+    createdAt: dto.createdAt,
+  };
+  if (dto.startDate) version.startDate = dto.startDate;
+  if (dto.releaseDate) version.releaseDate = dto.releaseDate;
+  if (dto.releasedAt) version.releasedAt = dto.releasedAt;
+  return version;
+}
+
 export interface IssueChangeDto {
   id: number;
   issueId: number;
@@ -210,6 +247,7 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     dueDate: dto.dueDate ?? null,
     estimateHours: dto.estimateHours ?? null,
     resolution: dto.resolution ? RESOLUTIONS_FROM_API[dto.resolution] : null,
+    fixVersionId: dto.fixVersionId == null ? null : String(dto.fixVersionId),
     labels: dto.labels ? [...dto.labels] : [],
     order: dto.order ?? order,
     createdAt: dto.createdAt,

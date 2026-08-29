@@ -102,6 +102,20 @@
 - REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
   규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
 
+## 버전(릴리스) (2026-08-30)
+
+`versions: ProjectVersion[]`(프로젝트별, 이름 유일)와 `Issue.fixVersionId`. 상태는 지라와 같은
+`unreleased`/`released`/`archived`.
+
+- `createVersion`·`updateVersion`(이름 중복·날짜 역전 거부)·`releaseVersion`·`archiveVersion`·
+  `deleteVersion`(달린 이슈의 수정 버전을 비운다)·`versionProgress`(카테고리 done 기준).
+- **릴리스 규칙**: 미완료 이슈는 `moveUnresolvedTo`가 있으면 그 버전(같은 프로젝트·미릴리스만)으로,
+  없으면 **그대로 둔다**(지라 기본). 대상 검증 실패 시 릴리스 자체가 일어나지 않는다.
+- 이슈에 달 수 있는 버전: 같은 프로젝트이고 보관되지 않은 것(`assertVersionAssignable`).
+- REST 어댑터의 `releaseVersion(id, doneStatuses, {moveUnresolvedTo})`는 스프린트 완료와 같은 규칙으로
+  완료 상태 목록을 프론트가 보낸다(서버 V7, `moveUnresolvedToVersionId`).
+- 활동로그 `type: "fixversion"`.
+
 ## 변경 이력 (2026-08-29)
 
 `changes: IssueChange[]`가 상태·스프린트 소속 변경을 남긴다. 서버 `issue_change_log`와 같은 모양이라

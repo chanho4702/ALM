@@ -21,6 +21,7 @@ export interface JiraOutletContext {
 const VIEW_TABS = [
   { id: "dashboard", label: "요약" },
   { id: "reports", label: "리포트" },
+  { id: "releases", label: "릴리스" },
   { id: "timeline", label: "타임라인" },
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },

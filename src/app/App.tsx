@@ -31,6 +31,10 @@ const TimelinePage = lazy(() =>
   import("../features/alm/pages/TimelinePage").then((module) => ({ default: module.TimelinePage })),
 );
 
+const ReleasesPage = lazy(() =>
+  import("../features/alm/pages/ReleasesPage").then((module) => ({ default: module.ReleasesPage })),
+);
+
 const ReportsPage = lazy(() =>
   import("../features/alm/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })),
 );
@@ -72,6 +76,20 @@ export function App() {
           element={<ProjectLayout projects={projects} onProjectsChanged={reload} />}
         >
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            path="releases"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="릴리스 불러오는 중" />
+                  </div>
+                }
+              >
+                <ReleasesPage />
+              </Suspense>
+            }
+          />
           <Route
             path="reports"
             element={

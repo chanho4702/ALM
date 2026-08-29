@@ -17,6 +17,7 @@ import type {
   Project,
   ProjectMember,
   ProjectRole,
+  ProjectVersion,
   ProjectSettingsEntry,
   SettingsBody,
   SettingsScheme,
@@ -92,6 +93,7 @@ function normalize(data: JiraData): JiraData {
     issue.parentId ??= null;
     issue.estimateHours ??= null;
     issue.resolution ??= null;
+    issue.fixVersionId ??= null;
   }
   data.notifications ??= [];
   data.boards ??= [];
@@ -99,6 +101,7 @@ function normalize(data: JiraData): JiraData {
   data.worklogs ??= [];
   data.changes ??= [];
   data.members ??= [];
+  data.versions ??= [];
   // 멤버가 없는 프로젝트에는 현재 사용자를 관리자로 넣는다 — 관리자 없는 프로젝트를 만들지 않는다
   for (const project of data.projects) {
     if (!data.members.some((m) => m.projectId === project.id)) {
@@ -287,6 +290,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.worklogs = data.worklogs.filter((w) => !issueIds.has(w.issueId));
   data.changes = data.changes.filter((c) => c.projectId !== id);
   data.members = data.members.filter((m) => m.projectId !== id);
+  data.versions = data.versions.filter((v) => v.projectId !== id);
   data.projectSettings = data.projectSettings.filter((e) => e.projectId !== id);
   delete data.issueCounters[id];
   persist();
@@ -340,6 +344,19 @@ function assertParentAllowed(data: JiraData, issue: Issue, parentId: string | nu
 function userLabel(data: JiraData, userId: string | null): string {
   if (!userId) return "미지정";
   return data.users.find((u) => u.id === userId)?.name ?? "미지정";
+}
+
+function versionLabel(data: JiraData, versionId: string | null): string {
+  if (!versionId) return "없음";
+  return data.versions.find((v) => v.id === versionId)?.name ?? "없음";
+}
+
+/** 이슈에 달 수 있는 버전인지 — 같은 프로젝트이고 보관되지 않았어야 한다 */
+function assertVersionAssignable(data: JiraData, versionId: string, projectId: string): void {
+  const version = data.versions.find((v) => v.id === versionId);
+  if (!version) throw new Error("버전을 찾을 수 없습니다");
+  if (version.projectId !== projectId) throw new Error("다른 프로젝트의 버전입니다");
+  if (version.status === "archived") throw new Error("보관된 버전에는 이슈를 달 수 없습니다");
 }
 
 function sprintLabel(data: JiraData, sprintId: string | null): string {
@@ -510,6 +527,9 @@ function recordChanges(data: JiraData, before: Issue, after: Issue, at: string):
     const label = (r: IssueResolution | null) => (r ? RESOLUTION_LABELS[r] : "없음");
     push("resolution", `${label(before.resolution)} → ${label(after.resolution)}`);
   }
+  if (before.fixVersionId !== after.fixVersionId) {
+    push("fixversion", `${versionLabel(data, before.fixVersionId)} → ${versionLabel(data, after.fixVersionId)}`);
+  }
   notifyIssueChanges(data, before, after, at);
 }
 
@@ -655,6 +675,166 @@ function assertNotLastAdmin(data: JiraData, projectId: string, userId: string): 
   if (otherAdmins.length === 0) {
     throw new Error("프로젝트에는 관리자가 최소 한 명 필요합니다");
   }
+}
+
+// ── versions (릴리스) ─────────────────────────────────────────
+
+export interface VersionInput {
+  name?: string;
+  description?: string | null;
+  startDate?: string | null;
+  releaseDate?: string | null;
+}
+
+function dateValue(next: string | null | undefined, current: string | undefined) {
+  if (next === undefined) return current;
+  const trimmed = (next ?? "").trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+function assertVersionDates(startDate?: string, releaseDate?: string): void {
+  if (startDate && releaseDate && startDate > releaseDate) {
+    throw new Error("시작일은 릴리스일보다 늦을 수 없습니다");
+  }
+}
+
+/** 만든 순서 — 릴리스 허브는 최신을 위에 보이려면 화면에서 뒤집는다 */
+export async function listVersions(projectId: string): Promise<ProjectVersion[]> {
+  return clone(load().versions.filter((v) => v.projectId === projectId));
+}
+
+export async function createVersion(
+  projectId: string,
+  input: VersionInput & { name: string },
+): Promise<ProjectVersion> {
+  const data = load();
+  if (!data.projects.some((p) => p.id === projectId)) throw new Error("프로젝트를 찾을 수 없습니다");
+  assertCanEdit(data, projectId);
+  const name = input.name.trim();
+  if (!name) throw new Error("버전 이름을 입력하세요");
+  if (data.versions.some((v) => v.projectId === projectId && v.name === name)) {
+    throw new Error(`이미 있는 버전 이름입니다: ${name}`);
+  }
+  const startDate = dateValue(input.startDate, undefined);
+  const releaseDate = dateValue(input.releaseDate, undefined);
+  assertVersionDates(startDate, releaseDate);
+  const version: ProjectVersion = {
+    id: nextId(),
+    projectId,
+    name,
+    description: input.description?.trim() ?? "",
+    status: "unreleased",
+    createdAt: new Date().toISOString(),
+  };
+  if (startDate) version.startDate = startDate;
+  if (releaseDate) version.releaseDate = releaseDate;
+  data.versions.push(version);
+  persist();
+  return clone(version);
+}
+
+export async function updateVersion(id: string, patch: VersionInput): Promise<ProjectVersion> {
+  const data = load();
+  const version = requireVersion(data, id);
+  assertCanEdit(data, version.projectId);
+  const name = patch.name === undefined ? version.name : patch.name.trim();
+  if (!name) throw new Error("버전 이름을 입력하세요");
+  if (
+    name !== version.name &&
+    data.versions.some((v) => v.projectId === version.projectId && v.name === name)
+  ) {
+    throw new Error(`이미 있는 버전 이름입니다: ${name}`);
+  }
+  const startDate = dateValue(patch.startDate, version.startDate);
+  const releaseDate = dateValue(patch.releaseDate, version.releaseDate);
+  assertVersionDates(startDate, releaseDate);
+  version.name = name;
+  if (patch.description !== undefined) version.description = patch.description?.trim() ?? "";
+  if (startDate === undefined) delete version.startDate;
+  else version.startDate = startDate;
+  if (releaseDate === undefined) delete version.releaseDate;
+  else version.releaseDate = releaseDate;
+  persist();
+  return clone(version);
+}
+
+/**
+ * 릴리스. 미완료(카테고리 done 아님) 이슈는 `moveUnresolvedTo`로 옮기고, 지정이 없으면
+ * 그 버전에 그대로 둔다(지라와 동일). 대상 검증이 실패하면 릴리스 자체가 일어나지 않는다.
+ */
+export async function releaseVersion(
+  id: string,
+  options: { moveUnresolvedTo?: string | null } = {},
+): Promise<ProjectVersion> {
+  const data = load();
+  const version = requireVersion(data, id);
+  assertCanEdit(data, version.projectId);
+  if (version.status === "released") throw new Error("이미 릴리스된 버전입니다");
+  if (version.status === "archived") throw new Error("보관된 버전은 릴리스할 수 없습니다");
+  const targetId = options.moveUnresolvedTo ?? null;
+  if (targetId !== null) {
+    if (targetId === id) throw new Error("릴리스하는 버전으로는 이관할 수 없습니다");
+    const target = requireVersion(data, targetId);
+    if (target.projectId !== version.projectId) throw new Error("다른 프로젝트의 버전입니다");
+    if (target.status === "released") throw new Error("릴리스된 버전으로는 이관할 수 없습니다");
+    if (target.status === "archived") throw new Error("보관된 버전으로는 이관할 수 없습니다");
+    const now = new Date().toISOString();
+    for (const issue of data.issues) {
+      if (
+        issue.fixVersionId === id &&
+        statusCategoryOf(data, issue.projectId, issue.status) !== "done"
+      ) {
+        issue.fixVersionId = targetId;
+        issue.updatedAt = now;
+      }
+    }
+  }
+  version.status = "released";
+  version.releasedAt = new Date().toISOString();
+  persist();
+  return clone(version);
+}
+
+export async function archiveVersion(id: string): Promise<ProjectVersion> {
+  const data = load();
+  const version = requireVersion(data, id);
+  assertCanEdit(data, version.projectId);
+  if (version.status === "archived") throw new Error("이미 보관된 버전입니다");
+  version.status = "archived";
+  persist();
+  return clone(version);
+}
+
+/** 지우면 달려 있던 이슈의 수정 버전이 비워진다(이슈는 남는다) */
+export async function deleteVersion(id: string): Promise<void> {
+  const data = load();
+  const version = requireVersion(data, id);
+  assertCanEdit(data, version.projectId);
+  for (const issue of data.issues) {
+    if (issue.fixVersionId === id) issue.fixVersionId = null;
+  }
+  data.versions = data.versions.filter((v) => v.id !== id);
+  persist();
+}
+
+/** 릴리스 허브의 진행률 — 완료 판정은 카테고리 */
+export async function versionProgress(
+  id: string,
+): Promise<{ total: number; done: number; percent: number }> {
+  const data = load();
+  const version = requireVersion(data, id);
+  const issues = data.issues.filter((i) => i.fixVersionId === version.id);
+  const done = issues.filter(
+    (i) => statusCategoryOf(data, i.projectId, i.status) === "done",
+  ).length;
+  const total = issues.length;
+  return { total, done, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
+}
+
+function requireVersion(data: JiraData, id: string): ProjectVersion {
+  const version = data.versions.find((v) => v.id === id);
+  if (!version) throw new Error("버전을 찾을 수 없습니다");
+  return version;
 }
 
 // ── sprints ──────────────────────────────────────────────────
@@ -954,6 +1134,7 @@ export async function createIssue(input: {
     dueDate: input.dueDate ?? null,
     estimateHours: null,
     resolution: null,
+    fixVersionId: null,
     labels: input.labels ?? [],
     order: maxOrder + 1,
     createdAt: now,
@@ -995,6 +1176,7 @@ export async function updateIssue(
       | "labels"
       | "estimateHours"
       | "resolution"
+      | "fixVersionId"
     >
   >,
 ): Promise<Issue> {
@@ -1005,6 +1187,9 @@ export async function updateIssue(
     throw new Error("예상 시간은 0보다 커야 합니다");
   }
   assertCanEdit(data, issue.projectId);
+  if (patch.fixVersionId !== undefined && patch.fixVersionId !== null) {
+    assertVersionAssignable(data, patch.fixVersionId, issue.projectId);
+  }
   if (patch.status !== undefined) {
     assertValidStatus(data, issue.projectId, patch.status);
     assertTransitionAllowed(data, issue.projectId, issue.status, patch.status);

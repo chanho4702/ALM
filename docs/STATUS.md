@@ -92,7 +92,7 @@ CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만
 
 ## 품질 상태
 
-- 테스트 **353 케이스 / 35 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **369 케이스 / 37 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 
@@ -114,8 +114,8 @@ CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만
 
 **R2 착수**(2026-08-29): 프로젝트 멤버·역할(설정 → 사용자·권한 탭). 역할은 org-service
 GrantRole과 1:1이며, 마지막 관리자 보호와 역할별 쓰기 가드를 스토어가 강제한다. 남은 R2는
-버전/릴리스, 첨부파일, 대량 변경, 서버 검색, 온프렘 이관 도구.
-해결(Resolution)은 완료했다(2026-08-29, 서버 V6 포함).
+첨부파일, 대량 변경, 서버 검색, 온프렘 이관 도구.
+해결(Resolution)은 완료했다(2026-08-29, 서버 V6 포함). 버전/릴리스도 완료했다(2026-08-30, 서버 V7 포함).
 
 **R1 완료**(2026-08-29): S1 목표·기간 · S2 계획 합계 · S3 완료 시 이관 선택 · S4 번다운 ·
 S5 스프린트 리포트 · S6 서버 이력 기록. 스크럼 한 사이클이 화면만으로 완주된다.

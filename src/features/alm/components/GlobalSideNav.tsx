@@ -29,6 +29,7 @@ const clampWidth = (width: number) =>
 /** 프로젝트 하위 페이지 — 현재 프로젝트 항목 아래에 중첩 표시된다 */
 const PROJECT_PAGES = [
   { id: "dashboard", label: "요약" },
+  { id: "releases", label: "릴리스" },
   { id: "timeline", label: "타임라인" },
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },

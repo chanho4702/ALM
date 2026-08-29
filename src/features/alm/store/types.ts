@@ -58,6 +58,8 @@ export interface Issue {
   estimateHours: number | null;
   /** 완료 카테고리일 때만 non-null. 완료로 들어가면 "done"이 기본값, 벗어나면 null */
   resolution: IssueResolution | null;
+  /** 수정 버전(fix version). null = 미지정 */
+  fixVersionId: string | null;
   labels: string[]; // 자유 문자열 라벨
   order: number; // 컬럼/목록 내 정렬
   createdAt: string;
@@ -89,7 +91,8 @@ export interface Activity {
     | "parent"
     | "link"
     | "worklog"
-    | "resolution";
+    | "resolution"
+    | "fixversion";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }
@@ -195,6 +198,22 @@ export interface ProjectMember {
   role: ProjectRole;
 }
 
+/** 버전 상태 — 지라와 같은 3단계 */
+export type VersionStatus = "unreleased" | "released" | "archived";
+
+/** 버전(릴리스). 이름은 프로젝트 안에서 유일하다 */
+export interface ProjectVersion {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  startDate?: string; // "YYYY-MM-DD"
+  releaseDate?: string;
+  status: VersionStatus;
+  releasedAt?: string;
+  createdAt: string;
+}
+
 /** 이력으로 남기는 필드 — 서버 V5 issue_change_log와 같은 범위(상태·스프린트 소속) */
 export type ChangeField = "status" | "sprint";
 
@@ -257,6 +276,8 @@ export interface JiraData {
   changes: IssueChange[];
   /** 프로젝트 멤버십과 역할 */
   members: ProjectMember[];
+  /** 버전(릴리스) */
+  versions: ProjectVersion[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

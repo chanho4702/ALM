@@ -34,6 +34,7 @@ function issue(over: Partial<Issue> & { id: string }): Issue {
     dueDate: null,
     estimateHours: null,
     resolution: null,
+    fixVersionId: null,
     labels: [],
     order: 1,
     createdAt: "2026-08-24T00:00:00.000Z",

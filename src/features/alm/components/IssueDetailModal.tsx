@@ -24,6 +24,7 @@ import type {
   IssueResolution,
   IssueStatus,
   IssueType,
+  ProjectVersion,
   Sprint,
   User,
   WorkflowStatus,
@@ -46,6 +47,7 @@ import {
   listIssues,
   listSprints,
   listUsers,
+  listVersions,
   listWorklogs,
   removeIssueLink,
   resolveSettings,
@@ -67,6 +69,7 @@ import {
 } from "./labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
+const NO_VERSION = "__no_version__";
 const UNASSIGNED = "unassigned";
 const BACKLOG = "backlog";
 const NO_PARENT = "none";
@@ -93,6 +96,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [issue, setIssue] = useState<Issue | null>(null);
   const [me, setMe] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -142,6 +146,18 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     setProjectIssues(allIssues);
     setWorklogs(worklogList);
   };
+
+  // 수정 버전 후보 — 프로젝트가 바뀔 때만 다시 읽는다
+  useEffect(() => {
+    if (!issue) return;
+    let cancelled = false;
+    void listVersions(issue.projectId).then((list) => {
+      if (!cancelled) setVersions(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [issue?.projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +216,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         | "labels"
         | "estimateHours"
       | "resolution"
+      | "fixVersionId"
       >
     >,
     successTitle: string,
@@ -691,6 +708,20 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             ]}
             onValueChange={(v) =>
               void applyPatch({ sprintId: v === BACKLOG ? null : v }, "스프린트를 변경했습니다")
+            }
+          />
+          <Select
+            label="수정 버전"
+            value={issue.fixVersionId ?? NO_VERSION}
+            options={[
+              { value: NO_VERSION, label: "없음" },
+              // 보관된 버전은 선택지에서 제외하되, 현재 값이면 표시를 위해 포함
+              ...versions
+                .filter((v) => v.status !== "archived" || v.id === issue.fixVersionId)
+                .map((v) => ({ value: v.id, label: v.name })),
+            ]}
+            onValueChange={(v) =>
+              void applyPatch({ fixVersionId: v === NO_VERSION ? null : v }, "수정 버전을 변경했습니다")
             }
           />
           <TextField
