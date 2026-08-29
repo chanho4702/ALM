@@ -24,6 +24,9 @@ export function createSeedData(): JiraData {
   };
 
   const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  // 스프린트 시작과 그 시점 편입 이력은 **같은 순간**이어야 한다. 호출마다 Date.now()를 다시 읽으면
+  // 편입이 시작보다 몇 ms 늦어져 리포트가 "시작 후 추가된 이슈"로 센다.
+  const sprintStartedAt = daysAgo(5);
   // 로컬 달력 기준 날짜 — 리포트 집계도 로컬 경계를 쓴다. UTC로 만들면 자정 근처에서 하루 밀린다.
   const dayKey = (offsetDays: number) => {
     const date = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
@@ -41,7 +44,7 @@ export function createSeedData(): JiraData {
     goal: "보드와 백로그를 실제로 쓸 수 있게 만든다",
     plannedStart: dayKey(-5),
     plannedEnd: dayKey(9),
-    startedAt: daysAgo(5),
+    startedAt: sprintStartedAt,
   };
 
   const base = {
@@ -173,8 +176,8 @@ export function createSeedData(): JiraData {
   for (const issue of issues) {
     const inSprint = issue.sprintId === "s1";
     // 스프린트 이슈는 전부 "할 일"로 시작했다 — 이후 전이는 아래에서 준다
-    pushChange(issue.id, "status", null, inSprint ? "todo" : issue.status, daysAgo(5), issue.sprintId);
-    if (inSprint) pushChange(issue.id, "sprint", null, "s1", daysAgo(5), "s1");
+    pushChange(issue.id, "status", null, inSprint ? "todo" : issue.status, sprintStartedAt, issue.sprintId);
+    if (inSprint) pushChange(issue.id, "sprint", null, "s1", sprintStartedAt, "s1");
   }
   pushChange("i3", "status", "todo", "inprogress", daysAgo(3), "s1");
   pushChange("i2", "status", "todo", "inprogress", daysAgo(2), "s1");

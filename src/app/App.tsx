@@ -14,13 +14,17 @@ import { ProjectCreatePage } from "../features/alm/pages/ProjectCreatePage";
 import { ProjectSettingsPage } from "../features/alm/pages/ProjectSettingsPage";
 import { DashboardPage } from "../features/alm/pages/DashboardPage";
 import { HomePage } from "../features/alm/pages/HomePage";
-import { TimelinePage } from "../features/alm/pages/TimelinePage";
 import { SearchPage } from "../features/alm/pages/SearchPage";
 import { GlobalSettingsPage } from "../features/alm/pages/GlobalSettingsPage";
 
 /**
  * 리포트만 차트 라이브러리(recharts)를 쓴다 — 첫 화면 번들에 넣지 않고 라우트 단위로 쪼갠다.
  */
+/** 타임라인도 차트 라이브러리(frappe-gantt)를 쓴다 — 방문자만 내려받게 라우트를 쪼갠다 */
+const TimelinePage = lazy(() =>
+  import("../features/alm/pages/TimelinePage").then((module) => ({ default: module.TimelinePage })),
+);
+
 const ReportsPage = lazy(() =>
   import("../features/alm/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })),
 );
@@ -76,7 +80,20 @@ export function App() {
               </Suspense>
             }
           />
-          <Route path="timeline" element={<TimelinePage />} />
+          <Route
+            path="timeline"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="타임라인 불러오는 중" />
+                  </div>
+                }
+              >
+                <TimelinePage />
+              </Suspense>
+            }
+          />
           <Route path="board" element={<BoardRedirect />} />
           <Route path="boards/:boardId" element={<BoardPage />} />
           <Route path="backlog" element={<BacklogPage />} />

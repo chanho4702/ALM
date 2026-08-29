@@ -22,52 +22,43 @@ beforeEach(() => {
 });
 
 describe("TimelinePage", () => {
-  it("프로젝트 이슈 전체가 행으로 렌더되고, 마감일 있는 이슈는 여러 날 막대를 가진다", async () => {
+  it("프로젝트 이슈 전체가 행으로 렌더되고 에픽 하위가 붙는다", async () => {
     renderTimeline();
 
-    const timeline = await screen.findByTestId("timeline");
-    // 시드 이슈 8개 = 좌측 행 8개
+    await screen.findByTestId("timeline");
+    const legend = screen.getByRole("list", { name: "타임라인 이슈" });
     for (const key of ["ALM-1", "ALM-4", "ALM-8"]) {
-      expect(within(timeline).getByText(key)).toBeInTheDocument();
+      expect(within(legend).getByText(key)).toBeInTheDocument();
     }
-    // 막대 8개 (마감일 없는 이슈도 하루짜리 막대)
-    const bars = within(timeline).getAllByRole("button", { name: /타임라인 막대/ });
-    expect(bars).toHaveLength(8);
-
-    // 마감일 있는 ALM-4(오늘~+7일)는 하루짜리(ALM-7)보다 넓다
-    const wide = bars.find((b) => b.getAttribute("aria-label")?.startsWith("ALM-4"))!;
-    const dot = bars.find((b) => b.getAttribute("aria-label")?.startsWith("ALM-7"))!;
-    expect(parseInt(wide.style.width)).toBeGreaterThan(parseInt(dot.style.width));
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(8);
+    // 에픽(ALM-4) 바로 다음에 그 하위(ALM-2)가 온다
+    const keys = within(legend)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent ?? "");
+    const epicIndex = keys.findIndex((text) => text.includes("ALM-4"));
+    expect(keys[epicIndex + 1]).toContain("ALM-2");
   });
 
-  it("막대를 클릭하면 이슈 상세 모달이 열린다", async () => {
+  it("일정 표는 시작·종료일을 보여주고 행을 누르면 상세가 열린다", async () => {
     const user = userEvent.setup();
     renderTimeline();
 
-    const timeline = await screen.findByTestId("timeline");
-    await user.click(
-      within(timeline)
-        .getAllByRole("button", { name: /타임라인 막대/ })
-        .find((b) => b.getAttribute("aria-label")?.startsWith("ALM-2"))!,
-    );
-    expect(await screen.findByRole("dialog", { name: "ALM-2" })).toBeInTheDocument();
+    const table = await screen.findByRole("table", { name: "일정 표" });
+    const row = within(table).getByText("ALM-4").closest("tr")!;
+    // 마감일이 있는 이슈는 종료일이 시작일과 다르다
+    const cells = within(row).getAllByRole("cell");
+    expect(cells[1].textContent).not.toBe(cells[2].textContent);
+
+    await user.click(within(table).getByRole("button", { name: /ALM-4/ }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("백로그 화면 구현");
   });
-});
 
-describe("타임라인 에픽 그룹핑", () => {
-  it("에픽 행 바로 아래에 자식이 들여쓰기로 나열된다", async () => {
+  it("보기 단위를 바꿀 수 있다", async () => {
+    const user = userEvent.setup();
     renderTimeline();
-    const timeline = await screen.findByTestId("timeline");
 
-    const rowButtons = Array.from(
-      timeline.querySelectorAll<HTMLButtonElement>(".timeline-issue"),
-    );
-    const keys = rowButtons.map((b) => b.textContent?.match(/ALM-\d+/)?.[0]);
-    // 에픽 ALM-4가 먼저, 자식 ALM-2가 바로 다음
-    const epicIndex = keys.indexOf("ALM-4");
-    expect(epicIndex).toBeGreaterThanOrEqual(0);
-    expect(keys[epicIndex + 1]).toBe("ALM-2");
-    expect(rowButtons[epicIndex + 1]).toHaveClass("is-child");
-    expect(rowButtons[epicIndex]).not.toHaveClass("is-child");
+    await user.click(await screen.findByRole("radio", { name: "주" }));
+
+    expect(screen.getByRole("radio", { name: "주" })).toBeChecked();
   });
 });

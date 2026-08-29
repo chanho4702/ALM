@@ -21,6 +21,7 @@ import type {
   SettingsScheme,
   Sprint,
   User,
+  WorkflowTransition,
   Worklog,
 } from "./types";
 import { CURRENT_USER_ID } from "../../../mock/users";
@@ -49,6 +50,9 @@ function cloneBody(body: SettingsBody): SettingsBody {
   return {
     statuses: body.statuses.map((s) => ({ ...s })),
     enabledTypes: [...body.enabledTypes],
+    ...(body.transitions
+      ? { transitions: body.transitions.map((t) => ({ ...t, from: [...t.from] })) }
+      : {}),
   };
 }
 
@@ -329,12 +333,17 @@ function sprintLabel(data: JiraData, sprintId: string | null): string {
 }
 
 /** 활동로그 부수효과: before/after를 비교해 변경 항목별 Activity를 쌓는다 */
-/** 프로젝트의 해석된 상태 목록 (내부 동기 버전 — 커스텀 > 스킴 > 기본) */
-function resolvedStatuses(data: JiraData, projectId: string): SettingsBody["statuses"] {
+/** 프로젝트의 해석된 설정 본문 (내부 동기 버전 — 커스텀 > 스킴 > 기본) */
+function resolvedBody(data: JiraData, projectId: string): SettingsBody {
   const entry = data.projectSettings.find((e) => e.projectId === projectId);
-  const scheme = data.schemes.find((s) => s.id === entry?.schemeId) ?? data.schemes.find((s) => s.isDefault);
-  const statuses = entry?.custom?.statuses ?? scheme?.body.statuses;
-  return statuses ?? defaultSettingsBody().statuses;
+  const scheme =
+    data.schemes.find((s) => s.id === entry?.schemeId) ?? data.schemes.find((s) => s.isDefault);
+  return entry?.custom ?? scheme?.body ?? defaultSettingsBody();
+}
+
+/** 프로젝트의 해석된 상태 목록 */
+function resolvedStatuses(data: JiraData, projectId: string): SettingsBody["statuses"] {
+  return resolvedBody(data, projectId).statuses;
 }
 
 function statusNameOf(data: JiraData, projectId: string, statusId: string): string {
@@ -342,6 +351,45 @@ function statusNameOf(data: JiraData, projectId: string, statusId: string): stri
 }
 
 /** 상태 id가 프로젝트 워크플로에 존재하는지 검증 — create/update/moveIssue의 쓰기 가드 */
+/**
+ * 전이 검사 — 목록이 비면 모두 허용(호환 기본값), 정의돼 있으면 목록에 있는 이동만 허용한다.
+ * 같은 상태로의 저장은 전이가 아니다.
+ */
+function assertTransitionAllowed(
+  data: JiraData,
+  projectId: string,
+  from: string,
+  to: string,
+): void {
+  if (from === to) return;
+  const transitions = resolvedBody(data, projectId).transitions ?? [];
+  if (transitions.length === 0) return;
+  const allowed = transitions.some(
+    (transition) =>
+      transition.to === to && (transition.from.length === 0 || transition.from.includes(from)),
+  );
+  if (!allowed) {
+    throw new Error(
+      `${statusNameOf(data, projectId, from)}에서 ${statusNameOf(data, projectId, to)}로 옮길 수 없습니다`,
+    );
+  }
+}
+
+/**
+ * 없는 상태를 가리키는 전이는 남기지 않는다 — 상태를 지우면 그 전이도 함께 사라진다.
+ * 원래 전역 전이(from 비었음)는 그대로 두고, from을 전부 잃은 전이만 버린다.
+ */
+function pruneTransitions(body: SettingsBody): WorkflowTransition[] | undefined {
+  if (!body.transitions) return undefined;
+  const valid = new Set(body.statuses.map((status) => status.id));
+  return body.transitions.flatMap((transition) => {
+    if (!valid.has(transition.to)) return [];
+    const from = transition.from.filter((id) => valid.has(id));
+    if (transition.from.length > 0 && from.length === 0) return [];
+    return [{ ...transition, from }];
+  });
+}
+
 function assertValidStatus(data: JiraData, projectId: string, statusId: string): void {
   if (!resolvedStatuses(data, projectId).some((s) => s.id === statusId)) {
     throw new Error(`이 프로젝트에 없는 상태입니다: ${statusId}`);
@@ -908,7 +956,10 @@ export async function updateIssue(
     throw new Error("예상 시간은 0보다 커야 합니다");
   }
   assertCanEdit(data, issue.projectId);
-  if (patch.status !== undefined) assertValidStatus(data, issue.projectId, patch.status);
+  if (patch.status !== undefined) {
+    assertValidStatus(data, issue.projectId, patch.status);
+    assertTransitionAllowed(data, issue.projectId, issue.status, patch.status);
+  }
   const before = { ...issue, labels: [...issue.labels] };
   // 타입 전환 정합성: 자식이 있는데 규칙 위반 타입이 되면 거부, 자신의 parent가 위반되면 자동 해제
   if (patch.type !== undefined && patch.type !== issue.type) {
@@ -979,6 +1030,7 @@ export async function moveIssue(
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   assertCanEdit(data, issue.projectId);
   assertValidStatus(data, issue.projectId, to.status);
+  assertTransitionAllowed(data, issue.projectId, issue.status, to.status);
   const before = { ...issue };
   issue.status = to.status;
   // 대상 컬럼: 같은 프로젝트·같은 스프린트·대상 상태 (이동 이슈 제외, order 순)
@@ -1401,7 +1453,7 @@ export async function updateScheme(
       .filter((e) => e.schemeId === id && e.custom === null)
       .map((e) => e.projectId);
     migrateIssueStatuses(data, sharedProjects, patch.body);
-    scheme.body = cloneBody(patch.body);
+    scheme.body = cloneBody({ ...patch.body, transitions: pruneTransitions(patch.body) });
   }
   persist();
   return clone(scheme);
@@ -1493,7 +1545,7 @@ export async function updateProjectCustomSettings(
   if (!entry.custom) throw new Error("커스텀 설정을 사용 중일 때만 편집할 수 있습니다");
   validateSettingsBody(body);
   migrateIssueStatuses(data, [projectId], body);
-  entry.custom = cloneBody(body);
+  entry.custom = cloneBody({ ...body, transitions: pruneTransitions(body) });
   persist();
 }
 

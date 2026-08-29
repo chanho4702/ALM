@@ -130,9 +130,25 @@ export interface WorkflowStatus {
   order: number;
 }
 
+/**
+ * 워크플로 전이 — 어느 상태에서 어느 상태로 갈 수 있는가.
+ * `from`이 비면 모든 상태에서 허용한다(지라의 "All statuses" 전이).
+ */
+export interface WorkflowTransition {
+  id: string;
+  name: string;
+  from: string[]; // WorkflowStatus.id 목록. 빈 배열 = 모든 상태
+  to: string; // WorkflowStatus.id
+}
+
 /** 설정 본문 — 스킴과 프로젝트 커스텀이 같은 형태를 공유한다 */
 export interface SettingsBody {
   statuses: WorkflowStatus[];
+  /**
+   * 전이 목록. **비어 있거나 없으면 모든 이동을 허용**한다 — 기존 프로젝트가 갑자기
+   * 막히지 않게 하려는 기본값이다.
+   */
+  transitions?: WorkflowTransition[];
   /** 프로젝트에서 쓸 이슈 타입 — subtask는 항상 포함 */
   enabledTypes: IssueType[];
 }
