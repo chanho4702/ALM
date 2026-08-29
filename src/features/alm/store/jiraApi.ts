@@ -6,6 +6,7 @@ import {
   extractApiError,
   mapIssue,
   mapProject,
+  mapAttachment,
   mapIssueChange,
   mapSprint,
   mapVersion,
@@ -14,6 +15,7 @@ import {
   toApiResolution,
   toApiIssueType,
   toBackendId,
+  type AttachmentDto,
   type IssueChangeDto,
   type IssueDto,
   type ProjectDto,
@@ -21,6 +23,7 @@ import {
   type VersionDto,
 } from "./mapping";
 import type {
+  Attachment,
   ChangeField,
   Issue,
   IssueChange,
@@ -416,6 +419,43 @@ export async function archiveVersion(id: string): Promise<ProjectVersion> {
 
 export async function deleteVersion(id: string): Promise<void> {
   await json(await sharedApiFetch(`/api/alm/versions/${toBackendId(id)}`, { method: "DELETE" }));
+}
+
+// ── 첨부 ─────────────────────────────────────────────────────
+
+export async function listAttachments(issueId: string): Promise<Attachment[]> {
+  const rows = await json<AttachmentDto[]>(
+    await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/attachments`),
+  );
+  return rows.map(mapAttachment);
+}
+
+/** multipart — Content-Type은 브라우저가 boundary와 함께 붙이므로 직접 쓰지 않는다 */
+export async function uploadAttachment(issueId: string, file: File): Promise<Attachment> {
+  const body = new FormData();
+  body.append("file", file, file.name);
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/attachments`, {
+    method: "POST",
+    body,
+  });
+  return mapAttachment(await json(response));
+}
+
+/**
+ * 바이트는 인증 헤더가 필요해 <a href>로 직접 열 수 없다 — fetch로 받아 Blob으로 돌려주고
+ * 화면이 object URL로 저장한다(목업과 같은 계약).
+ */
+export async function downloadAttachment(id: string): Promise<Blob> {
+  const response = await sharedApiFetch(`/api/alm/attachments/${toBackendId(id)}`);
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    throw new Error(extractApiError(response.status, body));
+  }
+  return response.blob();
+}
+
+export async function deleteAttachment(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/attachments/${toBackendId(id)}`, { method: "DELETE" }));
 }
 
 // ── 변경 이력 ────────────────────────────────────────────────

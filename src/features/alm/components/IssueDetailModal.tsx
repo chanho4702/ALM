@@ -40,6 +40,7 @@ import {
   deleteWorklog,
   getCurrentUser,
   getIssueByKey,
+  getMyProjectRole,
   listActivity,
   listChildren,
   listComments,
@@ -57,6 +58,7 @@ import {
 } from "../store/jiraStore";
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { IssueAttachments } from "./IssueAttachments";
 import {
   ISSUE_TYPES,
   PRIORITY_LABELS,
@@ -97,6 +99,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [me, setMe] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
+  const [canEdit, setCanEdit] = useState(true);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -147,13 +150,17 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     setWorklogs(worklogList);
   };
 
-  // 수정 버전 후보 — 프로젝트가 바뀔 때만 다시 읽는다
+  // 수정 버전 후보와 내 역할 — 프로젝트가 바뀔 때만 다시 읽는다
   useEffect(() => {
     if (!issue) return;
     let cancelled = false;
-    void listVersions(issue.projectId).then((list) => {
-      if (!cancelled) setVersions(list);
-    });
+    void Promise.all([listVersions(issue.projectId), getMyProjectRole(issue.projectId)]).then(
+      ([list, role]) => {
+        if (cancelled) return;
+        setVersions(list);
+        setCanEdit(role !== null && role !== "viewer");
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -522,6 +529,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               설명 저장
             </Button>
           </form>
+          <IssueAttachments
+            issueId={issue.id}
+            userNames={Object.fromEntries(users.map((u) => [u.id, u.name]))}
+            canEdit={canEdit}
+            onChanged={() => void onIssueChanged()}
+          />
 
           {/* 하위 이슈 — 에픽/일반 이슈에 표시 (하위 작업은 자식을 가질 수 없다) */}
           {issue.type !== "subtask" ? (

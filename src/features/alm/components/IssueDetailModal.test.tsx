@@ -422,6 +422,29 @@ describe("IssueDetailModal 수정 버전", () => {
   });
 });
 
+describe("IssueDetailModal 첨부", () => {
+  it("파일을 올리면 목록에 나타나고, 삭제하면 사라진다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-5");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-5" });
+    const section = within(dialog).getByRole("region", { name: "첨부" });
+    // 목록은 비동기로 온다 — 로딩 문구 다음에 빈 상태가 나타난다
+    expect(await within(section).findByText("첨부된 파일이 없습니다")).toBeInTheDocument();
+
+    const input = within(section).getByLabelText("파일 올리기") as HTMLInputElement;
+    await user.upload(input, new File(["hello"], "메모.txt", { type: "text/plain" }));
+
+    const row = await within(section).findByText("메모.txt");
+    expect(row.closest("li")).toHaveTextContent("5 B");
+
+    await user.click(within(section).getByRole("button", { name: "메모.txt 삭제" }));
+    await waitFor(() => {
+      expect(within(section).queryByText("메모.txt")).not.toBeInTheDocument();
+    });
+  });
+});
+
 describe("IssueDetailModal 워크로그", () => {
   it("시드(ALM-2): 진행률 '기록 5h / 예상 8h', 워크로그 탭에 2건", async () => {
     const user = userEvent.setup();

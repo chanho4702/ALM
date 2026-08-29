@@ -1,5 +1,6 @@
 import type {
   Activity,
+  Attachment,
   Board,
   BoardType,
   ChangeField,
@@ -102,6 +103,7 @@ function normalize(data: JiraData): JiraData {
   data.changes ??= [];
   data.members ??= [];
   data.versions ??= [];
+  data.attachments ??= [];
   // 멤버가 없는 프로젝트에는 현재 사용자를 관리자로 넣는다 — 관리자 없는 프로젝트를 만들지 않는다
   for (const project of data.projects) {
     if (!data.members.some((m) => m.projectId === project.id)) {
@@ -291,6 +293,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.changes = data.changes.filter((c) => c.projectId !== id);
   data.members = data.members.filter((m) => m.projectId !== id);
   data.versions = data.versions.filter((v) => v.projectId !== id);
+  data.attachments = data.attachments.filter((a) => !issueIds.has(a.issueId));
   data.projectSettings = data.projectSettings.filter((e) => e.projectId !== id);
   delete data.issueCounters[id];
   persist();
@@ -675,6 +678,81 @@ function assertNotLastAdmin(data: JiraData, projectId: string, userId: string): 
   if (otherAdmins.length === 0) {
     throw new Error("프로젝트에는 관리자가 최소 한 명 필요합니다");
   }
+}
+
+// ── attachments ──────────────────────────────────────────────
+
+/**
+ * 목업의 첨부 바이트는 메모리에만 둔다 — localStorage는 5MB 한계와 base64 팽창 때문에 부적합하다.
+ * 새로고침하면 바이트만 사라지고(메타는 남는다) 내려받기가 "저장소에 없음"으로 실패한다. 의도된 한계.
+ */
+const attachmentBlobs = new Map<string, Blob>();
+
+export async function listAttachments(issueId: string): Promise<Attachment[]> {
+  return clone(load().attachments.filter((a) => a.issueId === issueId));
+}
+
+export async function uploadAttachment(issueId: string, file: File): Promise<Attachment> {
+  const data = load();
+  const issue = data.issues.find((i) => i.id === issueId);
+  if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertCanEdit(data, issue.projectId);
+  if (file.size === 0) throw new Error("빈 파일은 올릴 수 없습니다");
+  const now = new Date().toISOString();
+  const attachment: Attachment = {
+    id: nextId(),
+    issueId,
+    filename: file.name || "unnamed",
+    contentType: file.type || "application/octet-stream",
+    sizeBytes: file.size,
+    uploadedBy: CURRENT_USER_ID,
+    createdAt: now,
+  };
+  attachmentBlobs.set(attachment.id, file);
+  data.attachments.push(attachment);
+  data.activities.push({
+    id: nextId(),
+    issueId,
+    actorId: CURRENT_USER_ID,
+    type: "attachment",
+    detail: `${attachment.filename} 첨부`,
+    at: now,
+  });
+  issue.updatedAt = now;
+  persist();
+  return clone(attachment);
+}
+
+export async function downloadAttachment(id: string): Promise<Blob> {
+  const data = load();
+  const attachment = data.attachments.find((a) => a.id === id);
+  if (!attachment) throw new Error("첨부를 찾을 수 없습니다");
+  const blob = attachmentBlobs.get(id);
+  if (!blob) throw new Error("첨부 본문이 저장소에 없습니다 (목업은 새로고침 후 바이트를 잃습니다)");
+  return blob;
+}
+
+export async function deleteAttachment(id: string): Promise<void> {
+  const data = load();
+  const attachment = data.attachments.find((a) => a.id === id);
+  if (!attachment) throw new Error("첨부를 찾을 수 없습니다");
+  const issue = data.issues.find((i) => i.id === attachment.issueId);
+  if (issue) assertCanEdit(data, issue.projectId);
+  data.attachments = data.attachments.filter((a) => a.id !== id);
+  attachmentBlobs.delete(id);
+  if (issue) {
+    const now = new Date().toISOString();
+    data.activities.push({
+      id: nextId(),
+      issueId: issue.id,
+      actorId: CURRENT_USER_ID,
+      type: "attachment",
+      detail: `${attachment.filename} 첨부 삭제`,
+      at: now,
+    });
+    issue.updatedAt = now;
+  }
+  persist();
 }
 
 // ── versions (릴리스) ─────────────────────────────────────────
@@ -1494,6 +1572,7 @@ export async function deleteIssue(id: string): Promise<void> {
   data.links = data.links.filter((l) => l.sourceId !== id && l.targetId !== id);
   data.worklogs = data.worklogs.filter((w) => w.issueId !== id);
   data.changes = data.changes.filter((c) => c.issueId !== id);
+  data.attachments = data.attachments.filter((a) => a.issueId !== id);
   for (const child of data.issues) {
     if (child.parentId === id) child.parentId = null; // 자식은 부모만 해제
   }

@@ -211,6 +211,7 @@ export function createSeedData(): JiraData {
     changes,
     members,
     versions: [],
+    attachments: [],
     // 지라식 설정 스킴 — 디폴트 스킴에 전 프로젝트 배정 (상태 id = 기존 status 값)
     schemes: [
       {

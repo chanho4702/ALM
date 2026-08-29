@@ -102,6 +102,18 @@
 - REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
   규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
 
+## 첨부 (2026-08-30)
+
+`attachments: Attachment[]`(메타)와 `uploadAttachment`/`listAttachments`/`downloadAttachment`/
+`deleteAttachment`. **바이트는 목업에서 메모리(Map)에만** 있다 — localStorage는 5MB 한계와 base64
+팽창 때문에 부적합하고, 새로고침하면 바이트만 사라진다(메타는 남는다). 의도된 한계.
+
+- 내려받기 계약은 목업·REST 모두 **Blob**이다. REST는 인증 헤더가 필요해 `<a href>`로 직접 열 수
+  없고, 화면이 Blob을 object URL로 저장한다.
+- 올리기/삭제는 편집 권한, 삭제 연쇄는 `deleteIssue`·`deleteProject`. 활동로그 `type: "attachment"`.
+- 서버는 클라이언트 Content-Type을 믿지 않고 매직 바이트로 판별한다(wiki-backend와 같은 정책).
+  인라인 표시는 래스터 이미지 4종만 허용, 다운로드는 항상 attachment 처분.
+
 ## 버전(릴리스) (2026-08-30)
 
 `versions: ProjectVersion[]`(프로젝트별, 이름 유일)와 `Issue.fixVersionId`. 상태는 지라와 같은

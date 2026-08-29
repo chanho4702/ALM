@@ -2800,3 +2800,92 @@ body {
   font-size: var(--chanho-font-size-200);
   font-weight: var(--chanho-font-weight-semibold);
 }
+
+/* ── 이슈 첨부 ───────────────────────────────────────────── */
+
+.issue-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.issue-attachments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+}
+
+.issue-attachments-head h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+/* 실제 input은 숨기되 포커스는 라벨 상자에 보이게 — 파일 입력의 기본 모양은 제어할 수 없다 */
+.issue-attachments-upload {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--chanho-space-50) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-surface);
+  font-size: var(--chanho-font-size-75);
+  cursor: pointer;
+}
+
+.issue-attachments-upload input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.issue-attachments-upload:has(input:focus-visible) {
+  outline: 2px solid var(--chanho-color-border-brand);
+  outline-offset: 2px;
+}
+
+.issue-attachments-upload:hover {
+  background: var(--chanho-color-background-neutral);
+}
+
+.issue-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issue-attachment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border-radius: var(--chanho-radius-small);
+}
+
+.issue-attachment-row:hover {
+  background: var(--chanho-color-background-neutral);
+}
+
+.issue-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-attachment-meta {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  white-space: nowrap;
+}

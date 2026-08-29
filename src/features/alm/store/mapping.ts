@@ -1,4 +1,5 @@
 import type {
+  Attachment,
   ChangeField,
   Issue,
   IssueChange,
@@ -181,6 +182,28 @@ export function mapVersion(dto: VersionDto): ProjectVersion {
   if (dto.releaseDate) version.releaseDate = dto.releaseDate;
   if (dto.releasedAt) version.releasedAt = dto.releasedAt;
   return version;
+}
+
+export interface AttachmentDto {
+  id: number;
+  issueId: number;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: number;
+  createdAt: string;
+}
+
+export function mapAttachment(dto: AttachmentDto): Attachment {
+  return {
+    id: String(dto.id),
+    issueId: String(dto.issueId),
+    filename: dto.filename,
+    contentType: dto.contentType,
+    sizeBytes: dto.sizeBytes,
+    uploadedBy: String(dto.uploadedBy),
+    createdAt: dto.createdAt,
+  };
 }
 
 export interface IssueChangeDto {

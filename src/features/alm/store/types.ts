@@ -92,7 +92,8 @@ export interface Activity {
     | "link"
     | "worklog"
     | "resolution"
-    | "fixversion";
+    | "fixversion"
+    | "attachment";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }
@@ -214,6 +215,20 @@ export interface ProjectVersion {
   createdAt: string;
 }
 
+/**
+ * 이슈 첨부 메타. 바이트는 서버(오브젝트 스토리지)에 있고 목업은 메모리에만 둔다 — 새로고침하면
+ * 목업의 바이트는 사라진다(메타는 남는다). localStorage는 용량·base64 팽창 때문에 부적합하다.
+ */
+export interface Attachment {
+  id: string;
+  issueId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  createdAt: string;
+}
+
 /** 이력으로 남기는 필드 — 서버 V5 issue_change_log와 같은 범위(상태·스프린트 소속) */
 export type ChangeField = "status" | "sprint";
 
@@ -278,6 +293,8 @@ export interface JiraData {
   members: ProjectMember[];
   /** 버전(릴리스) */
   versions: ProjectVersion[];
+  /** 이슈 첨부 메타 */
+  attachments: Attachment[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */
