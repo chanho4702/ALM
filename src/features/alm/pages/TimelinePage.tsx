@@ -122,6 +122,12 @@ export function TimelinePage() {
   useEffect(() => {
     const container = chartRef.current;
     if (!container || tasks.length === 0) return;
+    // 라이브러리는 생성 뒤 타이머에서도 SVG 계측(getBBox)을 부른다 — 그 호출은 아래 try 밖이라
+    // 잡히지 않고 미처리 오류가 된다. 계측이 없는 환경(jsdom)은 그리기 전에 대체본으로 보낸다.
+    if (typeof SVGElement === "undefined" || !("getBBox" in SVGElement.prototype)) {
+      setChartFailed(true);
+      return;
+    }
     try {
       if (!ganttRef.current) {
         ganttRef.current = new Gantt(container, tasks, {

@@ -56,6 +56,14 @@ describe("TimelinePage", () => {
     expect(await screen.findByRole("dialog")).toHaveTextContent("백로그 화면 구현");
   });
 
+  it("SVG 계측이 없는 환경에서는 그래픽 대신 사유와 표를 보여준다", async () => {
+    renderTimeline();
+
+    // jsdom에는 getBBox가 없다 — 침묵 실패가 아니라 상태로 드러나야 한다
+    expect(await screen.findByText(/간트 그래픽을 그릴 수 없습니다/)).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "일정 표" })).toBeInTheDocument();
+  });
+
   it("보기 단위를 바꿀 수 있다", async () => {
     const user = userEvent.setup();
     renderTimeline();
