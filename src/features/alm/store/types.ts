@@ -196,9 +196,16 @@ export interface WorkflowTransition {
   to: string; // WorkflowStatus.id
 }
 
+/** 워크플로 캔버스 노드 위치 — 상태 id(또는 `WORKFLOW_ANY_NODE`) → 좌상단 좌표 */
+export type WorkflowLayout = Record<string, { x: number; y: number }>;
+/** 캔버스의 가상 "모든 상태" 노드 id — 전역 전이(`from: []`)의 출발점 */
+export const WORKFLOW_ANY_NODE = "__any__";
+
 /** 설정 본문 — 스킴과 프로젝트 커스텀이 같은 형태를 공유한다 */
 export interface SettingsBody {
   statuses: WorkflowStatus[];
+  /** 캔버스에서 끌어 놓은 노드 위치. 없는 노드는 자동 배치(dagre) */
+  layout?: WorkflowLayout;
   /**
    * 전이 목록. **비어 있거나 없으면 모든 이동을 허용**한다 — 기존 프로젝트가 갑자기
    * 막히지 않게 하려는 기본값이다.

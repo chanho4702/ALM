@@ -156,3 +156,28 @@ describe("완료 판정은 카테고리 의미에서 나온다", () => {
     ).rejects.toThrow("카테고리(할 일/진행 중/완료)마다 상태가 최소 1개 필요합니다");
   });
 });
+
+describe("워크플로 캔버스 배치", () => {
+  it("노드 위치는 본문과 함께 저장되고, 빠진 상태의 위치는 정리된다", async () => {
+    const [scheme] = await listSchemes();
+    const review = await createStatusDef({ name: "리뷰", categoryId: "inprogress" });
+    await updateScheme(scheme.id, {
+      body: {
+        ...scheme.body,
+        statuses: [
+          ...scheme.body.statuses,
+          { id: review.id, name: "리뷰", category: "inprogress", order: 4 },
+        ],
+        layout: { todo: { x: 10, y: 20 }, [review.id]: { x: 300, y: 40 }, ghost: { x: 1, y: 1 } },
+      },
+    });
+    let body = (await listSchemes())[0].body;
+    expect(body.layout).toEqual({ todo: { x: 10, y: 20 }, [review.id]: { x: 300, y: 40 } });
+
+    await updateScheme(scheme.id, {
+      body: { ...body, statuses: body.statuses.filter((s) => s.id !== review.id) },
+    });
+    body = (await listSchemes())[0].body;
+    expect(body.layout).toEqual({ todo: { x: 10, y: 20 } });
+  });
+});

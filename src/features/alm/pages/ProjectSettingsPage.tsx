@@ -20,6 +20,7 @@ import type {
   SettingsScheme,
   WorkflowStatus,
   WorkflowTransition,
+  WorkflowLayout,
 } from "../store/types";
 import type { ResolvedSettings } from "../store/jiraStore";
 import {
@@ -73,6 +74,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const [typesDraft, setTypesDraft] = useState<IssueType[]>([]);
   const [statusesDraft, setStatusesDraft] = useState<WorkflowStatus[]>([]);
   const [transitionsDraft, setTransitionsDraft] = useState<WorkflowTransition[]>([]);
+  const [layoutDraft, setLayoutDraft] = useState<WorkflowLayout>({});
 
   const currentProjectId = project?.id;
 
@@ -87,6 +89,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     setTypesDraft([...resolvedSettings.body.enabledTypes]);
     setStatusesDraft([...resolvedSettings.body.statuses].sort((a, b) => a.order - b.order));
     setTransitionsDraft(resolvedSettings.body.transitions ?? []);
+    setLayoutDraft(resolvedSettings.body.layout ?? {});
   }, [currentProjectId]);
 
   useEffect(() => {
@@ -245,6 +248,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
                   ...resolved.body,
                   statuses: statusesDraft,
                   transitions: transitionsDraft,
+                  layout: layoutDraft,
                 });
                 toast({ title: "워크플로를 저장했습니다", appearance: "success" });
               });
@@ -254,7 +258,9 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             <WorkflowCanvas
               statuses={statusesDraft}
               transitions={transitionsDraft}
+              layout={layoutDraft}
               onChange={setTransitionsDraft}
+              onLayoutChange={setLayoutDraft}
             />
             <Button type="submit" size="small">
               저장
@@ -274,6 +280,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             <WorkflowCanvas
               statuses={resolved.body.statuses}
               transitions={resolved.body.transitions ?? []}
+              layout={resolved.body.layout}
               readOnly
             />
             <p className="admin-scheme-note">

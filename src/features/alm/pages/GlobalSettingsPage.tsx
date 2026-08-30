@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useParams } from "react-router";
 import { Badge, Button, Card, Checkbox, Lozenge, Modal, PageHeader, TextField, useToast } from "@chanho/react";
-import type { IssueType, SettingsScheme, WorkflowStatus, WorkflowTransition } from "../store/types";
+import type {
+  IssueType,
+  SettingsScheme,
+  WorkflowStatus,
+  WorkflowTransition,
+  WorkflowLayout,
+} from "../store/types";
 import {
   createScheme,
   deleteScheme,
@@ -41,6 +47,7 @@ export function GlobalSettingsPage() {
   const [editingWf, setEditingWf] = useState<SettingsScheme | null>(null);
   const [editStatuses, setEditStatuses] = useState<WorkflowStatus[]>([]);
   const [editTransitions, setEditTransitions] = useState<WorkflowTransition[]>([]);
+  const [editLayout, setEditLayout] = useState<WorkflowLayout>({});
 
   const reload = useCallback(async () => {
     const list = await listSchemes();
@@ -98,6 +105,7 @@ export function GlobalSettingsPage() {
     setEditingWf(scheme);
     setEditStatuses([...scheme.body.statuses].sort((a, b) => a.order - b.order));
     setEditTransitions(scheme.body.transitions ?? []);
+    setEditLayout(scheme.body.layout ?? {});
   };
 
   const handleStatusesSave = async (event: FormEvent<HTMLFormElement>) => {
@@ -105,7 +113,12 @@ export function GlobalSettingsPage() {
     if (!editingWf) return;
     await run("저장 실패", async () => {
       await updateScheme(editingWf.id, {
-        body: { ...editingWf.body, statuses: editStatuses, transitions: editTransitions },
+        body: {
+          ...editingWf.body,
+          statuses: editStatuses,
+          transitions: editTransitions,
+          layout: editLayout,
+        },
       });
       toast({ title: "워크플로 상태를 저장했습니다", appearance: "success" });
       setEditingWf(null);
@@ -293,7 +306,9 @@ export function GlobalSettingsPage() {
             <WorkflowCanvas
               statuses={editStatuses}
               transitions={editTransitions}
+              layout={editLayout}
               onChange={setEditTransitions}
+              onLayoutChange={setEditLayout}
             />
             <Button type="submit">저장</Button>
           </form>

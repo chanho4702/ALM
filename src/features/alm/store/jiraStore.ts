@@ -18,6 +18,7 @@ import type {
   WorkflowStatus,
   IssueTypeDef,
   IssueTypeLevel,
+  WorkflowLayout,
   IssueType,
   JiraData,
   Notification,
@@ -35,6 +36,7 @@ import type {
 } from "./types";
 import { CURRENT_USER_ID } from "../../../mock/users";
 import { createSeedData } from "../../../mock/seed";
+import { WORKFLOW_ANY_NODE } from "./types";
 import type { IssueQuery } from "./searchQuery";
 import { getTemplate } from "./projectTemplates";
 import type { ProjectTemplateId } from "./projectTemplates";
@@ -138,6 +140,13 @@ function cloneBody(body: SettingsBody): SettingsBody {
     enabledTypes: [...body.enabledTypes],
     ...(body.transitions
       ? { transitions: body.transitions.map((t) => ({ ...t, from: [...t.from] })) }
+      : {}),
+    ...(body.layout
+      ? {
+          layout: Object.fromEntries(
+            Object.entries(body.layout).map(([id, pos]) => [id, { x: pos.x, y: pos.y }]),
+          ),
+        }
       : {}),
   };
 }
@@ -542,6 +551,14 @@ function assertTransitionAllowed(
  * 없는 상태를 가리키는 전이는 남기지 않는다 — 상태를 지우면 그 전이도 함께 사라진다.
  * 원래 전역 전이(from 비었음)는 그대로 두고, from을 전부 잃은 전이만 버린다.
  */
+/** 빠진 상태의 노드 위치는 남기지 않는다 — 가상 "모든 상태" 노드는 유지 */
+function pruneLayout(body: SettingsBody): WorkflowLayout | undefined {
+  if (!body.layout) return undefined;
+  const valid = new Set(body.statuses.map((status) => status.id));
+  valid.add(WORKFLOW_ANY_NODE);
+  return Object.fromEntries(Object.entries(body.layout).filter(([id]) => valid.has(id)));
+}
+
 function pruneTransitions(body: SettingsBody): WorkflowTransition[] | undefined {
   if (!body.transitions) return undefined;
   const valid = new Set(body.statuses.map((status) => status.id));
@@ -1920,7 +1937,7 @@ export async function updateScheme(
       .map((e) => e.projectId);
     migrateIssueStatuses(data, sharedProjects, patch.body);
     applyBodyToRegistry(data, patch.body);
-    scheme.body = cloneBody({ ...patch.body, transitions: pruneTransitions(patch.body) });
+    scheme.body = cloneBody({ ...patch.body, transitions: pruneTransitions(patch.body), layout: pruneLayout(patch.body) });
   }
   persist();
   return clone(enrichScheme(data, scheme));
@@ -2022,7 +2039,7 @@ export async function updateProjectCustomSettings(
   validateSettingsBody(data, body);
   migrateIssueStatuses(data, [projectId], body);
   applyBodyToRegistry(data, body);
-  entry.custom = cloneBody({ ...body, transitions: pruneTransitions(body) });
+  entry.custom = cloneBody({ ...body, transitions: pruneTransitions(body), layout: pruneLayout(body) });
   persist();
 }
 
