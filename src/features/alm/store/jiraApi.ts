@@ -86,9 +86,6 @@ export async function createProject(input: {
   templateId?: ProjectTemplateId;
 }): Promise<Project> {
   const template = getTemplate(input.templateId ?? "blank");
-  if (template.withSprint || template.samples.length > 0 || template.board) {
-    throw new Error("백엔드 모드에서는 아직 빈 프로젝트 템플릿만 지원합니다.");
-  }
   const response = await sharedApiFetch("/api/alm/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -98,7 +95,43 @@ export async function createProject(input: {
       description: input.description?.trim() ?? "",
     }),
   });
-  return mapProject(await json(response));
+  const project = mapProject(await json(response));
+  await applyTemplate(project.id, template);
+  return project;
+}
+
+/**
+ * 템플릿은 서버 개념이 아니라 프론트 합성이다(목업과 같은 순서): 서버가 만든 기본 보드를 템플릿 보드로
+ * 바꾸고 → Sprint 1 → 샘플 이슈를 정상 경로(createIssue)로 만든다. 도중 실패하면 프로젝트는 남고
+ * 에러가 화면에 오른다 — 반쯤 적용된 템플릿은 설정 화면에서 손볼 수 있다.
+ */
+async function applyTemplate(projectId: string, template: ReturnType<typeof getTemplate>): Promise<void> {
+  if (template.board) {
+    const boards = await listBoards(projectId);
+    const target = boards.find((b) => b.isDefault) ?? boards[0];
+    if (target) {
+      await updateBoard(target.id, {
+        name: template.board.name,
+        type: template.board.type,
+        columns: template.board.columns.map((c) => ({ ...c })),
+        filter: {
+          assigneeIds: [...template.board.filter.assigneeIds],
+          types: [...template.board.filter.types],
+          labels: [...template.board.filter.labels],
+        },
+      });
+    }
+  }
+  if (template.withSprint) await createSprint(projectId);
+  for (const sample of template.samples) {
+    await createIssue({
+      projectId,
+      title: sample.title,
+      type: sample.type,
+      status: sample.status,
+      labels: sample.labels,
+    });
+  }
 }
 
 export async function updateProject(
@@ -1344,9 +1377,10 @@ export async function createBoard(input: {
   return mapBoard(await json(response));
 }
 
+/** REST는 목업과 달리 type도 바꿀 수 있다(템플릿 적용용) */
 export async function updateBoard(
   id: string,
-  patch: Partial<Pick<Board, "name" | "filter" | "columns" | "swimlane" | "isDefault">>,
+  patch: Partial<Pick<Board, "name" | "type" | "filter" | "columns" | "swimlane" | "isDefault">>,
 ): Promise<Board> {
   const response = await sharedApiFetch(`/api/alm/boards/${toBackendId(id)}`, {
     method: "PUT",

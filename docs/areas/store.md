@@ -8,7 +8,8 @@ REST에 아직 없는 함수는 목업으로 떨어진다(혼합 모드). 코멘
 서버 V12(`/api/alm/issues/{id}/{comments,worklogs,links,activity}`, `/api/alm/boards`)로 옮겼다.
 프로젝트 멤버·역할·사용자 디렉터리는 org-service REST(`/api/org/members`, `/api/org/grants`,
 `/api/org/me/permissions`)를 어댑터가 직접 부른다 — 역할 변경은 grant 삭제 후 재생성, 마지막 관리자 가드는
-클라이언트에서 목업과 같은 문구로 막는다. **REST 미구현(목업 폴백 남음)**: 프로젝트 템플릿(REST는 빈 템플릿만). 파사드는
+클라이언트에서 목업과 같은 문구로 막는다. 프로젝트 템플릿은 서버 개념이 아니라 프론트 합성이다(REST도 목업과 같은 순서: 기본 보드 갱신 → Sprint 1 → 샘플 이슈).
+**REST 미구현 함수는 이제 없다** — 새 목업 함수를 추가하면 REST도 같이 채운다. 파사드는
 `scratchpad/facade.py`처럼 export 이름을 긁어 만든다 — 목업에 함수를 추가하면 파사드에도 줄을 추가한다.
 
 **파일**: `src/features/alm/store/jiraStore.ts` (~1400줄, 현재 localStorage 구현),

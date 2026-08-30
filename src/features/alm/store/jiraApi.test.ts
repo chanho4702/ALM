@@ -76,12 +76,34 @@ describe("jiraApi projects", () => {
     });
   });
 
-  it("서버가 지원하지 않는 프로젝트 템플릿은 요청 전에 거부한다", async () => {
-    const spy = vi.spyOn(client, "sharedApiFetch");
-    await expect(
-      createProject({ key: "SCR", name: "스크럼", templateId: "scrum" }),
-    ).rejects.toThrow("빈 프로젝트 템플릿만");
-    expect(spy).not.toHaveBeenCalled();
+  it("스크럼 템플릿은 기본 보드 갱신·Sprint 1·샘플 이슈를 순서대로 만든다", async () => {
+    const board = {
+      id: 11, projectId: 3, name: "메인 보드", type: "scrum",
+      filter: { assigneeIds: [], types: [], labels: [] }, columns: [], swimlane: "none", isDefault: true,
+      createdAt: "2026-08-16T00:00:00Z",
+    };
+    const calls: string[] = [];
+    vi.spyOn(client, "sharedApiFetch").mockImplementation((path: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${path}`);
+      if (path === "/api/alm/projects") return Promise.resolve(response(201, PROJECT));
+      if (path.endsWith("/boards") && method === "GET") return Promise.resolve(response(200, [board]));
+      if (path === "/api/alm/boards/11") return Promise.resolve(response(200, { ...board, name: "스프린트 보드" }));
+      if (path.endsWith("/sprints")) return Promise.resolve(response(201, { id: 5, projectId: 3, sprintNumber: 1, name: "Sprint 1", state: "PLANNED", goal: null, startDate: null, endDate: null, version: 0, createdAt: "", updatedAt: "" }));
+      if (path.endsWith("/issues")) return Promise.resolve(response(201, ISSUE));
+      return Promise.resolve(response(404, { error: "없음" }));
+    });
+
+    await createProject({ key: "SCR", name: "스크럼", templateId: "scrum" });
+
+    expect(calls[0]).toBe("POST /api/alm/projects");
+    expect(calls).toContain("GET /api/alm/projects/3/boards");
+    expect(calls).toContain("PUT /api/alm/boards/11");
+    expect(calls).toContain("POST /api/alm/projects/3/sprints");
+    expect(calls.filter((c) => c === "POST /api/alm/projects/3/issues").length).toBeGreaterThan(0);
+    // 보드 갱신은 샘플 이슈보다 먼저, 스프린트는 보드 다음
+    expect(calls.indexOf("PUT /api/alm/boards/11")).toBeLessThan(calls.indexOf("POST /api/alm/projects/3/sprints"));
+    expect(calls.indexOf("POST /api/alm/projects/3/sprints")).toBeLessThan(calls.indexOf("POST /api/alm/projects/3/issues"));
   });
 
   it("수정 직전 최신 version을 조회해 expectedVersion으로 보낸다", async () => {
