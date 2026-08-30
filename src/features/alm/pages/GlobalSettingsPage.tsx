@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useParams } from "react-router";
-import { Badge, Button, Card, Checkbox, Lozenge, Modal, PageHeader, TextField, useToast } from "@chanho/react";
+import { Badge, Button, Card, Checkbox, Lozenge, Modal, PageHeader, Select, TextField, useToast } from "@chanho/react";
 import type {
   IssueType,
   SettingsScheme,
@@ -25,6 +25,9 @@ import { GLOBAL_SETTINGS_SECTIONS, isGlobalSettingsSection } from "../components
 import { StatusCategoriesPanel } from "../components/StatusCategoriesPanel";
 import { StatusRegistryPanel } from "../components/StatusRegistryPanel";
 import { IssueTypesPanel } from "../components/IssueTypesPanel";
+import { PrioritiesPanel } from "../components/PrioritiesPanel";
+import { usePriorities } from "../components/usePriorities";
+import { priorityName } from "../components/labels";
 import { AdminAuditPanel, SystemPanel } from "../components/AdminPanels";
 import { PersonalSettingsPanel } from "../components/PersonalSettingsPanel";
 import { BannerPanel } from "../components/BannerPanel";
@@ -47,6 +50,9 @@ export function GlobalSettingsPage() {
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<SettingsScheme | null>(null);
   const [editTypes, setEditTypes] = useState<IssueType[]>([]);
+  const [editPriorities, setEditPriorities] = useState<string[]>([]);
+  const [editDefaultPriority, setEditDefaultPriority] = useState("medium");
+  const priorities = usePriorities();
   const [editingWf, setEditingWf] = useState<SettingsScheme | null>(null);
   const [editStatuses, setEditStatuses] = useState<WorkflowStatus[]>([]);
   const [editTransitions, setEditTransitions] = useState<WorkflowTransition[]>([]);
@@ -92,13 +98,17 @@ export function GlobalSettingsPage() {
   const openTypeEditor = (scheme: SettingsScheme) => {
     setEditing(scheme);
     setEditTypes([...scheme.body.enabledTypes]);
+    setEditPriorities([...scheme.body.enabledPriorities]);
+    setEditDefaultPriority(scheme.body.defaultPriority);
   };
 
   const handleTypesSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editing) return;
     await run("저장 실패", async () => {
-      await updateScheme(editing.id, { body: { ...editing.body, enabledTypes: editTypes } });
+      await updateScheme(editing.id, {
+        body: { ...editing.body, enabledTypes: editTypes, enabledPriorities: editPriorities, defaultPriority: editDefaultPriority },
+      });
       toast({ title: "이슈 타입 구성을 저장했습니다", appearance: "success" });
       setEditing(null);
     });
@@ -158,6 +168,8 @@ export function GlobalSettingsPage() {
         <StatusRegistryPanel />
       ) : section === "issue-types" ? (
         <IssueTypesPanel />
+      ) : section === "priorities" ? (
+        <PrioritiesPanel />
       ) : section === "audit" ? (
         <AdminAuditPanel />
       ) : section === "system" ? (
@@ -302,6 +314,24 @@ export function GlobalSettingsPage() {
                 />
               ))}
             </div>
+            <div className="board-settings-checks" role="group" aria-label="우선순위">
+              {priorities.map(({ id, name }) => (
+                <Checkbox
+                  key={id}
+                  label={name}
+                  checked={editPriorities.includes(id)}
+                  onCheckedChange={() =>
+                    setEditPriorities((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
+                  }
+                />
+              ))}
+            </div>
+            <Select
+              label="기본 우선순위"
+              value={editDefaultPriority}
+              options={editPriorities.map((id) => ({ value: id, label: priorityName(priorities, id) }))}
+              onValueChange={setEditDefaultPriority}
+            />
             <Button type="submit">저장</Button>
           </form>
         </Modal>

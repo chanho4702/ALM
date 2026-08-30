@@ -3,7 +3,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { Avatar, Card, Lozenge, Tag } from "@chanho/react";
 import type { Issue } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
-import { PRIORITY_APPEARANCE, PRIORITY_LABELS } from "./labels";
+import { priorityAppearance, priorityName } from "./labels";
+import { usePriorities } from "./usePriorities";
 
 export interface IssueCardProps {
   issue: Issue;
@@ -16,6 +17,7 @@ export interface IssueCardProps {
 }
 
 export function IssueCard({ issue, assigneeName, epicName, onOpen }: IssueCardProps) {
+  const priorities = usePriorities();
   return (
     // interactive Card는 <button>으로 렌더 — hover elevation은 Card가 제공한다.
     // 내부는 phrasing 콘텐츠(span)만 둔다.
@@ -36,8 +38,8 @@ export function IssueCard({ issue, assigneeName, epicName, onOpen }: IssueCardPr
       <span className="issue-card-meta">
         <IssueTypeGlyph type={issue.type} />
         <span className="issue-card-key">{issue.key}</span>
-        <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
-          {PRIORITY_LABELS[issue.priority]}
+        <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
+          {priorityName(priorities, issue.priority)}
         </Lozenge>
         {assigneeName ? <Avatar name={assigneeName} size="small" /> : null}
       </span>

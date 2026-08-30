@@ -29,7 +29,8 @@ export interface ProjectDto {
 
 /** 서버 V11부터 이슈 타입은 레지스트리 id(task/bug/it-*)다. 옛 응답의 대문자 enum 이름도 소문자로 받는다 */
 export type IssueTypeDto = string;
-export type IssuePriorityDto = "HIGH" | "MEDIUM" | "LOW";
+/** 서버 V14부터 우선순위는 레지스트리 id(소문자). 옛 응답의 대문자 enum 이름도 소문자로 받는다 */
+export type IssuePriorityDto = string;
 
 export interface IssueDto {
   id: number;
@@ -78,18 +79,6 @@ export function mapProject(dto: ProjectDto): Project {
     createdAt: dto.createdAt,
   };
 }
-
-const PRIORITIES_FROM_API: Record<IssuePriorityDto, IssuePriority> = {
-  HIGH: "high",
-  MEDIUM: "medium",
-  LOW: "low",
-};
-
-const PRIORITIES_TO_API: Record<IssuePriority, IssuePriorityDto> = {
-  high: "HIGH",
-  medium: "MEDIUM",
-  low: "LOW",
-};
 
 export function toApiIssueType(type: IssueType): IssueTypeDto {
   return type.trim().toLowerCase();
@@ -240,7 +229,7 @@ export function toApiChangeField(field: ChangeField): IssueChangeDto["field"] {
 }
 
 export function toApiIssuePriority(priority: IssuePriority): IssuePriorityDto {
-  return PRIORITIES_TO_API[priority];
+  return priority.trim().toLowerCase();
 }
 
 /**
@@ -248,9 +237,8 @@ export function toApiIssuePriority(priority: IssuePriority): IssuePriorityDto {
  */
 export function mapIssue(dto: IssueDto, order = 1): Issue {
   const type = String(dto.type ?? "task").toLowerCase();
-  const priority = PRIORITIES_FROM_API[dto.priority];
+  const priority = String(dto.priority ?? "medium").toLowerCase();
   if (!type) throw new Error(`지원하지 않는 이슈 타입입니다: ${dto.type}`);
-  if (!priority) throw new Error(`지원하지 않는 우선순위입니다: ${dto.priority}`);
   return {
     id: String(dto.id),
     key: dto.key,

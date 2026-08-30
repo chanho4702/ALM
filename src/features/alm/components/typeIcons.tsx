@@ -1,5 +1,10 @@
 import {
   Bell,
+  ChevronDown,
+  ChevronUp,
+  ChevronsDown,
+  ChevronsUp,
+  Equal,
   Bookmark,
   Bug,
   CheckSquare,
@@ -47,6 +52,11 @@ export const TYPE_ICONS: Record<string, LucideIcon> = {
   paintbrush: Paintbrush,
   flask: FlaskConical,
   puzzle: Puzzle,
+  "chevrons-up": ChevronsUp,
+  "chevron-up": ChevronUp,
+  equal: Equal,
+  "chevron-down": ChevronDown,
+  "chevrons-down": ChevronsDown,
 };
 
 export const TYPE_ICON_OPTIONS: { value: string; label: string }[] = [
@@ -68,6 +78,11 @@ export const TYPE_ICON_OPTIONS: { value: string; label: string }[] = [
   { value: "database", label: "데이터" },
   { value: "message-square", label: "말풍선" },
   { value: "paintbrush", label: "붓" },
+  { value: "chevrons-up", label: "이중 화살표 ↑" },
+  { value: "chevron-up", label: "화살표 ↑" },
+  { value: "equal", label: "등호" },
+  { value: "chevron-down", label: "화살표 ↓" },
+  { value: "chevrons-down", label: "이중 화살표 ↓" },
   { value: "flask", label: "플라스크" },
   { value: "puzzle", label: "퍼즐" },
 ];

@@ -69,7 +69,7 @@ export const CSV_HEADERS = [
   "설명",
 ] as const;
 
-const PRIORITY_KO: Record<IssuePriority, string> = { high: "높음", medium: "보통", low: "낮음" };
+const PRIORITY_KO: Record<string, string> = { highest: "최상", high: "높음", medium: "보통", low: "낮음", lowest: "최하" };
 
 /** 사람이 읽는 이름(상태·담당자·타입)으로 내보낸다 — 다시 읽을 때도 같은 이름을 알아듣는다 */
 export function issuesToCsv(issues: Issue[], ctx: CsvContext): string {
@@ -82,7 +82,7 @@ export function issuesToCsv(issues: Issue[], ctx: CsvContext): string {
     issue.title,
     typeName(issue.type),
     statusName(issue.status),
-    PRIORITY_KO[issue.priority],
+    PRIORITY_KO[issue.priority] ?? issue.priority,
     userName(issue.assigneeId),
     userName(issue.reporterId),
     issue.labels.join(";"),
@@ -157,14 +157,16 @@ const JIRA_STATUSES: Record<string, string> = {
   resolved: "done",
 };
 const PRIORITIES: Record<string, IssuePriority> = {
+  최상: "highest",
+  highest: "highest",
   높음: "high",
   high: "high",
-  highest: "high",
   보통: "medium",
   medium: "medium",
   낮음: "low",
   low: "low",
-  lowest: "low",
+  최하: "lowest",
+  lowest: "lowest",
 };
 
 const norm = (value: string) => value.trim().toLowerCase();

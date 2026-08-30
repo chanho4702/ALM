@@ -39,13 +39,13 @@ import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { useIssueTypes } from "../components/useIssueTypes";
 import { FilterDropdown } from "../components/FilterDropdown";
 import {
-  PRIORITY_APPEARANCE,
-  PRIORITY_LABELS,
+  priorityAppearance,
+  priorityName,
   statusAppearance,
   statusName,
 } from "../components/labels";
+import { usePriorities } from "../components/usePriorities";
 
-const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 const CATEGORY_IDS = new Set(["todo", "inprogress", "done"]);
 
 const SORT_OPTIONS: { value: IssueQuery["sort"]; label: string }[] = [
@@ -63,6 +63,8 @@ const SORT_OPTIONS: { value: IssueQuery["sort"]; label: string }[] = [
  */
 export function SearchPage() {
   const issueTypes = useIssueTypes();
+  const priorities = usePriorities();
+  const PRIORITIES = priorities.map((d) => d.id);
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") ?? "";
   const [mode, setMode] = useState<"basic" | "smart">("basic");
@@ -83,8 +85,8 @@ export function SearchPage() {
   }, []);
 
   const ctx = useMemo(
-    () => ({ users, projects, statuses: allStatuses }),
-    [users, projects, allStatuses],
+    () => ({ users, projects, statuses: allStatuses, priorities }),
+    [users, projects, allStatuses, priorities],
   );
   const query = useMemo(() => parseSmartQuery(q, ctx), [q, ctx]);
 
@@ -219,8 +221,8 @@ export function SearchPage() {
       header: "우선순위",
       width: "104px",
       render: (issue) => (
-        <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
-          {PRIORITY_LABELS[issue.priority]}
+        <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
+          {priorityName(priorities, issue.priority)}
         </Lozenge>
       ),
     },
@@ -307,7 +309,7 @@ export function SearchPage() {
           />
           <FilterDropdown
             label="우선순위"
-            options={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
+            options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
             selected={query.priorities}
             onToggle={(v) =>
               setQuery({ ...query, priorities: toggled(query.priorities, v) as IssuePriority[] })

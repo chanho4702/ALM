@@ -179,12 +179,19 @@ describe("변경 이력 유지보수", () => {
     const withReview = {
       statuses: [...body.statuses, { id: "review", name: "리뷰", category: "inprogress" as const, order: 9 }],
       enabledTypes: body.enabledTypes,
+      enabledPriorities: body.enabledPriorities,
+      defaultPriority: body.defaultPriority,
     };
     await updateProjectCustomSettings("p1", withReview);
     const issue = await getIssueByKey("ALM-6");
     await moveIssue(issue!.id, { status: "review" });
 
-    await updateProjectCustomSettings("p1", { statuses: body.statuses, enabledTypes: body.enabledTypes });
+    await updateProjectCustomSettings("p1", {
+      statuses: body.statuses,
+      enabledTypes: body.enabledTypes,
+      enabledPriorities: body.enabledPriorities,
+      defaultPriority: body.defaultPriority,
+    });
 
     const changes = await listProjectChanges("p1", { field: "status" });
     const forIssue = changes.filter((change) => change.issueId === issue!.id);

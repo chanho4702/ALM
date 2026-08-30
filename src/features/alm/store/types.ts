@@ -104,7 +104,21 @@ export interface StatusDef {
   categoryId: string; // StatusCategory.id
   description: string;
 }
-export type IssuePriority = "high" | "medium" | "low";
+/** 기본 우선순위 id 5종(지라 5단계) — 시드·CSV·REST 매핑이 쓴다. 사용자 우선순위는 `pr-*` */
+export type BuiltinIssuePriority = "highest" | "high" | "medium" | "low" | "lowest";
+/** 우선순위 id — 레지스트리(`PriorityDef`)가 진실 */
+export type IssuePriority = string;
+
+/** 전역 우선순위 레지스트리 — order가 높음→낮음(정렬 근거). 기본 5종은 삭제 불가 */
+export interface PriorityDef {
+  id: string;
+  name: string;
+  icon: string;
+  color: StatusColor;
+  description: string;
+  order: number;
+  builtIn: boolean;
+}
 /** 기본 이슈 타입 id 5종 — 시드·템플릿·REST 매핑이 쓴다. 사용자 타입은 `it-*` */
 export type BuiltinIssueType = "task" | "story" | "bug" | "epic" | "subtask";
 /** 이슈 타입 id — 레지스트리(`IssueTypeDef`)가 진실 */
@@ -263,6 +277,10 @@ export interface SettingsBody {
   transitions?: WorkflowTransition[];
   /** 프로젝트에서 쓸 이슈 타입 — subtask는 항상 포함 */
   enabledTypes: IssueType[];
+  /** 프로젝트에서 쓸 우선순위(레지스트리 id) — 최소 1개 */
+  enabledPriorities: IssuePriority[];
+  /** 우선순위 없이 만든 이슈에 붙는 값 — enabledPriorities 안에 있어야 한다 */
+  defaultPriority: IssuePriority;
 }
 
 /** 지라식 설정 스킴 — 전역 관리가 정의하고 프로젝트에 배정한다 */
@@ -432,6 +450,7 @@ export interface JiraData {
   statusDefs: StatusDef[];
   /** 전역 이슈 타입 레지스트리 (order순) */
   issueTypes: IssueTypeDef[];
+  priorities: PriorityDef[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

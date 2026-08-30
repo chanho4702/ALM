@@ -61,8 +61,8 @@ import { useIssueTypes } from "./useIssueTypes";
 import { IssueAttachments } from "./IssueAttachments";
 import { WatchButton } from "./WatchButton";
 import {
+  priorityName,
   ISSUE_TYPES,
-  PRIORITY_LABELS,
   RESOLUTIONS,
   RESOLUTION_LABELS,
   statusAppearance,
@@ -70,13 +70,13 @@ import {
   statusName,
   typeLevel,
 } from "./labels";
+import { usePriorities } from "./usePriorities";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const NO_VERSION = "__no_version__";
 const UNASSIGNED = "unassigned";
 const BACKLOG = "backlog";
 const NO_PARENT = "none";
-const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 
 /** 링크 추가 폼의 종류 — 차단은 방향까지 구분 */
 type LinkKind = "blocks-out" | "blocks-in" | "relates";
@@ -114,6 +114,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [worklogs, setWorklogs] = useState<Worklog[]>([]);
   const [enabledTypes, setEnabledTypes] = useState<IssueType[]>([...ISSUE_TYPES]);
   const issueTypes = useIssueTypes();
+  const priorities = usePriorities();
+  const PRIORITIES = priorities.map((d) => d.id);
   const levelOf = (typeId: string) => typeLevel(issueTypes, typeId);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [worklogHours, setWorklogHours] = useState("");
@@ -713,7 +715,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <Select
             label="우선순위"
             value={issue.priority}
-            options={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
+            options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
             onValueChange={(v) =>
               void applyPatch({ priority: v as IssuePriority }, "우선순위를 변경했습니다")
             }

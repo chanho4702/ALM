@@ -1,5 +1,6 @@
 import type { LozengeProps } from "@chanho/react";
 import type {
+  PriorityDef,
   IssuePriority,
   IssueResolution,
   IssueStatus,
@@ -51,18 +52,43 @@ const KIND_OF_BUILTIN: Record<IssueStatus, StatusKind> = {
   done: "complete",
 };
 
-export const PRIORITY_LABELS: Record<IssuePriority, string> = {
+/** 기본 5단계 이름 — 레지스트리가 로드되기 전 폴백 */
+export const PRIORITY_LABELS: Record<string, string> = {
+  highest: "최상",
   high: "높음",
   medium: "보통",
   low: "낮음",
+  lowest: "최하",
 };
 
-/** 아이콘 패키지가 없어 우선순위는 Lozenge 색으로 구분한다 (지라 색 언어: 빨강/주황/회색) */
-export const PRIORITY_APPEARANCE: Record<IssuePriority, LozengeAppearance> = {
+/** 기본 5단계 색 폴백 (지라 색 언어: 빨강/주황/파랑/회색) */
+export const PRIORITY_APPEARANCE: Record<string, LozengeAppearance> = {
+  highest: "danger",
   high: "danger",
   medium: "warning",
-  low: "neutral",
+  low: "info",
+  lowest: "neutral",
 };
+
+export const BUILTIN_PRIORITY_IDS: IssuePriority[] = ["highest", "high", "medium", "low", "lowest"];
+
+/** 우선순위 id → 이름. 레지스트리 우선, 없으면 기본 5종 폴백, 그래도 없으면 id */
+export function priorityName(defs: PriorityDef[] | undefined, id: IssuePriority): string {
+  return defs?.find((d) => d.id === id)?.name ?? PRIORITY_LABELS[id] ?? id;
+}
+
+/** 우선순위 id → Lozenge 색 */
+export function priorityAppearance(defs: PriorityDef[] | undefined, id: IssuePriority): LozengeAppearance {
+  return defs?.find((d) => d.id === id)?.color ?? PRIORITY_APPEARANCE[id] ?? "neutral";
+}
+
+/** 정렬용 위계 — 레지스트리 order(높음→낮음), 모르는 값은 맨 뒤 */
+export function priorityRank(defs: PriorityDef[] | undefined, id: IssuePriority): number {
+  const def = defs?.find((d) => d.id === id);
+  if (def) return def.order;
+  const index = BUILTIN_PRIORITY_IDS.indexOf(id);
+  return index === -1 ? 99 : index + 1;
+}
 
 /** 보드 컬럼 순서 */
 export const BOARD_STATUSES: IssueStatus[] = ["todo", "inprogress", "done"];

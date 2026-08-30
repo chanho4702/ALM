@@ -98,3 +98,10 @@
 - 마지막 남은 **의미**의 상태는 빼기 버튼 disabled (검증기와 같은 가드).
 - 보드는 `listProjectStatuses`를 컬럼 원천으로 쓰므로 상태를 추가하면 컬럼이 자동으로 늘어난다.
   `BoardSettingsModal`의 컬럼 초안도 상태 목록에서 파생된다.
+
+## 우선순위 레지스트리 (2026-08-30)
+
+이슈 타입과 같은 구조다: 전역 `PriorityDef`(id·name·icon·color·order·builtIn, 기본 5종 `highest/high/medium/low/lowest`는
+삭제 불가·순서가 곧 위계) + `SettingsBody.enabledPriorities`/`defaultPriority`(스킴·프로젝트 커스텀). 이슈의
+`priority`는 레지스트리 id(소문자). 생성 시 없으면 기본값, 비활성이면 거부(서버·목업 같은 문구). 화면은
+`usePriorities()` + `priorityName/priorityAppearance/priorityRank`(labels.ts)로 그린다 — `PRIORITY_LABELS`는 폴백.

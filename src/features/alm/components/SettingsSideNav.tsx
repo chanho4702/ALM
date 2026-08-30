@@ -19,6 +19,7 @@ export const GLOBAL_SETTINGS_SECTIONS = [
   { id: "categories", label: "상태 카테고리", group: "이슈 항목" },
   { id: "statuses", label: "상태", group: "이슈 항목" },
   { id: "issue-types", label: "이슈 타입", group: "이슈 항목" },
+  { id: "priorities", label: "우선순위", group: "이슈 항목" },
   { id: "types", label: "이슈 타입 스킴", group: "이슈 항목" },
   { id: "workflows", label: "워크플로 스킴", group: "이슈 항목" },
   { id: "audit", label: "감사 로그", group: "시스템" },

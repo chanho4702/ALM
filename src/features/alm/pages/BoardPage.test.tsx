@@ -74,7 +74,7 @@ describe("BoardPage", () => {
         { id: "review", name: "코드 리뷰", category: "inprogress", order: 3 },
         { id: "done", name: "완료", category: "done", order: 4 },
       ],
-      enabledTypes: ["task", "story", "bug", "epic", "subtask"],
+      enabledTypes: ["task", "story", "bug", "epic", "subtask"], enabledPriorities: ["highest", "high", "medium", "low", "lowest"], defaultPriority: "medium",
     });
     const issue = await getIssueByKey("ALM-2");
     await moveIssue(issue!.id, { status: "review" });

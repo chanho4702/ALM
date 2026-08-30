@@ -48,11 +48,14 @@ import { PROJECT_COLOR_OPTIONS } from "../components/ProjectAvatar";
 import { TYPE_ICON_OPTIONS } from "../components/typeIcons";
 import { JiraImportPanel } from "../components/JiraImportPanel";
 import { useIssueTypes } from "../components/useIssueTypes";
+import { usePriorities } from "../components/usePriorities";
 import {
   PROJECT_SETTINGS_SECTIONS,
   isProjectSettingsSection,
 } from "../components/SettingsSideNav";
 import {
+  priorityAppearance,
+  priorityName,
   typeAppearance,
   typeName,
 } from "../components/labels";
@@ -98,6 +101,9 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const [resolved, setResolved] = useState<ResolvedSettings | null>(null);
   const [schemes, setSchemes] = useState<SettingsScheme[]>([]);
   const [typesDraft, setTypesDraft] = useState<IssueType[]>([]);
+  const [prioritiesDraft, setPrioritiesDraft] = useState<string[]>([]);
+  const [defaultPriorityDraft, setDefaultPriorityDraft] = useState("medium");
+  const priorities = usePriorities();
   const [statusesDraft, setStatusesDraft] = useState<WorkflowStatus[]>([]);
   const [transitionsDraft, setTransitionsDraft] = useState<WorkflowTransition[]>([]);
   const [layoutDraft, setLayoutDraft] = useState<WorkflowLayout>({});
@@ -113,6 +119,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     setResolved(resolvedSettings);
     setSchemes(schemeList);
     setTypesDraft([...resolvedSettings.body.enabledTypes]);
+    setPrioritiesDraft([...resolvedSettings.body.enabledPriorities]);
+    setDefaultPriorityDraft(resolvedSettings.body.defaultPriority);
     setStatusesDraft([...resolvedSettings.body.statuses].sort((a, b) => a.order - b.order));
     setTransitionsDraft(resolvedSettings.body.transitions ?? []);
     setLayoutDraft(resolvedSettings.body.layout ?? {});
@@ -403,6 +411,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
                 await updateProjectCustomSettings(project.id, {
                   ...resolved.body,
                   enabledTypes: typesDraft,
+                  enabledPriorities: prioritiesDraft,
+                  defaultPriority: defaultPriorityDraft,
                 });
                 toast({ title: "이슈 타입 구성을 저장했습니다", appearance: "success" });
               });
@@ -423,6 +433,24 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
                 />
               ))}
             </div>
+            <div className="board-settings-checks" role="group" aria-label="우선순위">
+              {priorities.map(({ id, name }) => (
+                <Checkbox
+                  key={id}
+                  label={name}
+                  checked={prioritiesDraft.includes(id)}
+                  onCheckedChange={() =>
+                    setPrioritiesDraft((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
+                  }
+                />
+              ))}
+            </div>
+            <Select
+              label="기본 우선순위"
+              value={defaultPriorityDraft}
+              options={prioritiesDraft.map((id) => ({ value: id, label: priorityName(priorities, id) }))}
+              onValueChange={setDefaultPriorityDraft}
+            />
             <Button type="submit" size="small">
               저장
             </Button>
@@ -432,6 +460,13 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             {resolved.body.enabledTypes.map((type) => (
               <Lozenge key={type} appearance={typeAppearance(issueTypes, type)}>
                 {typeName(issueTypes, type)}
+              </Lozenge>
+            ))}
+            <span className="admin-scheme-sep" aria-hidden>·</span>
+            {resolved.body.enabledPriorities.map((id) => (
+              <Lozenge key={id} appearance={priorityAppearance(priorities, id)}>
+                {priorityName(priorities, id)}
+                {id === resolved.body.defaultPriority ? " (기본)" : ""}
               </Lozenge>
             ))}
           </div>

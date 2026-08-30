@@ -30,26 +30,27 @@ import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { useIssueTypes } from "../components/useIssueTypes";
 import {
+  priorityAppearance,
+  priorityName,
+  priorityRank,
   KIND_ORDER,
-  PRIORITY_APPEARANCE,
-  PRIORITY_LABELS,
   statusAppearance,
   statusKind,
   statusName,
 } from "../components/labels";
+import { usePriorities } from "../components/usePriorities";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
 const ALL = "all";
-const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 /** 한 페이지 — 서버 검색과 같은 기본값 */
 const PAGE_SIZE = 50;
 
-// 정렬용 위계: 우선순위 높음→낮음 (상태는 카테고리 의미 위계 KIND_ORDER 사용)
-const PRIORITY_ORDER: Record<IssuePriority, number> = { high: 0, medium: 1, low: 2 };
 
 export function IssueListPage() {
   const { projectId } = useParams();
   const issueTypes = useIssueTypes();
+  const priorities = usePriorities();
+  const PRIORITIES = priorities.map((d) => d.id);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
   const [users, setUsers] = useState<User[]>([]);
   const [text, setText] = useState("");
@@ -142,7 +143,7 @@ export function IssueListPage() {
             KIND_ORDER[statusKind(statuses, a.status)] - KIND_ORDER[statusKind(statuses, b.status)];
           break;
         case "priority":
-          cmp = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+          cmp = priorityRank(priorities, a.priority) - priorityRank(priorities, b.priority);
           break;
         case "assignee":
           cmp = assigneeName(a).localeCompare(assigneeName(b), "ko");
@@ -288,8 +289,8 @@ export function IssueListPage() {
       sortable: true,
       width: "96px",
       render: (issue) => (
-        <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
-          {PRIORITY_LABELS[issue.priority]}
+        <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
+          {priorityName(priorities, issue.priority)}
         </Lozenge>
       ),
     },
@@ -366,7 +367,7 @@ export function IssueListPage() {
             onValueChange={setPriority}
             options={[
               { value: ALL, label: "전체" },
-              ...PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] })),
+              ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
             ]}
           />
           <Select

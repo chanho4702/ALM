@@ -4,16 +4,16 @@ import { Button, Modal, Select, TextArea, TextField, useToast } from "@chanho/re
 import type { Issue, IssuePriority, IssueType, Project, User } from "../store/types";
 import { createIssue, listUsers, resolveSettings } from "../store/jiraStore";
 import {
+  priorityName,
   ISSUE_TYPES,
-  PRIORITY_LABELS,
   typeLevel,
   typeName,
 } from "./labels";
+import { usePriorities } from "./usePriorities";
 import { useIssueTypes } from "./useIssueTypes";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const UNASSIGNED = "unassigned";
-const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 
 export interface CreateIssueModalProps {
   projects: Project[];
@@ -40,6 +40,8 @@ export function CreateIssueModal({
   const [description, setDescription] = useState("");
   const [type, setType] = useState<IssueType>("task");
   const issueTypes = useIssueTypes();
+  const priorities = usePriorities();
+  const PRIORITIES = priorities.map((d) => d.id);
   /** 선택한 프로젝트의 활성 타입 (설정 스킴) — subtask는 상세에서만 */
   const [enabledTypes, setEnabledTypes] = useState<IssueType[]>(
     ISSUE_TYPES.filter((t) => t !== "subtask"),
@@ -158,7 +160,7 @@ export function CreateIssueModal({
           <Select
             label="우선순위"
             value={priority}
-            options={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
+            options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
             onValueChange={(v) => setPriority(v as IssuePriority)}
           />
           <Select

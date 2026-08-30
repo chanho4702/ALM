@@ -78,7 +78,7 @@ describe("alm-backend DTO mapping", () => {
 
   it("프론트 enum을 백엔드 enum으로 바꾼다", () => {
     expect(toApiIssueType("subtask")).toBe("subtask"); // V11부터 레지스트리 id 그대로
-    expect(toApiIssuePriority("medium")).toBe("MEDIUM");
+    expect(toApiIssuePriority("medium")).toBe("medium");
   });
 
   it("백엔드 id는 양의 안전한 정수만 허용한다", () => {

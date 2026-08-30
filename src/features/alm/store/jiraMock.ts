@@ -1,4 +1,5 @@
 import type {
+  PriorityDef,
   ProjectShortcut,
   UserPreferences,
   UserPreferencesPatch,
@@ -61,6 +62,8 @@ function defaultSettingsBody(): SettingsBody {
       { id: "done", name: "완료", category: "done", order: 3 },
     ],
     enabledTypes: ["task", "story", "bug", "epic", "subtask"],
+    enabledPriorities: ["highest", "high", "medium", "low", "lowest"],
+    defaultPriority: "medium",
   };
 }
 
@@ -145,6 +148,8 @@ function cloneBody(body: SettingsBody): SettingsBody {
     // 해석 필드(kind/color)는 저장하지 않는다 — 레지스트리에서 매번 파생한다
     statuses: body.statuses.map((s) => ({ id: s.id, name: s.name, category: s.category, order: s.order })),
     enabledTypes: [...body.enabledTypes],
+    enabledPriorities: [...(body.enabledPriorities ?? defaultSettingsBody().enabledPriorities)],
+    defaultPriority: body.defaultPriority ?? "medium",
     ...(body.transitions
       ? { transitions: body.transitions.map((t) => ({ ...t, from: [...t.from] })) }
       : {}),
@@ -248,6 +253,24 @@ function normalize(data: JiraData): JiraData {
   }
   data.statusDefs ??= [];
   // 전역 이슈 타입 레지스트리 — 기본 5종은 항상 있다
+  data.priorities ??= BUILTIN_PRIORITIES.map((p) => ({ ...p }));
+  for (const builtin of BUILTIN_PRIORITIES) {
+    if (!data.priorities.some((p) => p.id === builtin.id)) data.priorities.push({ ...builtin });
+  }
+  for (const scheme of data.schemes ?? []) {
+    scheme.body.enabledPriorities ??= defaultSettingsBody().enabledPriorities;
+    scheme.body.defaultPriority ??= "medium";
+  }
+  for (const entry of data.projectSettings ?? []) {
+    if (entry.custom) {
+      entry.custom.enabledPriorities ??= defaultSettingsBody().enabledPriorities;
+      entry.custom.defaultPriority ??= "medium";
+    }
+  }
+  for (const issue of data.issues) {
+    const lowered = String(issue.priority ?? "medium").toLowerCase();
+    issue.priority = priorityDefOf(data, lowered) ? lowered : "medium";
+  }
   data.issueTypes ??= BUILTIN_ISSUE_TYPES.map((t) => ({ ...t }));
   for (const builtin of BUILTIN_ISSUE_TYPES) {
     if (!data.issueTypes.some((t) => t.id === builtin.id)) data.issueTypes.push({ ...builtin });
@@ -290,7 +313,7 @@ function load(): JiraData {
     }
   }
   if (!cache) {
-    cache = createSeedData();
+    cache = normalize(createSeedData());
     persist();
   }
   return cache;
@@ -516,6 +539,48 @@ function typeDefOf(data: JiraData, id: string): IssueTypeDef | undefined {
 /** 타입 id → 계층. 모르는 id는 일반으로 본다 */
 function typeLevelOf(data: JiraData, id: string): IssueTypeLevel {
   return typeDefOf(data, id)?.level ?? "standard";
+}
+
+/** 기본 우선순위 5단계(지라) — 순서 고정 삭제 불가, 이름·아이콘·색은 바꿀 수 있다 */
+const BUILTIN_PRIORITIES: PriorityDef[] = [
+  { id: "highest", name: "최상", icon: "chevrons-up", color: "danger", description: "지금 당장 처리해야 한다", order: 1, builtIn: true },
+  { id: "high", name: "높음", icon: "chevron-up", color: "danger", description: "다른 일보다 먼저 처리한다", order: 2, builtIn: true },
+  { id: "medium", name: "보통", icon: "equal", color: "warning", description: "순서대로 처리한다", order: 3, builtIn: true },
+  { id: "low", name: "낮음", icon: "chevron-down", color: "info", description: "여유가 있을 때 처리한다", order: 4, builtIn: true },
+  { id: "lowest", name: "최하", icon: "chevrons-down", color: "neutral", description: "미뤄도 된다", order: 5, builtIn: true },
+];
+
+export const PRIORITIES_CHANGED_EVENT = "alm:priorities-changed";
+function notifyPrioritiesChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PRIORITIES_CHANGED_EVENT));
+}
+
+function priorityDefOf(data: JiraData, id: string): PriorityDef | undefined {
+  return data.priorities.find((p) => p.id === id) ?? BUILTIN_PRIORITIES.find((p) => p.id === id);
+}
+
+/** 프로젝트에 적용되는 설정 본문(커스텀 → 스킴 → 기본) */
+function settingsBodyOf(data: JiraData, projectId: string): SettingsBody {
+  const entry = data.projectSettings.find((e) => e.projectId === projectId);
+  return (
+    entry?.custom ??
+    data.schemes.find((s) => s.id === entry?.schemeId)?.body ??
+    defaultSettingsBody()
+  );
+}
+
+/** 요청 값(대소문자 무관) → 레지스트리 id. 없으면 프로젝트 기본값, 비활성이면 거부 — 서버와 같은 문구 */
+function resolvePriority(data: JiraData, projectId: string, requested: string | null | undefined): string {
+  const body = settingsBodyOf(data, projectId);
+  const enabled = body.enabledPriorities ?? defaultSettingsBody().enabledPriorities;
+  if (requested === undefined || requested === null || requested.trim() === "") {
+    return body.defaultPriority ?? "medium";
+  }
+  const id = requested.trim().toLowerCase();
+  const def = priorityDefOf(data, id);
+  if (!def) throw new Error(`없는 우선순위입니다: ${requested}`);
+  if (!enabled.includes(id)) throw new Error(`이 프로젝트에서 사용할 수 없는 우선순위입니다: ${def.name}`);
+  return id;
 }
 
 function typeNameOf(data: JiraData, id: string): string {
@@ -1469,7 +1534,7 @@ export async function createIssue(input: {
       (resolvedStatuses(data, project.id)
         .sort((a, b) => a.order - b.order)
         .find((s) => s.kind === "new")?.id ?? "todo"),
-    priority: input.priority ?? "medium",
+    priority: resolvePriority(data, project.id, input.priority),
     assigneeId: input.assigneeId ?? (project.defaultAssignee === "lead" ? project.leadId : null),
     reporterId: CURRENT_USER_ID,
     sprintId: input.sprintId ?? null,
@@ -1567,6 +1632,7 @@ export async function updateIssue(
     }
   }
   const { resolution: explicitResolution, ...rest } = patch;
+  if (rest.priority !== undefined) rest.priority = resolvePriority(data, issue.projectId, rest.priority);
   Object.assign(issue, rest);
   applyResolutionRule(data, issue, before.status, explicitResolution);
   if (patch.type !== undefined && issue.parentId !== null) {
@@ -2027,7 +2093,7 @@ export async function bulkUpdateIssues(ids: string[], patch: BulkIssuePatch): Pr
     const next: Parameters<typeof updateIssue>[1] = {};
     if (patch.status !== undefined && patch.status !== issue.status) next.status = patch.status;
     if (patch.priority !== undefined && patch.priority !== issue.priority) {
-      next.priority = patch.priority;
+      next.priority = resolvePriority(data, issue.projectId, patch.priority);
     }
     if (patch.assigneeId !== undefined && patch.assigneeId !== issue.assigneeId) {
       next.assigneeId = patch.assigneeId;
@@ -2193,6 +2259,14 @@ function validateSettingsBody(data: JiraData, body: SettingsBody): void {
   }
   if (!body.enabledTypes.some((t) => typeLevelOf(data, t) !== "subtask")) {
     throw new Error("이슈 타입은 최소 1개 활성화해야 합니다");
+  }
+  const enabledPriorities = body.enabledPriorities ?? defaultSettingsBody().enabledPriorities;
+  for (const priority of enabledPriorities) {
+    if (!priorityDefOf(data, priority)) throw new Error(`없는 우선순위입니다: ${priority}`);
+  }
+  if (enabledPriorities.length === 0) throw new Error("우선순위는 최소 1개 활성화해야 합니다");
+  if (!enabledPriorities.includes(body.defaultPriority ?? "medium")) {
+    throw new Error("기본 우선순위는 활성화된 우선순위 중에서 골라야 합니다");
   }
 }
 
@@ -2699,6 +2773,103 @@ export async function deleteIssueType(id: string): Promise<void> {
 // ── boards ───────────────────────────────────────────────────
 
 /** 기본 보드 우선, 이후 생성순 */
+// ── 우선순위 레지스트리 (전역 관리 > 우선순위) ──────────────────────
+
+export async function listPriorities(): Promise<PriorityDef[]> {
+  return clone([...load().priorities].sort((a, b) => a.order - b.order));
+}
+
+export async function priorityUsage(): Promise<Record<string, number>> {
+  const data = load();
+  return Object.fromEntries(
+    data.priorities.map((p) => [p.id, data.issues.filter((i) => i.priority === p.id).length]),
+  );
+}
+
+export async function createPriority(input: {
+  name: string;
+  icon: string;
+  color: PriorityDef["color"];
+  description?: string;
+}): Promise<PriorityDef> {
+  const data = load();
+  const name = input.name.trim();
+  if (!name) throw new Error("우선순위 이름을 입력하세요");
+  if (data.priorities.some((p) => p.name === name)) throw new Error(`우선순위 이름이 중복됩니다: ${name}`);
+  if (!input.icon) throw new Error("아이콘을 고르세요");
+  const def: PriorityDef = {
+    id: `pr-${nextId()}`,
+    name,
+    icon: input.icon,
+    color: input.color,
+    description: input.description?.trim() ?? "",
+    order: data.priorities.length + 1,
+    builtIn: false,
+  };
+  data.priorities.push(def);
+  persist();
+  notifyPrioritiesChanged();
+  return clone(def);
+}
+
+export async function updatePriority(
+  id: string,
+  patch: Partial<Pick<PriorityDef, "name" | "icon" | "color" | "description">>,
+): Promise<PriorityDef> {
+  const data = load();
+  const def = data.priorities.find((p) => p.id === id);
+  if (!def) throw new Error("우선순위를 찾을 수 없습니다");
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("우선순위 이름을 입력하세요");
+    if (data.priorities.some((p) => p.id !== id && p.name === name)) {
+      throw new Error(`우선순위 이름이 중복됩니다: ${name}`);
+    }
+    def.name = name;
+  }
+  if (patch.icon !== undefined) def.icon = patch.icon;
+  if (patch.color !== undefined) def.color = patch.color;
+  if (patch.description !== undefined) def.description = patch.description.trim();
+  persist();
+  notifyPrioritiesChanged();
+  return clone(def);
+}
+
+export async function movePriority(id: string, delta: -1 | 1): Promise<void> {
+  const data = load();
+  const sorted = [...data.priorities].sort((a, b) => a.order - b.order);
+  const index = sorted.findIndex((p) => p.id === id);
+  if (index < 0) throw new Error("우선순위를 찾을 수 없습니다");
+  const target = index + delta;
+  if (target < 0 || target >= sorted.length) return;
+  const a = sorted[index];
+  const b = sorted[target];
+  [a.order, b.order] = [b.order, a.order];
+  persist();
+  notifyPrioritiesChanged();
+}
+
+export async function deletePriority(id: string): Promise<void> {
+  const data = load();
+  const def = data.priorities.find((p) => p.id === id);
+  if (!def) throw new Error("우선순위를 찾을 수 없습니다");
+  if (def.builtIn) throw new Error("기본 우선순위는 삭제할 수 없습니다");
+  if (data.issues.some((i) => i.priority === id)) throw new Error("이 우선순위를 쓰는 이슈가 있습니다");
+  data.priorities = data.priorities.filter((p) => p.id !== id);
+  // 모든 본문의 활성 목록에서 빼고, 기본값이었다면 보통(없으면 첫 항목)으로
+  const fix = (body: SettingsBody) => {
+    body.enabledPriorities = (body.enabledPriorities ?? defaultSettingsBody().enabledPriorities).filter((p) => p !== id);
+    if (body.defaultPriority === id) {
+      body.defaultPriority = body.enabledPriorities.includes("medium") ? "medium" : (body.enabledPriorities[0] ?? "medium");
+    }
+  };
+  for (const scheme of data.schemes) fix(scheme.body);
+  for (const entry of data.projectSettings) if (entry.custom) fix(entry.custom);
+  [...data.priorities].sort((a, b) => a.order - b.order).forEach((p, i) => (p.order = i + 1));
+  persist();
+  notifyPrioritiesChanged();
+}
+
 export async function listBoards(projectId: string): Promise<Board[]> {
   return clone(
     load()

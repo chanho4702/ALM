@@ -37,6 +37,8 @@ export interface QueryContext {
   statuses?: { id: string; name: string }[];
   /** 전역 이슈 타입 레지스트리 — 사용자 타입 이름 검색용. 없으면 기본 5종만 매치 */
   types?: { id: string; name: string }[];
+  /** 우선순위 레지스트리 — 커스텀 우선순위 이름을 토큰으로 알아듣는다 */
+  priorities?: { id: string; name: string }[];
 }
 
 // 한국어 라벨 ↔ 값 매핑 (스마트 구문의 어휘)
@@ -54,14 +56,18 @@ const STATUS_LABELS: Record<IssueStatus, string> = {
 };
 
 const PRIORITY_BY_LABEL: Record<string, IssuePriority> = {
+  최상: "highest",
   높음: "high",
   보통: "medium",
   낮음: "low",
+  최하: "lowest",
 };
-const PRIORITY_LABELS: Record<IssuePriority, string> = {
+const PRIORITY_LABELS: Record<string, string> = {
+  highest: "최상",
   high: "높음",
   medium: "보통",
   low: "낮음",
+  lowest: "최하",
 };
 
 const TYPE_BY_LABEL: Record<string, IssueType> = {
@@ -148,7 +154,7 @@ export function parseSmartQuery(input: string, ctx: QueryContext): IssueQuery {
         break;
       }
       case "우선순위": {
-        const priority = PRIORITY_BY_LABEL[value];
+        const priority = PRIORITY_BY_LABEL[value] ?? ctx.priorities?.find((p) => p.name === value)?.id;
         if (priority) push(query.priorities, priority);
         else textParts.push(raw);
         break;
@@ -204,7 +210,9 @@ export function serializeQuery(query: IssueQuery, ctx: QueryContext): string {
     const named = ctx.statuses?.find((s) => s.id === id);
     if (named) parts.push(`상태:${named.name.replace(/\s+/g, "")}`); // 토큰은 공백 불가 — 파서가 공백 제거 이름도 매치
   }
-  for (const priority of query.priorities) parts.push(`우선순위:${PRIORITY_LABELS[priority]}`);
+  for (const priority of query.priorities) {
+    parts.push(`우선순위:${PRIORITY_LABELS[priority] ?? ctx.priorities?.find((p) => p.id === priority)?.name ?? priority}`);
+  }
   for (const type of query.types) {
     parts.push(`타입:${TYPE_LABELS[type] ?? ctx.types?.find((t) => t.id === type)?.name ?? type}`);
   }

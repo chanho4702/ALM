@@ -41,7 +41,7 @@ function customBody(): SettingsBody {
       { id: "inprogress", name: "작업 중", category: "inprogress", order: 2 },
       { id: "done", name: "끝", category: "done", order: 3 },
     ],
-    enabledTypes: ["task", "story", "subtask"],
+    enabledTypes: ["task", "story", "subtask"], enabledPriorities: ["highest", "high", "medium", "low", "lowest"], defaultPriority: "medium",
   };
 }
 

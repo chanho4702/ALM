@@ -156,7 +156,7 @@ describe("jiraApi issues", () => {
     expect(body).toMatchObject({
       title: "로그인 오류",
       type: "bug",
-      priority: "HIGH",
+      priority: "high",
       assigneeId: 2,
       details: {
         parentId: null,
@@ -190,7 +190,7 @@ describe("jiraApi issues", () => {
       description: ISSUE.description,
       type: "bug",
       status: "inprogress",
-      priority: "MEDIUM",
+      priority: "medium",
       assigneeId: null,
       details: {
         sprintId: null,

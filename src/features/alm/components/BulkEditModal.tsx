@@ -4,12 +4,12 @@ import { Button, Modal, Select, TextField, useToast } from "@chanho/react";
 import type { IssuePriority, Sprint, User, WorkflowStatus } from "../store/types";
 import { bulkUpdateIssues } from "../store/jiraStore";
 import type { BulkIssuePatch } from "../store/jiraStore";
-import { PRIORITY_LABELS } from "./labels";
+import { priorityName } from "./labels";
+import { usePriorities } from "./usePriorities";
 
 const KEEP = "__keep__"; // "변경 안 함" 센티널 — Select는 빈 문자열 value를 쓰지 않는다
 const NONE = "__none__"; // 담당자 미지정 / 백로그
 
-const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 const splitLabels = (text: string) =>
   [...new Set(text.split(",").map((l) => l.trim()).filter(Boolean))];
 
@@ -38,6 +38,8 @@ export function BulkEditModal({
   onDone,
 }: BulkEditModalProps) {
   const toast = useToast();
+  const priorities = usePriorities();
+  const PRIORITIES = priorities.map((d) => d.id);
   const [status, setStatus] = useState(KEEP);
   const [priority, setPriority] = useState(KEEP);
   const [assignee, setAssignee] = useState(KEEP);
@@ -124,7 +126,7 @@ export function BulkEditModal({
             onValueChange={setPriority}
             options={[
               { value: KEEP, label: "변경 안 함" },
-              ...PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] })),
+              ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
             ]}
           />
           <Select

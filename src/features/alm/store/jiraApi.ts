@@ -45,6 +45,7 @@ import type {
   StatusColor,
   IssueTypeDef,
   IssueTypeLevel,
+  PriorityDef,
   User,
   ProjectRole,
   Comment,
@@ -63,7 +64,7 @@ import type {
   AnnouncementBanner,
 } from "./types";
 import type { IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock";
-import { DEFAULT_PREFERENCES } from "./jiraMock";
+import { DEFAULT_PREFERENCES, PRIORITIES_CHANGED_EVENT } from "./jiraMock";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -1098,6 +1099,52 @@ export async function moveIssueType(id: string, delta: -1 | 1): Promise<void> {
 export async function deleteIssueType(id: string): Promise<void> {
   await json(await sharedApiFetch(`/api/alm/settings/issue-types/${encodeURIComponent(id)}`, { method: "DELETE" }));
   notifyIssueTypesChanged();
+}
+
+// ── 우선순위 레지스트리 (서버 V14) ──
+
+function notifyPrioritiesChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PRIORITIES_CHANGED_EVENT));
+}
+
+export async function listPriorities(): Promise<PriorityDef[]> {
+  return (await json(await sharedApiFetch("/api/alm/settings/priorities"))) as PriorityDef[];
+}
+
+export async function priorityUsage(): Promise<Record<string, number>> {
+  return (await json(await sharedApiFetch("/api/alm/settings/priorities/usage"))) as Record<string, number>;
+}
+
+export async function createPriority(input: {
+  name: string;
+  icon: string;
+  color: PriorityDef["color"];
+  description?: string;
+}): Promise<PriorityDef> {
+  const created = (await json(await sharedApiFetch("/api/alm/settings/priorities", postJson(input)))) as PriorityDef;
+  notifyPrioritiesChanged();
+  return created;
+}
+
+export async function updatePriority(
+  id: string,
+  patch: Partial<Pick<PriorityDef, "name" | "icon" | "color" | "description">>,
+): Promise<PriorityDef> {
+  const updated = (await json(
+    await sharedApiFetch(`/api/alm/settings/priorities/${encodeURIComponent(id)}`, jsonBody(patch)),
+  )) as PriorityDef;
+  notifyPrioritiesChanged();
+  return updated;
+}
+
+export async function movePriority(id: string, delta: -1 | 1): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/priorities/${encodeURIComponent(id)}/move`, postJson({ delta })));
+  notifyPrioritiesChanged();
+}
+
+export async function deletePriority(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/priorities/${encodeURIComponent(id)}`, { method: "DELETE" }));
+  notifyPrioritiesChanged();
 }
 
 // ── 사용자 — 디렉터리 서비스가 아직 없다. 현재 사용자는 /api/me, 목록은 현재 사용자뿐 ──

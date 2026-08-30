@@ -7,13 +7,14 @@ import { Avatar, Badge, Button, Dropdown, Lozenge } from "@chanho/react";
 import type { Issue, Sprint, WorkflowStatus } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import {
+  priorityAppearance,
+  priorityName,
   estimateSummary,
   formatPlannedRange,
-  PRIORITY_APPEARANCE,
-  PRIORITY_LABELS,
   statusAppearance,
   statusName,
 } from "./labels";
+import { usePriorities } from "./usePriorities";
 
 /** 이슈를 옮길 수 있는 대상. sprintId null = 백로그 */
 export interface MoveTarget {
@@ -43,6 +44,7 @@ export function BacklogIssueRow({
   onDelete,
   onOpen,
 }: BacklogIssueRowProps) {
+  const priorities = usePriorities();
   return (
     // 행 안에 Dropdown 버튼이 중첩되므로 <button>이 아니라 role="button"으로 (button-in-button 방지)
     <div
@@ -63,8 +65,8 @@ export function BacklogIssueRow({
       <Lozenge appearance={statusAppearance(statuses, issue.status)}>
         {statusName(statuses, issue.status)}
       </Lozenge>
-      <Lozenge appearance={PRIORITY_APPEARANCE[issue.priority]}>
-        {PRIORITY_LABELS[issue.priority]}
+      <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
+        {priorityName(priorities, issue.priority)}
       </Lozenge>
       {assigneeName ? <Avatar name={assigneeName} size="small" /> : null}
       {/*
