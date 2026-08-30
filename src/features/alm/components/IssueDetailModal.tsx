@@ -21,6 +21,7 @@ import type {
   Comment,
   Issue,
   IssuePriority,
+  LinkTypeDef,
   IssueResolution,
   IssueType,
   ProjectVersion,
@@ -58,6 +59,7 @@ import {
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { useIssueTypes } from "./useIssueTypes";
+import { useLinkTypes } from "./useLinkTypes";
 import { IssueAttachments } from "./IssueAttachments";
 import { WatchButton } from "./WatchButton";
 import {
@@ -78,13 +80,24 @@ const UNASSIGNED = "unassigned";
 const BACKLOG = "backlog";
 const NO_PARENT = "none";
 
-/** 링크 추가 폼의 종류 — 차단은 방향까지 구분 */
-type LinkKind = "blocks-out" | "blocks-in" | "relates";
-const LINK_KIND_OPTIONS: { value: LinkKind; label: string }[] = [
-  { value: "blocks-out", label: "차단함" },
-  { value: "blocks-in", label: "차단됨" },
-  { value: "relates", label: "관련" },
-];
+/**
+ * 링크 추가 폼의 종류 — 레지스트리 타입마다 나가는 방향(`id:out`), 비대칭이면 들어오는 방향(`id:in`)도.
+ * 값은 "타입id:방향" 문자열이라 타입 id에 콜론이 없다는 전제(레지스트리 id는 slug)를 쓴다.
+ */
+type LinkKind = string;
+const LINK_KIND_DEFAULT: LinkKind = "blocks:out";
+function linkKindOptions(types: LinkTypeDef[]): { value: LinkKind; label: string }[] {
+  const options: { value: LinkKind; label: string }[] = [];
+  for (const t of types) {
+    options.push({ value: `${t.id}:out`, label: t.outward });
+    if (t.outward !== t.inward) options.push({ value: `${t.id}:in`, label: t.inward });
+  }
+  return options.length > 0 ? options : [{ value: LINK_KIND_DEFAULT, label: "차단함" }];
+}
+function parseLinkKind(kind: LinkKind): { type: string; inbound: boolean } {
+  const [type, dir] = kind.split(":");
+  return { type, inbound: dir === "in" };
+}
 
 export interface IssueDetailModalProps {
   /** "ALM-1" 형식 이슈 키 (?issue= 쿼리 값) */
@@ -114,6 +127,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [worklogs, setWorklogs] = useState<Worklog[]>([]);
   const [enabledTypes, setEnabledTypes] = useState<IssueType[]>([...ISSUE_TYPES]);
   const issueTypes = useIssueTypes();
+  const linkTypes = useLinkTypes();
   const priorities = usePriorities();
   const PRIORITIES = priorities.map((d) => d.id);
   const levelOf = (typeId: string) => typeLevel(issueTypes, typeId);
@@ -123,7 +137,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [worklogComment, setWorklogComment] = useState("");
   const [estimateDraft, setEstimateDraft] = useState("");
   const [subtaskDraft, setSubtaskDraft] = useState("");
-  const [linkKind, setLinkKind] = useState<LinkKind>("blocks-out");
+  const [linkKind, setLinkKind] = useState<LinkKind>(LINK_KIND_DEFAULT);
   const [linkTargetId, setLinkTargetId] = useState<string | null>(null);
   const [, setSearchParams] = useSearchParams();
   /** 수정 중인 코멘트 id — null이면 보기 모드 */
@@ -376,10 +390,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const handleLinkAdd = async () => {
     if (!issue || !linkTargetId) return;
     try {
+      const { type, inbound } = parseLinkKind(linkKind);
       await addIssueLink(
-        linkKind === "blocks-in"
-          ? { sourceId: linkTargetId, targetId: issue.id, type: "blocks" }
-          : { sourceId: issue.id, targetId: linkTargetId, type: linkKind === "relates" ? "relates" : "blocks" },
+        inbound
+          ? { sourceId: linkTargetId, targetId: issue.id, type }
+          : { sourceId: issue.id, targetId: linkTargetId, type },
       );
       setLinkTargetId(null);
       await refreshRelations(issue.id, issue.projectId);
@@ -489,17 +504,25 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       ? projectIssues.filter((i) => i.id !== issue.id && levelOf(i.type) === "standard")
       : projectIssues.filter((i) => levelOf(i.type) === "epic");
 
-  const linkGroups: { title: string; items: IssueLinkView[] }[] = [
-    {
-      title: "차단함",
-      items: links.filter((l) => l.link.type === "blocks" && l.direction === "outward"),
-    },
-    {
-      title: "차단됨",
-      items: links.filter((l) => l.link.type === "blocks" && l.direction === "inward"),
-    },
-    { title: "관련", items: links.filter((l) => l.link.type === "relates") },
-  ];
+  // 레지스트리 순서대로 타입마다 나가는/들어오는 그룹(대칭이면 하나). 모르는 타입은 id로 뒤에
+  const knownTypeIds = new Set(linkTypes.map((t) => t.id));
+  const linkGroups: { title: string; items: IssueLinkView[] }[] = [];
+  for (const t of linkTypes) {
+    const symmetric = t.outward === t.inward;
+    linkGroups.push({
+      title: t.outward,
+      items: links.filter((l) => l.link.type === t.id && (symmetric || l.direction === "outward")),
+    });
+    if (!symmetric) {
+      linkGroups.push({ title: t.inward, items: links.filter((l) => l.link.type === t.id && l.direction === "inward") });
+    }
+  }
+  for (const l of links) {
+    if (knownTypeIds.has(l.link.type)) continue;
+    const group = linkGroups.find((g) => g.title === l.link.type);
+    if (group) group.items.push(l);
+    else linkGroups.push({ title: l.link.type, items: [l] });
+  }
 
   const doneChildren = children.filter((c) => statusKind(statuses, c.status) === "complete").length;
 
@@ -632,8 +655,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               <Select
                 label="종류"
                 value={linkKind}
-                options={LINK_KIND_OPTIONS}
-                onValueChange={(v) => setLinkKind(v as LinkKind)}
+                options={linkKindOptions(linkTypes)}
+                onValueChange={(v) => setLinkKind(v)}
               />
               <Select
                 label="대상 이슈"

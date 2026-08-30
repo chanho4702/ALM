@@ -105,3 +105,10 @@
 삭제 불가·순서가 곧 위계) + `SettingsBody.enabledPriorities`/`defaultPriority`(스킴·프로젝트 커스텀). 이슈의
 `priority`는 레지스트리 id(소문자). 생성 시 없으면 기본값, 비활성이면 거부(서버·목업 같은 문구). 화면은
 `usePriorities()` + `priorityName/priorityAppearance/priorityRank`(labels.ts)로 그린다 — `PRIORITY_LABELS`는 폴백.
+
+## 링크 타입 레지스트리 (2026-08-30)
+
+전역 `LinkTypeDef`(id·name·outward·inward·order·builtIn, 기본 5종 `blocks/relates/duplicates/causes/clones`).
+`outward === inward`면 대칭(양방향) — 역방향도 중복으로 막고 방향 없이(outward) 보인다. 쓰이는 타입은 대칭 여부를
+못 바꾸고 삭제 불가. 이슈 상세의 링크 종류 Select는 타입마다 `id:out`(+비대칭이면 `id:in`) 옵션을 `useLinkTypes()`로 만든다.
+타임라인 의존선은 여전히 `blocks` id를 본다.

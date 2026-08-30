@@ -343,13 +343,13 @@ describe("IssueDetailModal 이슈 관계", () => {
 
     // 관련 링크 추가: ALM-2 ↔ ALM-5
     await user.click(within(linksSection).getByRole("combobox", { name: "종류" }));
-    await user.click(await screen.findByRole("option", { name: "관련" }));
+    await user.click(await screen.findByRole("option", { name: "관련됨" }));
     await user.click(within(linksSection).getByRole("combobox", { name: "대상 이슈" }));
     await user.click(await screen.findByRole("option", { name: /ALM-5/ }));
     await user.click(within(linksSection).getByRole("button", { name: "링크 추가" }));
 
     expect(
-      await within(linksSection).findByText("관련", { selector: ".issue-link-group-title" }),
+      await within(linksSection).findByText("관련됨", { selector: ".issue-link-group-title" }),
     ).toBeInTheDocument();
     expect(within(linksSection).getByText("ALM-5")).toBeInTheDocument();
 

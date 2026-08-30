@@ -370,7 +370,22 @@ export interface IssueChange {
   at: string;
 }
 
-export type IssueLinkType = "blocks" | "relates";
+/** 기본 링크 타입 id 5종 — 시드·타임라인(blocks 의존)이 쓴다. 사용자 타입은 `lt-*` */
+export type BuiltinIssueLinkType = "blocks" | "relates" | "duplicates" | "causes" | "clones";
+/** 링크 타입 id — 레지스트리(`LinkTypeDef`)가 진실 */
+export type IssueLinkType = string;
+
+/** 링크 타입 레지스트리 — outward/inward가 같으면 대칭(양방향) 링크. 기본 5종은 삭제 불가 */
+export interface LinkTypeDef {
+  id: string;
+  name: string;
+  /** source 쪽에서 보는 문구("차단함") */
+  outward: string;
+  /** target 쪽에서 보는 문구("차단됨") */
+  inward: string;
+  order: number;
+  builtIn: boolean;
+}
 
 /**
  * 이슈 링크 — blocks: source가 target을 차단(방향 있음), relates: 양방향(레코드 1개).
@@ -451,6 +466,7 @@ export interface JiraData {
   /** 전역 이슈 타입 레지스트리 (order순) */
   issueTypes: IssueTypeDef[];
   priorities: PriorityDef[];
+  linkTypes: LinkTypeDef[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

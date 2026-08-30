@@ -26,6 +26,7 @@ import { StatusCategoriesPanel } from "../components/StatusCategoriesPanel";
 import { StatusRegistryPanel } from "../components/StatusRegistryPanel";
 import { IssueTypesPanel } from "../components/IssueTypesPanel";
 import { PrioritiesPanel } from "../components/PrioritiesPanel";
+import { LinkTypesPanel } from "../components/LinkTypesPanel";
 import { usePriorities } from "../components/usePriorities";
 import { priorityName } from "../components/labels";
 import { AdminAuditPanel, SystemPanel } from "../components/AdminPanels";
@@ -170,6 +171,8 @@ export function GlobalSettingsPage() {
         <IssueTypesPanel />
       ) : section === "priorities" ? (
         <PrioritiesPanel />
+      ) : section === "link-types" ? (
+        <LinkTypesPanel />
       ) : section === "audit" ? (
         <AdminAuditPanel />
       ) : section === "system" ? (

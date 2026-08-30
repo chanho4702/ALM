@@ -46,6 +46,7 @@ import type {
   IssueTypeDef,
   IssueTypeLevel,
   PriorityDef,
+  LinkTypeDef,
   User,
   ProjectRole,
   Comment,
@@ -64,7 +65,7 @@ import type {
   AnnouncementBanner,
 } from "./types";
 import type { IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock";
-import { DEFAULT_PREFERENCES, PRIORITIES_CHANGED_EVENT } from "./jiraMock";
+import { DEFAULT_PREFERENCES, LINK_TYPES_CHANGED_EVENT, PRIORITIES_CHANGED_EVENT } from "./jiraMock";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -1099,6 +1100,47 @@ export async function moveIssueType(id: string, delta: -1 | 1): Promise<void> {
 export async function deleteIssueType(id: string): Promise<void> {
   await json(await sharedApiFetch(`/api/alm/settings/issue-types/${encodeURIComponent(id)}`, { method: "DELETE" }));
   notifyIssueTypesChanged();
+}
+
+// ── 링크 타입 레지스트리 (서버 V15) ──
+
+function notifyLinkTypesChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(LINK_TYPES_CHANGED_EVENT));
+}
+
+export async function listLinkTypes(): Promise<LinkTypeDef[]> {
+  return (await json(await sharedApiFetch("/api/alm/settings/link-types"))) as LinkTypeDef[];
+}
+
+export async function linkTypeUsage(): Promise<Record<string, number>> {
+  return (await json(await sharedApiFetch("/api/alm/settings/link-types/usage"))) as Record<string, number>;
+}
+
+export async function createLinkType(input: { name: string; outward: string; inward: string }): Promise<LinkTypeDef> {
+  const created = (await json(await sharedApiFetch("/api/alm/settings/link-types", postJson(input)))) as LinkTypeDef;
+  notifyLinkTypesChanged();
+  return created;
+}
+
+export async function updateLinkType(
+  id: string,
+  patch: Partial<Pick<LinkTypeDef, "name" | "outward" | "inward">>,
+): Promise<LinkTypeDef> {
+  const updated = (await json(
+    await sharedApiFetch(`/api/alm/settings/link-types/${encodeURIComponent(id)}`, jsonBody(patch)),
+  )) as LinkTypeDef;
+  notifyLinkTypesChanged();
+  return updated;
+}
+
+export async function moveLinkType(id: string, delta: -1 | 1): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/link-types/${encodeURIComponent(id)}/move`, postJson({ delta })));
+  notifyLinkTypesChanged();
+}
+
+export async function deleteLinkType(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/link-types/${encodeURIComponent(id)}`, { method: "DELETE" }));
+  notifyLinkTypesChanged();
 }
 
 // ── 우선순위 레지스트리 (서버 V14) ──

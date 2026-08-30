@@ -1,5 +1,6 @@
 import type {
   PriorityDef,
+  LinkTypeDef,
   ProjectShortcut,
   UserPreferences,
   UserPreferencesPatch,
@@ -253,6 +254,10 @@ function normalize(data: JiraData): JiraData {
   }
   data.statusDefs ??= [];
   // 전역 이슈 타입 레지스트리 — 기본 5종은 항상 있다
+  data.linkTypes ??= BUILTIN_LINK_TYPES.map((t) => ({ ...t }));
+  for (const builtin of BUILTIN_LINK_TYPES) {
+    if (!data.linkTypes.some((t) => t.id === builtin.id)) data.linkTypes.push({ ...builtin });
+  }
   data.priorities ??= BUILTIN_PRIORITIES.map((p) => ({ ...p }));
   for (const builtin of BUILTIN_PRIORITIES) {
     if (!data.priorities.some((p) => p.id === builtin.id)) data.priorities.push({ ...builtin });
@@ -549,6 +554,26 @@ const BUILTIN_PRIORITIES: PriorityDef[] = [
   { id: "low", name: "낮음", icon: "chevron-down", color: "info", description: "여유가 있을 때 처리한다", order: 4, builtIn: true },
   { id: "lowest", name: "최하", icon: "chevrons-down", color: "neutral", description: "미뤄도 된다", order: 5, builtIn: true },
 ];
+
+/** 기본 링크 타입 5종(지라) — outward/inward가 같으면 대칭 */
+const BUILTIN_LINK_TYPES: LinkTypeDef[] = [
+  { id: "blocks", name: "차단", outward: "차단함", inward: "차단됨", order: 1, builtIn: true },
+  { id: "relates", name: "관련", outward: "관련됨", inward: "관련됨", order: 2, builtIn: true },
+  { id: "duplicates", name: "중복", outward: "중복함", inward: "중복됨", order: 3, builtIn: true },
+  { id: "causes", name: "원인", outward: "원인임", inward: "결과임", order: 4, builtIn: true },
+  { id: "clones", name: "복제", outward: "복제함", inward: "복제됨", order: 5, builtIn: true },
+];
+
+export const LINK_TYPES_CHANGED_EVENT = "alm:link-types-changed";
+function notifyLinkTypesChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(LINK_TYPES_CHANGED_EVENT));
+}
+
+function linkTypeDefOf(data: JiraData, id: string): LinkTypeDef | undefined {
+  return data.linkTypes.find((t) => t.id === id) ?? BUILTIN_LINK_TYPES.find((t) => t.id === id);
+}
+
+const isSymmetric = (def: LinkTypeDef) => def.outward === def.inward;
 
 export const PRIORITIES_CHANGED_EVENT = "alm:priorities-changed";
 function notifyPrioritiesChanged(): void {
@@ -1806,17 +1831,20 @@ export async function addIssueLink(input: {
   const target = data.issues.find((i) => i.id === input.targetId);
   if (!source || !target) throw new Error("이슈를 찾을 수 없습니다");
   if (source.id === target.id) throw new Error("자기 자신과는 연결할 수 없습니다");
+  const def = linkTypeDefOf(data, input.type);
+  if (!def) throw new Error(`없는 링크 타입입니다: ${input.type}`);
+  const symmetric = isSymmetric(def);
   const duplicate = data.links.some((l) => {
     if (l.type !== input.type) return false;
     if (l.sourceId === input.sourceId && l.targetId === input.targetId) return true;
-    // relates는 양방향 — 무순서 중복도 막는다
-    return input.type === "relates" && l.sourceId === input.targetId && l.targetId === input.sourceId;
+    // 대칭 타입은 양방향 — 무순서 중복도 막는다
+    return symmetric && l.sourceId === input.targetId && l.targetId === input.sourceId;
   });
   if (duplicate) throw new Error("이미 연결돼 있습니다");
   const link: IssueLink = { id: nextId(), ...input };
   data.links.push(link);
   const at = new Date().toISOString();
-  const label = input.type === "blocks" ? "차단" : "관련";
+  const label = def.name;
   for (const [issue, other] of [
     [source, target],
     [target, source],
@@ -1857,8 +1885,9 @@ export async function listIssueLinks(issueId: string): Promise<IssueLinkView[]> 
     const otherId = link.sourceId === issueId ? link.targetId : link.sourceId;
     const other = data.issues.find((i) => i.id === otherId);
     if (!other) continue;
+    const def = linkTypeDefOf(data, link.type);
     const direction: IssueLinkView["direction"] =
-      link.type === "relates" || link.sourceId === issueId ? "outward" : "inward";
+      (def && isSymmetric(def)) || link.sourceId === issueId ? "outward" : "inward";
     views.push({ link: clone(link), other: clone(other), direction });
   }
   return views;
@@ -2868,6 +2897,95 @@ export async function deletePriority(id: string): Promise<void> {
   [...data.priorities].sort((a, b) => a.order - b.order).forEach((p, i) => (p.order = i + 1));
   persist();
   notifyPrioritiesChanged();
+}
+
+// ── 링크 타입 레지스트리 (전역 관리 > 링크 타입) ──────────────────────
+
+export async function listLinkTypes(): Promise<LinkTypeDef[]> {
+  return clone([...load().linkTypes].sort((a, b) => a.order - b.order));
+}
+
+export async function linkTypeUsage(): Promise<Record<string, number>> {
+  const data = load();
+  return Object.fromEntries(data.linkTypes.map((t) => [t.id, data.links.filter((l) => l.type === t.id).length]));
+}
+
+function requireLabel(value: string | undefined, message: string): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) throw new Error(message);
+  return trimmed;
+}
+
+export async function createLinkType(input: { name: string; outward: string; inward: string }): Promise<LinkTypeDef> {
+  const data = load();
+  const name = requireLabel(input.name, "링크 타입 이름을 입력하세요");
+  if (data.linkTypes.some((t) => t.name === name)) throw new Error(`링크 타입 이름이 중복됩니다: ${name}`);
+  const def: LinkTypeDef = {
+    id: `lt-${nextId()}`,
+    name,
+    outward: requireLabel(input.outward, "나가는 문구(예: 차단함)를 입력하세요"),
+    inward: requireLabel(input.inward, "들어오는 문구(예: 차단됨)를 입력하세요"),
+    order: data.linkTypes.length + 1,
+    builtIn: false,
+  };
+  data.linkTypes.push(def);
+  persist();
+  notifyLinkTypesChanged();
+  return clone(def);
+}
+
+export async function updateLinkType(
+  id: string,
+  patch: Partial<Pick<LinkTypeDef, "name" | "outward" | "inward">>,
+): Promise<LinkTypeDef> {
+  const data = load();
+  const def = data.linkTypes.find((t) => t.id === id);
+  if (!def) throw new Error("링크 타입을 찾을 수 없습니다");
+  if (patch.name !== undefined) {
+    const name = requireLabel(patch.name, "링크 타입 이름을 입력하세요");
+    if (data.linkTypes.some((t) => t.id !== id && t.name === name)) throw new Error(`링크 타입 이름이 중복됩니다: ${name}`);
+    def.name = name;
+  }
+  const outward = patch.outward === undefined ? undefined : requireLabel(patch.outward, "나가는 문구(예: 차단함)를 입력하세요");
+  const inward = patch.inward === undefined ? undefined : requireLabel(patch.inward, "들어오는 문구(예: 차단됨)를 입력하세요");
+  if ((outward !== undefined || inward !== undefined) && data.links.some((l) => l.type === id)) {
+    const nextOut = outward ?? def.outward;
+    const nextIn = inward ?? def.inward;
+    if (isSymmetric(def) !== (nextOut === nextIn)) {
+      throw new Error("이 타입을 쓰는 링크가 있어 방향성(대칭 여부)을 바꿀 수 없습니다");
+    }
+  }
+  if (outward !== undefined) def.outward = outward;
+  if (inward !== undefined) def.inward = inward;
+  persist();
+  notifyLinkTypesChanged();
+  return clone(def);
+}
+
+export async function moveLinkType(id: string, delta: -1 | 1): Promise<void> {
+  const data = load();
+  const sorted = [...data.linkTypes].sort((a, b) => a.order - b.order);
+  const index = sorted.findIndex((t) => t.id === id);
+  if (index < 0) throw new Error("링크 타입을 찾을 수 없습니다");
+  const target = index + delta;
+  if (target < 0 || target >= sorted.length) return;
+  const a = sorted[index];
+  const b = sorted[target];
+  [a.order, b.order] = [b.order, a.order];
+  persist();
+  notifyLinkTypesChanged();
+}
+
+export async function deleteLinkType(id: string): Promise<void> {
+  const data = load();
+  const def = data.linkTypes.find((t) => t.id === id);
+  if (!def) throw new Error("링크 타입을 찾을 수 없습니다");
+  if (def.builtIn) throw new Error("기본 링크 타입은 삭제할 수 없습니다");
+  if (data.links.some((l) => l.type === id)) throw new Error("이 타입을 쓰는 링크가 있습니다");
+  data.linkTypes = data.linkTypes.filter((t) => t.id !== id);
+  [...data.linkTypes].sort((a, b) => a.order - b.order).forEach((t, i) => (t.order = i + 1));
+  persist();
+  notifyLinkTypesChanged();
 }
 
 export async function listBoards(projectId: string): Promise<Board[]> {

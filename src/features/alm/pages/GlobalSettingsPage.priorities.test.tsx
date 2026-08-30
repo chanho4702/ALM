@@ -26,7 +26,7 @@ describe("전역 관리 > 우선순위 (지라 우선 순위 + 구성표)", () =
     const user = userEvent.setup();
     renderAt("/settings/priorities");
     const list = await screen.findByRole("list", { name: "우선순위 목록" });
-    const rows = within(list).getAllByRole("listitem");
+    const rows = await within(list).findAllByRole("listitem");
     expect(rows).toHaveLength(5);
     expect(within(rows[0]).getByLabelText("최상 이름")).toHaveValue("최상");
     expect(within(rows[0]).getByRole("button", { name: "최상 삭제" })).toBeDisabled();
