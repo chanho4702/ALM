@@ -47,7 +47,18 @@ import type {
   IssueTypeLevel,
   User,
   ProjectRole,
+  Comment,
+  Worklog,
+  IssueLink,
+  IssueLinkType,
+  Activity,
+  Board,
+  BoardType,
+  BoardColumn,
+  BoardFilter,
+  BoardSwimlane,
 } from "./types";
+import type { IssueLinkView } from "./jiraMock";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -1067,4 +1078,300 @@ export async function listUsers(): Promise<User[]> {
 /** 권한 판정은 서버(org-service)가 한다 — 화면은 낙관적으로 열어 두고 거부는 응답으로 받는다 */
 export async function getMyProjectRole(): Promise<ProjectRole | null> {
   return "admin";
+}
+
+// ── 협업(V12): 코멘트·워크로그·링크·활동·보드 — 목업과 같은 시그니처, 서버가 같은 규칙을 강제한다 ──
+
+interface CommentDto {
+  id: number;
+  issueId: number;
+  authorId: number;
+  body: string;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+function mapComment(dto: CommentDto): Comment {
+  return {
+    id: String(dto.id),
+    issueId: String(dto.issueId),
+    authorId: String(dto.authorId),
+    body: dto.body,
+    createdAt: dto.createdAt,
+    ...(dto.updatedAt ? { updatedAt: dto.updatedAt } : {}),
+  };
+}
+
+export async function listComments(issueId: string): Promise<Comment[]> {
+  const rows = await json<CommentDto[]>(
+    await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/comments`),
+  );
+  return rows.map(mapComment);
+}
+
+export async function addComment(issueId: string, body: string): Promise<Comment> {
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  return mapComment(await json(response));
+}
+
+export async function updateComment(id: string, body: string): Promise<Comment> {
+  const response = await sharedApiFetch(`/api/alm/comments/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  return mapComment(await json(response));
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/comments/${toBackendId(id)}`, { method: "DELETE" }));
+}
+
+interface WorklogDto {
+  id: number;
+  issueId: number;
+  authorId: number;
+  hours: number;
+  comment: string;
+  workedOn: string;
+  createdAt: string;
+}
+
+function mapWorklog(dto: WorklogDto): Worklog {
+  return {
+    id: String(dto.id),
+    issueId: String(dto.issueId),
+    authorId: String(dto.authorId),
+    hours: Number(dto.hours),
+    comment: dto.comment ?? "",
+    workedOn: dto.workedOn,
+    at: dto.createdAt,
+  };
+}
+
+/** 목업과 같은 순서 — 작업일 최신순, 같은 날은 기록 시각 최신순 */
+export async function listWorklogs(issueId: string): Promise<Worklog[]> {
+  const rows = await json<WorklogDto[]>(
+    await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/worklogs`),
+  );
+  return rows
+    .map(mapWorklog)
+    .sort((a, b) => b.workedOn.localeCompare(a.workedOn) || b.at.localeCompare(a.at));
+}
+
+export async function addWorklog(
+  issueId: string,
+  input: { hours: number; comment?: string; workedOn: string },
+): Promise<Worklog> {
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/worklogs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hours: input.hours, comment: input.comment ?? "", workedOn: input.workedOn }),
+  });
+  return mapWorklog(await json(response));
+}
+
+export async function deleteWorklog(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/worklogs/${toBackendId(id)}`, { method: "DELETE" }));
+}
+
+interface LinkDto {
+  id: number;
+  sourceId: number;
+  targetId: number;
+  type: IssueLinkType;
+}
+
+interface LinkViewDto {
+  link: LinkDto;
+  other: IssueDto;
+  direction: IssueLinkView["direction"];
+}
+
+function mapLink(dto: LinkDto): IssueLink {
+  return {
+    id: String(dto.id),
+    sourceId: String(dto.sourceId),
+    targetId: String(dto.targetId),
+    type: dto.type,
+  };
+}
+
+export async function listIssueLinks(issueId: string): Promise<IssueLinkView[]> {
+  const rows = await json<LinkViewDto[]>(
+    await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/links`),
+  );
+  return rows.map((row) => ({
+    link: mapLink(row.link),
+    other: mapIssue(row.other),
+    direction: row.direction,
+  }));
+}
+
+/** 경로의 이슈가 source — blocks면 "source가 target을 차단" */
+export async function addIssueLink(input: {
+  sourceId: string;
+  targetId: string;
+  type: IssueLinkType;
+}): Promise<IssueLink> {
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(input.sourceId)}/links`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targetId: toBackendId(input.targetId), type: input.type }),
+  });
+  return mapLink(await json(response));
+}
+
+export async function removeIssueLink(linkId: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/links/${toBackendId(linkId)}`, { method: "DELETE" }));
+}
+
+interface ActivityDto {
+  id: number;
+  issueId: number;
+  actorId: number;
+  type: Activity["type"];
+  detail: string;
+  occurredAt: string;
+}
+
+export async function listActivity(issueId: string): Promise<Activity[]> {
+  const rows = await json<ActivityDto[]>(
+    await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/activity`),
+  );
+  return rows.map((row) => ({
+    id: String(row.id),
+    issueId: String(row.issueId),
+    actorId: String(row.actorId),
+    type: row.type,
+    detail: row.detail,
+    at: row.occurredAt,
+  }));
+}
+
+export async function setIssueParent(id: string, parentId: string | null): Promise<Issue> {
+  return updateIssue(id, { parentId });
+}
+
+/** 서버 검색으로 자식을 찾는다 — 키 오름차순 */
+export async function listChildren(issueId: string): Promise<Issue[]> {
+  const query = searchParams({
+    parentId: toBackendId(issueId).toString(),
+    sort: "key",
+    dir: "asc",
+    size: "200",
+  });
+  const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`));
+  return dto.items.map((row, index) => mapIssue(row, index + 1));
+}
+
+/** 링크·부모 선택기용 텍스트 검색 — 접근 가능한 모든 프로젝트 */
+export async function searchIssues(text: string, limit = 20): Promise<Issue[]> {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  const query = searchParams({ text: trimmed, sort: "updated", dir: "desc", size: String(limit) });
+  const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`));
+  return dto.items.map((row, index) => mapIssue(row, index + 1));
+}
+
+/** 버전 진행률 — fixVersion 검색 결과를 프로젝트 상태 카테고리(complete)로 센다 */
+export async function versionProgress(
+  id: string,
+): Promise<{ total: number; done: number; percent: number }> {
+  const query = searchParams({ fixVersionId: toBackendId(id).toString(), size: "200" });
+  const [dto, meta] = await Promise.all([
+    json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`)),
+    statusMetaByProject(),
+  ]);
+  const issues = dto.items.map((row, index) => mapIssue(row, index + 1));
+  const done = issues.filter((issue) => meta[issue.projectId]?.[issue.status]?.kind === "complete").length;
+  const total = issues.length;
+  return { total, done, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
+}
+
+interface BoardDto {
+  id: number;
+  projectId: number;
+  name: string;
+  type: BoardType;
+  filter: Partial<BoardFilter> | null;
+  columns: BoardColumn[] | null;
+  swimlane: BoardSwimlane;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+function mapBoard(dto: BoardDto): Board {
+  return {
+    id: String(dto.id),
+    projectId: String(dto.projectId),
+    name: dto.name,
+    type: dto.type,
+    filter: {
+      assigneeIds: dto.filter?.assigneeIds ?? [],
+      types: dto.filter?.types ?? [],
+      labels: dto.filter?.labels ?? [],
+    },
+    columns: (dto.columns ?? []).map((column) => ({
+      status: column.status,
+      name: column.name,
+      wipLimit: column.wipLimit ?? null,
+    })),
+    swimlane: dto.swimlane,
+    isDefault: dto.isDefault,
+    createdAt: dto.createdAt,
+  };
+}
+
+export async function listBoards(projectId: string): Promise<Board[]> {
+  const rows = await json<BoardDto[]>(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/boards`),
+  );
+  return rows.map(mapBoard);
+}
+
+export async function getBoard(id: string): Promise<Board | null> {
+  const response = await sharedApiFetch(`/api/alm/boards/${toBackendId(id)}`);
+  if (response.status === 404) return null;
+  return mapBoard(await json(response));
+}
+
+export async function createBoard(input: {
+  projectId: string;
+  name: string;
+  type: BoardType;
+}): Promise<Board> {
+  const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(input.projectId)}/boards`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: input.name, type: input.type }),
+  });
+  return mapBoard(await json(response));
+}
+
+export async function updateBoard(
+  id: string,
+  patch: Partial<Pick<Board, "name" | "filter" | "columns" | "swimlane" | "isDefault">>,
+): Promise<Board> {
+  const response = await sharedApiFetch(`/api/alm/boards/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return mapBoard(await json(response));
+}
+
+export async function deleteBoard(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/boards/${toBackendId(id)}`, { method: "DELETE" }));
+}
+
+export async function listBoardIssues(boardId: string): Promise<Issue[]> {
+  const rows = await json<IssueDto[]>(
+    await sharedApiFetch(`/api/alm/boards/${toBackendId(boardId)}/issues`),
+  );
+  return rows.map((row, index) => mapIssue(row, index + 1));
 }
