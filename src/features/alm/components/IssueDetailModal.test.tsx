@@ -324,7 +324,7 @@ describe("IssueDetailModal 이슈 관계", () => {
     renderBoard("/projects/p1/board?issue=ALM-1");
     const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
 
-    await user.type(within(dialog).getByLabelText("하위 작업 추가"), "세부 구현");
+    await user.type(within(dialog).getByLabelText("하위 이슈 추가"), "세부 구현");
     await user.click(within(dialog).getByRole("button", { name: "추가" }));
 
     const childrenSection = within(dialog).getByTestId("issue-children");
@@ -360,14 +360,43 @@ describe("IssueDetailModal 이슈 관계", () => {
     });
   });
 
-  it("부모 Select로 에픽을 지정할 수 있다 (에픽 모달에는 부모 Select 없음)", async () => {
+  it("상위 항목 Select로 에픽을 지정하면 상위 경로가 보이고, 에픽 모달에도 상위 항목 Select가 있다", async () => {
     const user = userEvent.setup();
     renderBoard("/projects/p1/board?issue=ALM-1");
     const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
 
-    await user.click(within(dialog).getByRole("combobox", { name: "부모" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "상위 항목" }));
     await user.click(await screen.findByRole("option", { name: /ALM-4/ }));
-    expect(await screen.findByText("부모를 변경했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("상위 항목을 변경했습니다")).toBeInTheDocument();
+    const path = await within(dialog).findByRole("navigation", { name: "상위 항목 경로" });
+    expect(within(path).getByRole("button", { name: /ALM-4/ })).toBeInTheDocument();
+
+    // 계층 깊이 제한 없음 — 에픽도 상위 항목을 가질 수 있다
+    await user.click(within(path).getByRole("button", { name: /ALM-4/ }));
+    const epicDialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    expect(within(epicDialog).getByRole("combobox", { name: "상위 항목" })).toBeInTheDocument();
+  });
+
+  it("하위의 하위: 하위 작업 아래에 또 하위 이슈를 만들면 상위 모달에 중첩 목록으로 보인다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-1");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    await user.type(within(dialog).getByLabelText("하위 이슈 추가"), "1단계");
+    await user.click(within(dialog).getByRole("button", { name: "추가" }));
+    const childrenSection = within(dialog).getByTestId("issue-children");
+    await user.click(await within(childrenSection).findByText("1단계"));
+
+    const childDialog = await screen.findByRole("dialog", { name: /ALM-\d+/ });
+    await user.type(within(childDialog).getByLabelText("하위 이슈 추가"), "2단계");
+    await user.click(within(childDialog).getByRole("button", { name: "추가" }));
+    expect(await within(childDialog).findByText("2단계")).toBeInTheDocument();
+
+    // 상위(ALM-1)로 돌아가면 1단계 아래 2단계가 중첩돼 보인다
+    const path = within(childDialog).getByRole("navigation", { name: "상위 항목 경로" });
+    await user.click(within(path).getByRole("button", { name: /ALM-1/ }));
+    const parentDialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    const nested = await within(parentDialog).findByRole("list", { name: /의 하위 이슈$/ });
+    expect(within(nested).getByText("2단계")).toBeInTheDocument();
   });
 });
 

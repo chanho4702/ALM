@@ -37,24 +37,23 @@ describe("parentId 계층 규칙", () => {
     expect((await listChildren(task.id)).map((i) => i.id)).toEqual([sub.id]);
   });
 
-  it("에픽은 부모 불가, 일반 이슈 부모는 에픽만, 하위 작업 부모는 일반 이슈만", async () => {
+  it("계층 깊이 제한 없음 — 하위의 하위를 만들 수 있고, 자기 자신·순환·다른 프로젝트만 막는다", async () => {
     const epic = await getIssueByKey("ALM-4");
     const task = await getIssueByKey("ALM-1"); // task
     const story = await getIssueByKey("ALM-2"); // story(parent=epic)
 
-    await expect(setIssueParent(epic!.id, task!.id)).rejects.toThrow(
-      "에픽은 부모를 가질 수 없습니다",
-    );
-    await expect(setIssueParent(task!.id, story!.id)).rejects.toThrow(
-      "일반 이슈의 부모는 에픽이어야 합니다",
-    );
-    const sub = await createIssue({ projectId: PROJECT, title: "하위", type: "subtask" });
-    await expect(setIssueParent(sub.id, epic!.id)).rejects.toThrow(
-      "하위 작업의 부모는 일반 이슈여야 합니다",
-    );
+    // 에픽도 상위 항목을 가질 수 있고, 일반 이슈끼리도 상하 관계가 된다
+    await setIssueParent(task!.id, story!.id);
+    const sub = await createIssue({ projectId: PROJECT, title: "하위", type: "subtask", parentId: task!.id });
+    const subSub = await createIssue({ projectId: PROJECT, title: "하위의 하위", type: "subtask", parentId: sub.id });
+    expect(subSub.parentId).toBe(sub.id);
+    expect((await listChildren(sub.id)).map((i) => i.id)).toEqual([subSub.id]);
+
     await expect(setIssueParent(task!.id, task!.id)).rejects.toThrow(
       "자기 자신을 부모로 지정할 수 없습니다",
     );
+    // epic → story → task → sub → subSub 체인에서 epic의 상위를 subSub로 올리면 순환
+    await expect(setIssueParent(epic!.id, subSub.id)).rejects.toThrow("상위 항목이 순환합니다");
   });
 
   it("부모 변경은 활동로그(parent)에 남는다", async () => {
@@ -64,25 +63,16 @@ describe("parentId 계층 규칙", () => {
     expect(acts.at(-1)).toMatchObject({ type: "parent", detail: "ALM-4 → 없음" });
   });
 
-  it("타입 전환: 부모와 양립 불가하면 자동 해제, 자식 규칙 위반이면 거부", async () => {
-    // ALM-2(story, parent=에픽 ALM-4) → subtask로 바꾸면 에픽 부모와 양립 불가 → 해제
-    const story = await getIssueByKey("ALM-2");
+  it("타입 전환은 계층과 무관 — 부모·자식을 유지한 채 바뀐다", async () => {
+    const story = await getIssueByKey("ALM-2"); // parent = ALM-4
     const changed = await updateIssue(story!.id, { type: "subtask" });
-    expect(changed.parentId).toBeNull();
+    expect(changed.parentId).toBe(story!.parentId);
 
-    // 에픽 ALM-4가 자식을 가진 상태에서... 자식이 이미 해제됐으니 다시 구성
     const epic = await getIssueByKey("ALM-4");
     const child = await createIssue({ projectId: PROJECT, title: "자식", parentId: epic!.id });
-    await expect(updateIssue(epic!.id, { type: "subtask" })).rejects.toThrow(
-      "하위 이슈가 있어 타입을 변경할 수 없습니다",
-    );
-    // 일반 이슈(자식이 subtask가 아님)를 부모로 가진 에픽 → task 전환도 거부
-    await expect(updateIssue(epic!.id, { type: "task" })).rejects.toThrow(
-      "하위 이슈가 있어 타입을 변경할 수 없습니다",
-    );
-    await setIssueParent(child.id, null); // 자식 해제 후에는 전환 허용
     const asTask = await updateIssue(epic!.id, { type: "task" });
     expect(asTask.type).toBe("task");
+    expect((await getIssueByKey(child.key))!.parentId).toBe(epic!.id);
   });
 
   it("이슈 삭제 시 자식의 부모는 해제된다", async () => {

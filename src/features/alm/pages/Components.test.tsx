@@ -41,7 +41,7 @@ describe("컴포넌트 (지라 Components)", () => {
     renderAt("/projects/p1/issues");
     await user.click(await screen.findByRole("button", { name: "만들기" }));
     const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
-    await user.type(within(dialog).getByLabelText("제목"), "API 이슈");
+    await user.type(within(dialog).getByLabelText("요약 *"), "API 이슈");
     await user.click(await within(dialog).findByRole("checkbox", { name: "API" }));
     await user.click(within(dialog).getByRole("button", { name: "만들기" }));
     expect(await screen.findByText(/를 만들었습니다/)).toBeInTheDocument();

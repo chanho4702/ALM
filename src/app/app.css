@@ -683,7 +683,116 @@ body {
 /* ── 전역 이슈 만들기 / 검색 모달 ───────────────────────── */
 
 .create-issue-modal.create-issue-modal {
-  width: min(560px, calc(100vw - 32px));
+  width: min(680px, calc(100vw - 32px));
+}
+
+.create-issue-divider {
+  border: none;
+  border-top: 1px solid var(--chanho-color-border-default);
+  margin: 0;
+}
+
+.create-issue-assignee {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-100);
+}
+
+.create-issue-links {
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  padding: var(--chanho-space-150);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.create-issue-links legend {
+  padding: 0 var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.create-issue-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-100);
+}
+
+.create-issue-link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.create-issue-link-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.create-issue-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-200);
+  padding-top: var(--chanho-space-100);
+  border-top: 1px solid var(--chanho-color-border-default);
+}
+
+/* 이슈 상세 — 상위 항목 경로(브레드크럼)·중첩 하위 이슈 */
+.issue-ancestors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-ancestor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}
+
+.issue-ancestor-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--chanho-color-text-link);
+  cursor: pointer;
+}
+
+.issue-ancestor-link:hover {
+  text-decoration: underline;
+}
+
+.issue-ancestor-current {
+  color: var(--chanho-color-text-default);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.issue-relation-nested {
+  margin-left: var(--chanho-space-300);
+  border-left: 2px solid var(--chanho-color-border-default);
+  padding-left: var(--chanho-space-100);
 }
 
 .create-issue-form {

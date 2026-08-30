@@ -671,16 +671,15 @@ function assertParentAllowed(data: JiraData, issue: Issue, parentId: string | nu
   const parent = data.issues.find((i) => i.id === parentId);
   if (!parent) throw new Error("부모 이슈를 찾을 수 없습니다");
   if (parent.projectId !== issue.projectId) {
-    throw new Error("같은 프로젝트의 이슈만 부모로 지정할 수 있습니다");
+    throw new Error("같은 프로젝트의 이슈만 상위 항목으로 지정할 수 있습니다");
   }
-  const level = typeLevelOf(data, issue.type);
-  const parentLevel = typeLevelOf(data, parent.type);
-  if (level === "epic") throw new Error("에픽은 부모를 가질 수 없습니다");
-  if (level === "subtask") {
-    if (parentLevel !== "standard") throw new Error("하위 작업의 부모는 일반 이슈여야 합니다");
-    return;
+  // 계층 깊이 제한 없음(하위의 하위 허용) — 순환만 막는다: 자신의 자손을 상위로 올릴 수 없다
+  const seen = new Set<string>();
+  let cursor: Issue | undefined = parent;
+  while (cursor && cursor.parentId && seen.add(cursor.id)) {
+    if (cursor.parentId === issue.id) throw new Error("상위 항목이 순환합니다");
+    cursor = data.issues.find((i) => i.id === cursor!.parentId);
   }
-  if (parentLevel !== "epic") throw new Error("일반 이슈의 부모는 에픽이어야 합니다");
 }
 
 function userLabel(data: JiraData, userId: string | null): string {
@@ -1699,7 +1698,7 @@ export async function updateIssue(
     assertTransitionAllowed(data, issue.projectId, issue.status, patch.status);
   }
   const before = { ...issue, labels: [...issue.labels] };
-  // 타입 전환 정합성: 자식이 있는데 규칙 위반 타입이 되면 거부, 자신의 parent가 위반되면 자동 해제
+  // 타입 전환 — 프로젝트 설정(enabledTypes) 검증. 계층은 타입과 무관하므로 부모·자식은 그대로 둔다
   if (patch.type !== undefined && patch.type !== issue.type) {
     // 프로젝트 설정(enabledTypes) 검증 — subtask는 계층 기능이라 예외
     const entry = data.projectSettings.find((e) => e.projectId === issue.projectId);
@@ -1711,17 +1710,6 @@ export async function updateIssue(
     const nextLevel = typeLevelOf(data, patch.type);
     if (nextLevel !== "subtask" && !enabled.includes(patch.type)) {
       throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${typeNameOf(data, patch.type)}`);
-    }
-    const children = data.issues.filter((i) => i.parentId === issue.id);
-    if (children.length > 0) {
-      const childLevels = children.map((c) => typeLevelOf(data, c.type));
-      const childrenAllowed =
-        nextLevel === "epic"
-          ? childLevels.every((l) => l === "standard")
-          : nextLevel === "subtask"
-            ? false // 하위 작업은 자식을 가질 수 없다
-            : childLevels.every((l) => l === "subtask");
-      if (!childrenAllowed) throw new Error("하위 이슈가 있어 타입을 변경할 수 없습니다");
     }
   }
   const { resolution: explicitResolution, ...rest } = patch;

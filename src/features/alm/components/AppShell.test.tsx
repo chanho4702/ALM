@@ -38,10 +38,10 @@ describe("AppShell 전역 만들기", () => {
     const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
 
     // 프로젝트 기본값: 첫 프로젝트(ALM 플랫폼)
-    expect(within(dialog).getByRole("combobox", { name: "프로젝트" })).toHaveTextContent(
+    expect(within(dialog).getByRole("combobox", { name: "프로젝트 *" })).toHaveTextContent(
       "ALM 플랫폼 (ALM)",
     );
-    await user.type(within(dialog).getByLabelText("제목"), "전역에서 만든 이슈");
+    await user.type(within(dialog).getByLabelText("요약 *"), "전역에서 만든 이슈");
     await user.type(within(dialog).getByLabelText("라벨"), "global, shell");
     await user.click(within(dialog).getByRole("button", { name: "만들기" }));
 
@@ -59,7 +59,7 @@ describe("AppShell 전역 만들기", () => {
 
     await user.click(screen.getByRole("button", { name: "만들기" }));
     const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
-    expect(within(dialog).getByRole("combobox", { name: "프로젝트" })).toHaveTextContent(
+    expect(within(dialog).getByRole("combobox", { name: "프로젝트 *" })).toHaveTextContent(
       "ALM 플랫폼 (ALM)",
     );
   });
@@ -139,17 +139,23 @@ describe("AppShell 알림 벨", () => {
 });
 
 describe("전역 만들기 타입 선택지", () => {
-  it("하위 작업 타입은 전역 만들기에서 제외된다 (상세의 '하위 작업 추가' 전용)", async () => {
+  it("하위 작업 타입도 전역 만들기에서 고를 수 있고, 고르면 상위 항목이 필수가 된다", async () => {
     const user = userEvent.setup();
     renderShell("/projects");
     await screen.findByRole("table", { name: "프로젝트 목록" });
 
     await user.click(screen.getByRole("button", { name: "만들기" }));
     const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
-    await user.click(within(dialog).getByRole("combobox", { name: "타입" }));
-
+    await user.type(within(dialog).getByLabelText("요약 *"), "상위 없는 하위 작업");
+    await user.click(within(dialog).getByRole("combobox", { name: "이슈 타입 *" }));
     expect(await screen.findByRole("option", { name: "에픽" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "하위 작업" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "하위 작업" }));
+
+    expect(within(dialog).getByRole("combobox", { name: "상위 항목 *" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "만들기" })).toBeDisabled();
+    await user.click(within(dialog).getByRole("combobox", { name: "상위 항목 *" }));
+    await user.click(await screen.findByRole("option", { name: /ALM-1/ }));
+    expect(within(dialog).getByRole("button", { name: "만들기" })).toBeEnabled();
   });
 });
 

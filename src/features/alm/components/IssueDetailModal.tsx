@@ -7,7 +7,6 @@ import type {
   Comment,
   Issue,
   IssuePriority,
-  LinkTypeDef,
   Component,
   IssueResolution,
   IssueType,
@@ -49,6 +48,7 @@ import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { useIssueTypes } from "./useIssueTypes";
 import { useLinkTypes } from "./useLinkTypes";
+import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
 import { WatchButton } from "./WatchButton";
 import {
@@ -60,6 +60,7 @@ import {
   statusKind,
   statusName,
   typeLevel,
+  typeName,
 } from "./labels";
 import { usePriorities } from "./usePriorities";
 
@@ -68,25 +69,6 @@ const NO_VERSION = "__no_version__";
 const UNASSIGNED = "unassigned";
 const BACKLOG = "backlog";
 const NO_PARENT = "none";
-
-/**
- * 링크 추가 폼의 종류 — 레지스트리 타입마다 나가는 방향(`id:out`), 비대칭이면 들어오는 방향(`id:in`)도.
- * 값은 "타입id:방향" 문자열이라 타입 id에 콜론이 없다는 전제(레지스트리 id는 slug)를 쓴다.
- */
-type LinkKind = string;
-const LINK_KIND_DEFAULT: LinkKind = "blocks:out";
-function linkKindOptions(types: LinkTypeDef[]): { value: LinkKind; label: string }[] {
-  const options: { value: LinkKind; label: string }[] = [];
-  for (const t of types) {
-    options.push({ value: `${t.id}:out`, label: t.outward });
-    if (t.outward !== t.inward) options.push({ value: `${t.id}:in`, label: t.inward });
-  }
-  return options.length > 0 ? options : [{ value: LINK_KIND_DEFAULT, label: "차단함" }];
-}
-function parseLinkKind(kind: LinkKind): { type: string; inbound: boolean } {
-  const [type, dir] = kind.split(":");
-  return { type, inbound: dir === "in" };
-}
 
 export interface IssueDetailModalProps {
   /** "ALM-1" 형식 이슈 키 (?issue= 쿼리 값) */
@@ -127,6 +109,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [worklogComment, setWorklogComment] = useState("");
   const [estimateDraft, setEstimateDraft] = useState("");
   const [subtaskDraft, setSubtaskDraft] = useState("");
+  const [childType, setChildType] = useState<IssueType>("subtask");
   const [linkKind, setLinkKind] = useState<LinkKind>(LINK_KIND_DEFAULT);
   const [linkTargetId, setLinkTargetId] = useState<string | null>(null);
   const [, setSearchParams] = useSearchParams();
@@ -344,10 +327,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       setIssue(updated);
       await refreshLogs(updated.id);
       await onIssueChanged();
-      toast({ title: "부모를 변경했습니다", appearance: "success" });
+      toast({ title: "상위 항목을 변경했습니다", appearance: "success" });
     } catch (error) {
       toast({
-        title: "부모 변경 실패",
+        title: "상위 항목 변경 실패",
         description: error instanceof Error ? error.message : String(error),
         appearance: "danger",
       });
@@ -362,17 +345,17 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       await createIssue({
         projectId: issue.projectId,
         title: subtaskDraft,
-        type: "subtask",
+        type: childType,
         parentId: issue.id,
         sprintId: issue.sprintId,
       });
       setSubtaskDraft("");
       await refreshRelations(issue.id, issue.projectId);
       await onIssueChanged();
-      toast({ title: "하위 작업을 추가했습니다", appearance: "success" });
+      toast({ title: "하위 이슈를 추가했습니다", appearance: "success" });
     } catch (error) {
       toast({
-        title: "하위 작업 추가 실패",
+        title: "하위 이슈 추가 실패",
         description: error instanceof Error ? error.message : String(error),
         appearance: "danger",
       });
@@ -490,11 +473,39 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         statusKind(statuses, l.other.status) !== "complete",
     );
 
-  /** 부모 후보 — 하위 작업은 일반 이슈, 일반 이슈는 에픽 (자기 제외) */
-  const parentCandidates =
-    levelOf(issue.type) === "subtask"
-      ? projectIssues.filter((i) => i.id !== issue.id && levelOf(i.type) === "standard")
-      : projectIssues.filter((i) => levelOf(i.type) === "epic");
+  /** 계층 깊이 제한 없음 — 상위 항목 후보는 자기 자신과 자손을 뺀 프로젝트의 모든 이슈 */
+  const descendantIds = new Set<string>();
+  {
+    const queue = [issue.id];
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      for (const i of projectIssues) {
+        if (i.parentId === cur && !descendantIds.has(i.id)) {
+          descendantIds.add(i.id);
+          queue.push(i.id);
+        }
+      }
+    }
+  }
+  const parentCandidates = projectIssues.filter((i) => i.id !== issue.id && !descendantIds.has(i.id));
+  /** 상위 항목 경로(루트 먼저) — 순환은 없지만 목록이 덜 실렸을 때를 대비해 방문 가드 */
+  const ancestors: Issue[] = [];
+  {
+    const seen = new Set<string>([issue.id]);
+    let cursor = issue.parentId ? projectIssues.find((i) => i.id === issue.parentId) : undefined;
+    while (cursor && !seen.has(cursor.id)) {
+      seen.add(cursor.id);
+      ancestors.unshift(cursor);
+      cursor = cursor.parentId ? projectIssues.find((i) => i.id === cursor!.parentId) : undefined;
+    }
+  }
+  const grandChildrenOf = (id: string) => projectIssues.filter((i) => i.parentId === id);
+  const childTypeOptions = [
+    ...enabledTypes.filter((t) => levelOf(t) !== "subtask"),
+    ...issueTypes.filter((t) => t.level === "subtask").map((t) => t.id),
+  ]
+    .filter((t, index, arr) => arr.indexOf(t) === index)
+    .map((t) => ({ value: t, label: typeName(issueTypes, t) }));
 
   // 레지스트리 순서대로 타입마다 나가는/들어오는 그룹(대칭이면 하나). 모르는 타입은 id로 뒤에
   const knownTypeIds = new Set(linkTypes.map((t) => t.id));
@@ -537,6 +548,22 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <div className="issue-detail-toolbar">
             <WatchButton issueId={issue.id} userNames={Object.fromEntries(users.map((u) => [u.id, u.name]))} />
           </div>
+          {ancestors.length > 0 ? (
+            <nav className="issue-ancestors" aria-label="상위 항목 경로">
+              {ancestors.map((a) => (
+                <span key={a.id} className="issue-ancestor">
+                  <button type="button" className="issue-ancestor-link" onClick={() => switchIssue(a.key)}>
+                    <IssueTypeGlyph type={a.type} />
+                    {a.key}
+                  </button>
+                  <span aria-hidden="true" className="issue-ancestor-sep">
+                    /
+                  </span>
+                </span>
+              ))}
+              <span className="issue-ancestor-current">{issue.key}</span>
+            </nav>
+          ) : null}
           <InlineEdit
             label="제목"
             value={issue.title}
@@ -562,8 +589,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             onChanged={() => void onIssueChanged()}
           />
 
-          {/* 하위 이슈 — 에픽/일반 이슈에 표시 (하위 작업은 자식을 가질 수 없다) */}
-          {levelOf(issue.type) !== "subtask" ? (
+          {/* 하위 이슈 — 계층 깊이 제한 없음: 모든 이슈가 자식을 가질 수 있다 */}
+          {issue ? (
             <section className="issue-relations" data-testid="issue-children">
               <h4>
                 하위 이슈{" "}
@@ -588,13 +615,39 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                         {statusName(statuses, child.status)}
                       </Lozenge>
                     </button>
+                    {grandChildrenOf(child.id).length > 0 ? (
+                      <ul className="issue-relation-list issue-relation-nested" aria-label={`${child.key}의 하위 이슈`}>
+                        {grandChildrenOf(child.id).map((grand) => (
+                          <li key={grand.id}>
+                            <button
+                              type="button"
+                              className="issue-relation-row"
+                              onClick={() => switchIssue(grand.key)}
+                            >
+                              <IssueTypeGlyph type={grand.type} />
+                              <span className="issue-key-cell">{grand.key}</span>
+                              <span className="issue-relation-title">{grand.title}</span>
+                              <Lozenge appearance={statusAppearance(statuses, grand.status)}>
+                                {statusName(statuses, grand.status)}
+                              </Lozenge>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </li>
                 ))}
               </ul>
-              {levelOf(issue.type) !== "epic" ? (
+              {issue ? (
                 <form className="issue-relation-add" onSubmit={handleSubtaskSubmit}>
+                  <Select
+                    label="하위 타입"
+                    value={childType}
+                    options={childTypeOptions}
+                    onValueChange={setChildType}
+                  />
                   <TextField
-                    label="하위 작업 추가"
+                    label="하위 이슈 추가"
                     placeholder="하위 작업 제목"
                     value={subtaskDraft}
                     onChange={(e) => setSubtaskDraft(e.target.value)}
@@ -705,9 +758,9 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               }
             />
           ) : null}
-          {levelOf(issue.type) !== "epic" ? (
+          {issue ? (
             <Select
-              label="부모"
+              label="상위 항목"
               value={issue.parentId ?? NO_PARENT}
               options={[
                 { value: NO_PARENT, label: "없음" },
