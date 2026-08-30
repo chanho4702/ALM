@@ -26,6 +26,8 @@ import { StatusCategoriesPanel } from "../components/StatusCategoriesPanel";
 import { StatusRegistryPanel } from "../components/StatusRegistryPanel";
 import { IssueTypesPanel } from "../components/IssueTypesPanel";
 import { AdminAuditPanel, SystemPanel } from "../components/AdminPanels";
+import { PersonalSettingsPanel } from "../components/PersonalSettingsPanel";
+import { BannerPanel } from "../components/BannerPanel";
 import { useIssueTypes } from "../components/useIssueTypes";
 
 type Aspect = "workflow" | "types";
@@ -131,14 +133,18 @@ export function GlobalSettingsPage() {
   return (
     <main className="project-list-content settings-page">
       <PageHeader
-        title="전역 관리"
+        title={section === "personal" ? "개인 설정" : "전역 관리"}
         bottom={
           <span className="settings-header-sub">
             {GLOBAL_SETTINGS_SECTIONS.find((s) => s.id === section)?.label}
           </span>
         }
       />
-      {section === "categories" ? (
+      {section === "personal" ? (
+        <PersonalSettingsPanel />
+      ) : section === "banner" ? (
+        <BannerPanel />
+      ) : section === "categories" ? (
         <StatusCategoriesPanel />
       ) : section === "statuses" ? (
         <StatusRegistryPanel />

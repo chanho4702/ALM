@@ -17,6 +17,7 @@ import { SettingsSideNav, isSettingsPath } from "./SettingsSideNav";
 import { NotificationsModal } from "./NotificationsModal";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
+import { AnnouncementBanner } from "./AnnouncementBanner";
 import { useAuth } from "../../../auth/AuthGate";
 
 export interface AppShellProps {
@@ -78,7 +79,7 @@ export function AppShell({ projects }: AppShellProps) {
           <button
             type="button"
             className="jira-brand jira-brand-link"
-            onClick={() => navigate("/home")}
+            onClick={() => navigate("/")}
           >
             ALM
           </button>
@@ -135,6 +136,7 @@ export function AppShell({ projects }: AppShellProps) {
           </>
         }
       />
+      <AnnouncementBanner />
       <div className="app-body">
         {/* 설정에 들어오면 전역 사이드바 자리를 설정 메뉴가 차지한다 — 지라의 프로젝트 설정 사이드바 */}
         {isSettingsPath(location.pathname) ? (

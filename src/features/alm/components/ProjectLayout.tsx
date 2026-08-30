@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { Button } from "@chanho/react";
-import type { Project } from "../store/types";
+import { ExternalLink } from "lucide-react";
+import type { Project, ProjectShortcut } from "../store/types";
+import { listProjectShortcuts } from "../store/jiraStore";
+import { SHORTCUTS_CHANGED_EVENT } from "./ProjectShortcutsPanel";
 import { UI_CHANGED_EVENT, listStarredProjectIds, toggleProjectStar } from "../store/uiStore";
 import { ProjectAvatar } from "./ProjectAvatar";
 
@@ -58,6 +61,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
   // /boards/:boardId 도 "보드" 탭으로 취급한다
   const segment = rawSegment === "boards" ? "board" : rawSegment;
   const starred = starredIds.includes(current.id);
+  const shortcuts = useShortcuts(current.id);
 
   return (
     <div className="jira-main">
@@ -83,6 +87,16 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
         >
           {starred ? "★" : "☆"}
         </Button>
+        {shortcuts.length > 0 ? (
+          <nav aria-label="바로 가기" className="project-shortcuts">
+            {shortcuts.map((shortcut) => (
+              <a key={shortcut.id} href={shortcut.url} target="_blank" rel="noreferrer">
+                <ExternalLink size={14} aria-hidden />
+                {shortcut.name}
+              </a>
+            ))}
+          </nav>
+        ) : null}
       </header>
 
       {/* 가로 뷰 탭 — 밑줄 액티브, 라우터 이동 */}
@@ -105,4 +119,27 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
       </main>
     </div>
   );
+}
+
+/** 프로젝트 바로 가기 — 설정에서 바뀌면 같은 탭에서 바로 갱신된다 */
+function useShortcuts(projectId: string): ProjectShortcut[] {
+  const [shortcuts, setShortcuts] = useState<ProjectShortcut[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      void listProjectShortcuts(projectId)
+        .then((rows) => {
+          if (!cancelled) setShortcuts(rows);
+        })
+        .catch(() => {
+          if (!cancelled) setShortcuts([]);
+        });
+    load();
+    window.addEventListener(SHORTCUTS_CHANGED_EVENT, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SHORTCUTS_CHANGED_EVENT, load);
+    };
+  }, [projectId]);
+  return shortcuts;
 }

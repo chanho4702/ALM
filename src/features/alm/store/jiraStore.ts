@@ -11,7 +11,7 @@
 import * as mock from "./jiraMock";
 import * as rest from "./jiraApi";
 
-export type {
+export type { ProjectPatch,
   ProjectMemberView,
   VersionInput,
   SprintPlanPatch,
@@ -132,3 +132,12 @@ export const markNotificationRead = impl.markNotificationRead;
 export const markAllNotificationsRead = impl.markAllNotificationsRead;
 export const listProjectChanges = impl.listProjectChanges;
 export const listActivity = impl.listActivity;
+export const DEFAULT_PREFERENCES = mock.DEFAULT_PREFERENCES;
+export const getMyPreferences = impl.getMyPreferences;
+export const saveMyPreferences = impl.saveMyPreferences;
+export const listProjectShortcuts = impl.listProjectShortcuts;
+export const addProjectShortcut = impl.addProjectShortcut;
+export const updateProjectShortcut = impl.updateProjectShortcut;
+export const removeProjectShortcut = impl.removeProjectShortcut;
+export const getBanner = impl.getBanner;
+export const saveBanner = impl.saveBanner;

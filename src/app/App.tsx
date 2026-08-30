@@ -4,6 +4,7 @@ import { Spinner } from "@chanho/react";
 import type { Project } from "../features/alm/store/types";
 import { listProjects } from "../features/alm/store/jiraStore";
 import { AppShell } from "../features/alm/components/AppShell";
+import { StartRedirect } from "../features/alm/components/StartRedirect";
 import { ProjectLayout } from "../features/alm/components/ProjectLayout";
 import { BoardPage } from "../features/alm/pages/BoardPage";
 import { BoardRedirect } from "../features/alm/pages/BoardRedirect";
@@ -63,6 +64,7 @@ export function App() {
       {/* 전역 셸(상단바 + 상주 사이드바) 아래에 모든 화면이 놓인다 — 새 지라 구조 */}
       <Route element={<AppShell projects={projects} onProjectsChanged={reload} />}>
         {/* For you 홈 — 내 담당·최근 업데이트 */}
+        <Route path="/" element={<StartRedirect />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         {/* 전역 관리 — 구획은 URL 세그먼트, 메뉴는 설정 사이드바(SettingsSideNav) */}

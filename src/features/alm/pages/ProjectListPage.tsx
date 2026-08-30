@@ -141,6 +141,12 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
       render: (project) => <span className="issue-key-cell">{project.key}</span>,
     },
     {
+      key: "category",
+      header: "범주",
+      width: "120px",
+      render: (project) => project.category || "—",
+    },
+    {
       key: "issues",
       header: "이슈",
       width: "88px",

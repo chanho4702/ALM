@@ -1,4 +1,9 @@
 import type {
+  ProjectShortcut,
+  UserPreferences,
+  UserPreferencesPatch,
+  AnnouncementBanner,
+  ProjectDefaultAssignee,
   Activity,
   Attachment,
   Board,
@@ -180,7 +185,16 @@ export function defaultBoard(
 function normalize(data: JiraData): JiraData {
   for (const project of data.projects) {
     project.description ??= "";
+    project.category ??= "";
+    project.leadId ??= null;
+    project.defaultAssignee ??= "unassigned";
+    project.icon ??= "";
+    project.color ??= "";
+    project.url ??= "";
   }
+  data.shortcuts ??= [];
+  data.preferences ??= {};
+  data.banner ??= { enabled: false, level: "info", message: "" };
   for (const issue of data.issues) {
     issue.dueDate ??= null;
     issue.labels ??= [];
@@ -332,6 +346,12 @@ export async function createProject(input: {
     key,
     name,
     description: input.description?.trim() ?? "",
+    category: "",
+    leadId: CURRENT_USER_ID,
+    defaultAssignee: "unassigned",
+    icon: "",
+    color: "",
+    url: "",
     createdAt: new Date().toISOString(),
   };
   data.projects.push(project);
@@ -374,10 +394,46 @@ export async function createProject(input: {
 }
 
 /** 키는 이슈 키 접두어라 불변 — 이름/설명만 수정 가능 */
-export async function updateProject(
-  id: string,
-  patch: { name?: string; description?: string },
-): Promise<Project> {
+export interface ProjectPatch {
+  name?: string;
+  description?: string;
+  category?: string;
+  leadId?: string | null;
+  defaultAssignee?: ProjectDefaultAssignee;
+  icon?: string;
+  color?: string;
+  url?: string;
+}
+
+function assertHttpUrl(url: string, label: string): string {
+  const trimmed = url.trim();
+  if (trimmed && !/^https?:\/\//.test(trimmed)) {
+    throw new Error(`${label}URL은 http:// 또는 https://로 시작해야 합니다`);
+  }
+  return trimmed;
+}
+
+/** 세부 필드 적용 — 이름/설명 검증은 호출자가 한다 */
+function applyProjectDetails(data: JiraData, project: Project, patch: ProjectPatch): void {
+  if (patch.category !== undefined) project.category = patch.category.trim().slice(0, 60);
+  if (patch.leadId !== undefined) {
+    if (patch.leadId !== null && !data.users.some((u) => u.id === patch.leadId)) {
+      throw new Error("사용자를 찾을 수 없습니다");
+    }
+    project.leadId = patch.leadId;
+  }
+  if (patch.defaultAssignee !== undefined) {
+    if (patch.defaultAssignee !== "unassigned" && patch.defaultAssignee !== "lead") {
+      throw new Error("기본 담당자는 unassigned/lead 중 하나입니다");
+    }
+    project.defaultAssignee = patch.defaultAssignee;
+  }
+  if (patch.icon !== undefined) project.icon = patch.icon.trim();
+  if (patch.color !== undefined) project.color = patch.color.trim();
+  if (patch.url !== undefined) project.url = assertHttpUrl(patch.url, "");
+}
+
+export async function updateProject(id: string, patch: ProjectPatch): Promise<Project> {
   const data = load();
   const project = data.projects.find((p) => p.id === id);
   if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
@@ -390,6 +446,7 @@ export async function updateProject(
   if (patch.description !== undefined) {
     project.description = patch.description.trim();
   }
+  applyProjectDetails(data, project, patch);
   persist();
   return clone(project);
 }
@@ -710,7 +767,17 @@ function notificationRecipients(data: JiraData, issue: Issue, actorId: string): 
   return [...set];
 }
 
-function pushNotification(data: JiraData, userId: string, issue: Issue, message: string, at: string): void {
+type NotificationKind = keyof UserPreferences["notifications"];
+
+function pushNotification(
+  data: JiraData,
+  userId: string,
+  issue: Issue,
+  message: string,
+  at: string,
+  kind: NotificationKind = "statusChanged",
+): void {
+  if (!preferencesOf(data, userId).notifications[kind]) return;
   data.notifications.push({
     id: nextId(),
     userId,
@@ -725,11 +792,12 @@ function pushNotification(data: JiraData, userId: string, issue: Issue, message:
 
 function notifyIssueChanges(data: JiraData, before: Issue, after: Issue, at: string): void {
   const actorName = userLabel(data, CURRENT_USER_ID);
+  if (preferencesOf(data, CURRENT_USER_ID).autoWatch.edited) addWatcher(data, after.id, CURRENT_USER_ID, at);
   if (before.assigneeId !== after.assigneeId && after.assigneeId) {
     // 새 담당자는 자동 워처가 되고, 본인이 아니면 배정 알림을 받는다
     addWatcher(data, after.id, after.assigneeId, at);
     if (after.assigneeId !== CURRENT_USER_ID) {
-      pushNotification(data, after.assigneeId, after, `${actorName} 님이 ${after.key}를 나에게 할당했습니다`, at);
+      pushNotification(data, after.assigneeId, after, `${actorName} 님이 ${after.key}를 나에게 할당했습니다`, at, "assigned");
     }
   }
   if (before.status !== after.status) {
@@ -1400,7 +1468,7 @@ export async function createIssue(input: {
         .sort((a, b) => a.order - b.order)
         .find((s) => s.kind === "new")?.id ?? "todo"),
     priority: input.priority ?? "medium",
-    assigneeId: input.assigneeId ?? null,
+    assigneeId: input.assigneeId ?? (project.defaultAssignee === "lead" ? project.leadId : null),
     reporterId: CURRENT_USER_ID,
     sprintId: input.sprintId ?? null,
     parentId: null, // 계층 검증 후 아래에서 지정
@@ -1420,7 +1488,7 @@ export async function createIssue(input: {
   applyResolutionRule(data, issue, "todo", undefined);
   data.issues.push(issue);
   // 보고자(생성자)와 담당자는 자동 워처 — 지라 기본 동작
-  addWatcher(data, issue.id, CURRENT_USER_ID, now);
+  if (preferencesOf(data, CURRENT_USER_ID).autoWatch.created) addWatcher(data, issue.id, CURRENT_USER_ID, now);
   if (issue.assigneeId) addWatcher(data, issue.id, issue.assigneeId, now);
   data.activities.push({
     id: nextId(),
@@ -2054,8 +2122,11 @@ export async function addComment(issueId: string, body: string): Promise<Comment
   // 워처 ∪ 담당자에게 코멘트 알림 (본인 코멘트는 제외)
   const issue = data.issues.find((i) => i.id === issueId)!;
   const message = `${userLabel(data, CURRENT_USER_ID)} 님이 ${issue.key}에 코멘트를 남겼습니다`;
+  if (preferencesOf(data, CURRENT_USER_ID).autoWatch.commented) {
+    addWatcher(data, issue.id, CURRENT_USER_ID, comment.createdAt);
+  }
   for (const userId of notificationRecipients(data, issue, CURRENT_USER_ID)) {
-    pushNotification(data, userId, issue, message, comment.createdAt);
+    pushNotification(data, userId, issue, message, comment.createdAt, "commented");
   }
   persist();
   return clone(comment);
@@ -2808,4 +2879,121 @@ export async function listActivity(issueId: string): Promise<Activity[]> {
       .activities.filter((a) => a.issueId === issueId)
       .sort((a, b) => a.at.localeCompare(b.at)),
   );
+}
+
+// ── 개인 설정 · 바로 가기 · 공지 배너 (지라 메뉴 대조 2026-08-30) ────────────
+
+export const DEFAULT_PREFERENCES: UserPreferences = {
+  notifications: { assigned: true, statusChanged: true, commented: true },
+  autoWatch: { created: true, commented: true, edited: false },
+  startPage: "home",
+};
+
+const START_PAGES: readonly string[] = ["home", "projects", "last-project"];
+
+function preferencesOf(data: JiraData, userId: string): UserPreferences {
+  const stored = data.preferences[userId];
+  return {
+    notifications: { ...DEFAULT_PREFERENCES.notifications, ...stored?.notifications },
+    autoWatch: { ...DEFAULT_PREFERENCES.autoWatch, ...stored?.autoWatch },
+    startPage: stored?.startPage ?? DEFAULT_PREFERENCES.startPage,
+  };
+}
+
+export async function getMyPreferences(): Promise<UserPreferences> {
+  return clone(preferencesOf(load(), CURRENT_USER_ID));
+}
+
+/** 부분 갱신 — 빠진 키는 그대로 */
+export async function saveMyPreferences(patch: UserPreferencesPatch): Promise<UserPreferences> {
+  const data = load();
+  const current = preferencesOf(data, CURRENT_USER_ID);
+  if (patch.startPage !== undefined && !START_PAGES.includes(patch.startPage)) {
+    throw new Error("시작 화면은 home/projects/last-project 중 하나입니다");
+  }
+  const next: UserPreferences = {
+    notifications: { ...current.notifications, ...patch.notifications },
+    autoWatch: { ...current.autoWatch, ...patch.autoWatch },
+    startPage: patch.startPage ?? current.startPage,
+  };
+  data.preferences[CURRENT_USER_ID] = next;
+  persist();
+  return clone(next);
+}
+
+export async function listProjectShortcuts(projectId: string): Promise<ProjectShortcut[]> {
+  return clone(
+    load()
+      .shortcuts.filter((s) => s.projectId === projectId)
+      .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)),
+  );
+}
+
+function validateShortcut(input: { name: string; url: string }): { name: string; url: string } {
+  const name = input.name.trim();
+  if (!name) throw new Error("바로 가기 이름을 입력하세요");
+  if (name.length > 80) throw new Error("바로 가기 이름은 80자 이하여야 합니다");
+  const url = input.url.trim();
+  if (!/^https?:\/\//.test(url)) throw new Error("바로 가기 URL은 http:// 또는 https://로 시작해야 합니다");
+  return { name, url };
+}
+
+export async function addProjectShortcut(
+  projectId: string,
+  input: { name: string; url: string },
+): Promise<ProjectShortcut> {
+  const data = load();
+  if (!data.projects.some((p) => p.id === projectId)) throw new Error("프로젝트를 찾을 수 없습니다");
+  assertCanAdmin(data, projectId);
+  const valid = validateShortcut(input);
+  const shortcut: ProjectShortcut = {
+    id: nextId(),
+    projectId,
+    ...valid,
+    order: data.shortcuts.filter((s) => s.projectId === projectId).length + 1,
+    createdAt: new Date().toISOString(),
+  };
+  data.shortcuts.push(shortcut);
+  persist();
+  return clone(shortcut);
+}
+
+export async function updateProjectShortcut(
+  id: string,
+  input: { name: string; url: string },
+): Promise<ProjectShortcut> {
+  const data = load();
+  const shortcut = data.shortcuts.find((s) => s.id === id);
+  if (!shortcut) throw new Error("바로 가기를 찾을 수 없습니다");
+  assertCanAdmin(data, shortcut.projectId);
+  Object.assign(shortcut, validateShortcut(input));
+  persist();
+  return clone(shortcut);
+}
+
+export async function removeProjectShortcut(id: string): Promise<void> {
+  const data = load();
+  const shortcut = data.shortcuts.find((s) => s.id === id);
+  if (!shortcut) throw new Error("바로 가기를 찾을 수 없습니다");
+  assertCanAdmin(data, shortcut.projectId);
+  data.shortcuts = data.shortcuts.filter((s) => s.id !== id);
+  persist();
+}
+
+export async function getBanner(): Promise<AnnouncementBanner> {
+  return clone(load().banner);
+}
+
+/** 관리자만 — 서버는 ADMIN 역할로 막는다. 켤 때는 내용이 필요하다 */
+export async function saveBanner(banner: AnnouncementBanner): Promise<AnnouncementBanner> {
+  const data = load();
+  const message = banner.message.trim();
+  if (banner.level !== "info" && banner.level !== "warning") {
+    throw new Error("배너 수준은 info/warning 중 하나입니다");
+  }
+  if (banner.enabled && !message) throw new Error("배너 내용을 입력하세요");
+  if (message.length > 500) throw new Error("배너 내용은 500자 이하여야 합니다");
+  data.banner = { enabled: banner.enabled, level: banner.level, message };
+  persist();
+  return clone(data.banner);
 }

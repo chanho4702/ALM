@@ -20,6 +20,12 @@ export function createSeedData(): JiraData {
     key: "ALM",
     name: "ALM 플랫폼",
     description: "스틸 블루 디자인 시스템 기반 ALM 데모",
+    category: "",
+    leadId: MOCK_USERS[0].id,
+    defaultAssignee: "unassigned",
+    icon: "",
+    color: "",
+    url: "",
     createdAt: now,
   };
 
@@ -249,6 +255,9 @@ export function createSeedData(): JiraData {
       },
     ],
     projectSettings: [{ projectId: "p1", schemeId: "scheme-default", custom: null }],
+    shortcuts: [],
+    preferences: {},
+    banner: { enabled: false, level: "info", message: "" },
     issueCounters: { p1: 8 },
   };
 }

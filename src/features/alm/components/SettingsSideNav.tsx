@@ -14,6 +14,7 @@ export const PROJECT_SETTINGS_SECTIONS = [
 
 /** 전역 관리 구획 — `/settings/:section` */
 export const GLOBAL_SETTINGS_SECTIONS = [
+  { id: "personal", label: "개인 설정" },
   { id: "categories", label: "상태 카테고리" },
   { id: "statuses", label: "상태" },
   { id: "issue-types", label: "이슈 타입" },
@@ -21,6 +22,7 @@ export const GLOBAL_SETTINGS_SECTIONS = [
   { id: "workflows", label: "워크플로 스킴" },
   { id: "audit", label: "감사 로그" },
   { id: "system", label: "시스템" },
+  { id: "banner", label: "공지 배너" },
 ] as const;
 
 export type ProjectSettingsSection = (typeof PROJECT_SETTINGS_SECTIONS)[number]["id"];

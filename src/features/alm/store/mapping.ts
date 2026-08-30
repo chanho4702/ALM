@@ -16,6 +16,12 @@ export interface ProjectDto {
   key: string;
   name: string;
   description: string | null;
+  category?: string | null;
+  leadId?: number | null;
+  defaultAssignee?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  url?: string | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -63,6 +69,12 @@ export function mapProject(dto: ProjectDto): Project {
     key: dto.key,
     name: dto.name,
     description: dto.description ?? "",
+    category: dto.category ?? "",
+    leadId: dto.leadId == null ? null : String(dto.leadId),
+    defaultAssignee: dto.defaultAssignee === "lead" ? "lead" : "unassigned",
+    icon: dto.icon ?? "",
+    color: dto.color ?? "",
+    url: dto.url ?? "",
     createdAt: dto.createdAt,
   };
 }

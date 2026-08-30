@@ -57,8 +57,13 @@ import type {
   BoardColumn,
   BoardFilter,
   BoardSwimlane,
+  ProjectShortcut,
+  UserPreferences,
+  UserPreferencesPatch,
+  AnnouncementBanner,
 } from "./types";
-import type { IssueLinkView, ProjectMemberView } from "./jiraMock";
+import type { IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock";
+import { DEFAULT_PREFERENCES } from "./jiraMock";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -134,10 +139,7 @@ async function applyTemplate(projectId: string, template: ReturnType<typeof getT
   }
 }
 
-export async function updateProject(
-  id: string,
-  patch: { name?: string; description?: string },
-): Promise<Project> {
+export async function updateProject(id: string, patch: ProjectPatch): Promise<Project> {
   const current = await projectDto(id);
   const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(id)}`, {
     method: "PUT",
@@ -145,6 +147,13 @@ export async function updateProject(
     body: JSON.stringify({
       name: (patch.name ?? current.name).trim(),
       description: (patch.description ?? current.description ?? "").trim(),
+      category: patch.category,
+      leadId: patch.leadId ? toBackendId(patch.leadId) : undefined,
+      clearLead: patch.leadId === null ? true : undefined,
+      defaultAssignee: patch.defaultAssignee,
+      icon: patch.icon,
+      color: patch.color,
+      url: patch.url,
       expectedVersion: current.version,
     }),
   });
@@ -1511,4 +1520,120 @@ export async function getMyProjectRole(projectId: string): Promise<ProjectRole |
   }
   if (rows.some((g) => g.resourceType === "GLOBAL" && g.role === "ADMIN")) return "admin";
   return null;
+}
+
+// ── 개인 설정 · 바로 가기 · 공지 배너 (서버 V13) ──
+
+interface ShortcutDto {
+  id: number;
+  projectId: number;
+  name: string;
+  url: string;
+  order: number;
+  createdAt: string;
+}
+
+function mapShortcut(dto: ShortcutDto): ProjectShortcut {
+  return {
+    id: String(dto.id),
+    projectId: String(dto.projectId),
+    name: dto.name,
+    url: dto.url,
+    order: dto.order,
+    createdAt: dto.createdAt,
+  };
+}
+
+export async function listProjectShortcuts(projectId: string): Promise<ProjectShortcut[]> {
+  const rows = await json<ShortcutDto[]>(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/shortcuts`),
+  );
+  return rows.map(mapShortcut);
+}
+
+export async function addProjectShortcut(
+  projectId: string,
+  input: { name: string; url: string },
+): Promise<ProjectShortcut> {
+  const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/shortcuts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: input.name, url: input.url }),
+  });
+  return mapShortcut(await json(response));
+}
+
+export async function updateProjectShortcut(
+  id: string,
+  input: { name: string; url: string },
+): Promise<ProjectShortcut> {
+  const response = await sharedApiFetch(`/api/alm/shortcuts/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: input.name, url: input.url }),
+  });
+  return mapShortcut(await json(response));
+}
+
+export async function removeProjectShortcut(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/shortcuts/${toBackendId(id)}`, { method: "DELETE" }));
+}
+
+interface PreferenceDto {
+  notifications?: Partial<UserPreferences["notifications"]> | null;
+  autoWatch?: Partial<UserPreferences["autoWatch"]> | null;
+  startPage?: string | null;
+}
+
+function mapPreferences(dto: PreferenceDto): UserPreferences {
+  const startPage = dto.startPage;
+  return {
+    notifications: { ...DEFAULT_PREFERENCES.notifications, ...(dto.notifications ?? {}) },
+    autoWatch: { ...DEFAULT_PREFERENCES.autoWatch, ...(dto.autoWatch ?? {}) },
+    startPage:
+      startPage === "projects" || startPage === "last-project" ? startPage : "home",
+  };
+}
+
+export async function getMyPreferences(): Promise<UserPreferences> {
+  return mapPreferences(await json<PreferenceDto>(await sharedApiFetch("/api/alm/me/preferences")));
+}
+
+/** 서버는 전체 문서를 받는다 — 현재 값 위에 패치를 얹어 보낸다 */
+export async function saveMyPreferences(patch: UserPreferencesPatch): Promise<UserPreferences> {
+  const current = await getMyPreferences();
+  const next: UserPreferences = {
+    notifications: { ...current.notifications, ...patch.notifications },
+    autoWatch: { ...current.autoWatch, ...patch.autoWatch },
+    startPage: patch.startPage ?? current.startPage,
+  };
+  const response = await sharedApiFetch("/api/alm/me/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(next),
+  });
+  return mapPreferences(await json(response));
+}
+
+export async function getBanner(): Promise<AnnouncementBanner> {
+  const dto = await json<Partial<AnnouncementBanner>>(await sharedApiFetch("/api/alm/banner"));
+  return {
+    enabled: dto.enabled === true,
+    level: dto.level === "warning" ? "warning" : "info",
+    message: dto.message ?? "",
+  };
+}
+
+export async function saveBanner(banner: AnnouncementBanner): Promise<AnnouncementBanner> {
+  const response = await sharedApiFetch("/api/alm/admin/banner", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(banner),
+  });
+  const dto = await json<Partial<AnnouncementBanner>>(response);
+  return {
+    enabled: dto.enabled === true,
+    level: dto.level === "warning" ? "warning" : "info",
+    message: dto.message ?? "",
+  };
 }

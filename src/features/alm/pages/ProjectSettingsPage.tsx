@@ -15,6 +15,8 @@ import {
   useToast,
 } from "@chanho/react";
 import type {
+  ProjectDefaultAssignee,
+  ProjectRole,
   IssueType,
   Project,
   SettingsScheme,
@@ -30,6 +32,7 @@ import {
   listIssues,
   listSchemes,
   listUsers,
+  getMyProjectRole,
   resolveSettings,
   setProjectCustom,
   updateProject,
@@ -40,6 +43,9 @@ import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
+import { ProjectShortcutsPanel } from "../components/ProjectShortcutsPanel";
+import { PROJECT_COLOR_OPTIONS } from "../components/ProjectAvatar";
+import { TYPE_ICON_OPTIONS } from "../components/typeIcons";
 import { JiraImportPanel } from "../components/JiraImportPanel";
 import { useIssueTypes } from "../components/useIssueTypes";
 import {
@@ -61,6 +67,10 @@ export interface ProjectSettingsPageProps {
  * 프로젝트 설정 — 프로젝트 뷰(탭) 바깥의 별도 페이지. 구획은 URL(`/settings/:section`)이 정하고
  * 메뉴는 설정 사이드바(SettingsSideNav)가 그린다. 여기서는 현재 구획 하나만 렌더한다.
  */
+/** Select는 빈 문자열 value를 못 쓴다 — 센티널 */
+const NO_LEAD = "__none__";
+const AUTO = "__auto__";
+
 export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSettingsPageProps) {
   const { projectId, section = "general" } = useParams();
   const issueTypes = useIssueTypes();
@@ -74,6 +84,15 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const project = projects.find((p) => p.id === projectId);
   const [nameDraft, setNameDraft] = useState(project?.name ?? "");
   const [descriptionDraft, setDescriptionDraft] = useState(project?.description ?? "");
+  const [categoryDraft, setCategoryDraft] = useState(project?.category ?? "");
+  const [leadDraft, setLeadDraft] = useState(project?.leadId ?? NO_LEAD);
+  const [defaultAssigneeDraft, setDefaultAssigneeDraft] = useState<ProjectDefaultAssignee>(
+    project?.defaultAssignee ?? "unassigned",
+  );
+  const [iconDraft, setIconDraft] = useState(project?.icon || AUTO);
+  const [colorDraft, setColorDraft] = useState(project?.color || AUTO);
+  const [urlDraft, setUrlDraft] = useState(project?.url ?? "");
+  const [myRole, setMyRole] = useState<ProjectRole | null>(null);
   const [issueCount, setIssueCount] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [resolved, setResolved] = useState<ResolvedSettings | null>(null);
@@ -103,6 +122,13 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     if (!project) return;
     setNameDraft(project.name);
     setDescriptionDraft(project.description);
+    setCategoryDraft(project.category);
+    setLeadDraft(project.leadId ?? NO_LEAD);
+    setDefaultAssigneeDraft(project.defaultAssignee);
+    setIconDraft(project.icon || AUTO);
+    setColorDraft(project.color || AUTO);
+    setUrlDraft(project.url);
+    void getMyProjectRole(project.id).then(setMyRole).catch(() => setMyRole(null));
     let cancelled = false;
     void listIssues(project.id).then((issues) => {
       if (!cancelled) setIssueCount(issues.length);
@@ -120,7 +146,15 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     return <Navigate to={`/projects/${project.id}/settings/general`} replace />;
   }
 
-  const dirty = nameDraft !== project.name || descriptionDraft !== project.description;
+  const dirty =
+    nameDraft !== project.name ||
+    descriptionDraft !== project.description ||
+    categoryDraft !== project.category ||
+    leadDraft !== (project.leadId ?? NO_LEAD) ||
+    defaultAssigneeDraft !== project.defaultAssignee ||
+    (iconDraft === AUTO ? "" : iconDraft) !== project.icon ||
+    (colorDraft === AUTO ? "" : colorDraft) !== project.color ||
+    urlDraft !== project.url;
   const sectionLabel = PROJECT_SETTINGS_SECTIONS.find((s) => s.id === section)?.label ?? "";
 
   /** 설정 액션 공통 래퍼 — 실패 toast, 끝나면 설정 재조회 */
@@ -140,7 +174,16 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await updateProject(project.id, { name: nameDraft, description: descriptionDraft });
+      await updateProject(project.id, {
+        name: nameDraft,
+        description: descriptionDraft,
+        category: categoryDraft,
+        leadId: leadDraft === NO_LEAD ? null : leadDraft,
+        defaultAssignee: defaultAssigneeDraft,
+        icon: iconDraft === AUTO ? "" : iconDraft,
+        color: colorDraft === AUTO ? "" : colorDraft,
+        url: urlDraft,
+      });
       await onProjectsChanged();
       toast({ title: "프로젝트를 수정했습니다", appearance: "success" });
     } catch (error) {
@@ -222,6 +265,53 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             value={descriptionDraft}
             onChange={(e) => setDescriptionDraft(e.target.value)}
           />
+          <div className="project-details-grid">
+            <TextField
+              label="범주"
+              placeholder="예: 플랫폼, 고객 지원"
+              value={categoryDraft}
+              onChange={(e) => setCategoryDraft(e.target.value)}
+            />
+            <TextField
+              label="URL"
+              placeholder="https://"
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+            />
+            <Select
+              label="프로젝트 리더"
+              value={leadDraft}
+              options={[
+                { value: NO_LEAD, label: "없음" },
+                ...users.map((user) => ({ value: user.id, label: user.name })),
+              ]}
+              onValueChange={setLeadDraft}
+            />
+            <Select
+              label="기본 담당자"
+              value={defaultAssigneeDraft}
+              options={[
+                { value: "unassigned", label: "미지정" },
+                { value: "lead", label: "프로젝트 리더" },
+              ]}
+              onValueChange={(next) => setDefaultAssigneeDraft(next as ProjectDefaultAssignee)}
+            />
+            <Select
+              label="아이콘"
+              value={iconDraft}
+              options={[{ value: AUTO, label: "키 이니셜" }, ...TYPE_ICON_OPTIONS]}
+              onValueChange={setIconDraft}
+            />
+            <Select
+              label="색"
+              value={colorDraft}
+              options={[
+                { value: AUTO, label: "자동(키 기준)" },
+                ...PROJECT_COLOR_OPTIONS.map((c) => ({ value: c.value, label: c.label })),
+              ]}
+              onValueChange={setColorDraft}
+            />
+          </div>
           <div className="project-form-actions">
             <Button type="submit" disabled={!dirty || !nameDraft.trim()}>
               저장
@@ -229,6 +319,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
           </div>
         </form>
       </Card>
+      <ProjectShortcutsPanel projectId={project.id} canManage={myRole === "admin"} />
       <Card padding="lg" title="위험 구역" className="project-danger-zone">
         <p className="project-danger-desc">
           프로젝트를 삭제하면 이슈 {issueCount}개와 스프린트·코멘트·활동 기록이 함께 삭제됩니다.

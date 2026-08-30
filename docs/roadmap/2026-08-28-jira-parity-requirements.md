@@ -463,3 +463,24 @@ MVP 범위 밖이지만 설계를 이 방향에 맞춰 둔다. 지금 구현하�
 - [What is a saved search?](https://support.atlassian.com/jira-software-cloud/docs/what-is-a-saved-search/) · [Manage filters](https://support.atlassian.com/jira-software-cloud/docs/manage-filters/) · [What is advanced search in Jira Cloud?](https://support.atlassian.com/jira-software-cloud/docs/what-is-advanced-search-in-jira-cloud/)
 - [Edit multiple work items](https://support.atlassian.com/jira-software-cloud/docs/edit-multiple-issues/) · [Move multiple work items](https://support.atlassian.com/jira-software-cloud/docs/move-multiple-issues/)
 - [Watch, share and comment on a work item](https://support.atlassian.com/jira-software-cloud/docs/watch-share-and-comment-on-a-work-item/) · [Dashboard gadgets](https://support.atlassian.com/jira-cloud-administration/docs/use-dashboard-gadgets/)
+
+## 11. 지라 메뉴 대조 (2026-08-30, tom-chkim-dev.atlassian.net 실측)
+
+For you·개인 설정·이메일/알림 설정·시스템 설정·업무 항목 설정·프로젝트 설정·필터·대시보드 메뉴를 훑어
+우리에게 없는 것만 추렸다. 이미 있는 것(For you 홈·테마·알림함·저장 필터·감사 로그·백업)은 제외.
+
+| 지라 메뉴 | 우리 | 처리 |
+|---|---|---|
+| 개인 설정 > 이메일·알림(이벤트별 수신, 자동 관찰) / 일반(시작 화면) | 없음 | ✅ 가져옴 — `/settings/personal`, 서버 V13 `user_preference`(알림 on/off·자동 관찰은 서버 강제), 루트 진입은 시작 화면으로 |
+| 시스템 > 사용자 인터페이스 > 공지 배너 | 없음 | ✅ 가져옴 — `/settings/banner`(ADMIN), 셸 상단 배너, 세션 닫기 |
+| 프로젝트 설정 > 세부(아이콘·범주·리더·기본 담당자·URL) | 이름·설명만 | ✅ 가져옴 — 세부 필드 + 기본 담당자 규칙(담당자 없는 이슈 → 리더) |
+| 프로젝트 사이드바 > 바로 가기 | 없음 | ✅ 가져옴 — 프로젝트 머리 외부 링크, 관리자 편집, http(s)만 |
+| 이메일 알림·그룹화·이메일 형식 | 없음 | ⏸ 메일 서버 연동 전 — 앱 내 알림만 |
+| 우선 순위·우선 순위 구성표(5단계+커스텀) | 3단계 고정 | 후보(§5.1 🟡) |
+| 업무 항목 연결 타입 관리(duplicates/causes/custom) | blocks/relates 고정 | 후보 |
+| 보관된 업무 항목(아카이브)·휴지통 | 삭제만 | 후보(§5.7 🟡) |
+| 컴포넌트 | 없음 | 후보(R3) |
+| 기본 대시보드·가젯, 대시보드 목록 | 프로젝트 요약 1개 | 후보(§5.6 🟡) |
+| 전역 권한·스페이스 역할·권한 도우미 | org-service grant 화면 | 유지 — 권한의 진실은 org-service |
+| 전역 자동화·양식·데이터 연결·도구 체인·개발/코드 | 없음 | ✗ §4 제외(자동화는 로드맵 유지) |
+| 일반 구성 옵션(투표 허용·미배정 허용·키 길이 등) | 고정 | ✗ 지금은 필요 없음 |

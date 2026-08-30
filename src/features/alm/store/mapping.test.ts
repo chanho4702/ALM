@@ -48,6 +48,12 @@ describe("alm-backend DTO mapping", () => {
       key: "ALM",
       name: "ALM 제품",
       description: "",
+      category: "",
+      leadId: null,
+      defaultAssignee: "unassigned",
+      icon: "",
+      color: "",
+      url: "",
       createdAt: "2026-08-16T00:00:00Z",
     });
   });

@@ -8,8 +8,8 @@ const ctx: QueryContext = {
     { id: "u2", name: "이서연" },
   ],
   projects: [
-    { id: "p1", key: "ALM", name: "ALM 플랫폼", description: "", createdAt: "" },
-    { id: "p2", key: "PAY", name: "결제", description: "", createdAt: "" },
+    { id: "p1", key: "ALM", name: "ALM 플랫폼", description: "", category: "", leadId: null, defaultAssignee: "unassigned", icon: "", color: "", url: "", createdAt: "" },
+    { id: "p2", key: "PAY", name: "결제", description: "", category: "", leadId: null, defaultAssignee: "unassigned", icon: "", color: "", url: "", createdAt: "" },
   ],
 };
 

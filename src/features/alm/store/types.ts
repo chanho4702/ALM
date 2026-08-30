@@ -3,12 +3,62 @@ export interface User {
   name: string;
 }
 
+/** 담당자 없이 만든 이슈의 담당자 — 미지정 또는 프로젝트 리더(지라 "기본 담당자") */
+export type ProjectDefaultAssignee = "unassigned" | "lead";
+
 export interface Project {
   id: string;
   key: string; // "ALM" 같은 대문자 접두어 — 생성 후 불변 (이슈 키 접두어 보전)
   name: string;
   description: string;
+  /** 지라 프로젝트 설정 > 세부: 범주·리더·기본 담당자·아이콘·색·URL */
+  category: string;
+  leadId: string | null;
+  defaultAssignee: ProjectDefaultAssignee;
+  icon: string; // typeIcons 키, "" = 키 이니셜
+  color: string; // 색 이름(typeAppearance 팔레트), "" = 키 해시 색
+  url: string;
   createdAt: string;
+}
+
+/** 프로젝트 바로 가기 — 사이드바/헤더의 외부 링크(위키·저장소·대시보드) */
+export interface ProjectShortcut {
+  id: string;
+  projectId: string;
+  name: string;
+  url: string;
+  order: number;
+  createdAt: string;
+}
+
+/** 개인 설정 — 지라 개인 설정(일반·알림) 축약판 */
+export interface NotificationPreferences {
+  assigned: boolean;
+  statusChanged: boolean;
+  commented: boolean;
+}
+export interface AutoWatchPreferences {
+  created: boolean;
+  commented: boolean;
+  edited: boolean;
+}
+export type StartPage = "home" | "projects" | "last-project";
+export interface UserPreferences {
+  notifications: NotificationPreferences;
+  autoWatch: AutoWatchPreferences;
+  startPage: StartPage;
+}
+export type UserPreferencesPatch = {
+  notifications?: Partial<NotificationPreferences>;
+  autoWatch?: Partial<AutoWatchPreferences>;
+  startPage?: StartPage;
+};
+
+/** 전역 공지 배너 — 관리자가 켜면 모든 화면 상단에 뜬다 */
+export interface AnnouncementBanner {
+  enabled: boolean;
+  level: "info" | "warning";
+  message: string;
 }
 
 export interface Sprint {
@@ -386,4 +436,7 @@ export interface JiraData {
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */
   issueCounters: Record<string, number>;
+  shortcuts: ProjectShortcut[];
+  preferences: Record<string, UserPreferences>;
+  banner: AnnouncementBanner;
 }
