@@ -196,6 +196,7 @@ function normalize(data: JiraData): JiraData {
   data.members ??= [];
   data.versions ??= [];
   data.attachments ??= [];
+  data.watchers ??= [];
   // 멤버가 없는 프로젝트에는 현재 사용자를 관리자로 넣는다 — 관리자 없는 프로젝트를 만들지 않는다
   for (const project of data.projects) {
     if (!data.members.some((m) => m.projectId === project.id)) {
@@ -404,6 +405,7 @@ export async function deleteProject(id: string): Promise<void> {
   data.comments = data.comments.filter((c) => !issueIds.has(c.issueId));
   data.activities = data.activities.filter((a) => !issueIds.has(a.issueId));
   data.notifications = data.notifications.filter((n) => !issueIds.has(n.issueId));
+  data.watchers = data.watchers.filter((w) => !issueIds.has(w.issueId));
   data.boards = data.boards.filter((b) => b.projectId !== id);
   data.links = data.links.filter((l) => !issueIds.has(l.sourceId) && !issueIds.has(l.targetId));
   data.worklogs = data.worklogs.filter((w) => !issueIds.has(w.issueId));
@@ -691,29 +693,48 @@ function recordChanges(data: JiraData, before: Issue, after: Issue, at: string):
  * 알림 부수효과 — 지라처럼 본인 액션은 본인에게 알리지 않는다.
  * 목업은 단일 사용자(u1)라 실제 생성은 드물고, 시드 알림이 주 데모 데이터다.
  */
+/** 워처 추가 — 멱등 */
+function addWatcher(data: JiraData, issueId: string, userId: string, at: string): void {
+  if (!data.watchers.some((w) => w.issueId === issueId && w.userId === userId)) {
+    data.watchers.push({ issueId, userId, createdAt: at });
+  }
+}
+
+/** 알림 대상 = 워처 ∪ 담당자 − 행위자. 본인 행동은 본인에게 알리지 않는다 */
+function notificationRecipients(data: JiraData, issue: Issue, actorId: string): string[] {
+  const set = new Set(data.watchers.filter((w) => w.issueId === issue.id).map((w) => w.userId));
+  if (issue.assigneeId) set.add(issue.assigneeId);
+  set.delete(actorId);
+  return [...set];
+}
+
+function pushNotification(data: JiraData, userId: string, issue: Issue, message: string, at: string): void {
+  data.notifications.push({
+    id: nextId(),
+    userId,
+    issueId: issue.id,
+    issueKey: issue.key,
+    actorId: CURRENT_USER_ID,
+    message,
+    at,
+    read: false,
+  });
+}
+
 function notifyIssueChanges(data: JiraData, before: Issue, after: Issue, at: string): void {
   const actorName = userLabel(data, CURRENT_USER_ID);
-  const notify = (userId: string | null, message: string) => {
-    if (!userId || userId === CURRENT_USER_ID) return;
-    data.notifications.push({
-      id: nextId(),
-      userId,
-      issueId: after.id,
-      issueKey: after.key,
-      actorId: CURRENT_USER_ID,
-      message,
-      at,
-      read: false,
-    });
-  };
-  if (before.assigneeId !== after.assigneeId) {
-    notify(after.assigneeId, `${actorName} 님이 ${after.key}를 나에게 할당했습니다`);
+  if (before.assigneeId !== after.assigneeId && after.assigneeId) {
+    // 새 담당자는 자동 워처가 되고, 본인이 아니면 배정 알림을 받는다
+    addWatcher(data, after.id, after.assigneeId, at);
+    if (after.assigneeId !== CURRENT_USER_ID) {
+      pushNotification(data, after.assigneeId, after, `${actorName} 님이 ${after.key}를 나에게 할당했습니다`, at);
+    }
   }
   if (before.status !== after.status) {
-    notify(
-      after.assigneeId,
-      `${actorName} 님이 ${after.key}를 ${statusNameOf(data, after.projectId, after.status)}(으)로 옮겼습니다`,
-    );
+    const message = `${actorName} 님이 ${after.key}를 ${statusNameOf(data, after.projectId, after.status)}(으)로 옮겼습니다`;
+    for (const userId of notificationRecipients(data, after, CURRENT_USER_ID)) {
+      pushNotification(data, userId, after, message, at);
+    }
   }
 }
 
@@ -1396,6 +1417,9 @@ export async function createIssue(input: {
   }
   applyResolutionRule(data, issue, "todo", undefined);
   data.issues.push(issue);
+  // 보고자(생성자)와 담당자는 자동 워처 — 지라 기본 동작
+  addWatcher(data, issue.id, CURRENT_USER_ID, now);
+  if (issue.assigneeId) addWatcher(data, issue.id, issue.assigneeId, now);
   data.activities.push({
     id: nextId(),
     issueId: issue.id,
@@ -1779,6 +1803,44 @@ export async function importIssues(
   return { created, failed };
 }
 
+// ── 워처 ─────────────────────────────────────────────────────
+
+export interface WatchersView {
+  watching: boolean;
+  watchers: { userId: string; createdAt: string }[];
+}
+
+function watchersView(data: JiraData, issueId: string): WatchersView {
+  const list = data.watchers
+    .filter((w) => w.issueId === issueId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((w) => ({ userId: w.userId, createdAt: w.createdAt }));
+  return { watching: list.some((w) => w.userId === CURRENT_USER_ID), watchers: list };
+}
+
+export async function listWatchers(issueId: string): Promise<WatchersView> {
+  const data = load();
+  if (!data.issues.some((i) => i.id === issueId)) throw new Error("이슈를 찾을 수 없습니다");
+  return clone(watchersView(data, issueId));
+}
+
+/** 관심 등록 — 멱등. 보기 권한이면 된다 */
+export async function watchIssue(issueId: string): Promise<WatchersView> {
+  const data = load();
+  if (!data.issues.some((i) => i.id === issueId)) throw new Error("이슈를 찾을 수 없습니다");
+  addWatcher(data, issueId, CURRENT_USER_ID, new Date().toISOString());
+  persist();
+  return clone(watchersView(data, issueId));
+}
+
+export async function unwatchIssue(issueId: string): Promise<WatchersView> {
+  const data = load();
+  if (!data.issues.some((i) => i.id === issueId)) throw new Error("이슈를 찾을 수 없습니다");
+  data.watchers = data.watchers.filter((w) => !(w.issueId === issueId && w.userId === CURRENT_USER_ID));
+  persist();
+  return clone(watchersView(data, issueId));
+}
+
 // ── 대량 변경 ────────────────────────────────────────────────
 
 export interface BulkIssuePatch {
@@ -1875,6 +1937,7 @@ export async function deleteIssue(id: string): Promise<void> {
   data.comments = data.comments.filter((c) => c.issueId !== id);
   data.activities = data.activities.filter((a) => a.issueId !== id);
   data.notifications = data.notifications.filter((n) => n.issueId !== id);
+  data.watchers = data.watchers.filter((w) => w.issueId !== id);
   data.links = data.links.filter((l) => l.sourceId !== id && l.targetId !== id);
   data.worklogs = data.worklogs.filter((w) => w.issueId !== id);
   data.changes = data.changes.filter((c) => c.issueId !== id);
@@ -1908,19 +1971,11 @@ export async function addComment(issueId: string, body: string): Promise<Comment
     createdAt: new Date().toISOString(),
   };
   data.comments.push(comment);
-  // 담당자에게 코멘트 알림 (본인 코멘트는 제외)
+  // 워처 ∪ 담당자에게 코멘트 알림 (본인 코멘트는 제외)
   const issue = data.issues.find((i) => i.id === issueId)!;
-  if (issue.assigneeId && issue.assigneeId !== CURRENT_USER_ID) {
-    data.notifications.push({
-      id: nextId(),
-      userId: issue.assigneeId,
-      issueId: issue.id,
-      issueKey: issue.key,
-      actorId: CURRENT_USER_ID,
-      message: `${userLabel(data, CURRENT_USER_ID)} 님이 ${issue.key}에 코멘트를 남겼습니다`,
-      at: comment.createdAt,
-      read: false,
-    });
+  const message = `${userLabel(data, CURRENT_USER_ID)} 님이 ${issue.key}에 코멘트를 남겼습니다`;
+  for (const userId of notificationRecipients(data, issue, CURRENT_USER_ID)) {
+    pushNotification(data, userId, issue, message, comment.createdAt);
   }
   persist();
   return clone(comment);

@@ -490,3 +490,20 @@ describe("IssueDetailModal 워크로그", () => {
     expect(await screen.findByText("예상 시간을 저장했습니다")).toBeInTheDocument();
   });
 });
+
+describe("IssueDetailModal 관심 등록", () => {
+  it("관심 버튼으로 워처가 되고 다시 누르면 빠진다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/issues?issue=ALM-3");
+    const dialog = await screen.findByRole("dialog");
+
+    // 시드 이슈는 이력이 없어 워처가 비어 있다
+    const button = await within(dialog).findByRole("button", { name: /관심 등록/ });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    await user.click(button);
+    expect(await within(dialog).findByRole("button", { name: /관심 해제/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(dialog).getByRole("button", { name: /관심 해제/ })).toHaveTextContent("1");
+    await user.click(within(dialog).getByRole("button", { name: /관심 해제/ }));
+    expect(await within(dialog).findByRole("button", { name: /관심 등록/ })).toHaveTextContent("0");
+  });
+});

@@ -102,6 +102,13 @@
 - REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
   규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
 
+## 워처 · 알림 (2026-08-30)
+
+`watchers` + `listWatchers`/`watchIssue`/`unwatchIssue`. 보고자(생성자)·담당자는 자동 워처. 알림 대상은
+**워처 ∪ 담당자 − 행위자**(`notificationRecipients`) — 상태 변경·코멘트가 그 대상에게, 배정은 새 담당자에게
+간다. REST(서버 V9)는 `type + detail`만 주므로 어댑터가 문장을 만든다(사용자 이름 디렉터리가 아직 없어
+행위자는 id로 표시 — 사용자 디렉터리 연동 때 이름으로 바꾼다).
+
 ## CSV · 가져오기 (2026-08-30)
 
 `store/csv.ts`(순수): `parseCsv`/`toCsv`(RFC 4180), `issuesToCsv`(사람이 읽는 이름으로 내보냄),

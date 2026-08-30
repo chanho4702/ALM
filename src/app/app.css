@@ -3152,3 +3152,16 @@ body {
   border-color: var(--chanho-color-border-danger);
   color: var(--chanho-color-text-danger);
 }
+
+/* ── 이슈 상세 툴바(관심 등록) ───────────────────────────── */
+
+.issue-detail-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.watch-button-count {
+  margin-left: var(--chanho-space-50);
+  font-variant-numeric: tabular-nums;
+}

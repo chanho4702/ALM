@@ -315,6 +315,13 @@ export interface IssueLink {
 }
 
 /** 사용자에게 전달되는 알림 — 본인 액션은 알리지 않는다 (지라와 동일) */
+/** 이슈 워처 — 알림 대상. 보고자·담당자는 자동, 나머지는 스스로 등록 */
+export interface IssueWatcher {
+  issueId: string;
+  userId: string;
+  createdAt: string;
+}
+
 export interface Notification {
   id: string;
   /** 수신자 */
@@ -348,6 +355,8 @@ export interface JiraData {
   versions: ProjectVersion[];
   /** 이슈 첨부 메타 */
   attachments: Attachment[];
+  /** 이슈 워처 */
+  watchers: IssueWatcher[];
   /** 전역 상태 카테고리 (order순) */
   statusCategories: StatusCategory[];
   /** 전역 상태 레지스트리 */

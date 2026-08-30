@@ -212,6 +212,7 @@ export function createSeedData(): JiraData {
     members,
     versions: [],
     attachments: [],
+    watchers: [],
     // 전역 상태 카테고리·상태 레지스트리 — 기본 3개, 워크플로는 여기서 골라 쓴다
     statusCategories: [
       { id: "todo", name: "할 일", kind: "new" as const, color: "neutral" as const, order: 1, builtIn: true },

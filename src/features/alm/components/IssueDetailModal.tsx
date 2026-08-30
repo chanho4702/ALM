@@ -59,6 +59,7 @@ import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { useIssueTypes } from "./useIssueTypes";
 import { IssueAttachments } from "./IssueAttachments";
+import { WatchButton } from "./WatchButton";
 import {
   ISSUE_TYPES,
   PRIORITY_LABELS,
@@ -516,6 +517,9 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     >
       <div className="issue-detail-body">
         <div className="issue-detail-main">
+          <div className="issue-detail-toolbar">
+            <WatchButton issueId={issue.id} userNames={Object.fromEntries(users.map((u) => [u.id, u.name]))} />
+          </div>
           <InlineEdit
             label="제목"
             value={issue.title}
