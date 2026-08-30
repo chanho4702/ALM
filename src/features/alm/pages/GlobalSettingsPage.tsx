@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { Navigate, useParams } from "react-router";
 import { Badge, Button, Card, Checkbox, Lozenge, Modal, PageHeader, TextField, useToast } from "@chanho/react";
 import type { IssueType, SettingsScheme, WorkflowStatus, WorkflowTransition } from "../store/types";
 import {
@@ -12,16 +13,19 @@ import {
 import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
+import { isGlobalSettingsSection } from "../components/SettingsSideNav";
 
 type Aspect = "workflow" | "types";
 
 /**
- * 전역 관리(⚙ /settings) — 지라 관리자 화면 모방.
+ * 전역 관리(⚙ /settings/:section) — 지라 관리자 화면 모방.
  * 스킴을 정의하고 프로젝트가 배정받는다. 이슈 타입·워크플로 상태 모두 여기서 편집한다.
+ * 구획 메뉴는 설정 사이드바(SettingsSideNav)가 그리고, 여기서는 URL의 구획만 읽는다.
  */
 export function GlobalSettingsPage() {
   const toast = useToast();
-  const [aspect, setAspect] = useState<Aspect>("types");
+  const { section = "types" } = useParams();
+  const aspect: Aspect = section === "workflows" ? "workflow" : "types";
   const [schemes, setSchemes] = useState<SettingsScheme[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [newName, setNewName] = useState("");
@@ -100,28 +104,19 @@ export function GlobalSettingsPage() {
     });
   };
 
+  if (!isGlobalSettingsSection(section)) return <Navigate to="/settings/types" replace />;
+
   return (
     <main className="project-list-content">
-      <PageHeader title="전역 관리" />
+      <PageHeader
+        title="전역 관리"
+        bottom={
+          <span className="settings-header-sub">
+            {aspect === "types" ? "이슈 타입 스킴" : "워크플로 스킴"}
+          </span>
+        }
+      />
       <div className="admin-layout">
-        {/* 지라 관리자 화면식 좌측 메뉴 — 같은 스킴의 두 측면 */}
-        <nav className="admin-menu" aria-label="설정 메뉴">
-          <button
-            type="button"
-            className={aspect === "types" ? "admin-menu-item is-active" : "admin-menu-item"}
-            onClick={() => setAspect("types")}
-          >
-            이슈 타입 스킴
-          </button>
-          <button
-            type="button"
-            className={aspect === "workflow" ? "admin-menu-item is-active" : "admin-menu-item"}
-            onClick={() => setAspect("workflow")}
-          >
-            워크플로 스킴
-          </button>
-        </nav>
-
         <div className="admin-content">
           <form className="admin-create-form" onSubmit={handleCreate}>
             <TextField

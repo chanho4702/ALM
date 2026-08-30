@@ -2,7 +2,7 @@
 
 **파일**: `jiraStore.ts`의 설정 구획(schemes/projectSettings/resolveSettings/migrateIssueStatuses),
 `types.ts`(SettingsScheme/SettingsBody/WorkflowStatus), `StatusEditor.tsx`,
-`GlobalSettingsPage.tsx`(⚙ /settings), `ProjectSettingsPage.tsx`(워크플로/이슈 타입 탭).
+`GlobalSettingsPage.tsx`(⚙ /settings/:section), `ProjectSettingsPage.tsx`(/projects/:id/settings/:section — 뷰 탭 밖 별도 페이지, 메뉴는 `SettingsSideNav`).
 
 ## 모델 (지라 구조 모방, 설계 v3)
 
@@ -36,7 +36,7 @@
   같은 상태로의 저장은 전이가 아니다. 거부 문구는 상태 **이름**으로 만든다.
 - 상태를 지우면 그 상태를 쓰던 전이도 저장 시 정리된다(`pruneTransitions`) — 전역 전이(`from: []`)는
   남고, `from`을 전부 잃은 전이만 버린다.
-- 편집 UI는 `WorkflowCanvas`(설정 → 워크플로 탭). 캔버스는 `@xyflow/react`(MIT)가 그리고
+- 편집 UI는 `WorkflowCanvas`(프로젝트 설정 → 워크플로 구획). 캔버스는 `@xyflow/react`(MIT)가 그리고
   **편집은 캔버스 아래 목록에서** 한다 — 드래그로만 편집하면 키보드 사용자와 테스트가 닿지 못한다.
   캔버스는 보기 전용(노드 고정 + `inert`)이라 규칙이 한 곳에만 있고 탭 순서에도 끼어들지 않는다.
 - **두 층 모두에서 편집한다**: 전역 관리(⚙)의 "워크플로 편집" 모달이 스킴 전이를, 프로젝트 설정의

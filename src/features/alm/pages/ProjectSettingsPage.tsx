@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate, useOutletContext, useParams } from "react-router";
+import { Navigate, useNavigate, useParams } from "react-router";
 import {
   Badge,
   Button,
@@ -10,12 +10,17 @@ import {
   Modal,
   Select,
   Switch,
-  Tabs,
   TextArea,
   TextField,
   useToast,
 } from "@chanho/react";
-import type { IssueType, SettingsScheme, WorkflowStatus, WorkflowTransition } from "../store/types";
+import type {
+  IssueType,
+  Project,
+  SettingsScheme,
+  WorkflowStatus,
+  WorkflowTransition,
+} from "../store/types";
 import type { ResolvedSettings } from "../store/jiraStore";
 import {
   assignScheme,
@@ -28,16 +33,28 @@ import {
   updateProjectCustomSettings,
 } from "../store/jiraStore";
 import { pruneProject } from "../store/uiStore";
-import type { JiraOutletContext } from "../components/ProjectLayout";
 import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
+import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
+import {
+  PROJECT_SETTINGS_SECTIONS,
+  isProjectSettingsSection,
+} from "../components/SettingsSideNav";
 import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
 
-/** 프로젝트 설정 — 지라식 탭: 일반 / 워크플로 / 이슈 타입 (스킴 사용·커스텀 전환) */
-export function ProjectSettingsPage() {
-  const { projectId } = useParams();
-  const { projects, onProjectsChanged } = useOutletContext<JiraOutletContext>();
+export interface ProjectSettingsPageProps {
+  projects: Project[];
+  /** 프로젝트 목록이 바뀌었을 때(수정/삭제 등) App이 다시 로드하도록 알린다 */
+  onProjectsChanged: () => void | Promise<void>;
+}
+
+/**
+ * 프로젝트 설정 — 프로젝트 뷰(탭) 바깥의 별도 페이지. 구획은 URL(`/settings/:section`)이 정하고
+ * 메뉴는 설정 사이드바(SettingsSideNav)가 그린다. 여기서는 현재 구획 하나만 렌더한다.
+ */
+export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSettingsPageProps) {
+  const { projectId, section = "general" } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -82,9 +99,14 @@ export function ProjectSettingsPage() {
     // 프로젝트 전환 시에만 초안 리셋 (projects 재로드로 초안이 날아가면 안 된다)
   }, [currentProjectId, reloadSettings]);
 
-  if (!project) return null; // ProjectLayout이 이미 /projects로 보냈다
+  // 없는 프로젝트 → 디렉터리, 모르는 구획 → 일반
+  if (!project) return <Navigate to="/projects" replace />;
+  if (!isProjectSettingsSection(section)) {
+    return <Navigate to={`/projects/${project.id}/settings/general`} replace />;
+  }
 
   const dirty = nameDraft !== project.name || descriptionDraft !== project.description;
+  const sectionLabel = PROJECT_SETTINGS_SECTIONS.find((s) => s.id === section)?.label ?? "";
 
   /** 설정 액션 공통 래퍼 — 실패 toast, 끝나면 설정 재조회 */
   const run = async (failTitle: string, action: () => Promise<unknown>) => {
@@ -131,7 +153,7 @@ export function ProjectSettingsPage() {
     }
   };
 
-  /** 스킴/커스텀 배지 + 전환 컨트롤 — 워크플로·이슈 타입 탭 공용 */
+  /** 스킴/커스텀 배지 + 전환 컨트롤 — 워크플로·이슈 타입 구획 공용 */
   const schemeHeader = resolved ? (
     <div className="settings-scheme-header" data-testid="settings-scheme-header">
       {resolved.source === "scheme" ? (
@@ -169,174 +191,173 @@ export function ProjectSettingsPage() {
     </div>
   ) : null;
 
+  const general = (
+    <div className="project-settings">
+      <Card padding="lg" title="일반">
+        <form className="project-create-form" onSubmit={handleSave}>
+          <div className="project-key-readonly">
+            <span className="project-key-readonly-label">키</span>
+            <span className="issue-key-cell">{project.key}</span>
+          </div>
+          <TextField label="이름" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} />
+          <TextArea
+            label="설명"
+            rows={3}
+            placeholder="프로젝트 설명을 입력하세요"
+            value={descriptionDraft}
+            onChange={(e) => setDescriptionDraft(e.target.value)}
+          />
+          <div className="project-form-actions">
+            <Button type="submit" disabled={!dirty || !nameDraft.trim()}>
+              저장
+            </Button>
+          </div>
+        </form>
+      </Card>
+      <Card padding="lg" title="위험 구역" className="project-danger-zone">
+        <p className="project-danger-desc">
+          프로젝트를 삭제하면 이슈 {issueCount}개와 스프린트·코멘트·활동 기록이 함께 삭제됩니다.
+          되돌릴 수 없습니다.
+        </p>
+        <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+          프로젝트 삭제
+        </Button>
+      </Card>
+    </div>
+  );
+
+  const workflow = resolved ? (
+    <div className="project-settings">
+      <Card padding="lg" title="워크플로 상태">
+        {schemeHeader}
+        {resolved.source === "custom" ? (
+          <form
+            className="project-create-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run("저장 실패", async () => {
+                await updateProjectCustomSettings(project.id, {
+                  ...resolved.body,
+                  statuses: statusesDraft,
+                  transitions: transitionsDraft,
+                });
+                toast({ title: "워크플로를 저장했습니다", appearance: "success" });
+              });
+            }}
+          >
+            <StatusEditor value={statusesDraft} onChange={setStatusesDraft} />
+            <WorkflowCanvas
+              statuses={statusesDraft}
+              transitions={transitionsDraft}
+              onChange={setTransitionsDraft}
+            />
+            <Button type="submit" size="small">
+              저장
+            </Button>
+          </form>
+        ) : (
+          <>
+            <div className="admin-scheme-preview" data-testid="statuses-readonly">
+              {[...resolved.body.statuses]
+                .sort((a, b) => a.order - b.order)
+                .map((status) => (
+                  <Lozenge key={status.id} appearance={STATUS_APPEARANCE[status.category]}>
+                    {status.name}
+                  </Lozenge>
+                ))}
+            </div>
+            <WorkflowCanvas
+              statuses={resolved.body.statuses}
+              transitions={resolved.body.transitions ?? []}
+              readOnly
+            />
+            <p className="admin-scheme-note">
+              스킴 자체 편집은 전역 관리(⚙), 이 프로젝트만 바꾸려면 커스텀으로 전환하세요.
+            </p>
+          </>
+        )}
+      </Card>
+    </div>
+  ) : null;
+
+  const types = resolved ? (
+    <div className="project-settings">
+      <Card padding="lg" title="이슈 타입">
+        {schemeHeader}
+        {resolved.source === "custom" ? (
+          <form
+            className="project-create-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run("저장 실패", async () => {
+                await updateProjectCustomSettings(project.id, {
+                  ...resolved.body,
+                  enabledTypes: typesDraft,
+                });
+                toast({ title: "이슈 타입 구성을 저장했습니다", appearance: "success" });
+              });
+            }}
+          >
+            <div className="board-settings-checks" role="group" aria-label="이슈 타입">
+              {ISSUE_TYPES.map((type) => (
+                <Checkbox
+                  key={type}
+                  label={TYPE_LABELS[type]}
+                  checked={typesDraft.includes(type)}
+                  disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
+                  onCheckedChange={() =>
+                    setTypesDraft((prev) =>
+                      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+                    )
+                  }
+                />
+              ))}
+            </div>
+            <Button type="submit" size="small">
+              저장
+            </Button>
+          </form>
+        ) : (
+          <div className="admin-scheme-preview" data-testid="types-readonly">
+            {resolved.body.enabledTypes.map((type) => (
+              <Lozenge key={type} appearance="neutral">
+                {TYPE_LABELS[type]}
+              </Lozenge>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  ) : null;
+
   return (
-    <>
-      <Tabs
-        label="프로젝트 설정"
-        className="settings-tabs"
-        items={[
-          {
-            value: "general",
-            label: "일반",
-            content: (
-              <div className="project-settings">
-                <Card padding="lg" title="일반">
-                  <form className="project-create-form" onSubmit={handleSave}>
-                    <div className="project-key-readonly">
-                      <span className="project-key-readonly-label">키</span>
-                      <span className="issue-key-cell">{project.key}</span>
-                    </div>
-                    <TextField
-                      label="이름"
-                      value={nameDraft}
-                      onChange={(e) => setNameDraft(e.target.value)}
-                    />
-                    <TextArea
-                      label="설명"
-                      rows={3}
-                      placeholder="프로젝트 설명을 입력하세요"
-                      value={descriptionDraft}
-                      onChange={(e) => setDescriptionDraft(e.target.value)}
-                    />
-                    <div className="project-form-actions">
-                      <Button type="submit" disabled={!dirty || !nameDraft.trim()}>
-                        저장
-                      </Button>
-                    </div>
-                  </form>
-                </Card>
-                <Card padding="lg" title="위험 구역" className="project-danger-zone">
-                  <p className="project-danger-desc">
-                    프로젝트를 삭제하면 이슈 {issueCount}개와 스프린트·코멘트·활동 기록이 함께
-                    삭제됩니다. 되돌릴 수 없습니다.
-                  </p>
-                  <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
-                    프로젝트 삭제
-                  </Button>
-                </Card>
-              </div>
-            ),
-          },
-          {
-            value: "members",
-            label: "사용자·권한",
-            content: <ProjectMembersPanel projectId={project.id} />,
-          },
-          {
-            value: "workflow",
-            label: "워크플로",
-            content: resolved ? (
-              <div className="project-settings">
-                <Card padding="lg" title="워크플로 상태">
-                  {schemeHeader}
-                  {resolved.source === "custom" ? (
-                    <form
-                      className="project-create-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void run("저장 실패", async () => {
-                          await updateProjectCustomSettings(project.id, {
-                            ...resolved.body,
-                            statuses: statusesDraft,
-                            transitions: transitionsDraft,
-                          });
-                          toast({ title: "워크플로를 저장했습니다", appearance: "success" });
-                        });
-                      }}
-                    >
-                      <StatusEditor value={statusesDraft} onChange={setStatusesDraft} />
-                      <WorkflowCanvas
-                        statuses={statusesDraft}
-                        transitions={transitionsDraft}
-                        onChange={setTransitionsDraft}
-                      />
-                      <Button type="submit" size="small">
-                        저장
-                      </Button>
-                    </form>
-                  ) : (
-                    <>
-                      <div className="admin-scheme-preview" data-testid="statuses-readonly">
-                        {[...resolved.body.statuses]
-                          .sort((a, b) => a.order - b.order)
-                          .map((status) => (
-                            <Lozenge key={status.id} appearance={STATUS_APPEARANCE[status.category]}>
-                              {status.name}
-                            </Lozenge>
-                          ))}
-                      </div>
-                      <WorkflowCanvas
-                        statuses={resolved.body.statuses}
-                        transitions={resolved.body.transitions ?? []}
-                        readOnly
-                      />
-                      <p className="admin-scheme-note">
-                        스킴 자체 편집은 전역 관리(⚙), 이 프로젝트만 바꾸려면 커스텀으로
-                        전환하세요.
-                      </p>
-                    </>
-                  )}
-                </Card>
-              </div>
-            ) : null,
-          },
-          {
-            value: "types",
-            label: "이슈 타입",
-            content: resolved ? (
-              <div className="project-settings">
-                <Card padding="lg" title="이슈 타입">
-                  {schemeHeader}
-                  {resolved.source === "custom" ? (
-                    <form
-                      className="project-create-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void run("저장 실패", async () => {
-                          await updateProjectCustomSettings(project.id, {
-                            ...resolved.body,
-                            enabledTypes: typesDraft,
-                          });
-                          toast({ title: "이슈 타입 구성을 저장했습니다", appearance: "success" });
-                        });
-                      }}
-                    >
-                      <div className="board-settings-checks" role="group" aria-label="이슈 타입">
-                        {ISSUE_TYPES.map((type) => (
-                          <Checkbox
-                            key={type}
-                            label={TYPE_LABELS[type]}
-                            checked={typesDraft.includes(type)}
-                            disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
-                            onCheckedChange={() =>
-                              setTypesDraft((prev) =>
-                                prev.includes(type)
-                                  ? prev.filter((t) => t !== type)
-                                  : [...prev, type],
-                              )
-                            }
-                          />
-                        ))}
-                      </div>
-                      <Button type="submit" size="small">
-                        저장
-                      </Button>
-                    </form>
-                  ) : (
-                    <div className="admin-scheme-preview" data-testid="types-readonly">
-                      {resolved.body.enabledTypes.map((type) => (
-                        <Lozenge key={type} appearance="neutral">
-                          {TYPE_LABELS[type]}
-                        </Lozenge>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </div>
-            ) : null,
-          },
-        ]}
-      />
+    <div className="jira-main settings-main">
+      <nav aria-label="브레드크럼" className="breadcrumbs">
+        <button type="button" onClick={() => navigate("/projects")}>
+          프로젝트
+        </button>
+        <span aria-hidden>/</span>
+        <button type="button" onClick={() => navigate(`/projects/${project.id}/board`)}>
+          {project.name}
+        </button>
+        <span aria-hidden>/</span>
+        <span aria-current="page">설정</span>
+      </nav>
+
+      <header className="project-header settings-header">
+        <ProjectAvatar project={project} size="lg" />
+        <div className="settings-header-text">
+          <h1 className="project-header-name">프로젝트 설정</h1>
+          <span className="settings-header-sub">{sectionLabel}</span>
+        </div>
+      </header>
+
+      <main className="jira-content">
+        {section === "general" ? general : null}
+        {section === "members" ? <ProjectMembersPanel projectId={project.id} /> : null}
+        {section === "workflow" ? workflow : null}
+        {section === "types" ? types : null}
+      </main>
 
       {confirmingDelete ? (
         <Modal
@@ -363,6 +384,6 @@ export function ProjectSettingsPage() {
           </div>
         </Modal>
       ) : null}
-    </>
+    </div>
   );
 }

@@ -65,7 +65,9 @@ export function App() {
         {/* For you 홈 — 내 담당·최근 업데이트 */}
         <Route path="/home" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/settings" element={<GlobalSettingsPage />} />
+        {/* 전역 관리 — 구획은 URL 세그먼트, 메뉴는 설정 사이드바(SettingsSideNav) */}
+        <Route path="/settings" element={<Navigate to="/settings/types" replace />} />
+        <Route path="/settings/:section" element={<GlobalSettingsPage />} />
         <Route
           path="/projects"
           element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}
@@ -122,21 +124,23 @@ export function App() {
           <Route path="boards/:boardId" element={<BoardPage />} />
           <Route path="backlog" element={<BacklogPage />} />
           <Route path="issues" element={<IssueListPage />} />
-          <Route
-            path="settings"
-            element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="설정 불러오는 중" />
-                  </div>
-                }
-              >
-                <ProjectSettingsPage />
-              </Suspense>
-            }
-          />
         </Route>
+        {/* 프로젝트 설정 — 뷰 탭(ProjectLayout) 바깥의 별도 페이지, 사이드바는 설정 메뉴로 바뀐다 */}
+        <Route path="/projects/:projectId/settings" element={<Navigate to="general" replace />} />
+        <Route
+          path="/projects/:projectId/settings/:section"
+          element={
+            <Suspense
+              fallback={
+                <div className="board-loading">
+                  <Spinner size="large" label="설정 불러오는 중" />
+                </div>
+              }
+            >
+              <ProjectSettingsPage projects={projects} onProjectsChanged={reload} />
+            </Suspense>
+          }
+        />
         {/* "/" 포함 그 외 전부 → 홈 */}
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Route>

@@ -929,45 +929,12 @@ body {
   border-bottom: 1px solid var(--chanho-color-border-default);
 }
 
-.settings-tabs {
-  margin-top: var(--chanho-space-100);
-}
-
 /* ── 전역 관리 (/settings) ──────────────────────────────── */
 
 .admin-layout {
   display: flex;
   gap: var(--chanho-space-300);
   align-items: flex-start;
-}
-
-.admin-menu {
-  flex-shrink: 0;
-  width: 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.admin-menu-item {
-  padding: var(--chanho-space-100) var(--chanho-space-150);
-  border: 0;
-  border-radius: var(--chanho-radius-medium);
-  background: none;
-  font: inherit;
-  color: var(--chanho-color-text-default);
-  text-align: left;
-  cursor: pointer;
-}
-
-.admin-menu-item:hover {
-  background: var(--chanho-color-background-neutral-hovered);
-}
-
-.admin-menu-item.is-active {
-  background: var(--chanho-color-background-selected);
-  color: var(--chanho-color-text-selected);
-  font-weight: var(--chanho-font-weight-medium);
 }
 
 .admin-content {
@@ -2888,4 +2855,86 @@ body {
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
   white-space: nowrap;
+}
+
+/* ── 설정 전용 사이드바 (설정 라우트에서 전역 사이드바를 대신한다) ── */
+
+.settings-nav {
+  width: 240px;
+}
+
+.settings-nav-back {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-100);
+  border: 0;
+  border-radius: var(--chanho-radius-medium);
+  background: none;
+  font: inherit;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-nav-back:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+  color: var(--chanho-color-text-default);
+}
+
+.settings-nav-head {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  padding: var(--chanho-space-100) var(--chanho-space-100) var(--chanho-space-200);
+  margin-bottom: var(--chanho-space-100);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.settings-nav-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-subtle);
+}
+
+.settings-nav-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.settings-nav-eyebrow {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.settings-nav-name {
+  font-weight: var(--chanho-font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 설정 페이지 머리 — 프로젝트 헤더와 같은 자리, 구획 이름은 부제로 */
+.settings-header-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.settings-header-sub {
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 설정 페이지 본문 — 뷰 탭 안에 있던 때의 560px 폭은 캔버스에 좁다 */
+.settings-main .project-settings {
+  max-width: 880px;
 }

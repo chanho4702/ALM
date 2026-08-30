@@ -133,9 +133,8 @@ describe("프로젝트 설정 — 스킴/커스텀", () => {
   it("이슈 타입 탭: 스킴 사용 중(읽기 전용) → 커스텀 전환 → 편집 → 스킴 복귀", async () => {
     const user = userEvent.setup();
     renderSettings("/projects/p1/settings");
-    await screen.findByRole("tab", { name: "이슈 타입" });
-
-    await user.click(screen.getByRole("tab", { name: "이슈 타입" }));
+    const menu = await screen.findByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(menu).getByRole("button", { name: "이슈 타입" }));
     const header = await screen.findByTestId("settings-scheme-header");
     expect(within(header).getByText("스킴: 기본 스킴")).toBeInTheDocument();
     expect(screen.getByTestId("types-readonly")).toBeInTheDocument();
@@ -160,9 +159,8 @@ describe("프로젝트 설정 — 스킴/커스텀", () => {
   it("워크플로 탭: 스킴은 읽기 전용, 커스텀 전환하면 상태 편집기로 추가/저장", async () => {
     const user = userEvent.setup();
     renderSettings("/projects/p1/settings");
-    await screen.findByRole("tab", { name: "워크플로" });
-
-    await user.click(screen.getByRole("tab", { name: "워크플로" }));
+    const menu = await screen.findByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(menu).getByRole("button", { name: "워크플로" }));
     const readonly = await screen.findByTestId("statuses-readonly");
     expect(within(readonly).getByText("할 일")).toBeInTheDocument();
     expect(within(readonly).getByText("진행 중")).toBeInTheDocument();

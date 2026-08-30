@@ -44,9 +44,12 @@ describe("ProjectSettingsPage", () => {
     await user.clear(nameField);
     await user.type(nameField, "ALM 플랫폼 v2");
     await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("프로젝트를 수정했습니다")).toBeInTheDocument();
 
+    // 설정 페이지에는 전역 사이드바가 없다 — 프로젝트로 돌아가서 확인한다
+    await user.click(screen.getByRole("button", { name: "프로젝트로 돌아가기" }));
     const projectSection = within(
-      screen.getByRole("navigation", { name: "전역 내비게이션" }),
+      await screen.findByRole("navigation", { name: "전역 내비게이션" }),
     ).getByTestId("nav-projects");
     await waitFor(() => {
       expect(
@@ -79,7 +82,7 @@ describe("프로젝트 사용자·권한", () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByRole("tab", { name: "사용자·권한" }));
+    await user.click(within(await screen.findByRole("navigation", { name: "설정 메뉴" })).getByRole("button", { name: "사용자·권한" }));
 
     const members = await screen.findByRole("table", { name: "프로젝트 멤버" });
     // 시드: 김찬호 관리자 + 나머지 3명 편집자
@@ -102,7 +105,7 @@ describe("프로젝트 사용자·권한", () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByRole("tab", { name: "사용자·권한" }));
+    await user.click(within(await screen.findByRole("navigation", { name: "설정 메뉴" })).getByRole("button", { name: "사용자·권한" }));
     const members = await screen.findByRole("table", { name: "프로젝트 멤버" });
     const row = within(members).getByText("김찬호").closest("tr")!;
 
@@ -118,7 +121,7 @@ describe("프로젝트 사용자·권한", () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByRole("tab", { name: "사용자·권한" }));
+    await user.click(within(await screen.findByRole("navigation", { name: "설정 메뉴" })).getByRole("button", { name: "사용자·권한" }));
     const members = await screen.findByRole("table", { name: "프로젝트 멤버" });
     await user.click(within(members).getByRole("button", { name: "최다인 내보내기" }));
 
@@ -142,7 +145,8 @@ describe("워크플로 전이 편집", () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByRole("tab", { name: "워크플로" }));
+    const menu = await screen.findByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(menu).getByRole("button", { name: "워크플로" }));
     await user.click(await screen.findByRole("switch", { name: "이 프로젝트만 커스텀" }));
 
     // 기본 상태는 전이가 없다 — 자유 이동

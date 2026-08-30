@@ -13,6 +13,7 @@ import {
 import { recordProjectVisit } from "../store/uiStore";
 import { CreateIssueModal } from "./CreateIssueModal";
 import { GlobalSideNav } from "./GlobalSideNav";
+import { SettingsSideNav, isSettingsPath } from "./SettingsSideNav";
 import { NotificationsModal } from "./NotificationsModal";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
@@ -135,7 +136,12 @@ export function AppShell({ projects }: AppShellProps) {
         }
       />
       <div className="app-body">
-        <GlobalSideNav projects={projects} />
+        {/* 설정에 들어오면 전역 사이드바 자리를 설정 메뉴가 차지한다 — 지라의 프로젝트 설정 사이드바 */}
+        {isSettingsPath(location.pathname) ? (
+          <SettingsSideNav projects={projects} />
+        ) : (
+          <GlobalSideNav projects={projects} />
+        )}
         <div className="app-shell-content">
           <Outlet />
         </div>

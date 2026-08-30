@@ -10,7 +10,7 @@
 |---|---|---|
 | `/home` | HomePage | For you 홈: 인사말 → 이어서 하기 카드 → 추천 작업/나에게 배정됨/최근 업데이트/별표 탭 |
 | `/search` | SearchPage | 이슈 검색: 기본(필터 드롭다운)/스마트 2모드 → search.md |
-| `/settings` | GlobalSettingsPage | 전역 관리(⚙): 이슈 타입 스킴·워크플로 스킴 |
+| `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
 | `/projects` | ProjectListPage | 디렉터리: 테이블 기본(★/이름/키/이슈/생성일/⋯) + 카드 토글 + 검색 |
 | `/projects/new` | ProjectCreatePage | 템플릿(빈/스크럼/칸반/버그 트래킹) 미리보기 생성 |
 | `/projects/:id/board` | BoardRedirect | 기본 보드로 redirect (?issue 쿼리 보존) |
@@ -21,13 +21,18 @@
 | `/projects/:id/releases` | ReleasesPage(lazy) | 릴리스 허브: 버전 만들기·진행률·릴리스(미완료 이관 선택)·보관·삭제 |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
-| `/projects/:id/settings` | ProjectSettingsPage(lazy) | 일반/사용자·권한/워크플로(전이 캔버스)/이슈 타입 탭. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
+| `/projects/:id/settings/:section` | ProjectSettingsPage(lazy) | **프로젝트 뷰(ProjectLayout) 바깥의 별도 페이지.** 구획 `general`/`members`/`workflow`/`types`, `/settings`는 `general`로 redirect. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
 | 그 외 전부 | → `/home` | |
 
 이슈 상세는 페이지가 아니라 **`?issue=ALM-3` 쿼리로 여는 모달**(`useIssueModal` +
 `IssueDetailModal`) — 어느 화면에서든 URL 공유 가능.
 
 ## 셸 관례
+
+- **설정 라우트(`/settings/*`, `/projects/:id/settings/*`)에서는 전역 사이드바 자리를 설정 사이드바
+  (`SettingsSideNav`)가 차지한다** — 돌아가기 → 머리(무엇의 설정인가) → 구획 메뉴. 구획은 URL이
+  진실이라 새로고침·공유가 되고, 페이지 컴포넌트는 `useParams().section`으로 한 구획만 그린다.
+  판별은 `isSettingsPath`, 구획 목록은 `PROJECT_SETTINGS_SECTIONS`/`GLOBAL_SETTINGS_SECTIONS`.
 
 - 전역 사이드바: 최근/별표/프로젝트(보드 중첩)/필터 섹션. 프로젝트 행은 호버 시 ⋯ 메뉴(설정·이슈 목록), 접기(플로팅 엣지 셰브런),
   드래그 너비 조절(role="separator"). uiStore + `UI_CHANGED_EVENT` 구독으로 갱신.
