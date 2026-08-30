@@ -16,6 +16,8 @@ import type {
   StatusDef,
   StatusKind,
   WorkflowStatus,
+  IssueTypeDef,
+  IssueTypeLevel,
   IssueType,
   JiraData,
   Notification,
@@ -217,6 +219,11 @@ function normalize(data: JiraData): JiraData {
     }
   }
   data.statusDefs ??= [];
+  // 전역 이슈 타입 레지스트리 — 기본 5종은 항상 있다
+  data.issueTypes ??= BUILTIN_ISSUE_TYPES.map((t) => ({ ...t }));
+  for (const builtin of BUILTIN_ISSUE_TYPES) {
+    if (!data.issueTypes.some((t) => t.id === builtin.id)) data.issueTypes.push({ ...builtin });
+  }
   for (const body of allBodies(data)) {
     for (const status of body.statuses) {
       if (!data.statusDefs.some((d) => d.id === status.id)) {
@@ -415,13 +422,33 @@ const RESOLUTION_LABELS: Record<IssueResolution, string> = {
   cannot_reproduce: "재현 불가",
 };
 
-const TYPE_LABELS: Record<IssueType, string> = {
-  task: "작업",
-  story: "스토리",
-  bug: "버그",
-  epic: "에픽",
-  subtask: "하위 작업",
-};
+/** 기본 이슈 타입 — 계층은 고정, 이름·아이콘·색은 바꿀 수 있다 */
+const BUILTIN_ISSUE_TYPES: IssueTypeDef[] = [
+  { id: "task", name: "작업", icon: "check-square", color: "info", level: "standard", description: "", order: 1, builtIn: true },
+  { id: "story", name: "스토리", icon: "bookmark", color: "success", level: "standard", description: "", order: 2, builtIn: true },
+  { id: "bug", name: "버그", icon: "bug", color: "danger", level: "standard", description: "", order: 3, builtIn: true },
+  { id: "epic", name: "에픽", icon: "zap", color: "warning", level: "epic", description: "", order: 4, builtIn: true },
+  { id: "subtask", name: "하위 작업", icon: "list-tree", color: "neutral", level: "subtask", description: "", order: 5, builtIn: true },
+];
+
+/** 레지스트리 변경 알림 — 화면의 useIssueTypes가 듣는다 */
+export const ISSUE_TYPES_CHANGED_EVENT = "alm:issue-types-changed";
+function notifyIssueTypesChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(ISSUE_TYPES_CHANGED_EVENT));
+}
+
+function typeDefOf(data: JiraData, id: string): IssueTypeDef | undefined {
+  return data.issueTypes.find((t) => t.id === id) ?? BUILTIN_ISSUE_TYPES.find((t) => t.id === id);
+}
+
+/** 타입 id → 계층. 모르는 id는 일반으로 본다 */
+function typeLevelOf(data: JiraData, id: string): IssueTypeLevel {
+  return typeDefOf(data, id)?.level ?? "standard";
+}
+
+function typeNameOf(data: JiraData, id: string): string {
+  return typeDefOf(data, id)?.name ?? id;
+}
 
 /**
  * 2단계 계층 규칙 — 위반이면 throw.
@@ -435,14 +462,14 @@ function assertParentAllowed(data: JiraData, issue: Issue, parentId: string | nu
   if (parent.projectId !== issue.projectId) {
     throw new Error("같은 프로젝트의 이슈만 부모로 지정할 수 있습니다");
   }
-  if (issue.type === "epic") throw new Error("에픽은 부모를 가질 수 없습니다");
-  if (issue.type === "subtask") {
-    if (parent.type === "epic" || parent.type === "subtask") {
-      throw new Error("하위 작업의 부모는 일반 이슈여야 합니다");
-    }
+  const level = typeLevelOf(data, issue.type);
+  const parentLevel = typeLevelOf(data, parent.type);
+  if (level === "epic") throw new Error("에픽은 부모를 가질 수 없습니다");
+  if (level === "subtask") {
+    if (parentLevel !== "standard") throw new Error("하위 작업의 부모는 일반 이슈여야 합니다");
     return;
   }
-  if (parent.type !== "epic") throw new Error("일반 이슈의 부모는 에픽이어야 합니다");
+  if (parentLevel !== "epic") throw new Error("일반 이슈의 부모는 에픽이어야 합니다");
 }
 
 function userLabel(data: JiraData, userId: string | null): string {
@@ -631,7 +658,7 @@ function recordChanges(data: JiraData, before: Issue, after: Issue, at: string):
     push("labels", after.labels.length > 0 ? after.labels.join(", ") : "라벨 없음");
   }
   if (before.type !== after.type) {
-    push("issuetype", `${TYPE_LABELS[before.type]} → ${TYPE_LABELS[after.type]}`);
+    push("issuetype", `${typeNameOf(data, before.type)} → ${typeNameOf(data, after.type)}`);
   }
   if (before.resolution !== after.resolution) {
     const label = (r: IssueResolution | null) => (r ? RESOLUTION_LABELS[r] : "없음");
@@ -1286,9 +1313,14 @@ export async function createIssue(input: {
     data.schemes.find((s) => s.id === settingsEntryForCreate?.schemeId)?.body.enabledTypes ??
     defaultSettingsBody().enabledTypes;
   const resolvedType =
-    input.type ?? (enabledTypes.includes("task") ? "task" : enabledTypes.find((t) => t !== "subtask")!);
-  if (resolvedType !== "subtask" && !enabledTypes.includes(resolvedType)) {
-    throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${TYPE_LABELS[resolvedType]}`);
+    input.type ??
+    (enabledTypes.includes("task")
+      ? "task"
+      : enabledTypes.find((t) => typeLevelOf(data, t) !== "subtask")!);
+  if (!typeDefOf(data, resolvedType)) throw new Error(`없는 이슈 타입입니다: ${resolvedType}`);
+  // 하위 작업 계층은 계층 기능이라 활성 목록과 무관하게 허용
+  if (typeLevelOf(data, resolvedType) !== "subtask" && !enabledTypes.includes(resolvedType)) {
+    throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${typeNameOf(data, resolvedType)}`);
   }
   assertCanEdit(data, project.id);
   if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
@@ -1388,17 +1420,20 @@ export async function updateIssue(
       entry?.custom?.enabledTypes ??
       data.schemes.find((s) => s.id === entry?.schemeId)?.body.enabledTypes ??
       defaultSettingsBody().enabledTypes;
-    if (patch.type !== "subtask" && !enabled.includes(patch.type)) {
-      throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${TYPE_LABELS[patch.type]}`);
+    if (!typeDefOf(data, patch.type)) throw new Error(`없는 이슈 타입입니다: ${patch.type}`);
+    const nextLevel = typeLevelOf(data, patch.type);
+    if (nextLevel !== "subtask" && !enabled.includes(patch.type)) {
+      throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${typeNameOf(data, patch.type)}`);
     }
     const children = data.issues.filter((i) => i.parentId === issue.id);
     if (children.length > 0) {
+      const childLevels = children.map((c) => typeLevelOf(data, c.type));
       const childrenAllowed =
-        patch.type === "epic"
-          ? children.every((c) => c.type !== "subtask" && c.type !== "epic")
-          : patch.type === "subtask"
+        nextLevel === "epic"
+          ? childLevels.every((l) => l === "standard")
+          : nextLevel === "subtask"
             ? false // 하위 작업은 자식을 가질 수 없다
-            : children.every((c) => c.type === "subtask");
+            : childLevels.every((l) => l === "subtask");
       if (!childrenAllowed) throw new Error("하위 이슈가 있어 타입을 변경할 수 없습니다");
     }
   }
@@ -1778,10 +1813,13 @@ function validateSettingsBody(data: JiraData, body: SettingsBody): void {
       throw new Error("카테고리(할 일/진행 중/완료)마다 상태가 최소 1개 필요합니다");
     }
   }
+  for (const type of body.enabledTypes) {
+    if (!typeDefOf(data, type)) throw new Error(`없는 이슈 타입입니다: ${type}`);
+  }
   if (!body.enabledTypes.includes("subtask")) {
     throw new Error("하위 작업 타입은 비활성화할 수 없습니다");
   }
-  if (!body.enabledTypes.some((t) => t !== "subtask")) {
+  if (!body.enabledTypes.some((t) => typeLevelOf(data, t) !== "subtask")) {
     throw new Error("이슈 타입은 최소 1개 활성화해야 합니다");
   }
 }
@@ -2174,6 +2212,116 @@ export async function deleteStatusDef(id: string): Promise<void> {
   }
   data.statusDefs = data.statusDefs.filter((d) => d.id !== id);
   persist();
+}
+
+// ── 이슈 타입 레지스트리 (전역) ───────────────────────────────
+
+export async function listIssueTypes(): Promise<IssueTypeDef[]> {
+  return clone([...load().issueTypes].sort((a, b) => a.order - b.order));
+}
+
+/** 타입 id → 쓰는 이슈 수 */
+export async function issueTypeUsage(): Promise<Record<string, number>> {
+  const data = load();
+  const usage: Record<string, number> = {};
+  for (const type of data.issueTypes) usage[type.id] = 0;
+  for (const issue of data.issues) usage[issue.type] = (usage[issue.type] ?? 0) + 1;
+  return usage;
+}
+
+export async function createIssueType(input: {
+  name: string;
+  level: IssueTypeLevel;
+  icon: string;
+  color: IssueTypeDef["color"];
+  description?: string;
+}): Promise<IssueTypeDef> {
+  const data = load();
+  const name = input.name.trim();
+  if (!name) throw new Error("이슈 타입 이름을 입력하세요");
+  if (data.issueTypes.some((t) => t.name === name)) {
+    throw new Error(`이슈 타입 이름이 중복됩니다: ${name}`);
+  }
+  const def: IssueTypeDef = {
+    id: `it-${nextId().slice(0, 8)}`,
+    name,
+    icon: input.icon,
+    color: input.color,
+    level: input.level,
+    description: input.description?.trim() ?? "",
+    order: data.issueTypes.length + 1,
+    builtIn: false,
+  };
+  data.issueTypes.push(def);
+  persist();
+  notifyIssueTypesChanged();
+  return clone(def);
+}
+
+export async function updateIssueType(
+  id: string,
+  patch: Partial<Pick<IssueTypeDef, "name" | "icon" | "color" | "level" | "description">>,
+): Promise<IssueTypeDef> {
+  const data = load();
+  const def = data.issueTypes.find((t) => t.id === id);
+  if (!def) throw new Error("이슈 타입을 찾을 수 없습니다");
+  if (patch.level !== undefined && patch.level !== def.level) {
+    if (def.builtIn) throw new Error("기본 이슈 타입의 계층은 바꿀 수 없습니다");
+    // 계층은 부모-자식 규칙의 근거 — 쓰는 이슈가 있으면 기존 계층이 깨진다
+    if (data.issues.some((i) => i.type === id)) {
+      throw new Error("이 타입을 쓰는 이슈가 있어 계층을 바꿀 수 없습니다");
+    }
+    def.level = patch.level;
+  }
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("이슈 타입 이름을 입력하세요");
+    if (data.issueTypes.some((t) => t.id !== id && t.name === name)) {
+      throw new Error(`이슈 타입 이름이 중복됩니다: ${name}`);
+    }
+    def.name = name;
+  }
+  if (patch.icon !== undefined) def.icon = patch.icon;
+  if (patch.color !== undefined) def.color = patch.color;
+  if (patch.description !== undefined) def.description = patch.description.trim();
+  persist();
+  notifyIssueTypesChanged();
+  return clone(def);
+}
+
+export async function moveIssueType(id: string, delta: -1 | 1): Promise<void> {
+  const data = load();
+  const sorted = [...data.issueTypes].sort((a, b) => a.order - b.order);
+  const index = sorted.findIndex((t) => t.id === id);
+  if (index < 0) throw new Error("이슈 타입을 찾을 수 없습니다");
+  const target = index + delta;
+  if (target < 0 || target >= sorted.length) return;
+  [sorted[index], sorted[target]] = [sorted[target], sorted[index]];
+  sorted.forEach((t, i) => {
+    t.order = i + 1;
+  });
+  persist();
+  notifyIssueTypesChanged();
+}
+
+/** 삭제 — 쓰는 이슈가 없어야 하고, 스킴/커스텀의 활성 목록에서도 함께 빠진다 */
+export async function deleteIssueType(id: string): Promise<void> {
+  const data = load();
+  const def = data.issueTypes.find((t) => t.id === id);
+  if (!def) throw new Error("이슈 타입을 찾을 수 없습니다");
+  if (def.builtIn) throw new Error("기본 이슈 타입은 삭제할 수 없습니다");
+  if (data.issues.some((i) => i.type === id)) throw new Error("이 타입을 쓰는 이슈가 있습니다");
+  data.issueTypes = data.issueTypes.filter((t) => t.id !== id);
+  [...data.issueTypes]
+    .sort((a, b) => a.order - b.order)
+    .forEach((t, i) => {
+      t.order = i + 1;
+    });
+  for (const body of allBodies(data)) {
+    body.enabledTypes = body.enabledTypes.filter((t) => t !== id);
+  }
+  persist();
+  notifyIssueTypesChanged();
 }
 
 // ── boards ───────────────────────────────────────────────────

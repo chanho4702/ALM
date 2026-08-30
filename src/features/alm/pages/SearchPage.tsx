@@ -36,14 +36,13 @@ import { EMPTY_QUERY, parseSmartQuery, queryTokens, serializeQuery } from "../st
 import { saveFilter } from "../store/uiStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { useIssueTypes } from "../components/useIssueTypes";
 import { FilterDropdown } from "../components/FilterDropdown";
 import {
-  ISSUE_TYPES,
   PRIORITY_APPEARANCE,
   PRIORITY_LABELS,
   statusAppearance,
   statusName,
-  TYPE_LABELS,
 } from "../components/labels";
 
 const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
@@ -63,6 +62,7 @@ const SORT_OPTIONS: { value: IssueQuery["sort"]; label: string }[] = [
  * 진실은 어느 모드든 URL의 q 문자열 하나다.
  */
 export function SearchPage() {
+  const issueTypes = useIssueTypes();
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") ?? "";
   const [mode, setMode] = useState<"basic" | "smart">("basic");
@@ -299,7 +299,7 @@ export function SearchPage() {
           />
           <FilterDropdown
             label="타입"
-            options={ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+            options={issueTypes.map((t) => ({ value: t.id, label: t.name }))}
             selected={query.types}
             onToggle={(v) =>
               setQuery({ ...query, types: toggled(query.types, v) as IssueType[] })

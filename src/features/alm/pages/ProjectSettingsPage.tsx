@@ -37,13 +37,14 @@ import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
+import { useIssueTypes } from "../components/useIssueTypes";
 import {
   PROJECT_SETTINGS_SECTIONS,
   isProjectSettingsSection,
 } from "../components/SettingsSideNav";
 import {
-  ISSUE_TYPES,
-  TYPE_LABELS,
+  typeAppearance,
+  typeName,
 } from "../components/labels";
 
 export interface ProjectSettingsPageProps {
@@ -58,6 +59,7 @@ export interface ProjectSettingsPageProps {
  */
 export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSettingsPageProps) {
   const { projectId, section = "general" } = useParams();
+  const issueTypes = useIssueTypes();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -302,10 +304,10 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             }}
           >
             <div className="board-settings-checks" role="group" aria-label="이슈 타입">
-              {ISSUE_TYPES.map((type) => (
+              {issueTypes.map(({ id: type, name }) => (
                 <Checkbox
                   key={type}
-                  label={TYPE_LABELS[type]}
+                  label={name}
                   checked={typesDraft.includes(type)}
                   disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
                   onCheckedChange={() =>
@@ -323,8 +325,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         ) : (
           <div className="admin-scheme-preview" data-testid="types-readonly">
             {resolved.body.enabledTypes.map((type) => (
-              <Lozenge key={type} appearance="neutral">
-                {TYPE_LABELS[type]}
+              <Lozenge key={type} appearance={typeAppearance(issueTypes, type)}>
+                {typeName(issueTypes, type)}
               </Lozenge>
             ))}
           </div>

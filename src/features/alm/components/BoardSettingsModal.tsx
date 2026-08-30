@@ -4,7 +4,7 @@ import { Button, Checkbox, Modal, Select, Switch, TextField, useToast } from "@c
 import type { Board, BoardSwimlane, IssueType, User, WorkflowStatus } from "../store/types";
 import { deleteBoard, updateBoard } from "../store/jiraStore";
 import { UI_CHANGED_EVENT } from "../store/uiStore";
-import { ISSUE_TYPES, TYPE_LABELS } from "./labels";
+import { useIssueTypes } from "./useIssueTypes";
 
 const SWIMLANE_OPTIONS: { value: BoardSwimlane; label: string }[] = [
   { value: "none", label: "없음" },
@@ -42,6 +42,7 @@ export function BoardSettingsModal({
   const [name, setName] = useState(board.name);
   const [assigneeIds, setAssigneeIds] = useState<string[]>(board.filter.assigneeIds);
   const [types, setTypes] = useState<IssueType[]>(board.filter.types);
+  const issueTypes = useIssueTypes();
   const [labels, setLabels] = useState<string[]>(board.filter.labels);
   const [columns, setColumns] = useState(board.columns);
   const [swimlane, setSwimlane] = useState<BoardSwimlane>(board.swimlane);
@@ -142,10 +143,10 @@ export function BoardSettingsModal({
               />
             </div>
             <div className="board-settings-checks" role="group" aria-label="타입 필터">
-              {ISSUE_TYPES.map((type) => (
+              {issueTypes.map(({ id: type, name }) => (
                 <Checkbox
                   key={type}
-                  label={TYPE_LABELS[type]}
+                  label={name}
                   checked={types.includes(type)}
                   onCheckedChange={() => setTypes((prev) => toggle(prev, type))}
                 />

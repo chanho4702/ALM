@@ -3,10 +3,12 @@ import type {
   IssuePriority,
   IssueResolution,
   IssueStatus,
-  IssueType,
   StatusColor,
   StatusKind,
   WorkflowStatus,
+  BuiltinIssueType,
+  IssueTypeDef,
+  IssueTypeLevel,
 } from "../store/types";
 
 type LozengeAppearance = NonNullable<LozengeProps["appearance"]>;
@@ -108,9 +110,59 @@ export const CATEGORY_ORDER: Record<IssueStatus, number> = { todo: 0, inprogress
 
 // ── 이슈 타입 (지라: 작업 파랑 / 스토리 초록 / 버그 빨강 / 에픽 보라≈주황) ──
 
-export const ISSUE_TYPES: IssueType[] = ["task", "story", "bug", "epic", "subtask"];
+export const ISSUE_TYPES: BuiltinIssueType[] = ["task", "story", "bug", "epic", "subtask"];
 
-export const TYPE_LABELS: Record<IssueType, string> = {
+// ── 이슈 타입 레지스트리 헬퍼 — 목록이 없거나 못 찾으면 기본 5종으로 폴백 ──
+
+export const TYPE_LEVELS: IssueTypeLevel[] = ["epic", "standard", "subtask"];
+export const TYPE_LEVEL_LABELS: Record<IssueTypeLevel, string> = {
+  epic: "상위(에픽)",
+  standard: "일반",
+  subtask: "하위 작업",
+};
+const BUILTIN_TYPE_LEVEL: Record<BuiltinIssueType, IssueTypeLevel> = {
+  task: "standard",
+  story: "standard",
+  bug: "standard",
+  epic: "epic",
+  subtask: "subtask",
+};
+const BUILTIN_TYPE_ICON: Record<BuiltinIssueType, string> = {
+  task: "check-square",
+  story: "bookmark",
+  bug: "bug",
+  epic: "zap",
+  subtask: "list-tree",
+};
+const BUILTIN_TYPE_SET = new Set<string>(ISSUE_TYPES);
+const isBuiltinType = (id: string): id is BuiltinIssueType => BUILTIN_TYPE_SET.has(id);
+
+export function typeName(types: IssueTypeDef[] | undefined, id: string): string {
+  const def = types?.find((t) => t.id === id);
+  if (def) return def.name;
+  return isBuiltinType(id) ? TYPE_LABELS[id] : id;
+}
+
+/** 타입 id → 계층 (부모-자식 규칙·만들기 후보의 기준) */
+export function typeLevel(types: IssueTypeDef[] | undefined, id: string): IssueTypeLevel {
+  const def = types?.find((t) => t.id === id);
+  if (def) return def.level;
+  return isBuiltinType(id) ? BUILTIN_TYPE_LEVEL[id] : "standard";
+}
+
+export function typeIcon(types: IssueTypeDef[] | undefined, id: string): string {
+  const def = types?.find((t) => t.id === id);
+  if (def) return def.icon;
+  return isBuiltinType(id) ? BUILTIN_TYPE_ICON[id] : "check-square";
+}
+
+export function typeAppearance(types: IssueTypeDef[] | undefined, id: string): LozengeAppearance {
+  const def = types?.find((t) => t.id === id);
+  if (def) return def.color;
+  return isBuiltinType(id) ? TYPE_APPEARANCE[id] : "neutral";
+}
+
+export const TYPE_LABELS: Record<BuiltinIssueType, string> = {
   task: "작업",
   story: "스토리",
   bug: "버그",
@@ -118,7 +170,7 @@ export const TYPE_LABELS: Record<IssueType, string> = {
   subtask: "하위 작업",
 };
 
-export const TYPE_APPEARANCE: Record<IssueType, LozengeAppearance> = {
+export const TYPE_APPEARANCE: Record<BuiltinIssueType, LozengeAppearance> = {
   task: "info",
   story: "success",
   bug: "danger",
@@ -127,7 +179,7 @@ export const TYPE_APPEARANCE: Record<IssueType, LozengeAppearance> = {
 };
 
 /** 카드/행에 쓰는 한 글자 글리프 — 지라 타입 아이콘 대응 */
-export const TYPE_GLYPHS: Record<IssueType, string> = {
+export const TYPE_GLYPHS: Record<BuiltinIssueType, string> = {
   task: "✓",
   story: "◆",
   bug: "●",

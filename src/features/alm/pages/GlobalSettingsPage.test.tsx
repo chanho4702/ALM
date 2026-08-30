@@ -226,3 +226,25 @@ describe("상태 카테고리·상태 레지스트리", () => {
     expect(await within(await screen.findByTestId("scheme-list")).findByText("작업 중")).toBeInTheDocument();
   });
 });
+
+describe("이슈 타입 레지스트리", () => {
+  it("타입을 추가하면 스킴 편집 체크박스에 나타나고, 기본 타입은 지울 수 없다", async () => {
+    const user = userEvent.setup();
+    renderSettings("/settings/issue-types");
+    const list = await screen.findByRole("list", { name: "이슈 타입 목록" });
+    expect(await within(list).findByRole("button", { name: "버그 삭제" })).toBeDisabled();
+    expect(within(list).getByRole("combobox", { name: "에픽 계층" })).toBeDisabled();
+
+    await user.type(screen.getByLabelText("새 타입 이름"), "개선");
+    await user.click(screen.getByRole("button", { name: "타입 추가" }));
+    expect(await screen.findByText("이슈 타입을 추가했습니다")).toBeInTheDocument();
+    expect(within(list).getByRole("img", { name: "개선" })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "개선 삭제" })).toBeEnabled();
+
+    const menu = screen.getByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(menu).getByRole("button", { name: "이슈 타입 스킴" }));
+    await user.click(await screen.findByRole("button", { name: "이슈 타입 편집" }));
+    const dialog = await screen.findByRole("dialog", { name: /이슈 타입 — 기본 스킴/ });
+    expect(within(dialog).getByRole("checkbox", { name: "개선" })).not.toBeChecked();
+  });
+});

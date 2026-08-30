@@ -223,6 +223,14 @@ export function createSeedData(): JiraData {
       { id: "inprogress", name: "진행 중", categoryId: "inprogress", description: "" },
       { id: "done", name: "완료", categoryId: "done", description: "" },
     ],
+    // 전역 이슈 타입 레지스트리 — 기본 5종 (계층·아이콘·색)
+    issueTypes: [
+      { id: "task", name: "작업", icon: "check-square", color: "info" as const, level: "standard" as const, description: "", order: 1, builtIn: true },
+      { id: "story", name: "스토리", icon: "bookmark", color: "success" as const, level: "standard" as const, description: "", order: 2, builtIn: true },
+      { id: "bug", name: "버그", icon: "bug", color: "danger" as const, level: "standard" as const, description: "", order: 3, builtIn: true },
+      { id: "epic", name: "에픽", icon: "zap", color: "warning" as const, level: "epic" as const, description: "", order: 4, builtIn: true },
+      { id: "subtask", name: "하위 작업", icon: "list-tree", color: "neutral" as const, level: "subtask" as const, description: "", order: 5, builtIn: true },
+    ],
     // 지라식 설정 스킴 — 디폴트 스킴에 전 프로젝트 배정 (상태 id = 기존 status 값)
     schemes: [
       {

@@ -1,0 +1,75 @@
+import {
+  Bell,
+  Bookmark,
+  Bug,
+  CheckSquare,
+  Database,
+  FileText,
+  Flag,
+  FlaskConical,
+  Layers,
+  Lightbulb,
+  ListTree,
+  MessageSquare,
+  Paintbrush,
+  Puzzle,
+  Rocket,
+  ShieldAlert,
+  Star,
+  Target,
+  Wrench,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+/**
+ * 이슈 타입 아이콘 — lucide 전체를 번들에 넣지 않으려고 고른 목록만 이름으로 매핑한다.
+ * 레지스트리(`IssueTypeDef.icon`)는 이 키를 저장한다. 없는 키는 체크 박스로 폴백.
+ */
+export const TYPE_ICONS: Record<string, LucideIcon> = {
+  "check-square": CheckSquare,
+  bookmark: Bookmark,
+  bug: Bug,
+  zap: Zap,
+  "list-tree": ListTree,
+  flag: Flag,
+  lightbulb: Lightbulb,
+  wrench: Wrench,
+  "shield-alert": ShieldAlert,
+  "file-text": FileText,
+  star: Star,
+  layers: Layers,
+  target: Target,
+  rocket: Rocket,
+  bell: Bell,
+  database: Database,
+  "message-square": MessageSquare,
+  paintbrush: Paintbrush,
+  flask: FlaskConical,
+  puzzle: Puzzle,
+};
+
+export const TYPE_ICON_OPTIONS: { value: string; label: string }[] = [
+  { value: "check-square", label: "체크" },
+  { value: "bookmark", label: "책갈피" },
+  { value: "bug", label: "벌레" },
+  { value: "zap", label: "번개" },
+  { value: "list-tree", label: "트리" },
+  { value: "flag", label: "깃발" },
+  { value: "lightbulb", label: "전구" },
+  { value: "wrench", label: "렌치" },
+  { value: "shield-alert", label: "방패" },
+  { value: "file-text", label: "문서" },
+  { value: "star", label: "별" },
+  { value: "layers", label: "레이어" },
+  { value: "target", label: "과녁" },
+  { value: "rocket", label: "로켓" },
+  { value: "bell", label: "종" },
+  { value: "database", label: "데이터" },
+  { value: "message-square", label: "말풍선" },
+  { value: "paintbrush", label: "붓" },
+  { value: "flask", label: "플라스크" },
+  { value: "puzzle", label: "퍼즐" },
+];
+
+export const DEFAULT_TYPE_ICON = "check-square";

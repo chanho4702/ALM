@@ -35,6 +35,8 @@ export interface QueryContext {
   projects: Project[];
   /** 전체 워크플로 상태(스킴+커스텀 합집합) — 상태 이름 검색용. 없으면 카테고리만 매치 */
   statuses?: { id: string; name: string }[];
+  /** 전역 이슈 타입 레지스트리 — 사용자 타입 이름 검색용. 없으면 기본 5종만 매치 */
+  types?: { id: string; name: string }[];
 }
 
 // 한국어 라벨 ↔ 값 매핑 (스마트 구문의 어휘)
@@ -152,7 +154,7 @@ export function parseSmartQuery(input: string, ctx: QueryContext): IssueQuery {
         break;
       }
       case "타입": {
-        const type = TYPE_BY_LABEL[value];
+        const type = TYPE_BY_LABEL[value] ?? ctx.types?.find((t) => t.name === value)?.id;
         if (type) push(query.types, type);
         else textParts.push(raw);
         break;
@@ -203,7 +205,9 @@ export function serializeQuery(query: IssueQuery, ctx: QueryContext): string {
     if (named) parts.push(`상태:${named.name.replace(/\s+/g, "")}`); // 토큰은 공백 불가 — 파서가 공백 제거 이름도 매치
   }
   for (const priority of query.priorities) parts.push(`우선순위:${PRIORITY_LABELS[priority]}`);
-  for (const type of query.types) parts.push(`타입:${TYPE_LABELS[type]}`);
+  for (const type of query.types) {
+    parts.push(`타입:${TYPE_LABELS[type] ?? ctx.types?.find((t) => t.id === type)?.name ?? type}`);
+  }
   for (const id of query.assigneeIds) {
     if (id === "unassigned") {
       parts.push("담당:미지정");

@@ -3,7 +3,13 @@ import type { FormEvent } from "react";
 import { Button, Modal, Select, TextArea, TextField, useToast } from "@chanho/react";
 import type { Issue, IssuePriority, IssueType, Project, User } from "../store/types";
 import { createIssue, listUsers, resolveSettings } from "../store/jiraStore";
-import { ISSUE_TYPES, PRIORITY_LABELS, TYPE_LABELS } from "./labels";
+import {
+  ISSUE_TYPES,
+  PRIORITY_LABELS,
+  typeLevel,
+  typeName,
+} from "./labels";
+import { useIssueTypes } from "./useIssueTypes";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const UNASSIGNED = "unassigned";
@@ -33,6 +39,7 @@ export function CreateIssueModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<IssueType>("task");
+  const issueTypes = useIssueTypes();
   /** 선택한 프로젝트의 활성 타입 (설정 스킴) — subtask는 상세에서만 */
   const [enabledTypes, setEnabledTypes] = useState<IssueType[]>(
     ISSUE_TYPES.filter((t) => t !== "subtask"),
@@ -57,14 +64,17 @@ export function CreateIssueModal({
     let cancelled = false;
     void resolveSettings(projectId).then(({ body }) => {
       if (cancelled) return;
-      const creatable: IssueType[] = body.enabledTypes.filter((t) => t !== "subtask");
+      // 하위 작업 계층은 부모 필수라 상세의 "하위 작업 추가" 전용
+      const creatable: IssueType[] = body.enabledTypes.filter(
+        (t) => typeLevel(issueTypes, t) !== "subtask",
+      );
       setEnabledTypes(creatable);
       setType((prev) => (creatable.includes(prev) ? prev : creatable[0]));
     });
     return () => {
       cancelled = true;
     };
-  }, [open, projectId]);
+  }, [open, projectId, issueTypes]);
 
   const reset = () => {
     setTitle("");
@@ -142,8 +152,8 @@ export function CreateIssueModal({
             label="타입"
             value={type}
             // 프로젝트 설정의 활성 타입만. 하위 작업은 부모 필수라 상세의 "하위 작업 추가" 전용
-            options={enabledTypes.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
-            onValueChange={(v) => setType(v as IssueType)}
+            options={enabledTypes.map((t) => ({ value: t, label: typeName(issueTypes, t) }))}
+            onValueChange={setType}
           />
           <Select
             label="우선순위"

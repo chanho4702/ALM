@@ -57,16 +57,17 @@ import {
 } from "../store/jiraStore";
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { useIssueTypes } from "./useIssueTypes";
 import { IssueAttachments } from "./IssueAttachments";
 import {
   ISSUE_TYPES,
   PRIORITY_LABELS,
   RESOLUTIONS,
   RESOLUTION_LABELS,
-  TYPE_LABELS,
   statusAppearance,
   statusKind,
   statusName,
+  typeLevel,
 } from "./labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -111,6 +112,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [links, setLinks] = useState<IssueLinkView[]>([]);
   const [worklogs, setWorklogs] = useState<Worklog[]>([]);
   const [enabledTypes, setEnabledTypes] = useState<IssueType[]>([...ISSUE_TYPES]);
+  const issueTypes = useIssueTypes();
+  const levelOf = (typeId: string) => typeLevel(issueTypes, typeId);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [worklogHours, setWorklogHours] = useState("");
   const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -479,9 +482,9 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
 
   /** 부모 후보 — 하위 작업은 일반 이슈, 일반 이슈는 에픽 (자기 제외) */
   const parentCandidates =
-    issue.type === "subtask"
-      ? projectIssues.filter((i) => i.id !== issue.id && i.type !== "epic" && i.type !== "subtask")
-      : projectIssues.filter((i) => i.type === "epic");
+    levelOf(issue.type) === "subtask"
+      ? projectIssues.filter((i) => i.id !== issue.id && levelOf(i.type) === "standard")
+      : projectIssues.filter((i) => levelOf(i.type) === "epic");
 
   const linkGroups: { title: string; items: IssueLinkView[] }[] = [
     {
@@ -539,7 +542,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           />
 
           {/* 하위 이슈 — 에픽/일반 이슈에 표시 (하위 작업은 자식을 가질 수 없다) */}
-          {issue.type !== "subtask" ? (
+          {levelOf(issue.type) !== "subtask" ? (
             <section className="issue-relations" data-testid="issue-children">
               <h4>
                 하위 이슈{" "}
@@ -567,7 +570,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   </li>
                 ))}
               </ul>
-              {issue.type !== "epic" ? (
+              {levelOf(issue.type) !== "epic" ? (
                 <form className="issue-relation-add" onSubmit={handleSubtaskSubmit}>
                   <TextField
                     label="하위 작업 추가"
@@ -659,10 +662,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             label="타입"
             value={issue.type}
             // 프로젝트 설정의 활성 타입만 — 현재 값이 비활성이어도 표시를 위해 포함
-            options={ISSUE_TYPES.filter(
-              (t) => enabledTypes.includes(t) || t === issue.type,
-            ).map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
-            onValueChange={(v) => void applyPatch({ type: v as IssueType }, "타입을 변경했습니다")}
+            options={issueTypes
+              .filter((t) => enabledTypes.includes(t.id) || t.id === issue.type)
+              .map((t) => ({ value: t.id, label: t.name }))}
+            onValueChange={(v) => void applyPatch({ type: v }, "타입을 변경했습니다")}
           />
           <Select
             label="상태"
@@ -681,7 +684,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               }
             />
           ) : null}
-          {issue.type !== "epic" ? (
+          {levelOf(issue.type) !== "epic" ? (
             <Select
               label="부모"
               value={issue.parentId ?? NO_PARENT}

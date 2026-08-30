@@ -95,7 +95,10 @@ const PRIORITIES_TO_API: Record<IssuePriority, IssuePriorityDto> = {
 };
 
 export function toApiIssueType(type: IssueType): IssueTypeDto {
-  return ISSUE_TYPES_TO_API[type];
+  const dto = ISSUE_TYPES_TO_API[type];
+  // 서버의 IssueType은 아직 enum — 사용자 정의 타입은 서버 이관(V9)까지 목업 전용이다
+  if (!dto) throw new Error("서버가 아직 사용자 정의 이슈 타입을 지원하지 않습니다");
+  return dto;
 }
 
 export interface SprintDto {

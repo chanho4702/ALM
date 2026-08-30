@@ -1055,6 +1055,27 @@ body {
   grid-template-columns: minmax(0, 1fr) 180px 180px auto;
 }
 
+.status-editor-add.status-editor-add--4 {
+  grid-template-columns: minmax(0, 1fr) 150px 150px 150px auto;
+}
+
+/* 이슈 타입 행 — 글리프 · 이름 · 계층/아이콘/색 · 사용 수 · 액션 */
+.status-editor-row--type {
+  grid-template-columns: 32px minmax(120px, 1fr) 170px 170px 180px auto auto;
+  align-items: end;
+}
+
+.status-editor-row--type .status-editor-usage,
+.status-editor-row--type .status-editor-row-actions,
+.status-editor-row--type .status-editor-glyph {
+  margin-bottom: var(--chanho-space-100);
+}
+
+.status-editor-glyph {
+  display: inline-flex;
+  justify-content: center;
+}
+
 .status-editor-row > span:first-child {
   margin-bottom: var(--chanho-space-100);
 }
@@ -1077,8 +1098,10 @@ body {
   .status-editor-row,
   .status-editor-row--category,
   .status-editor-row--registry,
+  .status-editor-row--type,
   .status-editor-add,
-  .status-editor-add--3 {
+  .status-editor-add--3,
+  .status-editor-add--4 {
     grid-template-columns: 1fr;
     align-items: stretch;
   }
@@ -1411,20 +1434,25 @@ body {
   line-height: 1;
 }
 
-.issue-type-glyph.type-task {
+/* 레지스트리의 색(StatusColor)을 그대로 배경으로 — 아이콘은 lucide */
+.issue-type-glyph.is-info {
   background: var(--chanho-color-background-info);
 }
 
-.issue-type-glyph.type-story {
+.issue-type-glyph.is-success {
   background: var(--chanho-color-background-success);
 }
 
-.issue-type-glyph.type-bug {
+.issue-type-glyph.is-danger {
   background: var(--chanho-color-background-danger);
 }
 
-.issue-type-glyph.type-epic {
+.issue-type-glyph.is-warning {
   background: var(--chanho-color-background-warning);
+}
+
+.issue-type-glyph.is-neutral {
+  background: var(--chanho-color-text-subtle);
 }
 
 /* 지연된 마감일 — 완료 전인데 날짜가 지났다 */

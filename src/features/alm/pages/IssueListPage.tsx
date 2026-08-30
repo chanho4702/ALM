@@ -15,12 +15,11 @@ import type { Issue, IssuePriority, IssueType, User, WorkflowStatus } from "../s
 import { listIssues, listProjectStatuses, listUsers } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { useIssueTypes } from "../components/useIssueTypes";
 import {
-  ISSUE_TYPES,
   KIND_ORDER,
   PRIORITY_APPEARANCE,
   PRIORITY_LABELS,
-  TYPE_LABELS,
   statusAppearance,
   statusKind,
   statusName,
@@ -35,6 +34,7 @@ const PRIORITY_ORDER: Record<IssuePriority, number> = { high: 0, medium: 1, low:
 
 export function IssueListPage() {
   const { projectId } = useParams();
+  const issueTypes = useIssueTypes();
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
   const [users, setUsers] = useState<User[]>([]);
   const [text, setText] = useState("");
@@ -288,7 +288,7 @@ export function IssueListPage() {
             onValueChange={setType}
             options={[
               { value: ALL, label: "전체" },
-              ...ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] })),
+              ...issueTypes.map((t) => ({ value: t.id, label: t.name })),
             ]}
           />
         </div>

@@ -55,7 +55,25 @@ export interface StatusDef {
   description: string;
 }
 export type IssuePriority = "high" | "medium" | "low";
-export type IssueType = "task" | "story" | "bug" | "epic" | "subtask";
+/** 기본 이슈 타입 id 5종 — 시드·템플릿·REST 매핑이 쓴다. 사용자 타입은 `it-*` */
+export type BuiltinIssueType = "task" | "story" | "bug" | "epic" | "subtask";
+/** 이슈 타입 id — 레지스트리(`IssueTypeDef`)가 진실 */
+export type IssueType = string;
+/** 타입의 계층 — 부모-자식 규칙의 근거 (상위 → 일반 → 하위 작업) */
+export type IssueTypeLevel = "epic" | "standard" | "subtask";
+
+/** 전역 이슈 타입 레지스트리 항목 — 기본 5종은 계층을 바꾸거나 지울 수 없다 */
+export interface IssueTypeDef {
+  id: string;
+  name: string;
+  /** typeIcons.tsx의 키 */
+  icon: string;
+  color: StatusColor;
+  level: IssueTypeLevel;
+  description: string;
+  order: number;
+  builtIn: boolean;
+}
 /** 해결 — "왜 끝났는가". 지라 기본 4종. 완료 카테고리에서만 값을 갖고, 다시 열면 비워진다 */
 export type IssueResolution = "done" | "wont_do" | "duplicate" | "cannot_reproduce";
 
@@ -327,6 +345,8 @@ export interface JiraData {
   statusCategories: StatusCategory[];
   /** 전역 상태 레지스트리 */
   statusDefs: StatusDef[];
+  /** 전역 이슈 타입 레지스트리 (order순) */
+  issueTypes: IssueTypeDef[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

@@ -13,12 +13,13 @@ import {
 import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import {
-  ISSUE_TYPES,
-  TYPE_LABELS,
+  typeName,
 } from "../components/labels";
 import { GLOBAL_SETTINGS_SECTIONS, isGlobalSettingsSection } from "../components/SettingsSideNav";
 import { StatusCategoriesPanel } from "../components/StatusCategoriesPanel";
 import { StatusRegistryPanel } from "../components/StatusRegistryPanel";
+import { IssueTypesPanel } from "../components/IssueTypesPanel";
+import { useIssueTypes } from "../components/useIssueTypes";
 
 type Aspect = "workflow" | "types";
 
@@ -30,6 +31,7 @@ type Aspect = "workflow" | "types";
 export function GlobalSettingsPage() {
   const toast = useToast();
   const { section = "types" } = useParams();
+  const issueTypes = useIssueTypes();
   const aspect: Aspect = section === "workflows" ? "workflow" : "types";
   const [schemes, setSchemes] = useState<SettingsScheme[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -126,6 +128,8 @@ export function GlobalSettingsPage() {
         <StatusCategoriesPanel />
       ) : section === "statuses" ? (
         <StatusRegistryPanel />
+      ) : section === "issue-types" ? (
+        <IssueTypesPanel />
       ) : (
       <div className="admin-layout">
         <div className="admin-content">
@@ -157,7 +161,7 @@ export function GlobalSettingsPage() {
                       <div className="admin-scheme-preview">
                         {scheme.body.enabledTypes.map((type) => (
                           <Lozenge key={type} appearance="neutral">
-                            {TYPE_LABELS[type]}
+                            {typeName(issueTypes, type)}
                           </Lozenge>
                         ))}
                       </div>
@@ -252,10 +256,10 @@ export function GlobalSettingsPage() {
         >
           <form className="project-create-form" onSubmit={handleTypesSave}>
             <div className="board-settings-checks" role="group" aria-label="이슈 타입">
-              {ISSUE_TYPES.map((type) => (
+              {issueTypes.map(({ id: type, name }) => (
                 <Checkbox
                   key={type}
-                  label={TYPE_LABELS[type]}
+                  label={name}
                   checked={editTypes.includes(type)}
                   disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
                   onCheckedChange={() =>

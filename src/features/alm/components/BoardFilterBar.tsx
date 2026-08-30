@@ -1,6 +1,6 @@
 import { Avatar, Button, Select, TextField } from "@chanho/react";
 import type { Issue, IssueType, User } from "../store/types";
-import { ISSUE_TYPES, TYPE_LABELS } from "./labels";
+import { useIssueTypes } from "./useIssueTypes";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → 센티널
 const ALL = "all";
@@ -51,6 +51,7 @@ export interface BoardFilterBarProps {
 }
 
 export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFilterBarProps) {
+  const issueTypes = useIssueTypes();
   const hasActive =
     quick.text.trim() !== "" ||
     quick.assigneeIds.length > 0 ||
@@ -113,9 +114,9 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
         value={quick.type ?? ALL}
         options={[
           { value: ALL, label: "전체" },
-          ...ISSUE_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] })),
+          ...issueTypes.map((t) => ({ value: t.id, label: t.name })),
         ]}
-        onValueChange={(v) => onChange({ ...quick, type: v === ALL ? null : (v as IssueType) })}
+        onValueChange={(v) => onChange({ ...quick, type: v === ALL ? null : v })}
       />
       <Select
         label="라벨"

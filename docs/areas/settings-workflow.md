@@ -35,6 +35,21 @@
   즉시 등록) / 순서 / 빼기**만 한다. 새 상태는 모달을 취소해도 레지스트리에 남는다(상태 페이지에서 삭제).
 - 구버전 localStorage는 `normalize`가 스킴/커스텀에 적힌 상태로 레지스트리를 채운다(무마이그레이션).
 
+## 전역 이슈 타입 레지스트리 (2026-08-30)
+
+- `IssueTypeDef { id, name, icon, color, level, order, builtIn }` — `IssueType`은 이제 **string id**.
+  기본 5종(task/story/bug/epic/subtask)은 계층을 바꾸거나 지울 수 없다(이름·아이콘·색은 가능).
+- `level: "epic" | "standard" | "subtask"`가 **부모-자식 규칙의 근거**다(`typeLevelOf`) — 상위 타입은
+  부모 없음, 일반 이슈의 부모는 상위, 하위 작업의 부모는 일반. 쓰는 이슈가 있으면 계층을 못 바꾼다.
+- 아이콘은 `typeIcons.tsx`의 고른 lucide 목록 키(번들에 전체를 넣지 않는다). 화면은 `useIssueTypes()`
+  훅으로 레지스트리를 읽고(`ISSUE_TYPES_CHANGED_EVENT`로 갱신), 로드 전엔 `labels.ts`의
+  `typeName/typeLevel/typeIcon/typeAppearance` 기본 5종 폴백으로 그린다. `TYPE_LABELS` 직접 인덱싱 금지.
+- 스킴/커스텀의 `enabledTypes`는 레지스트리 id 목록. 삭제하면 활성 목록에서도 빠진다. 하위 작업 계층은
+  활성 목록과 무관하게 허용(계층 기능). 편집 UI: 전역 관리 → **이슈 타입**(`IssueTypesPanel`).
+- **서버(alm-backend)의 `IssueType`은 아직 enum** — 사용자 정의 타입은 목업 전용이고 REST 어댑터는
+  "서버가 아직 사용자 정의 이슈 타입을 지원하지 않습니다"로 거부한다. 설정 서버 저장(카테고리·상태·타입·
+  스킴)은 백엔드 후속 과제.
+
 ## 상태 모델 — 카테고리 불변 전략 (중요)
 
 - `IssueStatus` 타입은 **기본 카테고리 id 3종**("todo"|"inprogress"|"done")이다 — 시드·템플릿·검색이 쓴다. `WorkflowStatus.category`는 임의 카테고리 id(string).
