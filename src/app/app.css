@@ -3322,3 +3322,19 @@ body {
   display: block;
   margin-top: var(--chanho-space-150);
 }
+
+/* 보관함 · 휴지통 */
+.archive-page { padding: var(--chanho-space-200) 0; }
+.archive-row { flex: 1; }
+.archive-at { color: var(--chanho-color-text-subtle); font-size: var(--chanho-font-size-75); margin-left: auto; }
+.trash-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--chanho-space-100); }
+.trash-row {
+  display: flex; align-items: center; gap: var(--chanho-space-150);
+  padding: var(--chanho-space-150); border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium); background: var(--chanho-color-background-surface);
+}
+.trash-name { font-weight: var(--chanho-font-weight-medium); }
+.trash-at { color: var(--chanho-color-text-subtle); font-size: var(--chanho-font-size-75); }
+.trash-actions { margin-left: auto; display: flex; gap: var(--chanho-space-100); }
+.project-list-side-actions { display: flex; align-items: center; gap: var(--chanho-space-150); }
+.issue-danger-actions { display: flex; gap: var(--chanho-space-100); }

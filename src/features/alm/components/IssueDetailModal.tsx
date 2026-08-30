@@ -37,6 +37,7 @@ import {
   createIssue,
   deleteComment,
   deleteIssue,
+  archiveIssue,
   deleteWorklog,
   getCurrentUser,
   getIssueByKey,
@@ -826,9 +827,33 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             <dt>수정일</dt>
             <dd>{formatDateTime(issue.updatedAt)}</dd>
           </dl>
-          <Button variant="danger" size="small" onClick={() => setConfirmingDelete(true)}>
-            이슈 삭제
-          </Button>
+          <div className="issue-danger-actions">
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={() =>
+                void (async () => {
+                  try {
+                    await archiveIssue(issue.id);
+                    toast({ title: `${issue.key}을(를) 보관했습니다`, appearance: "success" });
+                    onClose();
+                    await onIssueChanged();
+                  } catch (error) {
+                    toast({
+                      title: "보관 실패",
+                      description: error instanceof Error ? error.message : String(error),
+                      appearance: "danger",
+                    });
+                  }
+                })()
+              }
+            >
+              보관
+            </Button>
+            <Button variant="danger" size="small" onClick={() => setConfirmingDelete(true)}>
+              이슈 삭제
+            </Button>
+          </div>
         </aside>
       </div>
       {confirmingDelete ? (

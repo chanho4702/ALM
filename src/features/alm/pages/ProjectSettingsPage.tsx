@@ -29,6 +29,8 @@ import type { ResolvedSettings } from "../store/jiraStore";
 import {
   assignScheme,
   deleteProject,
+  archiveProject,
+  unarchiveProject,
   listIssues,
   listSchemes,
   listUsers,
@@ -328,10 +330,30 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         </form>
       </Card>
       <ProjectShortcutsPanel projectId={project.id} canManage={myRole === "admin"} />
+      <Card padding="lg" title="보관" className="project-archive-zone">
+        <p className="project-danger-desc">
+          {project.archivedAt
+            ? "보관된 프로젝트는 읽기만 할 수 있습니다. 해제하면 다시 편집할 수 있습니다."
+            : "끝난 프로젝트를 보관하면 읽기 전용이 되고 목록에 \"보관됨\"으로 남습니다. 언제든 해제할 수 있습니다."}
+        </p>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            void run(project.archivedAt ? "보관 해제 실패" : "보관 실패", async () => {
+              if (project.archivedAt) await unarchiveProject(project.id);
+              else await archiveProject(project.id);
+              await onProjectsChanged();
+              toast({ title: project.archivedAt ? "보관을 해제했습니다" : "프로젝트를 보관했습니다", appearance: "success" });
+            })
+          }
+        >
+          {project.archivedAt ? "보관 해제" : "프로젝트 보관"}
+        </Button>
+      </Card>
       <Card padding="lg" title="위험 구역" className="project-danger-zone">
         <p className="project-danger-desc">
-          프로젝트를 삭제하면 이슈 {issueCount}개와 스프린트·코멘트·활동 기록이 함께 삭제됩니다.
-          되돌릴 수 없습니다.
+          프로젝트를 삭제하면 이슈 {issueCount}개와 함께 휴지통으로 옮겨집니다. 휴지통에서 복원하거나
+          영구 삭제할 수 있습니다.
         </p>
         <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
           프로젝트 삭제
@@ -523,7 +545,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
           <div className="project-delete-confirm">
             <p>
               <strong>{project.name}</strong> ({project.key}) 프로젝트를 삭제하면 이슈 {issueCount}
-              개가 함께 삭제됩니다. 되돌릴 수 없습니다.
+              개와 함께 휴지통으로 옮겨집니다. 휴지통에서 복원하거나 영구 삭제할 수 있습니다.
             </p>
             <div className="project-delete-actions">
               <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>

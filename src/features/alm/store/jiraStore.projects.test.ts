@@ -6,6 +6,7 @@ import {
   createProject,
   createSprint,
   deleteProject,
+  purgeProject,
   getCurrentUser,
   listComments,
   listIssues,
@@ -119,6 +120,8 @@ describe("deleteProject", () => {
 
     await deleteProject(project.id);
 
+    await purgeProject(project.id); // 삭제 = 휴지통, 연쇄 삭제는 영구 삭제 때
+
     expect(await listProjects()).toHaveLength(0);
     expect(await listIssues(project.id)).toHaveLength(0);
     expect(await listSprints(project.id)).toHaveLength(0);
@@ -132,6 +135,7 @@ describe("deleteProject", () => {
 
     const [alm] = await listProjects();
     await deleteProject(alm.id);
+    await purgeProject(alm.id); // 삭제 = 휴지통, 연쇄 삭제는 영구 삭제 때
 
     expect((await listProjects()).map((p) => p.key)).toEqual(["PAY"]);
     expect(await listIssues(other.id)).toHaveLength(1);

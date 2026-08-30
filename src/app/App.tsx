@@ -11,6 +11,8 @@ import { BoardRedirect } from "../features/alm/pages/BoardRedirect";
 import { BacklogPage } from "../features/alm/pages/BacklogPage";
 import { IssueListPage } from "../features/alm/pages/IssueListPage";
 import { ProjectListPage } from "../features/alm/pages/ProjectListPage";
+import { TrashPage } from "../features/alm/pages/TrashPage";
+import { ArchivePage } from "../features/alm/pages/ArchivePage";
 import { ProjectCreatePage } from "../features/alm/pages/ProjectCreatePage";
 import { DashboardPage } from "../features/alm/pages/DashboardPage";
 import { HomePage } from "../features/alm/pages/HomePage";
@@ -75,6 +77,7 @@ export function App() {
           element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}
         />
         <Route path="/projects/new" element={<ProjectCreatePage onProjectsChanged={reload} />} />
+        <Route path="/projects/trash" element={<TrashPage onProjectsChanged={reload} />} />
         <Route
           path="/projects/:projectId"
           element={<ProjectLayout projects={projects} onProjectsChanged={reload} />}
@@ -126,6 +129,7 @@ export function App() {
           <Route path="boards/:boardId" element={<BoardPage />} />
           <Route path="backlog" element={<BacklogPage />} />
           <Route path="issues" element={<IssueListPage />} />
+          <Route path="archive" element={<ArchivePage />} />
         </Route>
         {/* 프로젝트 설정 — 뷰 탭(ProjectLayout) 바깥의 별도 페이지, 사이드바는 설정 메뉴로 바뀐다 */}
         <Route path="/projects/:projectId/settings" element={<Navigate to="general" replace />} />

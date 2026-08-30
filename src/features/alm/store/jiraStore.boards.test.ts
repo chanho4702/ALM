@@ -6,6 +6,7 @@ import {
   createIssue,
   deleteBoard,
   deleteProject,
+  purgeProject,
   getBoard,
   listBoardIssues,
   listBoards,
@@ -106,6 +107,7 @@ describe("boards CRUD", () => {
 
   it("deleteProject는 보드도 연쇄 삭제한다", async () => {
     await deleteProject(PROJECT);
+    await purgeProject(PROJECT); // 삭제 = 휴지통, 연쇄 삭제는 영구 삭제 때
     expect(await listBoards(PROJECT)).toHaveLength(0);
   });
 });

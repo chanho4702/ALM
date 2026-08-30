@@ -64,7 +64,7 @@ describe("ProjectSettingsPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "프로젝트 삭제" }));
     const dialog = await screen.findByRole("dialog", { name: "프로젝트 삭제" });
-    expect(within(dialog).getByText(/이슈 8\s*개가 함께 삭제됩니다/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/이슈 8\s*개와 함께 휴지통으로/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "삭제" }));
 
     await waitFor(() => {

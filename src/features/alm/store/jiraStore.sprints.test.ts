@@ -4,6 +4,7 @@ import {
   completeSprint,
   deleteIssue,
   deleteProject,
+  purgeProject,
   getIssueByKey,
   listProjectChanges,
   moveIssue,
@@ -216,6 +217,8 @@ describe("변경 이력 유지보수", () => {
     expect(await listProjectChanges(project.id)).not.toHaveLength(0);
 
     await deleteProject(project.id);
+
+    await purgeProject(project.id); // 삭제 = 휴지통, 연쇄 삭제는 영구 삭제 때
 
     expect(await listProjectChanges(project.id)).toHaveLength(0);
     expect(issue.projectId).toBe(project.id);

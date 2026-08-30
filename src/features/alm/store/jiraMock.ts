@@ -254,6 +254,8 @@ function normalize(data: JiraData): JiraData {
   }
   data.statusDefs ??= [];
   // 전역 이슈 타입 레지스트리 — 기본 5종은 항상 있다
+  data.archivedIssues ??= [];
+  data.trashedProjects ??= [];
   data.linkTypes ??= BUILTIN_LINK_TYPES.map((t) => ({ ...t }));
   for (const builtin of BUILTIN_LINK_TYPES) {
     if (!data.linkTypes.some((t) => t.id === builtin.id)) data.linkTypes.push({ ...builtin });
@@ -382,6 +384,8 @@ export async function createProject(input: {
     icon: "",
     color: "",
     url: "",
+    archivedAt: null,
+    deletedAt: null,
     createdAt: new Date().toISOString(),
   };
   data.projects.push(project);
@@ -482,13 +486,50 @@ export async function updateProject(id: string, patch: ProjectPatch): Promise<Pr
 }
 
 /** 프로젝트의 스프린트·이슈·댓글·활동·이슈 카운터까지 연쇄 삭제한다 */
+/** 삭제 = 휴지통 이동(지라). 이슈는 archivedIssues로 옮겨 검색·홈에서 사라진다. 복원·영구 삭제는 휴지통에서 */
 export async function deleteProject(id: string): Promise<void> {
   const data = load();
   const index = data.projects.findIndex((p) => p.id === id);
   if (index === -1) throw new Error("프로젝트를 찾을 수 없습니다");
-  assertCanAdmin(data, id);
-  const issueIds = new Set(data.issues.filter((i) => i.projectId === id).map((i) => i.id));
-  data.projects.splice(index, 1);
+  assertAdminIgnoringArchive(data, id);
+  const [project] = data.projects.splice(index, 1);
+  project.deletedAt = new Date().toISOString();
+  data.trashedProjects.push(project);
+  const moving = data.issues.filter((i) => i.projectId === id);
+  data.issues = data.issues.filter((i) => i.projectId !== id);
+  data.archivedIssues.push(...moving);
+  persist();
+}
+
+export async function listTrashedProjects(): Promise<Project[]> {
+  return clone([...load().trashedProjects].sort((a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? "")));
+}
+
+export async function restoreProject(id: string): Promise<Project> {
+  const data = load();
+  const index = data.trashedProjects.findIndex((p) => p.id === id);
+  if (index === -1) throw new Error("휴지통에 없는 프로젝트입니다");
+  const [project] = data.trashedProjects.splice(index, 1);
+  project.deletedAt = null;
+  data.projects.push(project);
+  // 보관(archivedAt)됐던 이슈는 보관함에 남고, 나머지는 돌아온다
+  const returning = data.archivedIssues.filter((i) => i.projectId === id && !i.archivedAt);
+  data.archivedIssues = data.archivedIssues.filter((i) => !(i.projectId === id && !i.archivedAt));
+  data.issues.push(...returning);
+  persist();
+  return clone(project);
+}
+
+/** 영구 삭제 — 휴지통에 있는 프로젝트만. 되돌릴 수 없다 */
+export async function purgeProject(id: string): Promise<void> {
+  const data = load();
+  const index = data.trashedProjects.findIndex((p) => p.id === id);
+  if (index === -1) throw new Error("휴지통에 없는 프로젝트입니다");
+  const issueIds = new Set(
+    [...data.issues, ...data.archivedIssues].filter((i) => i.projectId === id).map((i) => i.id),
+  );
+  data.trashedProjects.splice(index, 1);
+  data.archivedIssues = data.archivedIssues.filter((i) => i.projectId !== id);
   data.sprints = data.sprints.filter((s) => s.projectId !== id);
   data.issues = data.issues.filter((i) => i.projectId !== id);
   data.comments = data.comments.filter((c) => !issueIds.has(c.issueId));
@@ -978,17 +1019,30 @@ export async function getMyProjectRole(projectId: string): Promise<ProjectRole |
  * 목업이 백엔드 대역이므로 여기서 막지 않으면 "뷰어 = 읽기만"이 화면의 빈말이 된다.
  * 서버 전환 후에는 org-service gRPC 판정이 이 자리를 대신한다.
  */
+function assertNotArchived(data: JiraData, projectId: string): void {
+  if (data.projects.find((p) => p.id === projectId)?.archivedAt) {
+    throw new Error("보관된 프로젝트는 읽기만 할 수 있습니다");
+  }
+}
+
 function assertCanEdit(data: JiraData, projectId: string): void {
   const role = myRole(data, projectId);
   if (role === null || role === "viewer") {
     throw new Error("이 프로젝트를 편집할 권한이 없습니다");
   }
+  assertNotArchived(data, projectId);
 }
 
-function assertCanAdmin(data: JiraData, projectId: string): void {
+/** 보관 가드를 우회하는 관리자 확인 — 보관 해제·휴지통 이동에 쓴다 */
+function assertAdminIgnoringArchive(data: JiraData, projectId: string): void {
   if (myRole(data, projectId) !== "admin") {
     throw new Error("프로젝트 관리자만 할 수 있습니다");
   }
+}
+
+function assertCanAdmin(data: JiraData, projectId: string): void {
+  assertAdminIgnoringArchive(data, projectId);
+  assertNotArchived(data, projectId);
 }
 
 function myRole(data: JiraData, projectId: string): ProjectRole | null {
@@ -2897,6 +2951,61 @@ export async function deletePriority(id: string): Promise<void> {
   [...data.priorities].sort((a, b) => a.order - b.order).forEach((p, i) => (p.order = i + 1));
   persist();
   notifyPrioritiesChanged();
+}
+
+// ── 보관 (지라 "보관된 업무 항목") ──────────────────────────────
+
+export async function archiveIssue(id: string): Promise<Issue> {
+  const data = load();
+  const index = data.issues.findIndex((i) => i.id === id);
+  if (index === -1) throw new Error("이슈를 찾을 수 없습니다");
+  assertCanEdit(data, data.issues[index].projectId);
+  const [issue] = data.issues.splice(index, 1);
+  issue.archivedAt = new Date().toISOString();
+  data.archivedIssues.push(issue);
+  persist();
+  return clone(issue);
+}
+
+export async function restoreIssue(id: string): Promise<Issue> {
+  const data = load();
+  const index = data.archivedIssues.findIndex((i) => i.id === id && i.archivedAt);
+  if (index === -1) throw new Error("보관함에 없는 이슈입니다");
+  assertCanEdit(data, data.archivedIssues[index].projectId);
+  const [issue] = data.archivedIssues.splice(index, 1);
+  issue.archivedAt = null;
+  data.issues.push(issue);
+  persist();
+  return clone(issue);
+}
+
+/** 프로젝트 보관함 — 최근 보관 순 */
+export async function listArchivedIssues(projectId: string): Promise<Issue[]> {
+  return clone(
+    load()
+      .archivedIssues.filter((i) => i.projectId === projectId && i.archivedAt)
+      .sort((a, b) => (b.archivedAt ?? "").localeCompare(a.archivedAt ?? "")),
+  );
+}
+
+export async function archiveProject(id: string): Promise<Project> {
+  const data = load();
+  const project = data.projects.find((p) => p.id === id);
+  if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
+  assertAdminIgnoringArchive(data, id);
+  project.archivedAt = new Date().toISOString();
+  persist();
+  return clone(project);
+}
+
+export async function unarchiveProject(id: string): Promise<Project> {
+  const data = load();
+  const project = data.projects.find((p) => p.id === id);
+  if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
+  assertAdminIgnoringArchive(data, id);
+  project.archivedAt = null;
+  persist();
+  return clone(project);
 }
 
 // ── 링크 타입 레지스트리 (전역 관리 > 링크 타입) ──────────────────────

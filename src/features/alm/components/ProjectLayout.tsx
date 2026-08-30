@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
-import { Button } from "@chanho/react";
+import { Button, Lozenge } from "@chanho/react";
 import { ExternalLink } from "lucide-react";
 import type { Project, ProjectShortcut } from "../store/types";
 import { listProjectShortcuts } from "../store/jiraStore";
@@ -29,6 +29,7 @@ const VIEW_TABS = [
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },
   { id: "issues", label: "이슈" },
+  { id: "archive", label: "보관함" },
 ];
 
 /**
@@ -77,6 +78,11 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
       <header className="project-header">
         <ProjectAvatar project={current} size="lg" />
         <h1 className="project-header-name">{current.name}</h1>
+        {current.archivedAt ? (
+          <Lozenge appearance="neutral" data-testid="project-archived-lozenge">
+            보관됨 · 읽기 전용
+          </Lozenge>
+        ) : null}
         <Button
           variant="ghost"
           size="small"

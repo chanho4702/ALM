@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { useNavigate } from "react-router";
-import {
-  Button,
-  Dropdown,
-  EmptyState,
-  Modal,
-  PageHeader,
-  Table,
-  TextField,
-  useToast,
-} from "@chanho/react";
+import { Button, Dropdown, EmptyState, Lozenge, Modal, PageHeader, Switch, Table, TextField, useToast } from "@chanho/react";
 import type { TableColumn } from "@chanho/react";
 import type { Project } from "../store/types";
 import { deleteProject, listIssues } from "../store/jiraStore";
@@ -59,13 +50,14 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
     };
   }, [projects]);
 
+  const [showArchived, setShowArchived] = useState(false);
   const visible = useMemo(() => {
     const text = filter.trim().toLowerCase();
     if (!text) return projects;
-    return projects.filter(
+    return projects.filter((p) => showArchived || !p.archivedAt).filter(
       (p) => p.name.toLowerCase().includes(text) || p.key.toLowerCase().includes(text),
     );
-  }, [projects, filter]);
+  }, [projects, filter, showArchived]);
 
   const handleDelete = async () => {
     if (!deleting) return;
@@ -131,6 +123,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
         <span className="project-name-cell">
           <ProjectAvatar project={project} size="sm" />
           <span className="project-name-cell-text">{project.name}</span>
+          {project.archivedAt ? <Lozenge appearance="neutral">보관됨</Lozenge> : null}
         </span>
       ),
     },
@@ -192,6 +185,12 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
         ) : (
           <>
             <div className="project-list-toolbar">
+              <div className="project-list-side-actions">
+                <Switch label="보관된 프로젝트 보기" checked={showArchived} onCheckedChange={setShowArchived} />
+                <Button variant="ghost" size="small" onClick={() => navigate("/projects/trash")}>
+                  휴지통
+                </Button>
+              </div>
               <div className="project-list-search">
                 <TextField
                   label="프로젝트 검색"

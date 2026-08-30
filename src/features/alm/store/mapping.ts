@@ -22,6 +22,8 @@ export interface ProjectDto {
   icon?: string | null;
   color?: string | null;
   url?: string | null;
+  archivedAt?: string | null;
+  deletedAt?: string | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +35,7 @@ export type IssueTypeDto = string;
 export type IssuePriorityDto = string;
 
 export interface IssueDto {
+  archivedAt?: string | null;
   id: number;
   key: string;
   projectId: number;
@@ -76,6 +79,8 @@ export function mapProject(dto: ProjectDto): Project {
     icon: dto.icon ?? "",
     color: dto.color ?? "",
     url: dto.url ?? "",
+    archivedAt: dto.archivedAt ?? null,
+    deletedAt: dto.deletedAt ?? null,
     createdAt: dto.createdAt,
   };
 }
@@ -256,6 +261,7 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     estimateHours: dto.estimateHours ?? null,
     resolution: dto.resolution ? RESOLUTIONS_FROM_API[dto.resolution] : null,
     fixVersionId: dto.fixVersionId == null ? null : String(dto.fixVersionId),
+    archivedAt: dto.archivedAt ?? null,
     labels: dto.labels ? [...dto.labels] : [],
     order: dto.order ?? order,
     createdAt: dto.createdAt,

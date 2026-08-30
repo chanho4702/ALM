@@ -257,6 +257,8 @@ export function createSeedData(): JiraData {
     projectSettings: [{ projectId: "p1", schemeId: "scheme-default", custom: null }],
     priorities: [],
     linkTypes: [],
+    archivedIssues: [],
+    trashedProjects: [],
     shortcuts: [],
     preferences: {},
     banner: { enabled: false, level: "info", message: "" },

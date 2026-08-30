@@ -8,6 +8,7 @@ import {
   addProjectMember,
   createProject,
   deleteProject,
+  purgeProject,
   getCurrentUser,
   listProjectMembers,
   listUsers,
@@ -82,6 +83,8 @@ describe("프로젝트 멤버·역할", () => {
     await addProjectMember(project.id, "u2", "editor");
 
     await deleteProject(project.id);
+
+    await purgeProject(project.id); // 삭제 = 휴지통, 연쇄 삭제는 영구 삭제 때
 
     expect(await listProjectMembers(project.id)).toEqual([]);
   });

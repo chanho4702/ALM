@@ -18,6 +18,10 @@ export interface Project {
   icon: string; // typeIcons 키, "" = 키 이니셜
   color: string; // 색 이름(typeAppearance 팔레트), "" = 키 해시 색
   url: string;
+  /** 보관(읽기 전용) 시각 — null/없음이면 활성 */
+  archivedAt?: string | null;
+  /** 휴지통 이동 시각 — 휴지통 목록에서만 값이 있다 */
+  deletedAt?: string | null;
   createdAt: string;
 }
 
@@ -166,6 +170,8 @@ export interface Issue {
   resolution: IssueResolution | null;
   /** 수정 버전(fix version). null = 미지정 */
   fixVersionId: string | null;
+  /** 보관 시각 — 보관함 목록에서만 값이 있다(활성 이슈는 null/없음) */
+  archivedAt?: string | null;
   labels: string[]; // 자유 문자열 라벨
   order: number; // 컬럼/목록 내 정렬
   createdAt: string;
@@ -467,6 +473,10 @@ export interface JiraData {
   issueTypes: IssueTypeDef[];
   priorities: PriorityDef[];
   linkTypes: LinkTypeDef[];
+  /** 보관된 이슈 + 휴지통 프로젝트의 이슈 — 일반 조회 배열(issues) 밖으로 옮겨 자동으로 숨긴다 */
+  archivedIssues: Issue[];
+  /** 휴지통 프로젝트 — projects 밖으로 옮긴다 */
+  trashedProjects: Project[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

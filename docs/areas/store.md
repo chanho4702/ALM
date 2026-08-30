@@ -211,3 +211,10 @@ REST 전환 때 계약이 바뀌지 않는다. `listProjectChanges(projectId, {f
    최초 1회로 분리 가능.
 4. `queryIssues(IssueQuery)`는 GraphQL 인자로 1:1 매핑하도록 설계돼 있다.
 5. 낙관적 업데이트·실시간은 `../BACKLOG.md` 2번 참고.
+
+## 보관·휴지통 (2026-08-30)
+
+목업은 보관된 이슈를 `data.archivedIssues`로, 휴지통 프로젝트를 `data.trashedProjects`로 **옮긴다** — 그래서 기존 조회
+(`data.issues`/`data.projects`)는 손대지 않고도 자동으로 빠진다. 서버는 같은 효과를 `@SQLRestriction`(issue.archived_at,
+project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 전용 가드(`assertCanEdit/assertCanAdmin`)로 막고,
+보관 해제·휴지통 이동만 `assertAdminIgnoringArchive`로 우회한다. `deleteProject`는 이제 휴지통 이동이며 실제 삭제는 `purgeProject`.

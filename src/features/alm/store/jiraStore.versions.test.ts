@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  purgeProject,
   __resetForTest,
   archiveVersion,
   createIssue,
@@ -141,6 +142,7 @@ describe("버전(릴리스)", () => {
 
     const { deleteProject } = await import("./jiraStore");
     await deleteProject(project.id);
+    await purgeProject(project.id); // 삭제 = 휴지통, 연쇄 삭제는 영구 삭제 때
 
     expect(await listVersions(project.id)).toEqual([]);
   });
