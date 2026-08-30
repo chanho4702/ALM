@@ -128,7 +128,7 @@ export function GlobalSettingsPage() {
   if (!isGlobalSettingsSection(section)) return <Navigate to="/settings/types" replace />;
 
   return (
-    <main className="project-list-content">
+    <main className="project-list-content settings-page">
       <PageHeader
         title="전역 관리"
         bottom={

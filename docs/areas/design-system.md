@@ -41,7 +41,7 @@
   `app.css` 전역 `*{box-sizing:border-box}`로 흡수 중 — DS에서 고치면 이 리셋은 남겨도 무해하다.
 - **SVG 속성에는 토큰을 쓸 수 없다.** Recharts처럼 `stroke="..."` 속성으로 색을 받는 라이브러리에는
   `useTokenColors`(components/useTokenColors.ts)로 계산된 값을 넘긴다. CSS 클래스로 칠할 수 있는
-  것(frappe-gantt)은 CSS에서 `var()`를 그대로 쓴다.
+  것(SVAR Gantt의 `--wx-*` 테마 변수)은 CSS에서 `var()`를 그대로 쓴다.
 - **RadioGroup 기본은 세로.** 가로로 두려면 같은 클래스를 두 번 써 우선순위를 올린다
   (`.reports-units.reports-units`).
 - **아이콘은 lucide-react.** 글자 기호(⋯ ☾ ⚙ 🔔)를 버튼 본문에 넣지 않는다 — 크기·정렬·다크모드가

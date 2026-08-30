@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import { useParams } from "react-router";
 import { EmptyState, Radio, RadioGroup, Spinner } from "@chanho/react";
-import Gantt from "frappe-gantt";
-import "../../../app/vendor/frappe-gantt.css";
-import type { Issue, IssueLink, WorkflowStatus } from "../store/types";
+import { Gantt, Willow } from "@svar-ui/react-gantt";
+import "@svar-ui/react-gantt/all.css";
+import type { Issue, IssueLink, IssueTypeDef, WorkflowStatus } from "../store/types";
 import { listIssues, listIssueLinks, listProjectStatuses } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
+import { useIssueTypes } from "../components/useIssueTypes";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
-import { statusCategory } from "../components/labels";
+import { statusKind, typeLevel } from "../components/labels";
 
 type ViewMode = "Day" | "Week" | "Month";
 const VIEW_MODES: { value: ViewMode; label: string }[] = [
@@ -16,48 +18,115 @@ const VIEW_MODES: { value: ViewMode; label: string }[] = [
   { value: "Month", label: "월" },
 ];
 
-/** 카테고리를 진행률로 — 간트 막대의 채움 */
-const PROGRESS: Record<string, number> = { todo: 0, inprogress: 50, done: 100 };
+/** 의미를 진행률로 — 간트 막대의 채움 */
+const PROGRESS = { new: 0, active: 50, complete: 100 } as const;
 
 const dayOf = (iso: string) => iso.slice(0, 10);
+/** "YYYY-MM-DD" → 로컬 자정 Date (UTC 파싱은 하루가 밀린다) */
+const localDate = (day: string) => {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+const addDays = (date: Date, days: number) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+const fmtDay = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 interface TimelineRow {
   issue: Issue;
   isChild: boolean;
+  parentId: string | null;
   start: string;
   end: string;
 }
 
-/** 에픽 → 하위 순으로 늘어놓는다. 지라 타임라인처럼 계층이 보이게 */
-function buildRows(issues: Issue[]): TimelineRow[] {
+/** 상위(에픽) → 하위 순으로 늘어놓는다. 지라 타임라인처럼 계층이 보이게 */
+function buildRows(issues: Issue[], types: IssueTypeDef[]): TimelineRow[] {
   const sorted = [...issues].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const toRow = (issue: Issue, isChild: boolean): TimelineRow => {
+  const toRow = (issue: Issue, parentId: string | null): TimelineRow => {
     const start = dayOf(issue.createdAt);
-    // frappe-gantt는 날짜만 준 종료일을 하루 뒤까지로 본다 — 여기서 하루를 더하면 이틀이 된다.
-    // 마감일이 없거나 시작보다 이르면 하루짜리로 눕힌다(라이브러리가 역전 구간을 거부한다).
+    // 마감일이 없거나 시작보다 이르면 하루짜리로 눕힌다
     const end = issue.dueDate && issue.dueDate >= start ? issue.dueDate : start;
-    return { issue, isChild, start, end };
+    return { issue, isChild: parentId !== null, parentId, start, end };
   };
 
   const rows: TimelineRow[] = [];
   const grouped = new Set<string>();
-  for (const epic of sorted.filter((issue) => issue.type === "epic")) {
-    rows.push(toRow(epic, false));
+  for (const epic of sorted.filter((issue) => typeLevel(types, issue.type) === "epic")) {
+    rows.push(toRow(epic, null));
     grouped.add(epic.id);
     for (const child of sorted.filter((issue) => issue.parentId === epic.id)) {
-      rows.push(toRow(child, true));
+      rows.push(toRow(child, epic.id));
       grouped.add(child.id);
     }
   }
   for (const issue of sorted) {
-    if (!grouped.has(issue.id)) rows.push(toRow(issue, false));
+    if (!grouped.has(issue.id)) rows.push(toRow(issue, null));
   }
   return rows;
 }
 
+/** 보기 단위별 눈금과 칸 너비 — 상단 줄은 큰 단위, 아랫줄은 선택 단위 */
+function scalesFor(mode: ViewMode) {
+  const monthLong = (date: Date) =>
+    date.toLocaleDateString("ko-KR", { year: "numeric", month: "long" });
+  switch (mode) {
+    case "Day":
+      return {
+        cellWidth: 40,
+        scales: [
+          { unit: "month", step: 1, format: monthLong },
+          { unit: "day", step: 1, format: (date: Date) => String(date.getDate()) },
+        ],
+      };
+    case "Week":
+      return {
+        cellWidth: 84,
+        scales: [
+          { unit: "month", step: 1, format: monthLong },
+          {
+            unit: "week",
+            step: 1,
+            format: (date: Date) => `${date.getMonth() + 1}/${date.getDate()}~`,
+          },
+        ],
+      };
+    default:
+      return {
+        cellWidth: 120,
+        scales: [
+          { unit: "year", step: 1, format: (date: Date) => `${date.getFullYear()}년` },
+          {
+            unit: "month",
+            step: 1,
+            format: (date: Date) => date.toLocaleDateString("ko-KR", { month: "short" }),
+          },
+        ],
+      };
+  }
+}
+
+/** 차트가 렌더 중 던지면 화면 전체가 아니라 차트만 대체본으로 바꾼다 */
+class ChartBoundary extends Component<
+  { onError: () => void; children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(_error: unknown, _info: ErrorInfo) {
+    this.props.onError();
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 /**
- * 타임라인(간트) — 막대는 frappe-gantt(MIT)가 그린다. 좌측 이슈 목록과 일정 표는 우리 DOM이라
- * 키보드·스크린리더·테스트가 그래픽에 의존하지 않는다(차트가 못 그려져도 화면은 성립한다).
+ * 타임라인(간트) — SVAR React Gantt(MIT, `@svar-ui/react-gantt`)가 그리드+차트를 그린다.
+ * 상위(에픽)는 요약 막대, 하위는 그 아래 접힘 트리, 차단 링크는 의존선(끝→시작)이다.
+ * 그래픽을 못 그리는 환경(jsdom 등)에서는 이슈 목록과 일정 표가 같은 정보를 준다.
  */
 export function TimelinePage() {
   const { projectId } = useParams();
@@ -65,9 +134,13 @@ export function TimelinePage() {
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [links, setLinks] = useState<IssueLink[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("Day");
-  const [chartFailed, setChartFailed] = useState(false);
-  const chartRef = useRef<HTMLDivElement | null>(null);
-  const ganttRef = useRef<Gantt | null>(null);
+  const types = useIssueTypes();
+  // SVG 계측이 없는 환경(jsdom)은 그리기 전에 대체본으로 보낸다 — 침묵 실패가 아니라 상태로 남긴다
+  const [chartFailed, setChartFailed] = useState(
+    () =>
+      typeof SVGGraphicsElement === "undefined" ||
+      !("getBBox" in SVGGraphicsElement.prototype),
+  );
 
   const generation = useRef(0);
   const reload = useCallback(async () => {
@@ -92,83 +165,53 @@ export function TimelinePage() {
   }, [reload]);
 
   const { openIssue, issueModal } = useIssueModal(reload);
-  const rows = useMemo(() => (issues ? buildRows(issues) : []), [issues]);
+  const rows = useMemo(() => (issues ? buildRows(issues, types) : []), [issues, types]);
 
-  const tasks = useMemo(
-    () =>
-      rows.map((row) => ({
-        id: row.issue.id,
-        name: `${row.issue.key} ${row.issue.title}`,
-        start: row.start,
-        end: row.end,
-        progress: PROGRESS[statusCategory(statuses, row.issue.status)] ?? 0,
-        dependencies: links
-          .filter((link) => link.type === "blocks" && link.targetId === row.issue.id)
-          .map((link) => link.sourceId)
-          .join(","),
-      })),
-    [rows, statuses, links],
+  /** 자식이 있는 상위 이슈 — 초기화 뒤 API로 펼친다 (task 데이터의 open 플래그는 라이브러리가 죽는다) */
+  const parentIds = useMemo(
+    () => [...new Set(rows.map((row) => row.parentId).filter((id): id is string => id !== null))],
+    [rows],
   );
+  const tasks = useMemo(() => {
+    return rows.map((row) => ({
+        id: row.issue.id,
+        text: `${row.issue.key} ${row.issue.title}`,
+        start: localDate(row.start),
+        // 라이브러리의 end는 배타적 — 마감일 당일까지 칠하려면 하루를 더한다
+        end: addDays(localDate(row.end), 1),
+        progress: PROGRESS[statusKind(statuses, row.issue.status)],
+        type: typeLevel(types, row.issue.type) === "epic" ? "summary" : "task",
+        parent: row.parentId ?? 0,
+        key: row.issue.key,
+      }));
+  }, [rows, statuses, types]);
 
-  // on_click은 생성 시점의 클로저를 붙든다 — 최신 행을 ref로 읽어 stale 참조를 피한다
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
+  const ganttLinks = useMemo(() => {
+    const ids = new Set(rows.map((row) => row.issue.id));
+    return links
+      .filter((link) => link.type === "blocks" && ids.has(link.sourceId) && ids.has(link.targetId))
+      .map((link) => ({ id: link.id, source: link.sourceId, target: link.targetId, type: "e2s" as const }));
+  }, [links, rows]);
 
-  /**
-   * frappe-gantt는 DOM에 직접 SVG를 그리고 생성자마다 document 레벨 리스너를 건다.
-   * 그래서 **인스턴스를 하나만 만들어 갱신**한다(매번 새로 만들면 리스너가 쌓인다).
-   * jsdom처럼 SVG 계측이 없는 환경에서는 실패하므로 표 대체본을 항상 제공하고 상태로 남긴다.
-   */
-  useEffect(() => {
-    const container = chartRef.current;
-    if (!container || tasks.length === 0) return;
-    // 라이브러리는 생성 뒤 타이머에서도 SVG 계측(getBBox)을 부른다 — 그 호출은 아래 try 밖이라
-    // 잡히지 않고 미처리 오류가 된다. 계측이 없는 환경(jsdom)은 그리기 전에 대체본으로 보낸다.
-    if (
-      typeof SVGGraphicsElement === "undefined" ||
-      !("getBBox" in SVGGraphicsElement.prototype)
-    ) {
-      setChartFailed(true);
-      return;
-    }
-    try {
-      if (!ganttRef.current) {
-        ganttRef.current = new Gantt(container, tasks, {
-          view_mode: viewMode,
-          readonly: true,
-          popup: false,
-          // 범위를 실제 이슈 기간에 맞춘다 — 무한 여백이면 한 달 전 빈 격자가 첫 화면을 차지한다
-          infinite_padding: false,
-          scroll_to: "start",
-          // 라이브러리의 영어 Today 버튼·뷰 선택은 우리 라디오가 대신한다
-          today_button: false,
-          view_mode_select: false,
-          bar_height: 24,
-          padding: 12,
-          on_click: (task) => {
-            const issue = rowsRef.current.find((row) => row.issue.id === task.id)?.issue;
-            if (issue) openIssue(issue.key);
-          },
-        });
-      } else {
-        ganttRef.current.refresh(tasks);
-        ganttRef.current.change_view_mode(viewMode);
-      }
-      setChartFailed(false);
-    } catch {
-      setChartFailed(true);
-      ganttRef.current = null;
-      container.innerHTML = "";
-    }
-  }, [tasks, viewMode, openIssue]);
-
-  useEffect(
-    () => () => {
-      ganttRef.current = null;
-      if (chartRef.current) chartRef.current.innerHTML = "";
-    },
+  const { scales, cellWidth } = useMemo(() => scalesFor(viewMode), [viewMode]);
+  const columns = useMemo(
+    () => [
+      { id: "text", header: "이슈", flexgrow: 1 },
+      { id: "start", header: "시작", width: 100, template: (value: Date) => fmtDay(value) },
+      // 배타적 end를 마감일로 되돌려 보여준다
+      { id: "end", header: "종료", width: 100, template: (value: Date) => fmtDay(addDays(value, -1)) },
+    ],
     [],
   );
+  const markers = useMemo(() => [{ start: new Date(), text: "오늘", css: "timeline-today" }], []);
+
+  // 이벤트 핸들러는 생성 시점의 클로저를 붙든다 — 최신 행을 ref로 읽어 stale 참조를 피한다
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const handleSelect = (ev: { id: string | number }) => {
+    const issue = rowsRef.current.find((row) => row.issue.id === String(ev.id))?.issue;
+    if (issue) openIssue(issue.key);
+  };
 
   if (issues === null) {
     return (
@@ -201,29 +244,52 @@ export function TimelinePage() {
               <Radio key={mode.value} value={mode.value} label={mode.label} />
             ))}
           </RadioGroup>
+          <span className="timeline-hint">막대나 행을 누르면 이슈가 열립니다. 점선은 차단 관계입니다.</span>
         </div>
 
-        <ul className="timeline-legend" aria-label="타임라인 이슈">
-          {rows.map((row) => (
-            <li
-              key={row.issue.id}
-              className={row.isChild ? "timeline-issue is-child" : "timeline-issue"}
-            >
-              <IssueTypeGlyph type={row.issue.type} />
-              <span className="issue-key-cell">{row.issue.key}</span>
-              <span className="timeline-issue-title">{row.issue.title}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="timeline-chart" ref={chartRef} aria-hidden />
         {chartFailed ? (
-          <p className="dash-empty">
-            이 환경에서는 간트 그래픽을 그릴 수 없습니다. 아래 표로 같은 일정을 볼 수 있습니다.
-          </p>
-        ) : null}
+          <>
+            <ul className="timeline-legend" aria-label="타임라인 이슈">
+              {rows.map((row) => (
+                <li
+                  key={row.issue.id}
+                  className={row.isChild ? "timeline-issue is-child" : "timeline-issue"}
+                >
+                  <IssueTypeGlyph type={row.issue.type} />
+                  <span className="issue-key-cell">{row.issue.key}</span>
+                  <span className="timeline-issue-title">{row.issue.title}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="dash-empty">
+              이 환경에서는 간트 그래픽을 그릴 수 없습니다. 아래 표로 같은 일정을 볼 수 있습니다.
+            </p>
+          </>
+        ) : (
+          <div className="timeline-chart">
+            <ChartBoundary onError={() => setChartFailed(true)}>
+              <Willow fonts={false}>
+                <Gantt
+                  tasks={tasks}
+                  links={ganttLinks}
+                  scales={scales}
+                  columns={columns}
+                  markers={markers}
+                  cellWidth={cellWidth}
+                  cellHeight={36}
+                  scaleHeight={30}
+                  readonly
+                  init={(api) => {
+                    for (const id of parentIds) api.exec("open-task", { id, mode: true });
+                  }}
+                  onselecttask={handleSelect}
+                />
+              </Willow>
+            </ChartBoundary>
+          </div>
+        )}
 
-        <details className="reports-table" open>
+        <details className="reports-table" open={chartFailed}>
           <summary>일정 표</summary>
           <table aria-label="일정 표">
             <thead>

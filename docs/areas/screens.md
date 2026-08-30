@@ -17,7 +17,7 @@
 | `/projects/:id/boards/:boardId` | BoardPage | 칸반: 동적 상태 컬럼, DnD, 퀵필터, 스윔레인(담당자/에픽), WIP |
 | `/projects/:id/backlog` | BacklogPage | 스프린트 패널 + 백로그, DnD 랭크/이동 |
 | `/projects/:id/issues` | IssueListPage | 목록: 필터 6종 + 정렬 테이블, ?issue=키로 상세 모달 |
-| `/projects/:id/timeline` | TimelinePage | 간트: frappe-gantt(MIT) 막대 + 일/주/월 보기, 차단 링크가 의존선. 좌측 이슈 목록과 일정 표는 우리 DOM(그래픽 없이도 성립). 라우트는 지연 로딩(차트 청크 분리), Gantt 인스턴스는 하나만 만들어 갱신한다(생성자마다 document 리스너가 붙는다) |
+| `/projects/:id/timeline` | TimelinePage(lazy) | 간트: **SVAR React Gantt**(`@svar-ui/react-gantt` 2.7, MIT) — 그리드(이슈/시작/종료) + 차트, 상위(에픽)는 요약 막대와 접힘 트리, 차단 링크는 끝→시작 의존선, 오늘 마커, 일/주/월 눈금. 읽기 전용(막대 드래그로 마감일 변경은 후속). 테마 변수(`--wx-*`)를 우리 토큰으로 덮는다. 그래픽을 못 그리는 환경(jsdom)은 이슈 목록 + 일정 표 대체본 |
 | `/projects/:id/releases` | ReleasesPage(lazy) | 릴리스 허브: 버전 만들기·진행률·릴리스(미완료 이관 선택)·보관·삭제 |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |

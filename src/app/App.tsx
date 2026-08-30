@@ -26,7 +26,7 @@ const ProjectSettingsPage = lazy(() =>
   })),
 );
 
-/** 타임라인도 차트 라이브러리(frappe-gantt)를 쓴다 — 방문자만 내려받게 라우트를 쪼갠다 */
+/** 타임라인도 차트 라이브러리(SVAR React Gantt)를 쓴다 — 방문자만 내려받게 라우트를 쪼갠다 */
 const TimelinePage = lazy(() =>
   import("../features/alm/pages/TimelinePage").then((module) => ({ default: module.TimelinePage })),
 );
