@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, Settings } from "lucide-react";
+import { Bell } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Avatar, Badge, Button, TopBar } from "@chanho/react";
 import type { Issue, Notification, Project, User } from "../store/types";
@@ -18,6 +18,7 @@ import { NotificationsModal } from "./NotificationsModal";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { AnnouncementBanner } from "./AnnouncementBanner";
+import { SettingsMenu } from "./SettingsMenu";
 import { useAuth } from "../../../auth/AuthGate";
 
 export interface AppShellProps {
@@ -112,17 +113,7 @@ export function AppShell({ projects }: AppShellProps) {
               <Bell size={18} />
               {unreadCount > 0 ? <Badge appearance="danger">{unreadCount}</Badge> : null}
             </Button>
-            <Button
-              size="small"
-              variant="ghost"
-              iconOnly
-              className="topbar-icon"
-              aria-label="전역 관리"
-              title="전역 관리"
-              onClick={() => navigate("/settings")}
-            >
-              <Settings size={18} />
-            </Button>
+            <SettingsMenu />
             <ThemeToggle />
             {authUser ? (
               <>

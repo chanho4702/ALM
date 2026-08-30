@@ -14,15 +14,16 @@ export const PROJECT_SETTINGS_SECTIONS = [
 
 /** 전역 관리 구획 — `/settings/:section` */
 export const GLOBAL_SETTINGS_SECTIONS = [
-  { id: "personal", label: "개인 설정" },
-  { id: "categories", label: "상태 카테고리" },
-  { id: "statuses", label: "상태" },
-  { id: "issue-types", label: "이슈 타입" },
-  { id: "types", label: "이슈 타입 스킴" },
-  { id: "workflows", label: "워크플로 스킴" },
-  { id: "audit", label: "감사 로그" },
-  { id: "system", label: "시스템" },
-  { id: "banner", label: "공지 배너" },
+  { id: "personal", label: "일반 설정", group: "개인 설정" },
+  { id: "notifications", label: "알림 설정", group: "개인 설정" },
+  { id: "categories", label: "상태 카테고리", group: "이슈 항목" },
+  { id: "statuses", label: "상태", group: "이슈 항목" },
+  { id: "issue-types", label: "이슈 타입", group: "이슈 항목" },
+  { id: "types", label: "이슈 타입 스킴", group: "이슈 항목" },
+  { id: "workflows", label: "워크플로 스킴", group: "이슈 항목" },
+  { id: "audit", label: "감사 로그", group: "시스템" },
+  { id: "system", label: "시스템 현황", group: "시스템" },
+  { id: "banner", label: "공지 배너", group: "시스템" },
 ] as const;
 
 export type ProjectSettingsSection = (typeof PROJECT_SETTINGS_SECTIONS)[number]["id"];
@@ -53,7 +54,7 @@ export function SettingsSideNav({ projects }: SettingsSideNavProps) {
   const project = projectMatch ? projects.find((p) => p.id === projectMatch[1]) : undefined;
   const globalMatch = pathname.match(/^\/settings(?:\/([^/?]+))?/);
 
-  const items: ReadonlyArray<{ id: string; label: string }> = project
+  const items: ReadonlyArray<{ id: string; label: string; group?: string }> = project
     ? PROJECT_SETTINGS_SECTIONS
     : GLOBAL_SETTINGS_SECTIONS;
   const active = project ? (projectMatch?.[2] ?? "general") : (globalMatch?.[1] ?? "types");
@@ -83,16 +84,19 @@ export function SettingsSideNav({ projects }: SettingsSideNavProps) {
             </span>
           )}
           <span className="settings-nav-head-text">
-            <span className="settings-nav-eyebrow">{project ? "프로젝트 설정" : "전역 관리"}</span>
+            <span className="settings-nav-eyebrow">{project ? "프로젝트 설정" : "설정"}</span>
             <span className="settings-nav-name" title={project?.name}>
-              {project ? project.name : "모든 프로젝트"}
+              {project ? project.name : "개인 · ALM 관리"}
             </span>
           </span>
         </div>
 
         <ul className="global-nav-list">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <li key={item.id}>
+              {item.group && items[index - 1]?.group !== item.group ? (
+                <span className="global-nav-section settings-nav-group">{item.group}</span>
+              ) : null}
               <button
                 type="button"
                 className={itemClass(active === item.id)}

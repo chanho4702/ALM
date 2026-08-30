@@ -30,19 +30,26 @@ beforeEach(() => {
 });
 
 describe("개인 설정 (지라 개인 설정 > 일반·알림)", () => {
-  it("알림 토글과 시작 화면을 저장하면 스토어에 반영된다", async () => {
+  it("알림 설정에서 토글을 저장하면 스토어에 반영된다", async () => {
     const user = userEvent.setup();
-    renderAt("/settings/personal");
+    renderAt("/settings/notifications");
     expect(await screen.findByRole("heading", { name: "개인 설정" })).toBeInTheDocument();
     const commented = await screen.findByRole("switch", { name: "관찰 중인 이슈에 코멘트가 달릴 때" });
     expect(commented).toBeChecked();
     await user.click(commented);
-    await user.click(screen.getByRole("switch", { name: "내가 수정한 이슈" }));
     await user.click(screen.getByRole("button", { name: "저장" }));
     expect(await screen.findByText("개인 설정을 저장했습니다")).toBeInTheDocument();
-    const prefs = await getMyPreferences();
-    expect(prefs.notifications.commented).toBe(false);
-    expect(prefs.autoWatch.edited).toBe(true);
+    expect((await getMyPreferences()).notifications.commented).toBe(false);
+  });
+
+  it("일반 설정에서 자동 관찰을 저장하면 스토어에 반영된다", async () => {
+    const user = userEvent.setup();
+    renderAt("/settings/personal");
+    expect(await screen.findByRole("heading", { name: "개인 설정" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("switch", { name: "내가 수정한 이슈" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("개인 설정을 저장했습니다")).toBeInTheDocument();
+    expect((await getMyPreferences()).autoWatch.edited).toBe(true);
   });
 
   it("시작 화면이 '마지막으로 본 프로젝트'면 루트 진입이 그 프로젝트 보드로 간다", async () => {

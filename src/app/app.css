@@ -3312,3 +3312,13 @@ body {
 .project-shortcuts a:hover {
   background: var(--chanho-color-background-neutral-hovered);
 }
+
+/* ⚙ 설정 메뉴 — 지라 설정 드롭다운(그룹 제목 + 아이콘·이름·설명) */
+.settings-menu {
+  width: 340px;
+  max-width: calc(100vw - var(--chanho-space-300));
+}
+.settings-nav-group {
+  display: block;
+  margin-top: var(--chanho-space-150);
+}

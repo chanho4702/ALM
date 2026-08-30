@@ -33,8 +33,12 @@ describe("전역 관리 (/settings)", () => {
     renderSettings("/home");
     await screen.findByRole("heading", { name: /안녕하세요/ });
 
-    await user.click(screen.getByRole("button", { name: "전역 관리" }));
-    expect(await screen.findByRole("heading", { name: "전역 관리" })).toBeInTheDocument();
+    // ⚙ 드롭다운(지라 구조) → 이슈 항목 → 설정 사이드바에서 스킴으로
+    await user.click(screen.getByRole("button", { name: "설정" }));
+    await user.click(await screen.findByRole("menuitem", { name: /이슈 항목/ }));
+    expect(await screen.findByRole("heading", { name: "ALM 관리" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(nav).getByRole("button", { name: "이슈 타입 스킴" }));
 
     const list = screen.getByTestId("scheme-list");
     expect(within(list).getByText("기본 스킴")).toBeInTheDocument();
@@ -45,7 +49,7 @@ describe("전역 관리 (/settings)", () => {
   it("새 스킴 생성 → 목록 추가, 이슈 타입 편집으로 버그를 끄면 반영된다", async () => {
     const user = userEvent.setup();
     renderSettings();
-    await screen.findByRole("heading", { name: "전역 관리" });
+    await screen.findByRole("heading", { name: "ALM 관리" });
 
     await user.type(screen.getByLabelText("새 스킴 이름"), "개발팀 스킴");
     await user.click(screen.getByRole("button", { name: "스킴 만들기" }));
@@ -67,7 +71,7 @@ describe("전역 관리 (/settings)", () => {
   it("워크플로 스킴: 상태 편집으로 새 상태를 추가하면 미리보기에 반영된다", async () => {
     const user = userEvent.setup();
     renderSettings();
-    await screen.findByRole("heading", { name: "전역 관리" });
+    await screen.findByRole("heading", { name: "ALM 관리" });
 
     await user.click(screen.getByRole("button", { name: "워크플로 스킴" }));
     const list = screen.getByTestId("scheme-list");
@@ -89,7 +93,7 @@ describe("전역 관리 (/settings)", () => {
   it("상태 편집기: 마지막 남은 카테고리 상태는 삭제 버튼이 비활성화된다", async () => {
     const user = userEvent.setup();
     renderSettings();
-    await screen.findByRole("heading", { name: "전역 관리" });
+    await screen.findByRole("heading", { name: "ALM 관리" });
 
     await user.click(screen.getByRole("button", { name: "워크플로 스킴" }));
     await user.click(
@@ -107,7 +111,7 @@ describe("스킴 워크플로 전이", () => {
   it("스킴 편집 모달에서 전이를 추가해 저장한다 (프로젝트를 커스텀으로 돌리지 않고)", async () => {
     const user = userEvent.setup();
     renderSettings();
-    await screen.findByRole("heading", { name: "전역 관리" });
+    await screen.findByRole("heading", { name: "ALM 관리" });
     await user.click(screen.getByRole("button", { name: "워크플로 스킴" }));
 
     await user.click(await screen.findByRole("button", { name: "기본 스킴 워크플로 편집" }));
@@ -266,7 +270,7 @@ describe("관리 콘솔", () => {
     });
 
     const menu = screen.getByRole("navigation", { name: "설정 메뉴" });
-    await user.click(within(menu).getByRole("button", { name: "시스템" }));
+    await user.click(within(menu).getByRole("button", { name: "시스템 현황" }));
     const stats = await screen.findByLabelText("시스템 현황");
     expect(stats).toHaveTextContent("프로젝트1");
     expect(stats).toHaveTextContent("이슈8");

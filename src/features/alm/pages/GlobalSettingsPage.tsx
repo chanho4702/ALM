@@ -133,10 +133,12 @@ export function GlobalSettingsPage() {
   return (
     <main className="project-list-content settings-page">
       <PageHeader
-        title={section === "personal" ? "개인 설정" : "전역 관리"}
+        title={section === "personal" || section === "notifications" ? "개인 설정" : "ALM 관리"}
         bottom={
           section === "personal" ? (
-            <span className="settings-header-sub">알림 · 자동 관찰 · 시작 화면</span>
+            <span className="settings-header-sub">시작 화면 · 자동 관찰</span>
+          ) : section === "notifications" ? (
+            <span className="settings-header-sub">앱 내 알림 수신</span>
           ) : (
             <span className="settings-header-sub">
               {GLOBAL_SETTINGS_SECTIONS.find((s) => s.id === section)?.label}
@@ -145,7 +147,9 @@ export function GlobalSettingsPage() {
         }
       />
       {section === "personal" ? (
-        <PersonalSettingsPanel />
+        <PersonalSettingsPanel part="general" />
+      ) : section === "notifications" ? (
+        <PersonalSettingsPanel part="notifications" />
       ) : section === "banner" ? (
         <BannerPanel />
       ) : section === "categories" ? (

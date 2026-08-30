@@ -14,7 +14,12 @@ const START_PAGE_OPTIONS: { value: StartPage; label: string }[] = [
  * 자동 관찰은 내가 만든/댓글 단/수정한 이슈를 워처로 붙일지, 시작 화면은 로고 클릭·첫 진입 위치.
  * 이메일은 메일 서버 연동 전이라 없다.
  */
-export function PersonalSettingsPanel() {
+export interface PersonalSettingsPanelProps {
+  /** general = 시작 화면·자동 관찰(지라 개인 설정 > 일반), notifications = 알림 수신(지라 > 알림) */
+  part: "general" | "notifications";
+}
+
+export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
   const toast = useToast();
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [saved, setSaved] = useState<UserPreferences>(DEFAULT_PREFERENCES);
@@ -71,6 +76,7 @@ export function PersonalSettingsPanel() {
 
   return (
     <div className="project-settings personal-settings" aria-busy={loading}>
+      {part === "notifications" ? (
       <Card padding="lg" title="알림">
         <p className="settings-help">
           어떤 일이 있을 때 앱 안 알림을 받을지 정합니다. 본인이 한 행동은 알리지 않습니다.
@@ -93,6 +99,9 @@ export function PersonalSettingsPanel() {
           />
         </div>
       </Card>
+      ) : null}
+      {part === "general" ? (
+        <>
       <Card padding="lg" title="자동 관찰">
         <p className="settings-help">
           내가 상호작용한 이슈를 자동으로 관찰(워처 등록)합니다. 관찰 중인 이슈의 변화가 알림으로 옵니다.
@@ -124,6 +133,8 @@ export function PersonalSettingsPanel() {
           onValueChange={(next) => setPrefs((p) => ({ ...p, startPage: next as StartPage }))}
         />
       </Card>
+        </>
+      ) : null}
       <div className="project-form-actions">
         <Button onClick={() => void handleSave()} disabled={!dirty || saving || loading}>
           저장
