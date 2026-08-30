@@ -135,9 +135,13 @@ export function GlobalSettingsPage() {
       <PageHeader
         title={section === "personal" ? "개인 설정" : "전역 관리"}
         bottom={
-          <span className="settings-header-sub">
-            {GLOBAL_SETTINGS_SECTIONS.find((s) => s.id === section)?.label}
-          </span>
+          section === "personal" ? (
+            <span className="settings-header-sub">알림 · 자동 관찰 · 시작 화면</span>
+          ) : (
+            <span className="settings-header-sub">
+              {GLOBAL_SETTINGS_SECTIONS.find((s) => s.id === section)?.label}
+            </span>
+          )
         }
       />
       {section === "personal" ? (

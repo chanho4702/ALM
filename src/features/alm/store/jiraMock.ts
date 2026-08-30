@@ -186,7 +186,9 @@ function normalize(data: JiraData): JiraData {
   for (const project of data.projects) {
     project.description ??= "";
     project.category ??= "";
-    project.leadId ??= null;
+    // 구버전 데이터: 리더가 없으면 첫 관리자 멤버를 리더로 (서버는 생성자를 리더로 둔다)
+    project.leadId ??=
+      (data.members ?? []).find((m) => m.projectId === project.id && m.role === "admin")?.userId ?? null;
     project.defaultAssignee ??= "unassigned";
     project.icon ??= "";
     project.color ??= "";
