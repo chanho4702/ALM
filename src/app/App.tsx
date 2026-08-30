@@ -12,6 +12,8 @@ import { BacklogPage } from "../features/alm/pages/BacklogPage";
 import { IssueListPage } from "../features/alm/pages/IssueListPage";
 import { ProjectListPage } from "../features/alm/pages/ProjectListPage";
 import { TrashPage } from "../features/alm/pages/TrashPage";
+import { DashboardsPage } from "../features/alm/pages/DashboardsPage";
+import { DashboardViewPage } from "../features/alm/pages/DashboardViewPage";
 import { ArchivePage } from "../features/alm/pages/ArchivePage";
 import { ProjectCreatePage } from "../features/alm/pages/ProjectCreatePage";
 import { DashboardPage } from "../features/alm/pages/DashboardPage";
@@ -69,6 +71,8 @@ export function App() {
         <Route path="/" element={<StartRedirect />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/dashboards" element={<DashboardsPage />} />
+        <Route path="/dashboards/:dashboardId" element={<DashboardViewPage />} />
         {/* 전역 관리 — 구획은 URL 세그먼트, 메뉴는 설정 사이드바(SettingsSideNav) */}
         <Route path="/settings" element={<Navigate to="/settings/types" replace />} />
         <Route path="/settings/:section" element={<GlobalSettingsPage />} />

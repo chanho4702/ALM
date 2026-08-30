@@ -49,3 +49,10 @@
   toLocaleString/원본 ISO 혼용 — 공용 시간 유틸로 추출 후보.
 - `/projects/:projectId` 인덱스 라우트가 없어 bare URL은 빈 아울렛(수동 진입 시에만 해당).
 - IssueListPage가 필터 변경마다 라벨 옵션·상태 목록까지 재조회(최초 1회면 충분).
+
+## 대시보드(가젯) · 워크로그 (2026-08-30)
+
+`/dashboards` 목록(내 것 + 공유) → `/dashboards/:id` 2열 그리드. 가젯 배치(`DashboardGadget[]`)만 서버에 저장하고 데이터는 각
+가젯이 스토어에서 읽는다(`DashboardGadgets.tsx`의 `renderGadget`). 가젯 추가는 `AddGadgetModal`(종류별로 프로젝트·기간·쿼리만 묻는다).
+워크로그는 `listProjectWorklogs(projectId, {since, until})` + `worklogMetrics.worklogSummary`로 사람별·날짜별 합산 — 가젯 "기록 시간"과
+리포트 종류 "워크로그"가 같은 표(`WorklogTable`)를 쓴다.

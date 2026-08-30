@@ -40,6 +40,56 @@ export interface Component {
   createdAt: string;
 }
 
+/** 대시보드 가젯 종류 — 데이터는 프론트가 기존 스토어 함수로 계산한다 */
+export type GadgetType =
+  | "status-distribution"
+  | "assignee-load"
+  | "priority-distribution"
+  | "sprint-burnup"
+  | "recent-issues"
+  | "filter-results"
+  | "worklog-summary";
+
+export interface GadgetConfig {
+  /** 프로젝트 범위 가젯의 프로젝트. recent-issues/filter-results는 없으면 전체 */
+  projectId?: string;
+  /** 기간(일) — worklog-summary, recent-issues */
+  period?: 7 | 30 | 90;
+  /** 스마트 검색 쿼리 — filter-results */
+  query?: string;
+}
+
+export interface DashboardGadget {
+  id: string;
+  type: GadgetType;
+  /** 2열 그리드의 열(0/1). 같은 열 안에서는 배열 순서 */
+  column: 0 | 1;
+  title?: string;
+  config: GadgetConfig;
+}
+
+/** 대시보드(지라 Dashboards) — 소유자가 가젯을 배치하고, 공유하면 모두가 읽는다 */
+export interface Dashboard {
+  id: string;
+  ownerId: string;
+  name: string;
+  shared: boolean;
+  gadgets: DashboardGadget[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 프로젝트 단위 워크로그 한 줄(가젯·리포트) */
+export interface ProjectWorklogRow {
+  id: string;
+  issueId: string;
+  issueKey: string;
+  authorId: string;
+  hours: number;
+  comment: string;
+  workedOn: string;
+}
+
 /** 프로젝트 바로 가기 — 사이드바/헤더의 외부 링크(위키·저장소·대시보드) */
 export interface ProjectShortcut {
   id: string;
@@ -495,6 +545,7 @@ export interface JiraData {
   /** 휴지통 프로젝트 — projects 밖으로 옮긴다 */
   trashedProjects: Project[];
   components: Component[];
+  dashboards: Dashboard[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

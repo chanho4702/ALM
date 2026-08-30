@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Filter, FolderKanban, Home, MoreHorizontal, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, FolderKanban, Home, LayoutDashboard, MoreHorizontal, Search } from "lucide-react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Dropdown } from "@chanho/react";
@@ -251,6 +251,20 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
               <Search />
             </span>
             <span className="global-nav-label">검색</span>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            className={itemClass(pathname.startsWith("/dashboards"))}
+            aria-label="대시보드"
+            title="대시보드"
+            onClick={() => navigate("/dashboards")}
+          >
+            <span className="global-nav-glyph" aria-hidden>
+              <LayoutDashboard />
+            </span>
+            <span className="global-nav-label">대시보드</span>
           </button>
         </li>
       </ul>

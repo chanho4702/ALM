@@ -19,13 +19,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Issue, IssueChange, Sprint, WorkflowStatus } from "../store/types";
+import type { Issue, IssueChange, ProjectWorklogRow, Sprint, WorkflowStatus } from "../store/types";
+import { WorklogTable } from "../components/DashboardGadgets";
+import { recentRange, worklogSummary } from "./worklogMetrics";
 import {
   listIssues,
   listProjectChanges,
   listProjectStatuses,
   listSprints,
   listUsers,
+  listProjectWorklogs,
 } from "../store/jiraStore";
 import type { User } from "../store/types";
 import { useIssueModal } from "../components/useIssueModal";
@@ -43,13 +46,14 @@ import {
 } from "../components/ReportCharts";
 
 /** 리포트 종류 — 스프린트 기준(번다운·번업)과 프로젝트 기준(벨로시티·누적 흐름·컨트롤) */
-type ReportKind = "burndown" | "burnup" | "velocity" | "cfd" | "control";
+type ReportKind = "burndown" | "burnup" | "velocity" | "cfd" | "control" | "worklog";
 const REPORT_OPTIONS: { value: ReportKind; label: string }[] = [
   { value: "burndown", label: "번다운" },
   { value: "burnup", label: "번업" },
   { value: "velocity", label: "벨로시티" },
   { value: "cfd", label: "누적 흐름도" },
   { value: "control", label: "컨트롤 차트" },
+  { value: "worklog", label: "워크로그" },
 ];
 const SPRINT_SCOPED = new Set<ReportKind>(["burndown", "burnup"]);
 const RANGE_DAYS = 30;
@@ -77,6 +81,7 @@ export function ReportsPage() {
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [changes, setChanges] = useState<IssueChange[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [worklogRows, setWorklogRows] = useState<ProjectWorklogRow[]>([]);
   const [sprintId, setSprintId] = useState<string | null>(null);
   // null = 아직 고르지 않음. 예상 미입력이 있으면 이슈 수 기준이 정직하다 — 시간 기준은 빈 이슈를 0으로 센다
   const [unit, setUnit] = useState<BurndownUnit | null>(null);
@@ -86,12 +91,13 @@ export function ReportsPage() {
   const reload = useCallback(async () => {
     if (!projectId) return;
     const mine = ++generation.current;
-    const [issueList, sprintList, statusList, changeList, userList] = await Promise.all([
+    const [issueList, sprintList, statusList, changeList, userList, worklogList] = await Promise.all([
       listIssues(projectId),
       listSprints(projectId),
       listProjectStatuses(projectId),
       listProjectChanges(projectId),
       listUsers(),
+      listProjectWorklogs(projectId, recentRange(RANGE_DAYS)),
     ]);
     if (mine !== generation.current) return;
     setIssues(issueList);
@@ -99,6 +105,7 @@ export function ReportsPage() {
     setStatuses(statusList);
     setChanges(changeList);
     setUsers(userList);
+    setWorklogRows(worklogList);
     setSprintId((current) => current ?? defaultSprint(sprintList)?.id ?? null);
   }, [projectId]);
 
@@ -153,6 +160,10 @@ export function ReportsPage() {
     if (!sprint || !issues || kind !== "burnup") return null;
     return burnupSeries({ sprint, issues, changes, statuses, unit: effectiveUnit, today });
   }, [sprint, issues, changes, statuses, effectiveUnit, today, kind]);
+  const worklog = useMemo(
+    () => (kind === "worklog" ? worklogSummary(worklogRows, users) : null),
+    [kind, worklogRows, users],
+  );
   const velocity = useMemo(
     () =>
       issues && kind === "velocity"
@@ -215,6 +226,20 @@ export function ReportsPage() {
             </RadioGroup>
           </div>
           {velocity ? <VelocityCard rows={velocity} unit={effectiveUnit} /> : null}
+          {worklog ? (
+            <Card padding="lg" title={`워크로그 (최근 ${RANGE_DAYS}일)`} data-testid="worklog-report">
+              <WorklogTable summary={worklog} rows={worklogRows} />
+              {worklog.byDay.length > 0 ? (
+                <ul className="worklog-days" aria-label="날짜별 기록">
+                  {worklog.byDay.map((d) => (
+                    <li key={d.day}>
+                      {d.day} · {d.hours}h
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </Card>
+          ) : null}
           {flow ? <CumulativeFlowCard points={flow} /> : null}
           {control ? <ControlChartCard chart={control} onOpen={openIssue} /> : null}
         </div>

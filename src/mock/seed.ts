@@ -260,6 +260,7 @@ export function createSeedData(): JiraData {
     archivedIssues: [],
     trashedProjects: [],
     components: [],
+    dashboards: [],
     shortcuts: [],
     preferences: {},
     banner: { enabled: false, level: "info", message: "" },
