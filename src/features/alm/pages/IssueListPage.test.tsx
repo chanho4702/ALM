@@ -201,3 +201,31 @@ describe("IssueListPage 대량 변경", () => {
     });
   });
 });
+
+describe("IssueListPage CSV", () => {
+  it("CSV 파일을 고르면 미리보기·건너뛸 행을 보여주고, 가져오면 목록에 나타난다", async () => {
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.click(screen.getByRole("button", { name: "CSV 가져오기" }));
+    const dialog = await screen.findByRole("dialog", { name: "CSV 가져오기" });
+    const csv = [
+      "Issue key,Summary,Issue Type,Status,Priority,Assignee,Labels",
+      "ALM-30,이관된 버그,Bug,Done,High,박준영,legacy",
+      ",모르는 상태는 건너뛴다,Task,Unknown,Low,,",
+    ].join("\n");
+    await user.upload(
+      within(dialog).getByLabelText("CSV 파일"),
+      new File([csv], "jira.csv", { type: "text/csv" }),
+    );
+    expect(await within(dialog).findByText(/읽을 수 있는 행 1개, 건너뛸 행 1개/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("list", { name: "건너뛰는 행" })).toHaveTextContent("3행: 모르는 상태입니다: Unknown");
+
+    await user.click(within(dialog).getByRole("button", { name: "가져오기" }));
+    expect(await screen.findByText("1개 이슈를 가져왔습니다")).toBeInTheDocument();
+    const row = (await screen.findByText("ALM-30")).closest("tr")!;
+    expect(within(row).getByText("이관된 버그")).toBeInTheDocument();
+    expect(within(row).getByText("완료")).toBeInTheDocument();
+  });
+});

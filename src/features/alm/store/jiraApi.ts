@@ -577,3 +577,48 @@ export async function bulkDeleteIssues(
   }
   return { deleted, failed };
 }
+
+// ── CSV/이관 가져오기 — 서버는 키를 직접 발급하므로 키 보존은 서버 이관 API까지 목업 전용 ──
+
+export interface ImportResult {
+  created: number;
+  failed: { row: number; title: string; reason: string }[];
+}
+
+export async function importIssues(
+  projectId: string,
+  inputs: {
+    key?: string;
+    title: string;
+    description?: string;
+    type?: IssueType;
+    status?: string;
+    priority?: IssuePriority;
+    assigneeId?: string | null;
+    labels?: string[];
+    dueDate?: string | null;
+    estimateHours?: number | null;
+  }[],
+): Promise<ImportResult> {
+  if (inputs.length === 0) throw new Error("가져올 이슈가 없습니다");
+  let created = 0;
+  const failed: ImportResult["failed"] = [];
+  for (const [index, input] of inputs.entries()) {
+    try {
+      if (input.key) throw new Error("서버는 아직 키 보존 가져오기를 지원하지 않습니다");
+      const { estimateHours, key: _key, ...rest } = input;
+      const issue = await createIssue({ projectId, ...rest });
+      if (estimateHours !== undefined && estimateHours !== null) {
+        await updateIssue(issue.id, { estimateHours });
+      }
+      created += 1;
+    } catch (error) {
+      failed.push({
+        row: index + 1,
+        title: input.key ?? input.title,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { created, failed };
+}

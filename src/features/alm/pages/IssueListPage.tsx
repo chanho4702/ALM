@@ -23,6 +23,8 @@ import {
   listUsers,
 } from "../store/jiraStore";
 import { BulkEditModal } from "../components/BulkEditModal";
+import { CsvImportModal } from "../components/CsvImportModal";
+import { issuesToCsv } from "../store/csv";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { useIssueTypes } from "../components/useIssueTypes";
@@ -62,6 +64,7 @@ export function IssueListPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const toast = useToast();
 
   const reload = useCallback(async () => {
@@ -190,6 +193,23 @@ export function IssueListPage() {
     setConfirmingDelete(false);
     setSelected(new Set());
     await reload();
+  };
+
+  /** 현재 보이는(필터·정렬 적용) 목록을 CSV로 — 선택이 있으면 선택만 */
+  const exportCsv = () => {
+    const rows = selected.size > 0 ? sortedIssues.filter((i) => selected.has(i.id)) : sortedIssues;
+    const csv = issuesToCsv(rows, { statuses, users, types: issueTypes });
+    if (typeof URL.createObjectURL !== "function") {
+      toast({ title: "이 환경에서는 파일 내려받기를 지원하지 않습니다", appearance: "info" });
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `issues-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast({ title: `${rows.length}개 이슈를 CSV로 내보냈습니다`, appearance: "success" });
   };
 
   const columns: TableColumn<Issue>[] = [
@@ -392,6 +412,13 @@ export function IssueListPage() {
             >
               삭제
             </Button>
+            <span className="bulk-bar-divider" aria-hidden />
+            <Button size="small" variant="secondary" onClick={exportCsv}>
+              CSV 내보내기
+            </Button>
+            <Button size="small" variant="secondary" onClick={() => setImportOpen(true)}>
+              CSV 가져오기
+            </Button>
           </div>
         ) : null}
         {issues === null ? (
@@ -399,10 +426,15 @@ export function IssueListPage() {
             <Spinner size="large" label="이슈 불러오는 중" />
           </div>
         ) : issues.length === 0 ? (
-          <EmptyState
-            title="조건에 맞는 이슈가 없습니다"
-            description="검색어나 필터를 조정해 보세요."
-          />
+          <div className="issue-empty">
+            <EmptyState
+              title="조건에 맞는 이슈가 없습니다"
+              description="검색어나 필터를 조정해 보세요."
+            />
+            <Button size="small" variant="secondary" onClick={() => setImportOpen(true)}>
+              CSV 가져오기
+            </Button>
+          </div>
         ) : (
           <div className="issue-table-scroll">
             <Table
@@ -430,6 +462,15 @@ export function IssueListPage() {
           void reload();
         }}
       />
+      {projectId ? (
+        <CsvImportModal
+          open={importOpen}
+          projectId={projectId}
+          ctx={{ statuses, users, types: issueTypes }}
+          onOpenChange={setImportOpen}
+          onDone={() => void reload()}
+        />
+      ) : null}
       {confirmingDelete ? (
         <Modal
           trigger={<span hidden />}

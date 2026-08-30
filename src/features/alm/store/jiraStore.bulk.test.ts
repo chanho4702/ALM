@@ -4,6 +4,7 @@ import {
   bulkDeleteIssues,
   bulkUpdateIssues,
   getIssueByKey,
+  importIssues,
   listIssues,
   listSchemes,
   updateScheme,
@@ -62,5 +63,29 @@ describe("대량 변경", () => {
     const result = await bulkDeleteIssues(ids);
     expect(result).toEqual({ deleted: 2, failed: [] });
     expect((await listIssues("p1")).length).toBe(before - 2);
+  });
+});
+
+describe("가져오기", () => {
+  it("키를 보존해 만들고, 카운터는 그 번호 이상으로 앞당겨지며, 중복 키는 사유와 함께 실패한다", async () => {
+    const result = await importIssues("p1", [
+      { key: "ALM-20", title: "이관 이슈", status: "done", priority: "high", labels: ["legacy"], estimateHours: 3 },
+      { key: "ALM-1", title: "중복 키" },
+      { title: "키 없는 이슈" },
+    ]);
+    expect(result.created).toBe(2);
+    expect(result.failed).toEqual([{ row: 2, title: "ALM-1", reason: "이미 있는 키입니다: ALM-1" }]);
+    expect(await getIssueByKey("ALM-20")).toMatchObject({
+      status: "done",
+      priority: "high",
+      labels: ["legacy"],
+      estimateHours: 3,
+      resolution: "done",
+    });
+    expect((await getIssueByKey("ALM-21"))?.title).toBe("키 없는 이슈"); // 카운터가 20을 넘어섰다
+    await expect(importIssues("p1", [{ key: "PAY-1", title: "다른 프로젝트 키" }])).resolves.toMatchObject({
+      created: 0,
+      failed: [{ reason: "키는 ALM-번호 형식이어야 합니다: PAY-1" }],
+    });
   });
 });

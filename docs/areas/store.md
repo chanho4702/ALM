@@ -102,6 +102,13 @@
 - REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
   규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
 
+## CSV · 가져오기 (2026-08-30)
+
+`store/csv.ts`(순수): `parseCsv`/`toCsv`(RFC 4180), `issuesToCsv`(사람이 읽는 이름으로 내보냄),
+`csvToIssueInputs`(우리 헤더 + 지라 영문 헤더 별칭, 행 단위 오류 분리). `importIssues(projectId, inputs)`는
+행마다 `createIssue` — `key`가 있으면 보존하고 카운터를 그 번호 이상으로 앞당긴다(`{프로젝트키}-N` 형식·유일
+검증). REST 어댑터는 서버가 키를 발급하므로 키 보존을 거부한다(서버 이관 API 후속).
+
 ## 대량 변경 (2026-08-30)
 
 `bulkUpdateIssues(ids, patch)` / `bulkDeleteIssues(ids)` — 이슈마다 `updateIssue`/`deleteIssue`를 거쳐

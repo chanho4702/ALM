@@ -1317,12 +1317,27 @@ export async function createIssue(input: {
   parentId?: string | null;
   dueDate?: string | null;
   labels?: string[];
+  estimateHours?: number | null;
+  /** 보존할 키(이관·CSV) — `{프로젝트키}-{번호}` 형식, 유일해야 한다. 번호는 카운터를 앞당긴다 */
+  key?: string;
 }): Promise<Issue> {
   const data = load();
   const project = data.projects.find((p) => p.id === input.projectId);
   if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
   const title = input.title.trim();
   if (!title) throw new Error("이슈 제목을 입력하세요");
+  let preservedSeq: number | null = null;
+  if (input.key !== undefined) {
+    const match = new RegExp(`^${project.key}-(\\d+)$`).exec(input.key.trim().toUpperCase());
+    if (!match) throw new Error(`키는 ${project.key}-번호 형식이어야 합니다: ${input.key}`);
+    if (data.issues.some((i) => i.key === match[0])) {
+      throw new Error(`이미 있는 키입니다: ${match[0]}`);
+    }
+    preservedSeq = Number(match[1]);
+  }
+  if (input.estimateHours !== undefined && input.estimateHours !== null && !(input.estimateHours > 0)) {
+    throw new Error("예상 시간은 0보다 커야 합니다");
+  }
   // 타입은 프로젝트 설정(enabledTypes)을 따른다 — 미지정이면 task, task가 꺼져 있으면 첫 활성 타입
   const settingsEntryForCreate = data.projectSettings.find((e) => e.projectId === project.id);
   const enabledTypes =
@@ -1341,8 +1356,9 @@ export async function createIssue(input: {
   }
   assertCanEdit(data, project.id);
   if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
-  const seq = (data.issueCounters[project.id] ?? 0) + 1;
-  data.issueCounters[project.id] = seq; // 삭제돼도 감소하지 않는다 → 키 미재사용
+  const seq = preservedSeq ?? (data.issueCounters[project.id] ?? 0) + 1;
+  // 삭제돼도 감소하지 않는다 → 키 미재사용. 보존 키는 카운터를 그 번호 이상으로 앞당긴다
+  data.issueCounters[project.id] = Math.max(data.issueCounters[project.id] ?? 0, seq);
   const now = new Date().toISOString();
   const maxOrder = data.issues
     .filter((i) => i.projectId === project.id)
@@ -1366,7 +1382,7 @@ export async function createIssue(input: {
     sprintId: input.sprintId ?? null,
     parentId: null, // 계층 검증 후 아래에서 지정
     dueDate: input.dueDate ?? null,
-    estimateHours: null,
+    estimateHours: input.estimateHours ?? null,
     resolution: null,
     fixVersionId: null,
     labels: input.labels ?? [],
@@ -1717,6 +1733,50 @@ export async function rankIssue(
   recordChanges(data, before, issue, issue.updatedAt); // sprint 변경 활동로그
   persist();
   return clone(issue);
+}
+
+// ── CSV/이관 가져오기 ────────────────────────────────────────
+
+export interface ImportResult {
+  created: number;
+  failed: { row: number; title: string; reason: string }[];
+}
+
+/**
+ * 여러 이슈를 순서대로 만든다 — 한 줄이 실패해도 나머지는 만들고 사유를 남긴다(전부 롤백 없음).
+ * 키가 있으면 보존한다(createIssue의 key 규칙).
+ */
+export async function importIssues(
+  projectId: string,
+  inputs: {
+    key?: string;
+    title: string;
+    description?: string;
+    type?: IssueType;
+    status?: string;
+    priority?: IssuePriority;
+    assigneeId?: string | null;
+    labels?: string[];
+    dueDate?: string | null;
+    estimateHours?: number | null;
+  }[],
+): Promise<ImportResult> {
+  if (inputs.length === 0) throw new Error("가져올 이슈가 없습니다");
+  let created = 0;
+  const failed: ImportResult["failed"] = [];
+  for (const [index, input] of inputs.entries()) {
+    try {
+      await createIssue({ projectId, ...input });
+      created += 1;
+    } catch (error) {
+      failed.push({
+        row: index + 1,
+        title: input.key ?? input.title,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { created, failed };
 }
 
 // ── 대량 변경 ────────────────────────────────────────────────
