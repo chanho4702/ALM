@@ -111,6 +111,14 @@ export interface CsvIssueInput {
   estimateHours: number | null;
 }
 
+/** 모르는 값을 어디로 보낼지 — 이관 마법사가 채운다. 키는 파일의 원문(트림) */
+export interface CsvMappings {
+  statuses?: Record<string, string>;
+  types?: Record<string, string>;
+  /** null = 미지정으로 */
+  assignees?: Record<string, string | null>;
+}
+
 export interface CsvRowError {
   /** 1부터 세는 줄 번호(헤더 = 1) */
   row: number;
@@ -164,6 +172,7 @@ const norm = (value: string) => value.trim().toLowerCase();
 export function csvToIssueInputs(
   rows: string[][],
   ctx: CsvContext,
+  mappings: CsvMappings = {},
 ): { inputs: CsvIssueInput[]; errors: CsvRowError[] } {
   if (rows.length === 0) return { inputs: [], errors: [{ row: 1, reason: "빈 파일입니다" }] };
   const header = rows[0].map(norm);
@@ -200,6 +209,7 @@ export function csvToIssueInputs(
     const typeText = cell(row, col.type);
     if (typeText) {
       const found =
+        mappings.types?.[typeText] ??
         ctx.types.find((t) => t.name === typeText || t.id === typeText)?.id ??
         JIRA_TYPES[norm(typeText)];
       if (!found) return fail(`모르는 타입입니다: ${typeText}`);
@@ -208,6 +218,7 @@ export function csvToIssueInputs(
     const statusText = cell(row, col.status);
     if (statusText) {
       const found =
+        mappings.statuses?.[statusText] ??
         ctx.statuses.find((s) => s.name === statusText || s.id === statusText)?.id ??
         JIRA_STATUSES[norm(statusText)];
       if (!found) return fail(`모르는 상태입니다: ${statusText}`);
@@ -222,7 +233,9 @@ export function csvToIssueInputs(
     const assigneeText = cell(row, col.assignee);
     if (col.assignee >= 0) {
       if (!assigneeText) input.assigneeId = null;
-      else {
+      else if (mappings.assignees && assigneeText in mappings.assignees) {
+        input.assigneeId = mappings.assignees[assigneeText];
+      } else {
         const found = ctx.users.find(
           (u) => u.name === assigneeText || u.id === assigneeText,
         );
@@ -246,4 +259,49 @@ export function csvToIssueInputs(
     inputs.push(input);
   });
   return { inputs, errors };
+}
+
+// ── 이관 분석 — 파일에 있지만 우리가 모르는 값을 모은다(짝짓기 UI의 입력) ──
+
+export interface CsvAnalysis {
+  rowCount: number;
+  unknown: { statuses: string[]; types: string[]; assignees: string[] };
+}
+
+export function analyzeCsv(rows: string[][], ctx: CsvContext): CsvAnalysis {
+  const header = rows[0]?.map(norm) ?? [];
+  const col = (field: keyof typeof HEADER_ALIASES) =>
+    header.findIndex((h) => HEADER_ALIASES[field].includes(h));
+  const status = col("status");
+  const type = col("type");
+  const assignee = col("assignee");
+  const statuses = new Set<string>();
+  const types = new Set<string>();
+  const assignees = new Set<string>();
+  for (const row of rows.slice(1)) {
+    const statusText = status < 0 ? "" : (row[status] ?? "").trim();
+    if (
+      statusText &&
+      !ctx.statuses.some((s) => s.name === statusText || s.id === statusText) &&
+      !JIRA_STATUSES[norm(statusText)]
+    ) {
+      statuses.add(statusText);
+    }
+    const typeText = type < 0 ? "" : (row[type] ?? "").trim();
+    if (
+      typeText &&
+      !ctx.types.some((t) => t.name === typeText || t.id === typeText) &&
+      !JIRA_TYPES[norm(typeText)]
+    ) {
+      types.add(typeText);
+    }
+    const assigneeText = assignee < 0 ? "" : (row[assignee] ?? "").trim();
+    if (assigneeText && !ctx.users.some((u) => u.name === assigneeText || u.id === assigneeText)) {
+      assignees.add(assigneeText);
+    }
+  }
+  return {
+    rowCount: Math.max(rows.length - 1, 0),
+    unknown: { statuses: [...statuses], types: [...types], assignees: [...assignees] },
+  };
 }

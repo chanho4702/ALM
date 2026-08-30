@@ -9,6 +9,7 @@ export const PROJECT_SETTINGS_SECTIONS = [
   { id: "members", label: "사용자·권한" },
   { id: "workflow", label: "워크플로" },
   { id: "types", label: "이슈 타입" },
+  { id: "import", label: "가져오기" },
 ] as const;
 
 /** 전역 관리 구획 — `/settings/:section` */

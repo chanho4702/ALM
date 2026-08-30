@@ -21,6 +21,7 @@ import type {
   WorkflowStatus,
   WorkflowTransition,
   WorkflowLayout,
+  User,
 } from "../store/types";
 import type { ResolvedSettings } from "../store/jiraStore";
 import {
@@ -28,6 +29,7 @@ import {
   deleteProject,
   listIssues,
   listSchemes,
+  listUsers,
   resolveSettings,
   setProjectCustom,
   updateProject,
@@ -38,6 +40,7 @@ import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
+import { JiraImportPanel } from "../components/JiraImportPanel";
 import { useIssueTypes } from "../components/useIssueTypes";
 import {
   PROJECT_SETTINGS_SECTIONS,
@@ -61,6 +64,10 @@ export interface ProjectSettingsPageProps {
 export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSettingsPageProps) {
   const { projectId, section = "general" } = useParams();
   const issueTypes = useIssueTypes();
+  const [users, setUsers] = useState<User[]>([]);
+  useEffect(() => {
+    void listUsers().then(setUsers);
+  }, []);
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -369,6 +376,13 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         {section === "members" ? <ProjectMembersPanel projectId={project.id} /> : null}
         {section === "workflow" ? workflow : null}
         {section === "types" ? types : null}
+        {section === "import" && resolved ? (
+          <JiraImportPanel
+            projectId={project.id}
+            ctx={{ statuses: resolved.body.statuses, users, types: issueTypes }}
+            onImported={() => void reloadSettings()}
+          />
+        ) : null}
       </main>
 
       {confirmingDelete ? (

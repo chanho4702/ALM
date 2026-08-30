@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvToIssueInputs, issuesToCsv, parseCsv } from "./csv";
+import { analyzeCsv, csvToIssueInputs, issuesToCsv, parseCsv } from "./csv";
 import type { Issue, IssueTypeDef, User, WorkflowStatus } from "./types";
 
 const statuses: WorkflowStatus[] = [
@@ -117,5 +117,30 @@ describe("CSV → 이슈 입력 (지라 내보내기 헤더 호환)", () => {
     const { inputs, errors } = csvToIssueInputs(parseCsv("키,상태\nALM-1,할 일"), ctx);
     expect(inputs).toEqual([]);
     expect(errors).toEqual([{ row: 1, reason: "제목(Summary) 열이 없습니다" }]);
+  });
+});
+
+describe("이관 분석·짝짓기", () => {
+  it("모르는 상태·타입·담당자를 모으고, 짝지어 주면 그 행이 살아난다", () => {
+    const rows = parseCsv(
+      [
+        "Issue key,Summary,Issue Type,Status,Assignee",
+        "PAY-1,리뷰 중,Improvement,Code Review,홍길동",
+        "PAY-2,정상,Bug,Done,박준영",
+      ].join("\n"),
+    );
+    const analysis = analyzeCsv(rows, ctx);
+    expect(analysis).toEqual({
+      rowCount: 2,
+      unknown: { statuses: ["Code Review"], types: ["Improvement"], assignees: ["홍길동"] },
+    });
+    expect(csvToIssueInputs(rows, ctx).errors).toHaveLength(1);
+    const mapped = csvToIssueInputs(rows, ctx, {
+      statuses: { "Code Review": "todo" },
+      types: { Improvement: "task" },
+      assignees: { 홍길동: null },
+    });
+    expect(mapped.errors).toEqual([]);
+    expect(mapped.inputs[0]).toMatchObject({ key: "PAY-1", status: "todo", type: "task", assigneeId: null });
   });
 });

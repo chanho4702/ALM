@@ -167,3 +167,34 @@ describe("워크플로 전이 편집", () => {
     expect(await screen.findByText("워크플로를 저장했습니다")).toBeInTheDocument();
   });
 });
+
+describe("프로젝트 설정 — 가져오기", () => {
+  it("지라 CSV의 모르는 상태를 짝지어 가져오면 키가 보존된 이슈가 생긴다", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const menu = await screen.findByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(menu).getByRole("button", { name: "가져오기" }));
+
+    const csv = [
+      "Issue key,Summary,Issue Type,Status,Priority,Assignee",
+      "ALM-40,리뷰 대기,Task,Code Review,High,",
+      "ALM-41,완료된 것,Bug,Done,Low,",
+    ].join("\n");
+    await user.upload(
+      await screen.findByLabelText("지라 CSV 파일"),
+      new File([csv], "jira-export.csv", { type: "text/csv" }),
+    );
+    expect(await screen.findByText(/읽을 수 있는 행 1개, 건너뛸 행 1개/)).toBeInTheDocument();
+
+    // 모르는 상태 Code Review → 진행 중으로 짝짓기
+    await user.click(screen.getByRole("combobox", { name: "상태 Code Review" }));
+    await user.click(await screen.findByRole("option", { name: /진행 중/ }));
+    expect(await screen.findByText(/읽을 수 있는 행 2개/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "2개 이슈 가져오기" }));
+    expect(await screen.findByText("2개 이슈를 가져왔습니다")).toBeInTheDocument();
+    expect(screen.getByLabelText("가져오기 결과")).toHaveTextContent("만듦 2건");
+    const { getIssueByKey } = await import("../store/jiraStore");
+    expect(await getIssueByKey("ALM-40")).toMatchObject({ status: "inprogress", priority: "high" });
+  });
+});

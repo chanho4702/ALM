@@ -21,7 +21,7 @@
 | `/projects/:id/releases` | ReleasesPage(lazy) | 릴리스 허브: 버전 만들기·진행률·릴리스(미완료 이관 선택)·보관·삭제 |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
-| `/projects/:id/settings/:section` | ProjectSettingsPage(lazy) | **프로젝트 뷰(ProjectLayout) 바깥의 별도 페이지.** 구획 `general`/`members`/`workflow`/`types`, `/settings`는 `general`로 redirect. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
+| `/projects/:id/settings/:section` | ProjectSettingsPage(lazy) | **프로젝트 뷰(ProjectLayout) 바깥의 별도 페이지.** 구획 `general`/`members`/`workflow`/`types`/`import`(지라 CSV 이관 마법사), `/settings`는 `general`로 redirect. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
 | 그 외 전부 | → `/home` | |
 
 이슈 상세는 페이지가 아니라 **`?issue=ALM-3` 쿼리로 여는 모달**(`useIssueModal` +
