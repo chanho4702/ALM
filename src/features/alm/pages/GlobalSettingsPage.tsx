@@ -25,6 +25,7 @@ import { GLOBAL_SETTINGS_SECTIONS, isGlobalSettingsSection } from "../components
 import { StatusCategoriesPanel } from "../components/StatusCategoriesPanel";
 import { StatusRegistryPanel } from "../components/StatusRegistryPanel";
 import { IssueTypesPanel } from "../components/IssueTypesPanel";
+import { AdminAuditPanel, SystemPanel } from "../components/AdminPanels";
 import { useIssueTypes } from "../components/useIssueTypes";
 
 type Aspect = "workflow" | "types";
@@ -143,6 +144,10 @@ export function GlobalSettingsPage() {
         <StatusRegistryPanel />
       ) : section === "issue-types" ? (
         <IssueTypesPanel />
+      ) : section === "audit" ? (
+        <AdminAuditPanel />
+      ) : section === "system" ? (
+        <SystemPanel />
       ) : (
       <div className="admin-layout">
         <div className="admin-content">

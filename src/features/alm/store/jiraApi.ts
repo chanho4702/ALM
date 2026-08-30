@@ -34,6 +34,8 @@ import type {
   ProjectVersion,
   Sprint,
   Notification,
+  AuditEntry,
+  SystemStats,
 } from "./types";
 
 async function json<T>(response: Response): Promise<T> {
@@ -763,4 +765,53 @@ export async function markNotificationRead(id: string): Promise<void> {
 
 export async function markAllNotificationsRead(): Promise<void> {
   await sharedApiFetch("/api/alm/notifications/read-all", { method: "POST" });
+}
+
+// ── 관리 콘솔 — 서버 V10 감사 로그·현황 (roles에 ADMIN 필요, 아니면 403이 그대로 온다) ──
+
+interface AuditDto {
+  id: number;
+  eventType: string;
+  actorId: number;
+  projectId: number | null;
+  targetKey: string | null;
+  summary: string | null;
+  occurredAt: string;
+}
+
+export async function listAuditLog(
+  filter: { type?: string; since?: string; projectId?: string },
+  paging: { page: number; size: number },
+): Promise<{ items: AuditEntry[]; page: number; size: number; total: number }> {
+  const query = searchParams({
+    type: filter.type,
+    since: filter.since,
+    projectId: filter.projectId ? toBackendId(filter.projectId).toString() : undefined,
+    page: String(paging.page),
+    size: String(paging.size),
+  });
+  const dto = (await json(await sharedApiFetch(`/api/alm/admin/audit?${query}`))) as {
+    items: AuditDto[];
+    page: number;
+    size: number;
+    total: number;
+  };
+  return {
+    items: dto.items.map((row) => ({
+      id: String(row.id),
+      eventType: row.eventType,
+      actorId: String(row.actorId),
+      projectId: row.projectId === null ? null : String(row.projectId),
+      targetKey: row.targetKey,
+      summary: row.summary,
+      at: row.occurredAt,
+    })),
+    page: dto.page,
+    size: dto.size,
+    total: dto.total,
+  };
+}
+
+export async function systemStats(): Promise<SystemStats> {
+  return (await json(await sharedApiFetch("/api/alm/admin/stats"))) as SystemStats;
 }

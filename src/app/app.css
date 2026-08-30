@@ -3195,3 +3195,24 @@ body {
   align-items: center;
   gap: var(--chanho-space-150);
 }
+
+/* ── 관리 콘솔: 시스템 현황 ──────────────────────────────── */
+
+.system-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--chanho-space-200);
+  margin: 0;
+}
+
+.system-stats dt {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.system-stats dd {
+  margin: 0;
+  font-size: var(--chanho-font-size-300);
+  font-weight: var(--chanho-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}

@@ -248,3 +248,27 @@ describe("이슈 타입 레지스트리", () => {
     expect(within(dialog).getByRole("checkbox", { name: "개선" })).not.toBeChecked();
   });
 });
+
+describe("관리 콘솔", () => {
+  it("감사 로그는 최신순 표로 보이고 종류로 거를 수 있으며, 시스템 현황이 숫자로 나온다", async () => {
+    const user = userEvent.setup();
+    renderSettings("/settings/audit");
+    const table = await screen.findByRole("table", { name: "감사 로그" });
+    expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
+    expect(screen.getByRole("navigation", { name: "감사 로그 페이지" })).toHaveTextContent(/\/ \d+건/);
+
+    await user.click(screen.getByRole("combobox", { name: "종류" }));
+    await user.click(await screen.findByRole("option", { name: "프로젝트 생성" }));
+    await waitFor(() => {
+      const rows = within(screen.getByRole("table", { name: "감사 로그" })).getAllByRole("row");
+      expect(rows).toHaveLength(2); // 헤더 + 시드 프로젝트 1
+      expect(rows[1]).toHaveTextContent("ALM");
+    });
+
+    const menu = screen.getByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(menu).getByRole("button", { name: "시스템" }));
+    const stats = await screen.findByLabelText("시스템 현황");
+    expect(stats).toHaveTextContent("프로젝트1");
+    expect(stats).toHaveTextContent("이슈8");
+  });
+});

@@ -19,6 +19,8 @@ export const GLOBAL_SETTINGS_SECTIONS = [
   { id: "issue-types", label: "이슈 타입" },
   { id: "types", label: "이슈 타입 스킴" },
   { id: "workflows", label: "워크플로 스킴" },
+  { id: "audit", label: "감사 로그" },
+  { id: "system", label: "시스템" },
 ] as const;
 
 export type ProjectSettingsSection = (typeof PROJECT_SETTINGS_SECTIONS)[number]["id"];
