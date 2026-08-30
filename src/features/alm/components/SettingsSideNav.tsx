@@ -13,6 +13,8 @@ export const PROJECT_SETTINGS_SECTIONS = [
 
 /** 전역 관리 구획 — `/settings/:section` */
 export const GLOBAL_SETTINGS_SECTIONS = [
+  { id: "categories", label: "상태 카테고리" },
+  { id: "statuses", label: "상태" },
   { id: "types", label: "이슈 타입 스킴" },
   { id: "workflows", label: "워크플로 스킴" },
 ] as const;

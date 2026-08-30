@@ -1,0 +1,143 @@
+import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { Button, Card, Lozenge, Select, TextField, useToast } from "@chanho/react";
+import type { StatusCategory, StatusDef } from "../store/types";
+import {
+  createStatusDef,
+  deleteStatusDef,
+  listStatusCategories,
+  listStatusDefs,
+  statusDefUsage,
+  updateStatusDef,
+} from "../store/jiraStore";
+import { KIND_LABELS } from "./labels";
+
+/**
+ * 전역 관리 → 상태. 워크플로가 골라 쓰는 **상태 레지스트리** — 이름·카테고리를 여기서 바꾸면
+ * 그 상태를 쓰는 모든 스킴·프로젝트에 즉시 반영된다. 워크플로가 쓰는 동안은 지울 수 없다.
+ */
+export function StatusRegistryPanel() {
+  const toast = useToast();
+  const [defs, setDefs] = useState<StatusDef[]>([]);
+  const [categories, setCategories] = useState<StatusCategory[]>([]);
+  const [usage, setUsage] = useState<Record<string, number>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState("todo");
+
+  const reload = useCallback(async () => {
+    const [list, cats, used] = await Promise.all([
+      listStatusDefs(),
+      listStatusCategories(),
+      statusDefUsage(),
+    ]);
+    setDefs(list);
+    setCategories(cats);
+    setUsage(used);
+    setDrafts(Object.fromEntries(list.map((d) => [d.id, d.name])));
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const run = async (failTitle: string, action: () => Promise<unknown>) => {
+    try {
+      await action();
+    } catch (error) {
+      toast({
+        title: failTitle,
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+    await reload();
+  };
+
+  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void run("상태 추가 실패", async () => {
+      await createStatusDef({ name: newName, categoryId: newCategory });
+      setNewName("");
+      toast({ title: "상태를 추가했습니다", appearance: "success" });
+    });
+  };
+
+  const categoryOf = (id: string) => categories.find((c) => c.id === id);
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: `${c.name} (${KIND_LABELS[c.kind]})`,
+  }));
+
+  const commitName = (def: StatusDef) => {
+    const name = (drafts[def.id] ?? "").trim();
+    if (!name || name === def.name) return;
+    void run("이름 변경 실패", () => updateStatusDef(def.id, { name }));
+  };
+
+  return (
+    <Card padding="lg" title="상태">
+      <p className="admin-scheme-note">
+        워크플로 스킴과 프로젝트 커스텀이 이 목록에서 상태를 골라 씁니다. 이름·카테고리를 바꾸면 쓰는
+        곳 전부에 반영되고, 쓰는 워크플로가 있으면 지울 수 없습니다.
+      </p>
+
+      <form className="status-editor-add" onSubmit={handleCreate}>
+        <TextField
+          label="새 상태 이름"
+          placeholder="예: 코드 리뷰"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+        />
+        <Select
+          label="새 상태 카테고리"
+          value={newCategory}
+          options={categoryOptions}
+          onValueChange={setNewCategory}
+        />
+        <Button type="submit" variant="secondary" disabled={!newName.trim()}>
+          상태 추가
+        </Button>
+      </form>
+
+      <ul className="status-editor-list" aria-label="상태 목록">
+        {defs.map((def) => {
+          const category = categoryOf(def.categoryId);
+          const used = usage[def.id] ?? 0;
+          return (
+            <li key={def.id} className="status-editor-row status-editor-row--registry">
+              <Lozenge appearance={category?.color ?? "neutral"}>{category?.name ?? def.categoryId}</Lozenge>
+              <TextField
+                label={`${def.name} 이름`}
+                value={drafts[def.id] ?? def.name}
+                onChange={(e) => setDrafts((prev) => ({ ...prev, [def.id]: e.target.value }))}
+                onBlur={() => commitName(def)}
+              />
+              <Select
+                label={`${def.name} 카테고리`}
+                value={def.categoryId}
+                options={categoryOptions}
+                onValueChange={(v) =>
+                  void run("카테고리 변경 실패", () => updateStatusDef(def.id, { categoryId: v }))
+                }
+              />
+              <span className="status-editor-usage">워크플로 {used}개</span>
+              <div className="status-editor-row-actions">
+                <Button
+                  type="button"
+                  size="small"
+                  variant="ghost"
+                  aria-label={`${def.name} 삭제`}
+                  disabled={used > 0}
+                  onClick={() => void run("상태 삭제 실패", () => deleteStatusDef(def.id))}
+                >
+                  삭제
+                </Button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}

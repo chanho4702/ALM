@@ -1,5 +1,7 @@
 import type { Issue, IssueChange, Sprint, WorkflowStatus } from "../store/types";
-import { statusCategory } from "../components/labels";
+import {
+  statusKind,
+} from "../components/labels";
 
 /**
  * 번다운·스프린트 리포트 집계. 변경 이력(`IssueChange`)을 시간순으로 재생해 "그 시점에 이 이슈가
@@ -167,7 +169,7 @@ export function burndownSeries(input: {
       const state = stateAt(issue, changes, at);
       const inSprint = state.replayed ? state.sprintId === sprint.id : issue.sprintId === sprint.id;
       if (!inSprint) return sum;
-      return statusCategory(statuses, state.status) === "done" ? sum : sum + weight(issue);
+      return statusKind(statuses, state.status) === "complete" ? sum : sum + weight(issue);
     }, 0);
 
   // 총량(기준선의 출발점)은 첫날 변경 이전 = 실제 시작 시각 기준이다. 첫날 끝으로 재면
@@ -219,7 +221,7 @@ export function sprintReport(input: {
     const state = stateAt(issue, changes, reference, sprint.completedAt);
     const inSprint = state.replayed ? state.sprintId === sprint.id : issue.sprintId === sprint.id;
     if (!inSprint) continue;
-    if (statusCategory(statuses, state.status) === "done") {
+    if (statusKind(statuses, state.status) === "complete") {
       completed.push(issue);
       continue;
     }

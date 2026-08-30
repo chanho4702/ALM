@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { EmptyState, Lozenge, Spinner, Tabs } from "@chanho/react";
-import type { Issue, IssueStatus, Project, User, WorkflowStatus } from "../store/types";
+import type { Issue, Project, StatusKind, User, WorkflowStatus } from "../store/types";
 import {
   getCurrentUser,
   listIssues,
@@ -11,7 +11,11 @@ import {
 import { listRecentProjectIds, listStarredProjectIds } from "../store/uiStore";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
-import { statusAppearance, statusName } from "../components/labels";
+import {
+  statusAppearance,
+  statusKind,
+  statusName,
+} from "../components/labels";
 
 /** "3시간 전" 식 상대 시간 — 지라 홈의 시간 표기 모방 */
 function relTime(iso: string): string {
@@ -85,11 +89,9 @@ export function HomePage() {
   const openIssue = (issue: Issue) =>
     navigate(`/projects/${issue.projectId}/issues?issue=${issue.key}`);
 
-  const categoryOf = (issue: Issue): IssueStatus => {
-    const ws = statusMeta[issue.projectId]?.[issue.status];
-    if (ws) return ws.category;
-    return issue.status === "inprogress" || issue.status === "done" ? issue.status : "todo";
-  };
+  /** 이슈 → 상태 의미 — 프로젝트별 해석 메타에서 읽고, 없으면 기본 id로 폴백 */
+  const kindOf = (issue: Issue): StatusKind =>
+    statusKind(Object.values(statusMeta[issue.projectId] ?? {}), issue.status);
 
   /** 이어서 하기 — 최근 방문 프로젝트(없으면 전체 앞순) + 최근 업데이트 이슈 */
   const resumeProjects = useMemo(() => {
@@ -114,7 +116,7 @@ export function HomePage() {
     const dueSoon: Recommendation[] = [];
     const unassigned: Recommendation[] = [];
     for (const issue of issues) {
-      if (categoryOf(issue) === "done") continue;
+      if (kindOf(issue) === "complete") continue;
       if (issue.dueDate && issue.dueDate < today) {
         overdue.push({ issue, reason: "기한 지남", appearance: "danger" });
       } else if (issue.dueDate && issue.dueDate <= soon) {

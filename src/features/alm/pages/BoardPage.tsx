@@ -33,7 +33,6 @@ import {
 import type { QuickFilter } from "../components/BoardFilterBar";
 import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
-import { STATUS_APPEARANCE } from "../components/labels";
 import { resolveMove } from "./boardDnd";
 
 const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
@@ -270,7 +269,7 @@ export function BoardPage() {
                         onOpenIssue={openIssue}
                         epicNames={epicNames}
                         columnName={column?.name ?? ws.name}
-                        appearance={STATUS_APPEARANCE[ws.category]}
+                        appearance={ws.color ?? "neutral"}
                         // 밴드별 개수는 전체 WIP 기준과 달라 오해 소지 — 스윔레인에선 표시 생략
                         wipLimit={null}
                       />
@@ -293,7 +292,7 @@ export function BoardPage() {
                     epicNames={epicNames}
                     onCreateIssue={handleColumnCreate}
                     columnName={column?.name ?? ws.name}
-                    appearance={STATUS_APPEARANCE[ws.category]}
+                    appearance={ws.color ?? "neutral"}
                     wipLimit={column?.wipLimit ?? null}
                   />
                 );

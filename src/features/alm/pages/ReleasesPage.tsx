@@ -23,7 +23,10 @@ import {
   listVersions,
   releaseVersion,
 } from "../store/jiraStore";
-import { formatPlannedRange, statusCategory } from "../components/labels";
+import {
+  formatPlannedRange,
+  statusKind,
+} from "../components/labels";
 import { VersionReleaseModal } from "../components/VersionReleaseModal";
 
 const STATUS_LABELS: Record<VersionStatus, string> = {
@@ -103,7 +106,7 @@ export function ReleasesPage() {
       if (!issue.fixVersionId) continue;
       const entry = byVersion.get(issue.fixVersionId) ?? { total: 0, done: 0 };
       entry.total += 1;
-      if (statusCategory(statuses, issue.status) === "done") entry.done += 1;
+      if (statusKind(statuses, issue.status) === "complete") entry.done += 1;
       byVersion.set(issue.fixVersionId, entry);
     }
     return (id: string) => byVersion.get(id) ?? { total: 0, done: 0 };
@@ -122,7 +125,7 @@ export function ReleasesPage() {
   const unresolvedOf = (version: ProjectVersion) =>
     issues.filter(
       (issue) =>
-        issue.fixVersionId === version.id && statusCategory(statuses, issue.status) !== "done",
+        issue.fixVersionId === version.id && statusKind(statuses, issue.status) !== "complete",
     );
 
   return (

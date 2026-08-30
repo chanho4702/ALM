@@ -41,7 +41,10 @@ import {
   PROJECT_SETTINGS_SECTIONS,
   isProjectSettingsSection,
 } from "../components/SettingsSideNav";
-import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
+import {
+  ISSUE_TYPES,
+  TYPE_LABELS,
+} from "../components/labels";
 
 export interface ProjectSettingsPageProps {
   projects: Project[];
@@ -261,7 +264,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
               {[...resolved.body.statuses]
                 .sort((a, b) => a.order - b.order)
                 .map((status) => (
-                  <Lozenge key={status.id} appearance={STATUS_APPEARANCE[status.category]}>
+                  <Lozenge key={status.id} appearance={status.color ?? "neutral"}>
                     {status.name}
                   </Lozenge>
                 ))}

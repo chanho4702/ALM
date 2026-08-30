@@ -29,7 +29,31 @@ export interface Sprint {
  * 상태 카테고리 — 워크플로 커스텀 상태(WorkflowStatus)가 반드시 소속되는 3분류.
  * 통계/색/완료 판정은 전부 카테고리 기준이다. (커스텀 상태 도입 후에도 불변)
  */
+/** 기본 상태 카테고리 id 3종 — 시드·템플릿·검색이 이 id를 쓴다. 사용자 카테고리는 `cat-*` */
 export type IssueStatus = "todo" | "inprogress" | "done";
+
+/** 카테고리의 의미 — 완료 판정·번다운·보드 정렬은 전부 여기서 파생한다 (지라의 statusCategory) */
+export type StatusKind = "new" | "active" | "complete";
+/** 카테고리 색 — Lozenge appearance와 1:1 */
+export type StatusColor = "neutral" | "info" | "success" | "warning" | "danger";
+
+/** 전역 상태 카테고리 — 기본 3개(todo/inprogress/done)는 의미를 바꾸거나 지울 수 없다 */
+export interface StatusCategory {
+  id: string;
+  name: string;
+  kind: StatusKind;
+  color: StatusColor;
+  order: number;
+  builtIn: boolean;
+}
+
+/** 전역 상태 레지스트리 항목 — 워크플로(스킴/커스텀)가 골라 쓴다. 이름·카테고리의 진실 */
+export interface StatusDef {
+  id: string;
+  name: string;
+  categoryId: string; // StatusCategory.id
+  description: string;
+}
 export type IssuePriority = "high" | "medium" | "low";
 export type IssueType = "task" | "story" | "bug" | "epic" | "subtask";
 /** 해결 — "왜 끝났는가". 지라 기본 4종. 완료 카테고리에서만 값을 갖고, 다시 열면 비워진다 */
@@ -133,10 +157,14 @@ export interface Board {
 
 /** 워크플로 상태 — id는 불변(이슈가 참조), category가 색/완료 판정을 결정한다 */
 export interface WorkflowStatus {
-  id: string;
+  id: string; // StatusDef.id
+  /** 레지스트리 값의 캐시 — 읽을 때는 레지스트리가 이기고, 저장할 때는 레지스트리로 관통된다 */
   name: string;
-  category: IssueStatus; // "todo" | "inprogress" | "done"
+  category: string; // StatusCategory.id
   order: number;
+  /** 해석(resolve) 시 채워지는 파생 — 카테고리 의미·색. 저장 데이터에는 없다 */
+  kind?: StatusKind;
+  color?: StatusColor;
 }
 
 /**
@@ -295,6 +323,10 @@ export interface JiraData {
   versions: ProjectVersion[];
   /** 이슈 첨부 메타 */
   attachments: Attachment[];
+  /** 전역 상태 카테고리 (order순) */
+  statusCategories: StatusCategory[];
+  /** 전역 상태 레지스트리 */
+  statusDefs: StatusDef[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

@@ -37,7 +37,9 @@ import {
 import { SprintEditModal } from "../components/SprintEditModal";
 import { SprintCompleteModal } from "../components/SprintCompleteModal";
 import type { MoveTarget } from "../components/SprintPanel";
-import { statusCategory } from "../components/labels";
+import {
+  statusKind,
+} from "../components/labels";
 import { BACKLOG_PANEL, resolveBacklogMove } from "./backlogDnd";
 
 export function BacklogPage() {
@@ -191,7 +193,7 @@ export function BacklogPage() {
             ? issues.filter(
                 (issue) =>
                   issue.sprintId === completingSprint.id &&
-                  statusCategory(statuses, issue.status) !== "done",
+                  statusKind(statuses, issue.status) !== "complete",
               )
             : []
         }

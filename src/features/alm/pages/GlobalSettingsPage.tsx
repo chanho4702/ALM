@@ -12,8 +12,13 @@ import {
 } from "../store/jiraStore";
 import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
-import { ISSUE_TYPES, STATUS_APPEARANCE, TYPE_LABELS } from "../components/labels";
-import { isGlobalSettingsSection } from "../components/SettingsSideNav";
+import {
+  ISSUE_TYPES,
+  TYPE_LABELS,
+} from "../components/labels";
+import { GLOBAL_SETTINGS_SECTIONS, isGlobalSettingsSection } from "../components/SettingsSideNav";
+import { StatusCategoriesPanel } from "../components/StatusCategoriesPanel";
+import { StatusRegistryPanel } from "../components/StatusRegistryPanel";
 
 type Aspect = "workflow" | "types";
 
@@ -45,9 +50,10 @@ export function GlobalSettingsPage() {
     setCounts(Object.fromEntries(entries));
   }, []);
 
+  // 구획을 오가도 컴포넌트는 유지된다 — 레지스트리 편집 뒤 스킴 미리보기가 낡지 않게 다시 읽는다
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, section]);
 
   const run = async (failTitle: string, action: () => Promise<unknown>) => {
     try {
@@ -112,10 +118,15 @@ export function GlobalSettingsPage() {
         title="전역 관리"
         bottom={
           <span className="settings-header-sub">
-            {aspect === "types" ? "이슈 타입 스킴" : "워크플로 스킴"}
+            {GLOBAL_SETTINGS_SECTIONS.find((s) => s.id === section)?.label}
           </span>
         }
       />
+      {section === "categories" ? (
+        <StatusCategoriesPanel />
+      ) : section === "statuses" ? (
+        <StatusRegistryPanel />
+      ) : (
       <div className="admin-layout">
         <div className="admin-content">
           <form className="admin-create-form" onSubmit={handleCreate}>
@@ -183,7 +194,7 @@ export function GlobalSettingsPage() {
                         {[...scheme.body.statuses]
                           .sort((a, b) => a.order - b.order)
                           .map((status) => (
-                            <Lozenge key={status.id} appearance={STATUS_APPEARANCE[status.category]}>
+                            <Lozenge key={status.id} appearance={status.color ?? "neutral"}>
                               {status.name}
                             </Lozenge>
                           ))}
@@ -227,6 +238,7 @@ export function GlobalSettingsPage() {
           </ul>
         </div>
       </div>
+      )}
 
       {editing ? (
         <Modal

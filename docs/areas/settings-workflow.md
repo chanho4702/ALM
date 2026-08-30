@@ -14,17 +14,38 @@
   파생 API: `listProjectStatuses`(order순), `statusMetaByProject`(크로스 프로젝트 화면용),
   `listAllStatuses`(스마트 검색용 합집합).
 
+## 전역 상태 카테고리 · 상태 레지스트리 (2026-08-30)
+
+지라처럼 **상태는 전역**이고 워크플로(스킴/커스텀)는 그중 무엇을 어떤 순서로 쓸지만 정한다.
+
+- `StatusCategory { id, name, kind, color, order, builtIn }` — 기본 3개(`todo`/`inprogress`/`done`)는
+  **의미(kind)를 바꾸거나 지울 수 없다**(이름·색은 가능). 사용자 카테고리(`cat-*`)는 추가·삭제·순서 변경
+  가능하되, 쓰는 상태가 있으면 못 지운다.
+- `kind: "new" | "active" | "complete"` — **완료 판정·해결 규칙·번다운·보드 정렬·요약 타일은 전부
+  의미에서 파생**한다. 화면은 `labels.ts`의 `statusKind()`/`KIND_ORDER`/`KIND_LABELS`를 쓴다.
+  `statusCategory()`는 이제 카테고리 **id**(string)를 돌려주며 스마트 검색의 카테고리 필터만 쓴다.
+- `StatusDef { id, name, categoryId, description }` — 레지스트리. 이름은 전역 유일. 워크플로가 쓰는 동안
+  못 지우고, 카테고리를 옮겨 어떤 워크플로의 의미가 비게 되면 거부한다.
+- `SettingsBody.statuses`는 **참조 + 캐시**(`{ id, name, category, order }`). 읽을 때(`resolveSettings`·
+  `listSchemes`·`listProjectStatuses`·`statusMetaByProject`)는 레지스트리가 이기고 `kind`/`color`가
+  채워져 온다. 저장할 때 본문의 이름·카테고리는 **레지스트리로 관통**된다(`applyBodyToRegistry`) —
+  커스텀 본문에서 바꾼 이름도 전역이다(지라와 같음, 프로젝트별 별명은 없다).
+- 편집 UI: 전역 관리 → **상태 카테고리**(`StatusCategoriesPanel`) · **상태**(`StatusRegistryPanel`).
+  워크플로 상태 편집기(`StatusEditor`)는 이름을 바꾸지 않고 **기존 상태 추가 / 새 상태 만들기(레지스트리
+  즉시 등록) / 순서 / 빼기**만 한다. 새 상태는 모달을 취소해도 레지스트리에 남는다(상태 페이지에서 삭제).
+- 구버전 localStorage는 `normalize`가 스킴/커스텀에 적힌 상태로 레지스트리를 채운다(무마이그레이션).
+
 ## 상태 모델 — 카테고리 불변 전략 (중요)
 
-- `IssueStatus` 타입은 이제 **카테고리**("todo"|"inprogress"|"done")를 뜻한다.
+- `IssueStatus` 타입은 **기본 카테고리 id 3종**("todo"|"inprogress"|"done")이다 — 시드·템플릿·검색이 쓴다. `WorkflowStatus.category`는 임의 카테고리 id(string).
 - `Issue.status: string`은 `WorkflowStatus.id`를 가리킨다. 기본 상태의 id가 카테고리 문자열과
   동일해서 구버전 데이터가 무마이그레이션 호환된다.
 - **색·완료 판정·통계·정렬은 전부 카테고리에서 파생**한다. 화면은
   `components/labels.ts`의 `statusCategory/statusName/statusAppearance/CATEGORY_ORDER` 헬퍼를 쓴다
   (statuses 미로드 시 기본 3상태 폴백 내장). 직접 `STATUS_LABELS[issue.status]` 인덱싱 금지 —
   잔재가 `BoardColumn.tsx` 폴백에 남아 있다(도달 불가 코드, 정리 대상).
-- 검증 규칙(`validateSettingsBody`): 카테고리마다 상태 최소 1개, 이름 중복 금지,
-  subtask 타입은 항상 활성.
+- 검증 규칙(`validateSettingsBody`): **의미(new/active/complete)마다** 상태 최소 1개, 이름 중복 금지(레지스트리 전체),
+  카테고리 실재, subtask 타입은 항상 활성. 에러 문구는 그대로 "카테고리(할 일/진행 중/완료)마다 …".
 
 ## 전이 규칙 (2026-08-29)
 
@@ -45,8 +66,8 @@
 
 ## 이관 규칙
 
-상태 구성이 바뀌어 특정 상태가 사라지면, 그 상태의 이슈는 **옛 구성에서 읽은 카테고리와 같은
-카테고리의 첫 상태(order순)** 로 이관된다(`migrateIssueStatuses`). 호출 순서 계약:
+상태 구성이 바뀌어 특정 상태가 사라지면, 그 상태의 이슈는 **같은 카테고리의 첫 상태 → 없으면 같은
+의미(kind)의 첫 상태 → 없으면 첫 상태**(order순)로 이관된다(`migrateIssueStatuses`). 호출 순서 계약:
 **반드시 구성 변경 전에 호출** (4개 경로 전부 준수 중).
 알려진 구멍: 보드 컬럼(`board.columns[].status`)은 이관하지 않는다 → store.md 참고.
 
@@ -54,6 +75,6 @@
 
 - `StatusEditor`는 초안만 다루는 controlled 컴포넌트 — 저장은 부모가
   `updateScheme` 또는 `updateProjectCustomSettings`로 한다. order는 커밋 때 1부터 재부여.
-- 마지막 남은 카테고리 상태는 삭제 버튼 disabled (검증기와 같은 가드).
+- 마지막 남은 **의미**의 상태는 빼기 버튼 disabled (검증기와 같은 가드).
 - 보드는 `listProjectStatuses`를 컬럼 원천으로 쓰므로 상태를 추가하면 컬럼이 자동으로 늘어난다.
   `BoardSettingsModal`의 컬럼 초안도 상태 목록에서 파생된다.

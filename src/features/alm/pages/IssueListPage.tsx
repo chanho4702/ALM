@@ -16,21 +16,21 @@ import { listIssues, listProjectStatuses, listUsers } from "../store/jiraStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import {
-  CATEGORY_ORDER,
   ISSUE_TYPES,
+  KIND_ORDER,
   PRIORITY_APPEARANCE,
   PRIORITY_LABELS,
-  statusAppearance,
-  statusCategory,
-  statusName,
   TYPE_LABELS,
+  statusAppearance,
+  statusKind,
+  statusName,
 } from "../components/labels";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
 const ALL = "all";
 const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
 
-// 정렬용 위계: 우선순위 높음→낮음 (상태는 카테고리 위계 CATEGORY_ORDER 사용)
+// 정렬용 위계: 우선순위 높음→낮음 (상태는 카테고리 의미 위계 KIND_ORDER 사용)
 const PRIORITY_ORDER: Record<IssuePriority, number> = { high: 0, medium: 1, low: 2 };
 
 export function IssueListPage() {
@@ -101,8 +101,7 @@ export function IssueListPage() {
           break;
         case "status":
           cmp =
-            CATEGORY_ORDER[statusCategory(statuses, a.status)] -
-            CATEGORY_ORDER[statusCategory(statuses, b.status)];
+            KIND_ORDER[statusKind(statuses, a.status)] - KIND_ORDER[statusKind(statuses, b.status)];
           break;
         case "priority":
           cmp = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
@@ -138,7 +137,7 @@ export function IssueListPage() {
   const isOverdue = (issue: Issue) =>
     issue.dueDate !== null &&
     issue.dueDate < today &&
-    statusCategory(statuses, issue.status) !== "done";
+    statusKind(statuses, issue.status) !== "complete";
 
   const columns: TableColumn<Issue>[] = [
     {

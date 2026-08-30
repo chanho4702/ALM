@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import { Background, Controls, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Button, Lozenge, Select } from "@chanho/react";
-import type { IssueStatus, WorkflowStatus, WorkflowTransition } from "../store/types";
-import { STATUS_APPEARANCE } from "./labels";
+import type { StatusKind, WorkflowStatus, WorkflowTransition } from "../store/types";
+import { statusAppearance } from "./labels";
 
-/** 카테고리별 열 — 왼쪽에서 오른쪽으로 진행 방향을 그린다 */
-const COLUMN_X: Record<IssueStatus, number> = { todo: 0, inprogress: 240, done: 480 };
+/** 의미(할 일/진행 중/완료)별 열 — 왼쪽에서 오른쪽으로 진행 방향을 그린다 */
+const COLUMN_X: Record<StatusKind, number> = { new: 0, active: 240, complete: 480 };
 const ROW_HEIGHT = 88;
 const ANY = "any"; // "모든 상태" 센티널 — Select는 빈 문자열 value를 쓰지 않는다
 
@@ -43,17 +43,18 @@ export function WorkflowCanvas({
   const nameOf = (id: string) => sorted.find((status) => status.id === id)?.name ?? id;
 
   const nodes = useMemo<Node[]>(() => {
-    const perColumn: Record<IssueStatus, number> = { todo: 0, inprogress: 0, done: 0 };
+    const perColumn: Record<StatusKind, number> = { new: 0, active: 0, complete: 0 };
     return sorted.map((status) => {
-      const row = perColumn[status.category]++;
+      const kind = status.kind ?? "new";
+      const row = perColumn[kind]++;
       return {
         id: status.id,
-        position: { x: COLUMN_X[status.category], y: row * ROW_HEIGHT },
+        position: { x: COLUMN_X[kind], y: row * ROW_HEIGHT },
         data: { label: status.name },
         // 캔버스는 보기 전용이다 — 편집은 아래 목록에서 한다(규칙이 한 곳에만 있게)
         draggable: false,
         connectable: false,
-        className: `workflow-node is-${status.category}`,
+        className: `workflow-node is-${kind}`,
       };
     });
   }, [sorted]);
@@ -119,9 +120,7 @@ export function WorkflowCanvas({
                 transition.from.map((id) => (
                   <Lozenge
                     key={id}
-                    appearance={
-                      STATUS_APPEARANCE[sorted.find((s) => s.id === id)?.category ?? "todo"]
-                    }
+                    appearance={statusAppearance(sorted, id)}
                   >
                     {nameOf(id)}
                   </Lozenge>
@@ -130,9 +129,7 @@ export function WorkflowCanvas({
             </span>
             <span aria-hidden>→</span>
             <Lozenge
-              appearance={
-                STATUS_APPEARANCE[sorted.find((s) => s.id === transition.to)?.category ?? "todo"]
-              }
+              appearance={statusAppearance(sorted, transition.to)}
             >
               {nameOf(transition.to)}
             </Lozenge>

@@ -102,6 +102,13 @@
 - REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
   규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
 
+## 상태 카테고리 · 상태 레지스트리 (2026-08-30)
+
+`statusCategories`/`statusDefs` + `listStatusCategories`/`createStatusCategory`/`updateStatusCategory`/
+`moveStatusCategory`/`deleteStatusCategory`, `listStatusDefs`/`statusDefUsage`/`createStatusDef`/
+`updateStatusDef`/`deleteStatusDef`. 모델·규칙은 settings-workflow.md "전역 상태 카테고리 · 상태
+레지스트리" 절. 핵심: 완료 판정은 `kind === "complete"`(`statusKindOf`), 화면은 `statusKind()`.
+
 ## 첨부 (2026-08-30)
 
 `attachments: Attachment[]`(메타)와 `uploadAttachment`/`listAttachments`/`downloadAttachment`/

@@ -179,6 +179,50 @@ describe("프로젝트 설정 — 스킴/커스텀", () => {
     expect(await screen.findByText("워크플로를 저장했습니다")).toBeInTheDocument();
 
     // 저장 후 재조회된 편집기에 새 상태가 남아 있다
-    expect(await screen.findByDisplayValue("코드 리뷰")).toBeInTheDocument();
+    expect(
+      await within(screen.getByTestId("status-editor")).findByText("코드 리뷰"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("상태 카테고리·상태 레지스트리", () => {
+  it("카테고리를 추가하면 목록 끝에 붙고, 기본 카테고리는 삭제할 수 없다", async () => {
+    const user = userEvent.setup();
+    renderSettings("/settings/categories");
+    const list = await screen.findByRole("list", { name: "카테고리 목록" });
+    expect(await within(list).findByRole("button", { name: "완료 삭제" })).toBeDisabled();
+    expect(within(list).getByRole("combobox", { name: "완료 의미" })).toBeDisabled();
+
+    await user.type(screen.getByLabelText("새 카테고리 이름"), "검토");
+    await user.click(screen.getByRole("button", { name: "카테고리 추가" }));
+    expect(await screen.findByText("카테고리를 추가했습니다")).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "검토 삭제" })).toBeEnabled();
+    expect(within(list).getByRole("combobox", { name: "검토 의미" })).toBeEnabled();
+  });
+
+  it("상태를 만들고 이름을 바꾸면 워크플로 스킴 미리보기에 반영된다", async () => {
+    const user = userEvent.setup();
+    renderSettings("/settings/statuses");
+    const list = await screen.findByRole("list", { name: "상태 목록" });
+    // 기본 스킴이 쓰는 상태는 지울 수 없다
+    expect(await within(list).findByRole("button", { name: "완료 삭제" })).toBeDisabled();
+
+    await user.type(screen.getByLabelText("새 상태 이름"), "리뷰");
+    await user.click(screen.getByRole("button", { name: "상태 추가" }));
+    expect(await within(list).findByLabelText("리뷰 이름")).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "리뷰 삭제" })).toBeEnabled(); // 아직 아무도 안 씀
+
+    // 이름 변경은 블러에서 저장된다
+    const field = within(list).getByLabelText("진행 중 이름");
+    await user.clear(field);
+    await user.type(field, "작업 중");
+    await user.tab();
+    await waitFor(() => {
+      expect(within(list).getByLabelText("작업 중 이름")).toBeInTheDocument();
+    });
+
+    const menu = screen.getByRole("navigation", { name: "설정 메뉴" });
+    await user.click(within(menu).getByRole("button", { name: "워크플로 스킴" }));
+    expect(await within(await screen.findByTestId("scheme-list")).findByText("작업 중")).toBeInTheDocument();
   });
 });

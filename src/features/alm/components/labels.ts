@@ -1,5 +1,13 @@
 import type { LozengeProps } from "@chanho/react";
-import type { IssuePriority, IssueResolution, IssueStatus, IssueType, WorkflowStatus } from "../store/types";
+import type {
+  IssuePriority,
+  IssueResolution,
+  IssueStatus,
+  IssueType,
+  StatusColor,
+  StatusKind,
+  WorkflowStatus,
+} from "../store/types";
 
 type LozengeAppearance = NonNullable<LozengeProps["appearance"]>;
 
@@ -15,6 +23,30 @@ export const STATUS_APPEARANCE: Record<IssueStatus, LozengeAppearance> = {
   todo: "neutral",
   inprogress: "info",
   done: "success",
+};
+
+// ── 카테고리 의미(kind) — 완료 판정·정렬·보드 묶음의 기준 ──
+
+export const STATUS_KINDS: StatusKind[] = ["new", "active", "complete"];
+export const KIND_LABELS: Record<StatusKind, string> = {
+  new: "할 일",
+  active: "진행 중",
+  complete: "완료",
+};
+/** 정렬용 의미 위계 (할 일 → 진행 중 → 완료) */
+export const KIND_ORDER: Record<StatusKind, number> = { new: 0, active: 1, complete: 2 };
+export const STATUS_COLORS: StatusColor[] = ["neutral", "info", "success", "warning", "danger"];
+export const COLOR_LABELS: Record<StatusColor, string> = {
+  neutral: "회색",
+  info: "파랑",
+  success: "초록",
+  warning: "주황",
+  danger: "빨강",
+};
+const KIND_OF_BUILTIN: Record<IssueStatus, StatusKind> = {
+  todo: "new",
+  inprogress: "active",
+  done: "complete",
 };
 
 export const PRIORITY_LABELS: Record<IssuePriority, string> = {
@@ -38,14 +70,19 @@ export const BOARD_STATUSES: IssueStatus[] = ["todo", "inprogress", "done"];
 
 const CATEGORY_SET = new Set<string>(BOARD_STATUSES);
 
-/** 상태 id → 카테고리 (색·완료 판정·통계의 기준) */
-export function statusCategory(
-  statuses: WorkflowStatus[] | undefined,
-  statusId: string,
-): IssueStatus {
+/** 상태 id → 카테고리 id */
+export function statusCategory(statuses: WorkflowStatus[] | undefined, statusId: string): string {
   const found = statuses?.find((s) => s.id === statusId);
   if (found) return found.category;
-  return CATEGORY_SET.has(statusId) ? (statusId as IssueStatus) : "todo";
+  return CATEGORY_SET.has(statusId) ? statusId : "todo";
+}
+
+/** 상태 id → 카테고리 의미 (완료 판정·통계·정렬의 기준). 해석 안 된 목록은 기본 id로 폴백 */
+export function statusKind(statuses: WorkflowStatus[] | undefined, statusId: string): StatusKind {
+  const found = statuses?.find((s) => s.id === statusId);
+  if (found?.kind) return found.kind;
+  const category = found?.category ?? statusId;
+  return CATEGORY_SET.has(category) ? KIND_OF_BUILTIN[category as IssueStatus] : "new";
 }
 
 /** 상태 id → 표시 이름 */
@@ -60,7 +97,10 @@ export function statusAppearance(
   statuses: WorkflowStatus[] | undefined,
   statusId: string,
 ): LozengeAppearance {
-  return STATUS_APPEARANCE[statusCategory(statuses, statusId)];
+  const found = statuses?.find((s) => s.id === statusId);
+  if (found?.color) return found.color;
+  const category = statusCategory(statuses, statusId);
+  return CATEGORY_SET.has(category) ? STATUS_APPEARANCE[category as IssueStatus] : "neutral";
 }
 
 /** 정렬용 카테고리 위계 (할 일 → 진행 중 → 완료) */

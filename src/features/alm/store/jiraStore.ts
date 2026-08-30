@@ -11,7 +11,11 @@ import type {
   IssueLinkType,
   IssuePriority,
   IssueResolution,
-  IssueStatus,
+  StatusCategory,
+  StatusColor,
+  StatusDef,
+  StatusKind,
+  WorkflowStatus,
   IssueType,
   JiraData,
   Notification,
@@ -49,9 +53,86 @@ function defaultSettingsBody(): SettingsBody {
   };
 }
 
+/** 기본 카테고리 — 의미(kind)는 고정, 이름·색은 바꿀 수 있다 */
+const BUILTIN_CATEGORIES: StatusCategory[] = [
+  { id: "todo", name: "할 일", kind: "new", color: "neutral", order: 1, builtIn: true },
+  { id: "inprogress", name: "진행 중", kind: "active", color: "info", order: 2, builtIn: true },
+  { id: "done", name: "완료", kind: "complete", color: "success", order: 3, builtIn: true },
+];
+const STATUS_KIND_LIST: StatusKind[] = ["new", "active", "complete"];
+
+function categoryById(data: JiraData, id: string): StatusCategory {
+  return (
+    data.statusCategories.find((c) => c.id === id) ??
+    BUILTIN_CATEGORIES.find((c) => c.id === id) ??
+    BUILTIN_CATEGORIES[0]
+  );
+}
+
+/**
+ * 저장된 워크플로 상태(참조 + 캐시)를 레지스트리로 해석한다 — 이름·카테고리는 레지스트리가 진실이고,
+ * 레지스트리에 없는 옛 id만 캐시로 버틴다. kind/color는 카테고리에서 파생한다.
+ */
+function enrichStatuses(data: JiraData, statuses: WorkflowStatus[]): WorkflowStatus[] {
+  return statuses.map((s) => {
+    const def = data.statusDefs.find((d) => d.id === s.id);
+    const categoryId = def?.categoryId ?? s.category;
+    const category = categoryById(data, categoryId);
+    return {
+      id: s.id,
+      name: def?.name ?? s.name,
+      category: categoryId,
+      order: s.order,
+      kind: category.kind,
+      color: category.color,
+    };
+  });
+}
+
+function enrichBody(data: JiraData, body: SettingsBody): SettingsBody {
+  return { ...body, statuses: enrichStatuses(data, body.statuses) };
+}
+
+function enrichScheme(data: JiraData, scheme: SettingsScheme): SettingsScheme {
+  return { ...scheme, body: enrichBody(data, scheme.body) };
+}
+
+/** 워크플로 본문의 이름·카테고리를 레지스트리로 관통 저장한다 (검증 뒤에 호출) */
+function applyBodyToRegistry(data: JiraData, body: SettingsBody): void {
+  for (const status of body.statuses) {
+    const def = data.statusDefs.find((d) => d.id === status.id);
+    if (!def) {
+      data.statusDefs.push({
+        id: status.id,
+        name: status.name.trim(),
+        categoryId: status.category,
+        description: "",
+      });
+      continue;
+    }
+    def.name = status.name.trim();
+    def.categoryId = status.category;
+  }
+}
+
+/** 스킴·커스텀 본문 전부 — 레지스트리 사용처 판단용 */
+function allBodies(data: JiraData): SettingsBody[] {
+  return [
+    ...data.schemes.map((s) => s.body),
+    ...data.projectSettings.flatMap((e) => (e.custom ? [e.custom] : [])),
+  ];
+}
+
+/** 본문이 의미(할 일/진행 중/완료)마다 상태를 갖는지 — 카테고리 변경이 워크플로를 비우지 않게 */
+function bodyCoversAllKinds(data: JiraData, body: SettingsBody): boolean {
+  const kinds = new Set(enrichStatuses(data, body.statuses).map((s) => s.kind));
+  return STATUS_KIND_LIST.every((kind) => kinds.has(kind));
+}
+
 function cloneBody(body: SettingsBody): SettingsBody {
   return {
-    statuses: body.statuses.map((s) => ({ ...s })),
+    // 해석 필드(kind/color)는 저장하지 않는다 — 레지스트리에서 매번 파생한다
+    statuses: body.statuses.map((s) => ({ id: s.id, name: s.name, category: s.category, order: s.order })),
     enabledTypes: [...body.enabledTypes],
     ...(body.transitions
       ? { transitions: body.transitions.map((t) => ({ ...t, from: [...t.from] })) }
@@ -128,6 +209,26 @@ function normalize(data: JiraData): JiraData {
     });
   }
   data.projectSettings ??= [];
+  // 전역 상태 카테고리·상태 레지스트리 — 없던 데이터는 스킴/커스텀에 적힌 상태로 채운다
+  data.statusCategories ??= BUILTIN_CATEGORIES.map((c) => ({ ...c }));
+  for (const builtin of BUILTIN_CATEGORIES) {
+    if (!data.statusCategories.some((c) => c.id === builtin.id)) {
+      data.statusCategories.push({ ...builtin });
+    }
+  }
+  data.statusDefs ??= [];
+  for (const body of allBodies(data)) {
+    for (const status of body.statuses) {
+      if (!data.statusDefs.some((d) => d.id === status.id)) {
+        data.statusDefs.push({
+          id: status.id,
+          name: status.name,
+          categoryId: status.category,
+          description: "",
+        });
+      }
+    }
+  }
   const defaultScheme = data.schemes.find((s) => s.isDefault)!;
   for (const project of data.projects) {
     if (!data.projectSettings.some((e) => e.projectId === project.id)) {
@@ -136,7 +237,7 @@ function normalize(data: JiraData): JiraData {
   }
   // 해결 도입 전 데이터: 이미 완료 카테고리인 이슈는 "완료됨"으로 백필한다(설정 정규화 뒤에 판정)
   for (const issue of data.issues) {
-    if (issue.resolution === null && statusCategoryOf(data, issue.projectId, issue.status) === "done") {
+    if (issue.resolution === null && statusKindOf(data, issue.projectId, issue.status) === "complete") {
       issue.resolution = "done";
     }
   }
@@ -378,7 +479,7 @@ function resolvedBody(data: JiraData, projectId: string): SettingsBody {
 
 /** 프로젝트의 해석된 상태 목록 */
 function resolvedStatuses(data: JiraData, projectId: string): SettingsBody["statuses"] {
-  return resolvedBody(data, projectId).statuses;
+  return enrichStatuses(data, resolvedBody(data, projectId).statuses);
 }
 
 function statusNameOf(data: JiraData, projectId: string, statusId: string): string {
@@ -436,8 +537,8 @@ function applyResolutionRule(
   previousStatus: string,
   explicit: IssueResolution | null | undefined,
 ): void {
-  const wasDone = statusCategoryOf(data, issue.projectId, previousStatus) === "done";
-  const isDone = statusCategoryOf(data, issue.projectId, issue.status) === "done";
+  const wasDone = statusKindOf(data, issue.projectId, previousStatus) === "complete";
+  const isDone = statusKindOf(data, issue.projectId, issue.status) === "complete";
   if (!isDone) {
     if (explicit !== undefined && explicit !== null) {
       throw new Error("완료된 이슈에만 해결을 설정할 수 있습니다");
@@ -458,10 +559,16 @@ function assertValidStatus(data: JiraData, projectId: string, statusId: string):
   }
 }
 
-function statusCategoryOf(data: JiraData, projectId: string, statusId: string): IssueStatus {
+function statusKindOf(data: JiraData, projectId: string, statusId: string): StatusKind {
   const found = resolvedStatuses(data, projectId).find((s) => s.id === statusId);
-  if (found) return found.category;
-  return statusId === "inprogress" || statusId === "done" ? statusId : "todo";
+  if (found) return found.kind ?? "new";
+  return categoryById(data, statusId).kind; // 기본 id 폴백 (구버전 데이터)
+}
+
+/** 상태 id → 카테고리 id — 스마트 검색의 카테고리 필터용 */
+function statusCategoryIdOf(data: JiraData, projectId: string, statusId: string): string {
+  const found = resolvedStatuses(data, projectId).find((s) => s.id === statusId);
+  return found?.category ?? categoryById(data, statusId).id;
 }
 
 /**
@@ -860,7 +967,7 @@ export async function releaseVersion(
     for (const issue of data.issues) {
       if (
         issue.fixVersionId === id &&
-        statusCategoryOf(data, issue.projectId, issue.status) !== "done"
+        statusKindOf(data, issue.projectId, issue.status) !== "complete"
       ) {
         issue.fixVersionId = targetId;
         issue.updatedAt = now;
@@ -903,7 +1010,7 @@ export async function versionProgress(
   const version = requireVersion(data, id);
   const issues = data.issues.filter((i) => i.fixVersionId === version.id);
   const done = issues.filter(
-    (i) => statusCategoryOf(data, i.projectId, i.status) === "done",
+    (i) => statusKindOf(data, i.projectId, i.status) === "complete",
   ).length;
   const total = issues.length;
   return { total, done, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
@@ -1029,7 +1136,7 @@ export async function completeSprint(
 
   const now = new Date().toISOString();
   for (const issue of data.issues) {
-    if (issue.sprintId === id && statusCategoryOf(data, issue.projectId, issue.status) !== "done") {
+    if (issue.sprintId === id && statusKindOf(data, issue.projectId, issue.status) !== "complete") {
       issue.sprintId = targetId; // null = 백로그
       issue.updatedAt = now;
       logChange(data, issue, "sprint", id, targetId, now);
@@ -1095,7 +1202,7 @@ export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
   if (query.statuses.length > 0) {
     // 카테고리 기준 매치 — 프로젝트별 커스텀 상태도 카테고리로 걸린다
     issues = issues.filter((i) =>
-      query.statuses.includes(statusCategoryOf(data, i.projectId, i.status)),
+      (query.statuses as string[]).includes(statusCategoryIdOf(data, i.projectId, i.status)),
     );
   }
   if (query.statusIds.length > 0) {
@@ -1203,7 +1310,7 @@ export async function createIssue(input: {
       input.status ??
       (resolvedStatuses(data, project.id)
         .sort((a, b) => a.order - b.order)
-        .find((s) => s.category === "todo")?.id ?? "todo"),
+        .find((s) => s.kind === "new")?.id ?? "todo"),
     priority: input.priority ?? "medium",
     assigneeId: input.assigneeId ?? null,
     reporterId: CURRENT_USER_ID,
@@ -1646,17 +1753,28 @@ export async function deleteComment(id: string): Promise<void> {
 
 // ── settings schemes (지라 구조: 전역 정의 → 배정 → 프로젝트 커스텀) ──
 
-/** 카테고리별 최소 1개·이름 유일/필수·subtask 고정 + 비-subtask 최소 1개 */
-function validateSettingsBody(body: SettingsBody): void {
+/** 의미마다 최소 1개·이름 유일(레지스트리 전체)/필수·카테고리 실재·subtask 고정 + 비-subtask 최소 1개 */
+function validateSettingsBody(data: JiraData, body: SettingsBody): void {
   const names = new Set<string>();
+  const ids = new Set<string>();
+  const kinds = new Set<StatusKind>();
   for (const status of body.statuses) {
     const name = status.name.trim();
     if (!name) throw new Error("상태 이름을 입력하세요");
     if (names.has(name)) throw new Error(`상태 이름이 중복됩니다: ${name}`);
     names.add(name);
+    if (ids.has(status.id)) throw new Error("같은 상태를 두 번 넣을 수 없습니다");
+    ids.add(status.id);
+    if (data.statusDefs.some((d) => d.id !== status.id && d.name === name)) {
+      throw new Error(`상태 이름이 중복됩니다: ${name}`);
+    }
+    if (!data.statusCategories.some((c) => c.id === status.category)) {
+      throw new Error("카테고리를 찾을 수 없습니다");
+    }
+    kinds.add(categoryById(data, status.category).kind);
   }
-  for (const category of ["todo", "inprogress", "done"] as const) {
-    if (!body.statuses.some((s) => s.category === category)) {
+  for (const kind of STATUS_KIND_LIST) {
+    if (!kinds.has(kind)) {
       throw new Error("카테고리(할 일/진행 중/완료)마다 상태가 최소 1개 필요합니다");
     }
   }
@@ -1686,9 +1804,9 @@ export async function resolveSettings(projectId: string): Promise<ResolvedSettin
   const entry = settingsEntry(data, projectId);
   const scheme = data.schemes.find((s) => s.id === entry.schemeId) ?? data.schemes.find((s) => s.isDefault)!;
   return clone({
-    body: entry.custom ?? scheme.body,
+    body: enrichBody(data, entry.custom ?? scheme.body),
     source: entry.custom ? ("custom" as const) : ("scheme" as const),
-    scheme,
+    scheme: enrichScheme(data, scheme),
   });
 }
 
@@ -1710,21 +1828,15 @@ export async function statusMetaByProject() {
   return clone(map);
 }
 
-/** 전 스킴+커스텀의 상태 합집합 (id 유일) — 스마트 검색 상태 이름 매칭용 */
+/** 레지스트리의 상태 전부 (id 유일) — 스마트 검색 상태 이름 매칭용 */
 export async function listAllStatuses(): Promise<{ id: string; name: string }[]> {
-  const data = load();
-  const map = new Map<string, string>();
-  for (const scheme of data.schemes) {
-    for (const s of scheme.body.statuses) map.set(s.id, s.name);
-  }
-  for (const entry of data.projectSettings) {
-    for (const s of entry.custom?.statuses ?? []) map.set(s.id, s.name);
-  }
-  return [...map.entries()].map(([id, name]) => ({ id, name }));
+  return load().statusDefs.map((d) => ({ id: d.id, name: d.name }));
 }
 
+/** 스킴 목록 — 본문 상태는 레지스트리로 해석돼 온다(kind/color 포함) */
 export async function listSchemes(): Promise<SettingsScheme[]> {
-  return clone(load().schemes);
+  const data = load();
+  return clone(data.schemes.map((s) => enrichScheme(data, s)));
 }
 
 /** 스킴별 배정(공유) 프로젝트 수 — 커스텀 전환한 프로젝트는 제외 */
@@ -1747,7 +1859,7 @@ export async function createScheme(name: string): Promise<SettingsScheme> {
   };
   data.schemes.push(scheme);
   persist();
-  return clone(scheme);
+  return clone(enrichScheme(data, scheme));
 }
 
 /** 스킴 수정 — 공유 중인 모든 프로젝트의 이슈를 새 상태 구성으로 이관한다 */
@@ -1764,15 +1876,16 @@ export async function updateScheme(
     scheme.name = name;
   }
   if (patch.body !== undefined) {
-    validateSettingsBody(patch.body);
+    validateSettingsBody(data, patch.body);
     const sharedProjects = data.projectSettings
       .filter((e) => e.schemeId === id && e.custom === null)
       .map((e) => e.projectId);
     migrateIssueStatuses(data, sharedProjects, patch.body);
+    applyBodyToRegistry(data, patch.body);
     scheme.body = cloneBody({ ...patch.body, transitions: pruneTransitions(patch.body) });
   }
   persist();
-  return clone(scheme);
+  return clone(enrichScheme(data, scheme));
 }
 
 export async function deleteScheme(id: string): Promise<void> {
@@ -1802,12 +1915,21 @@ function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: Set
   if (projectIds.length === 0) return;
   const valid = new Set(newBody.statuses.map((s) => s.id));
   const targets = new Set(projectIds);
-  const sorted = [...newBody.statuses].sort((a, b) => a.order - b.order);
+  // 새 본문은 아직 레지스트리에 관통되기 전이라 본문의 카테고리로 의미를 읽는다
+  const sorted = [...newBody.statuses]
+    .sort((a, b) => a.order - b.order)
+    .map((s) => ({ ...s, kind: categoryById(data, s.category).kind }));
   const at = new Date().toISOString();
   for (const issue of data.issues) {
     if (!targets.has(issue.projectId) || valid.has(issue.status)) continue;
-    const oldCategory = statusCategoryOf(data, issue.projectId, issue.status);
-    const fallback = sorted.find((s) => s.category === oldCategory) ?? sorted[0];
+    const old = resolvedStatuses(data, issue.projectId).find((s) => s.id === issue.status);
+    const oldCategory = old?.category ?? issue.status;
+    const oldKind = old?.kind ?? categoryById(data, issue.status).kind;
+    // 같은 카테고리의 첫 상태 → 없으면 같은 의미의 첫 상태 → 없으면 첫 상태
+    const fallback =
+      sorted.find((s) => s.category === oldCategory) ??
+      sorted.find((s) => s.kind === oldKind) ??
+      sorted[0];
     const previous = issue.status;
     issue.status = fallback.id;
     // 구성 변경 이관도 이력에 남긴다 — 남기지 않으면 리포트 재생이 사라진 상태를 계속 되살린다
@@ -1859,9 +1981,198 @@ export async function updateProjectCustomSettings(
   assertCanAdmin(data, projectId);
   const entry = settingsEntry(data, projectId);
   if (!entry.custom) throw new Error("커스텀 설정을 사용 중일 때만 편집할 수 있습니다");
-  validateSettingsBody(body);
+  validateSettingsBody(data, body);
   migrateIssueStatuses(data, [projectId], body);
+  applyBodyToRegistry(data, body);
   entry.custom = cloneBody({ ...body, transitions: pruneTransitions(body) });
+  persist();
+}
+
+// ── 상태 카테고리 · 상태 레지스트리 (전역) ───────────────────
+
+export async function listStatusCategories(): Promise<StatusCategory[]> {
+  return clone([...load().statusCategories].sort((a, b) => a.order - b.order));
+}
+
+export async function createStatusCategory(input: {
+  name: string;
+  kind: StatusKind;
+  color: StatusColor;
+}): Promise<StatusCategory> {
+  const data = load();
+  const name = input.name.trim();
+  if (!name) throw new Error("카테고리 이름을 입력하세요");
+  if (data.statusCategories.some((c) => c.name === name)) {
+    throw new Error(`카테고리 이름이 중복됩니다: ${name}`);
+  }
+  const category: StatusCategory = {
+    id: `cat-${nextId().slice(0, 8)}`,
+    name,
+    kind: input.kind,
+    color: input.color,
+    order: data.statusCategories.length + 1,
+    builtIn: false,
+  };
+  data.statusCategories.push(category);
+  persist();
+  return clone(category);
+}
+
+export async function updateStatusCategory(
+  id: string,
+  patch: Partial<Pick<StatusCategory, "name" | "kind" | "color">>,
+): Promise<StatusCategory> {
+  const data = load();
+  const category = data.statusCategories.find((c) => c.id === id);
+  if (!category) throw new Error("카테고리를 찾을 수 없습니다");
+  if (patch.kind !== undefined && patch.kind !== category.kind) {
+    if (category.builtIn) throw new Error("기본 카테고리의 의미는 바꿀 수 없습니다");
+    // 의미를 바꾸면 이 카테고리의 상태를 쓰는 워크플로가 어떤 의미를 잃을 수 있다
+    const previous = category.kind;
+    category.kind = patch.kind;
+    const affected = new Set(data.statusDefs.filter((d) => d.categoryId === id).map((d) => d.id));
+    const broken = allBodies(data).some(
+      (body) => body.statuses.some((s) => affected.has(s.id)) && !bodyCoversAllKinds(data, body),
+    );
+    if (broken) {
+      category.kind = previous;
+      throw new Error("이 카테고리를 쓰는 워크플로에서 의미(할 일/진행 중/완료)가 비게 됩니다");
+    }
+  }
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("카테고리 이름을 입력하세요");
+    if (data.statusCategories.some((c) => c.id !== id && c.name === name)) {
+      throw new Error(`카테고리 이름이 중복됩니다: ${name}`);
+    }
+    category.name = name;
+  }
+  if (patch.color !== undefined) category.color = patch.color;
+  persist();
+  return clone(category);
+}
+
+/** 순서 한 칸 이동 — order는 1부터 재부여 */
+export async function moveStatusCategory(id: string, delta: -1 | 1): Promise<void> {
+  const data = load();
+  const sorted = [...data.statusCategories].sort((a, b) => a.order - b.order);
+  const index = sorted.findIndex((c) => c.id === id);
+  if (index < 0) throw new Error("카테고리를 찾을 수 없습니다");
+  const target = index + delta;
+  if (target < 0 || target >= sorted.length) return;
+  [sorted[index], sorted[target]] = [sorted[target], sorted[index]];
+  sorted.forEach((c, i) => {
+    c.order = i + 1;
+  });
+  persist();
+}
+
+export async function deleteStatusCategory(id: string): Promise<void> {
+  const data = load();
+  const category = data.statusCategories.find((c) => c.id === id);
+  if (!category) throw new Error("카테고리를 찾을 수 없습니다");
+  if (category.builtIn) throw new Error("기본 카테고리는 삭제할 수 없습니다");
+  if (data.statusDefs.some((d) => d.categoryId === id)) {
+    throw new Error("이 카테고리를 쓰는 상태가 있습니다");
+  }
+  data.statusCategories = data.statusCategories.filter((c) => c.id !== id);
+  [...data.statusCategories]
+    .sort((a, b) => a.order - b.order)
+    .forEach((c, i) => {
+      c.order = i + 1;
+    });
+  persist();
+}
+
+export async function listStatusDefs(): Promise<StatusDef[]> {
+  return clone(load().statusDefs);
+}
+
+/** 상태 id → 쓰는 워크플로(스킴+커스텀) 수 */
+export async function statusDefUsage(): Promise<Record<string, number>> {
+  const data = load();
+  const usage: Record<string, number> = {};
+  for (const def of data.statusDefs) usage[def.id] = 0;
+  for (const body of allBodies(data)) {
+    for (const status of body.statuses) usage[status.id] = (usage[status.id] ?? 0) + 1;
+  }
+  return usage;
+}
+
+export async function createStatusDef(input: {
+  name: string;
+  categoryId: string;
+  description?: string;
+}): Promise<StatusDef> {
+  const data = load();
+  const name = input.name.trim();
+  if (!name) throw new Error("상태 이름을 입력하세요");
+  if (data.statusDefs.some((d) => d.name === name)) {
+    throw new Error(`상태 이름이 중복됩니다: ${name}`);
+  }
+  if (!data.statusCategories.some((c) => c.id === input.categoryId)) {
+    throw new Error("카테고리를 찾을 수 없습니다");
+  }
+  const def: StatusDef = {
+    id: `st-${nextId().slice(0, 8)}`,
+    name,
+    categoryId: input.categoryId,
+    description: input.description?.trim() ?? "",
+  };
+  data.statusDefs.push(def);
+  persist();
+  return clone(def);
+}
+
+/** 이름·카테고리 변경은 쓰는 곳 전부에 즉시 반영된다 (저장된 캐시도 함께 맞춘다) */
+export async function updateStatusDef(
+  id: string,
+  patch: Partial<Pick<StatusDef, "name" | "categoryId" | "description">>,
+): Promise<StatusDef> {
+  const data = load();
+  const def = data.statusDefs.find((d) => d.id === id);
+  if (!def) throw new Error("상태를 찾을 수 없습니다");
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("상태 이름을 입력하세요");
+    if (data.statusDefs.some((d) => d.id !== id && d.name === name)) {
+      throw new Error(`상태 이름이 중복됩니다: ${name}`);
+    }
+    def.name = name;
+  }
+  if (patch.categoryId !== undefined && patch.categoryId !== def.categoryId) {
+    if (!data.statusCategories.some((c) => c.id === patch.categoryId)) {
+      throw new Error("카테고리를 찾을 수 없습니다");
+    }
+    const previous = def.categoryId;
+    def.categoryId = patch.categoryId;
+    const broken = allBodies(data).some(
+      (body) => body.statuses.some((s) => s.id === id) && !bodyCoversAllKinds(data, body),
+    );
+    if (broken) {
+      def.categoryId = previous;
+      throw new Error("이 상태를 쓰는 워크플로에서 의미(할 일/진행 중/완료)가 비게 됩니다");
+    }
+  }
+  if (patch.description !== undefined) def.description = patch.description.trim();
+  for (const body of allBodies(data)) {
+    for (const status of body.statuses) {
+      if (status.id !== id) continue;
+      status.name = def.name;
+      status.category = def.categoryId;
+    }
+  }
+  persist();
+  return clone(def);
+}
+
+export async function deleteStatusDef(id: string): Promise<void> {
+  const data = load();
+  if (!data.statusDefs.some((d) => d.id === id)) throw new Error("상태를 찾을 수 없습니다");
+  if (allBodies(data).some((body) => body.statuses.some((s) => s.id === id))) {
+    throw new Error("워크플로에서 쓰는 상태는 삭제할 수 없습니다");
+  }
+  data.statusDefs = data.statusDefs.filter((d) => d.id !== id);
   persist();
 }
 

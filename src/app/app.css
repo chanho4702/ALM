@@ -1017,9 +1017,42 @@ body {
 
 .status-editor-row {
   display: grid;
-  grid-template-columns: 72px 1fr 140px auto;
+  grid-template-columns: 72px 1fr auto;
   gap: var(--chanho-space-100);
+  align-items: center;
+}
+
+.status-editor-name {
+  font-size: var(--chanho-font-size-100);
+}
+
+.status-editor-usage {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  white-space: nowrap;
+}
+
+/* 전역 관리의 레지스트리 편집 행 — 로젠지 · 이름 · 카테고리/의미/색 · 사용 수 · 액션 */
+.status-editor-row--category {
+  grid-template-columns: 72px minmax(0, 1fr) 180px 180px auto auto;
   align-items: end;
+}
+
+.status-editor-row--registry {
+  grid-template-columns: 72px minmax(0, 1fr) 220px auto auto;
+  align-items: end;
+}
+
+.status-editor-row--category .status-editor-usage,
+.status-editor-row--registry .status-editor-usage,
+.status-editor-row--category .status-editor-row-actions,
+.status-editor-row--registry .status-editor-row-actions {
+  margin-bottom: var(--chanho-space-100);
+}
+
+/* 기본 .status-editor-add(3열)보다 뒤에 오지 않으므로 특이도로 이긴다 */
+.status-editor-add.status-editor-add--3 {
+  grid-template-columns: minmax(0, 1fr) 180px 180px auto;
 }
 
 .status-editor-row > span:first-child {
@@ -1042,7 +1075,10 @@ body {
 
 @media (max-width: 720px) {
   .status-editor-row,
-  .status-editor-add {
+  .status-editor-row--category,
+  .status-editor-row--registry,
+  .status-editor-add,
+  .status-editor-add--3 {
     grid-template-columns: 1fr;
     align-items: stretch;
   }
@@ -2196,11 +2232,11 @@ body {
   font-size: var(--chanho-font-size-75);
 }
 
-.workflow-flow .react-flow__node.is-inprogress {
+.workflow-flow .react-flow__node.is-active {
   border-color: var(--chanho-color-background-info);
 }
 
-.workflow-flow .react-flow__node.is-done {
+.workflow-flow .react-flow__node.is-complete {
   border-color: var(--chanho-color-background-success);
 }
 

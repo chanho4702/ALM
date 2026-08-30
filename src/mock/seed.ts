@@ -212,6 +212,17 @@ export function createSeedData(): JiraData {
     members,
     versions: [],
     attachments: [],
+    // 전역 상태 카테고리·상태 레지스트리 — 기본 3개, 워크플로는 여기서 골라 쓴다
+    statusCategories: [
+      { id: "todo", name: "할 일", kind: "new" as const, color: "neutral" as const, order: 1, builtIn: true },
+      { id: "inprogress", name: "진행 중", kind: "active" as const, color: "info" as const, order: 2, builtIn: true },
+      { id: "done", name: "완료", kind: "complete" as const, color: "success" as const, order: 3, builtIn: true },
+    ],
+    statusDefs: [
+      { id: "todo", name: "할 일", categoryId: "todo", description: "" },
+      { id: "inprogress", name: "진행 중", categoryId: "inprogress", description: "" },
+      { id: "done", name: "완료", categoryId: "done", description: "" },
+    ],
     // 지라식 설정 스킴 — 디폴트 스킴에 전 프로젝트 배정 (상태 id = 기존 status 값)
     schemes: [
       {

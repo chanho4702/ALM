@@ -22,7 +22,6 @@ import type {
   Issue,
   IssuePriority,
   IssueResolution,
-  IssueStatus,
   IssueType,
   ProjectVersion,
   Sprint,
@@ -66,7 +65,7 @@ import {
   RESOLUTION_LABELS,
   TYPE_LABELS,
   statusAppearance,
-  statusCategory,
+  statusKind,
   statusName,
 } from "./labels";
 
@@ -470,9 +469,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
 
   /** 미완료 차단자가 있고 이 이슈도 미완료면 "차단됨" */
   const isBlocked =
-    issue.status !== "done" &&
+    statusKind(statuses, issue.status) !== "complete" &&
     links.some(
-      (l) => l.link.type === "blocks" && l.direction === "inward" && l.other.status !== "done",
+      (l) =>
+        l.link.type === "blocks" &&
+        l.direction === "inward" &&
+        statusKind(statuses, l.other.status) !== "complete",
     );
 
   /** 부모 후보 — 하위 작업은 일반 이슈, 일반 이슈는 에픽 (자기 제외) */
@@ -493,7 +495,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     { title: "관련", items: links.filter((l) => l.link.type === "relates") },
   ];
 
-  const doneChildren = children.filter((c) => c.status === "done").length;
+  const doneChildren = children.filter((c) => statusKind(statuses, c.status) === "complete").length;
 
   /** 워크로그 합계 — 예상 시간과 함께 진행률을 만든다 */
   const loggedHours = worklogs.reduce((sum, w) => sum + w.hours, 0);
@@ -666,10 +668,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             label="상태"
             value={issue.status}
             options={statuses.map((s) => ({ value: s.id, label: s.name }))}
-            onValueChange={(v) => void applyPatch({ status: v as IssueStatus }, "상태를 변경했습니다")}
+            onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
           />
           {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}
-          {statusCategory(statuses, issue.status) === "done" ? (
+          {statusKind(statuses, issue.status) === "complete" ? (
             <Select
               label="해결"
               value={issue.resolution ?? "done"}

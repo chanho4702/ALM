@@ -10,7 +10,7 @@
 |---|---|---|
 | `/home` | HomePage | For you 홈: 인사말 → 이어서 하기 카드 → 추천 작업/나에게 배정됨/최근 업데이트/별표 탭 |
 | `/search` | SearchPage | 이슈 검색: 기본(필터 드롭다운)/스마트 2모드 → search.md |
-| `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
+| `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `categories`(상태 카테고리)·`statuses`(상태 레지스트리)·`types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
 | `/projects` | ProjectListPage | 디렉터리: 테이블 기본(★/이름/키/이슈/생성일/⋯) + 카드 토글 + 검색 |
 | `/projects/new` | ProjectCreatePage | 템플릿(빈/스크럼/칸반/버그 트래킹) 미리보기 생성 |
 | `/projects/:id/board` | BoardRedirect | 기본 보드로 redirect (?issue 쿼리 보존) |

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { Card, EmptyState, Lozenge, ProgressBar, Spinner } from "@chanho/react";
-import type { Issue, IssueStatus, Sprint, User, WorkflowStatus } from "../store/types";
+import type { Issue, Sprint, StatusKind, User, WorkflowStatus } from "../store/types";
 import { listIssues, listProjectStatuses, listSprints, listUsers } from "../store/jiraStore";
 import {
-  formatPlannedRange,
-  STATUS_LABELS,
+  KIND_LABELS,
   estimateSummary,
-  statusCategory,
+  formatPlannedRange,
+  statusKind,
 } from "../components/labels";
 import {
   assigneeLead,
@@ -27,11 +27,11 @@ import {
 } from "./dashboardMetrics";
 
 /** 상태 카운트 타일 — 색 액센트는 상태 언어(neutral/info/success)를 따른다 */
-const STAT_TILES: { key: string; label: string; status: IssueStatus | null; tone: string }[] = [
-  { key: "total", label: "전체 이슈", status: null, tone: "brand" },
-  { key: "todo", label: STATUS_LABELS.todo, status: "todo", tone: "neutral" },
-  { key: "inprogress", label: STATUS_LABELS.inprogress, status: "inprogress", tone: "info" },
-  { key: "done", label: STATUS_LABELS.done, status: "done", tone: "success" },
+const STAT_TILES: { key: string; label: string; kind: StatusKind | null; tone: string }[] = [
+  { key: "total", label: "전체 이슈", kind: null, tone: "brand" },
+  { key: "todo", label: KIND_LABELS.new, kind: "new", tone: "neutral" },
+  { key: "inprogress", label: KIND_LABELS.active, kind: "active", tone: "info" },
+  { key: "done", label: KIND_LABELS.complete, kind: "complete", tone: "success" },
 ];
 
 /** 상대 시간 — 요약 목록의 "무엇이 방금 움직였나"용 */
@@ -91,9 +91,9 @@ export function DashboardPage() {
   const rows = issues ?? [];
 
   const counts = useMemo(() => {
-    const byCategory: Record<IssueStatus, number> = { todo: 0, inprogress: 0, done: 0 };
-    for (const issue of rows) byCategory[statusCategory(statuses, issue.status)] += 1;
-    return byCategory;
+    const byKind: Record<StatusKind, number> = { new: 0, active: 0, complete: 0 };
+    for (const issue of rows) byKind[statusKind(statuses, issue.status)] += 1;
+    return byKind;
   }, [rows, statuses]);
 
   const progress = useMemo(() => workProgress(rows, statuses), [rows, statuses]);
@@ -138,11 +138,11 @@ export function DashboardPage() {
             <Card key={tile.key} padding="md" className={`stat-tile stat-tile-${tile.tone}`}>
               <span className="stat-tile-label">{tile.label}</span>
               <span className="stat-tile-value" data-testid={`stat-${tile.key}`}>
-                {tile.status ? counts[tile.status] : total}
+                {tile.kind ? counts[tile.kind] : total}
               </span>
               <span className="stat-tile-sub">
-                {tile.status
-                  ? `전체의 ${Math.round((counts[tile.status] / total) * 100)}%`
+                {tile.kind
+                  ? `전체의 ${Math.round((counts[tile.kind] / total) * 100)}%`
                   : "프로젝트 누적"}
               </span>
             </Card>

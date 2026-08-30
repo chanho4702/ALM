@@ -174,7 +174,8 @@ describe("프로젝트 커스텀 전환/복귀·스킴 재배정", () => {
     await setProjectCustom(PROJECT, false);
     const resolved = await resolveSettings(PROJECT);
     expect(resolved.source).toBe("scheme");
-    expect(resolved.body.statuses[1].name).toBe("진행 중");
+    // 상태 이름은 전역 레지스트리의 것 — 커스텀 본문에서 바꾼 이름도 전역으로 관통된다
+    expect(resolved.body.statuses[1].name).toBe("작업 중");
   });
 
   it("커스텀 상태 추가: 목록·이동·검색·합집합에 모두 나타난다 (설계 v3 ③④)", async () => {

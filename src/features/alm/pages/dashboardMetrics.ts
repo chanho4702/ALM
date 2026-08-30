@@ -1,5 +1,7 @@
 import type { Issue, User, WorkflowStatus } from "../store/types";
-import { statusCategory } from "../components/labels";
+import {
+  statusKind,
+} from "../components/labels";
 
 /**
  * 요약 화면이 쓰는 순수 집계. 화면에서 계산 로직을 빼둬 단위 테스트로 고정한다
@@ -16,7 +18,7 @@ export interface WorkProgress {
 
 export function workProgress(issues: Issue[], statuses: WorkflowStatus[]): WorkProgress {
   const total = issues.length;
-  const done = issues.filter((issue) => statusCategory(statuses, issue.status) === "done").length;
+  const done = issues.filter((issue) => statusKind(statuses, issue.status) === "complete").length;
   return { total, done, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
 }
 
@@ -48,7 +50,7 @@ export function dueRows(
 ): DueRow[] {
   const { windowDays = 7, limit } = options;
   return issues
-    .filter((issue) => issue.dueDate && statusCategory(statuses, issue.status) !== "done")
+    .filter((issue) => issue.dueDate && statusKind(statuses, issue.status) !== "complete")
     .map((issue) => {
       const daysLeft = dayDiff(today, issue.dueDate as string);
       return { issue, daysLeft, overdue: daysLeft < 0 };
