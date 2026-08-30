@@ -241,7 +241,7 @@ export function IssueListPage() {
       key: "select",
       adjustable: false,
       header: "",
-      width: "36px",
+      width: "44px",
       render: (issue) => (
         // 행 클릭(상세 열기)과 분리 — 체크박스 클릭은 행으로 올라가지 않는다
         <span className="issue-select" onClick={(e) => e.stopPropagation()}>
@@ -321,7 +321,7 @@ export function IssueListPage() {
       key: "dueDate",
       header: "마감일",
       sortable: true,
-      width: "96px",
+      width: "116px",
       align: "right",
       render: (issue) =>
         issue.dueDate ? (
@@ -336,7 +336,7 @@ export function IssueListPage() {
       key: "createdAt",
       header: "생성일",
       sortable: true,
-      width: "96px",
+      width: "116px",
       align: "right",
       render: (issue) => new Date(issue.createdAt).toLocaleDateString("ko-KR"),
     },
@@ -344,7 +344,7 @@ export function IssueListPage() {
       key: "updatedAt",
       header: "수정일",
       sortable: true,
-      width: "96px",
+      width: "116px",
       align: "right",
       render: (issue) => new Date(issue.updatedAt).toLocaleDateString("ko-KR"),
     },

@@ -198,7 +198,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
       key: "manage",
       adjustable: false,
       header: "",
-      width: "56px",
+      width: "72px",
       align: "right",
       render: (project) => manageDropdown(project),
     },
@@ -206,7 +206,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
 
   return (
     <>
-      <main className="project-list-content">
+      <main className="project-list-content project-directory">
         <PageHeader
           title="프로젝트"
           actions={
@@ -227,12 +227,6 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
         ) : (
           <>
             <div className="project-list-toolbar">
-              <div className="project-list-side-actions">
-                <Switch label="보관된 프로젝트 보기" checked={showArchived} onCheckedChange={setShowArchived} />
-                <Button variant="ghost" size="small" onClick={() => navigate("/projects/trash")}>
-                  휴지통
-                </Button>
-              </div>
               <div className="project-list-search">
                 <TextField
                   label="프로젝트 검색"
@@ -240,6 +234,12 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                 />
+              </div>
+              <div className="project-list-side-actions">
+                <Switch label="보관된 프로젝트 보기" checked={showArchived} onCheckedChange={setShowArchived} />
+                <Button variant="ghost" size="small" onClick={() => navigate("/projects/trash")}>
+                  휴지통
+                </Button>
               </div>
               <div className="project-view-toggle" role="group" aria-label="보기 방식">
                 <Button

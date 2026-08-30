@@ -452,14 +452,19 @@ body {
 .project-list-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--chanho-space-100);
+  gap: var(--chanho-space-200);
   align-items: flex-end;
-  justify-content: space-between;
 }
 
 .project-list-search {
-  width: 260px;
+  width: 320px;
   min-width: 200px;
+  margin-right: auto;
+}
+
+/* 프로젝트 디렉터리는 표가 주인공 — 지라처럼 넓게 */
+.project-directory {
+  width: min(1280px, 100%);
 }
 
 .project-view-toggle {
@@ -2921,17 +2926,13 @@ body {
   min-width: 1040px;
 }
 
-.issue-table-scroll th:nth-child(3),
-.issue-table-scroll td:nth-child(3) {
-  min-width: 260px;
-}
-
 .issue-table-scroll td {
   white-space: nowrap;
 }
 
-.issue-table-scroll td:nth-child(3) {
-  white-space: normal;
+/* 열 너비 조절 핸들이 마지막 열에서 3px 밖으로 나가 가로 스크롤을 만들지 않게 */
+th:last-child > [role="separator"] {
+  right: 0;
 }
 
 /* 이슈 상세 — 키는 작게(눈썹), 제목이 크게. 지라와 같은 위계 */
