@@ -102,7 +102,7 @@ export function DashboardViewPage() {
   };
 
   const renderColumn = (items: DashboardGadget[], columnIndex: 0 | 1) => (
-    <div className="dashboard-column" data-testid={`dashboard-column-${columnIndex}`}>
+    <div className="gadget-column" data-testid={`dashboard-column-${columnIndex}`}>
       {items.map((gadget, index) => (
         <section key={gadget.id} className="gadget" aria-label={gadget.title ?? GADGET_LABELS[gadget.type]}>
           <header className="gadget-header">
@@ -171,7 +171,7 @@ export function DashboardViewPage() {
       {gadgets.length === 0 ? (
         isOwner ? <GadgetEmptyHint onAdd={() => setAdding(true)} /> : <EmptyState title="가젯이 없습니다" description="소유자가 아직 가젯을 놓지 않았습니다." />
       ) : (
-        <div className="dashboard-grid">
+        <div className="gadget-grid">
           {renderColumn(columns[0], 0)}
           {renderColumn(columns[1], 1)}
         </div>
