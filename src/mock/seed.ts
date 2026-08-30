@@ -259,6 +259,7 @@ export function createSeedData(): JiraData {
     linkTypes: [],
     archivedIssues: [],
     trashedProjects: [],
+    components: [],
     shortcuts: [],
     preferences: {},
     banner: { enabled: false, level: "info", message: "" },

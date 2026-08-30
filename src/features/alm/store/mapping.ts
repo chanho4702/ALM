@@ -53,6 +53,7 @@ export interface IssueDto {
   resolution?: IssueResolutionDto | null;
   fixVersionId?: number | null;
   labels?: string[] | null;
+  componentIds?: number[] | null;
   order?: number;
   version: number;
   createdAt: string;
@@ -263,6 +264,7 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     fixVersionId: dto.fixVersionId == null ? null : String(dto.fixVersionId),
     archivedAt: dto.archivedAt ?? null,
     labels: dto.labels ? [...dto.labels] : [],
+    componentIds: dto.componentIds ? dto.componentIds.map(String) : [],
     order: dto.order ?? order,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,

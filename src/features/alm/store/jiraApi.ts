@@ -47,6 +47,8 @@ import type {
   IssueTypeLevel,
   PriorityDef,
   LinkTypeDef,
+  Component,
+  ComponentDefaultAssignee,
   User,
   ProjectRole,
   Comment,
@@ -175,6 +177,7 @@ export interface IssueFilter {
   assigneeId?: string;
   label?: string;
   type?: IssueType;
+  componentId?: string;
 }
 
 
@@ -217,6 +220,7 @@ export async function listIssuesPage(
     types: filter?.type ? toApiIssueType(filter.type) : undefined,
     assignees: filter?.assigneeId ? toBackendId(filter.assigneeId).toString() : undefined,
     labels: filter?.label,
+    componentIds: filter?.componentId ? toBackendId(filter.componentId).toString() : undefined,
     sort: "key",
     dir: "asc",
     page: String(paging.page),
@@ -278,6 +282,7 @@ export interface IssueCreateInput {
   parentId?: string | null;
   dueDate?: string | null;
   labels?: string[];
+  componentIds?: string[];
 }
 
 function assertCreateFieldsSupported(_input: IssueCreateInput): void {
@@ -304,6 +309,7 @@ export async function createIssue(input: IssueCreateInput): Promise<Issue> {
           dueDate: input.dueDate ?? null,
           estimateHours: null,
           labels: input.labels ?? [],
+          componentIds: (input.componentIds ?? []).map(toBackendId),
         },
       }),
     },
@@ -324,6 +330,7 @@ type IssuePatch = Partial<
     | "sprintId"
     | "dueDate"
     | "labels"
+    | "componentIds"
     | "estimateHours"
     | "resolution"
     | "fixVersionId"
@@ -371,6 +378,7 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
             ? (current.estimateHours ?? null)
             : patch.estimateHours,
         labels: patch.labels === undefined ? (current.labels ?? []) : patch.labels,
+        componentIds: patch.componentIds === undefined ? (current.componentIds ?? []) : patch.componentIds.map(toBackendId),
         // 기본값·해제 규칙은 목업 스토어와 같이 프론트 몫이다 — 여기서는 값만 옮긴다
         resolution:
           patch.resolution === undefined ? (current.resolution ?? null) : toApiResolution(patch.resolution),
@@ -1100,6 +1108,76 @@ export async function moveIssueType(id: string, delta: -1 | 1): Promise<void> {
 export async function deleteIssueType(id: string): Promise<void> {
   await json(await sharedApiFetch(`/api/alm/settings/issue-types/${encodeURIComponent(id)}`, { method: "DELETE" }));
   notifyIssueTypesChanged();
+}
+
+// ── 컴포넌트 (서버 V17) ──
+
+interface ComponentDto {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  leadId: number | null;
+  defaultAssignee: string;
+  issueCount: number;
+  createdAt: string;
+}
+
+function mapComponent(dto: ComponentDto): Component {
+  return {
+    id: String(dto.id),
+    projectId: String(dto.projectId),
+    name: dto.name,
+    description: dto.description ?? "",
+    leadId: dto.leadId == null ? null : String(dto.leadId),
+    defaultAssignee: dto.defaultAssignee === "lead" || dto.defaultAssignee === "unassigned" ? dto.defaultAssignee : "project",
+    issueCount: dto.issueCount ?? 0,
+    createdAt: dto.createdAt,
+  };
+}
+
+export async function listComponents(projectId: string): Promise<Component[]> {
+  const rows = await json<ComponentDto[]>(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/components`));
+  return rows.map(mapComponent);
+}
+
+export async function createComponent(
+  projectId: string,
+  input: { name: string; description?: string; leadId?: string | null; defaultAssignee?: ComponentDefaultAssignee },
+): Promise<Component> {
+  const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/components`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name,
+      description: input.description ?? "",
+      leadId: input.leadId ? toBackendId(input.leadId) : null,
+      defaultAssignee: input.defaultAssignee ?? "project",
+    }),
+  });
+  return mapComponent(await json(response));
+}
+
+export async function updateComponent(
+  id: string,
+  patch: Partial<Pick<Component, "name" | "description" | "leadId" | "defaultAssignee">>,
+): Promise<Component> {
+  const response = await sharedApiFetch(`/api/alm/components/${toBackendId(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: patch.name,
+      description: patch.description,
+      leadId: patch.leadId ? toBackendId(patch.leadId) : undefined,
+      clearLead: patch.leadId === null ? true : undefined,
+      defaultAssignee: patch.defaultAssignee,
+    }),
+  });
+  return mapComponent(await json(response));
+}
+
+export async function deleteComponent(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/components/${toBackendId(id)}`, { method: "DELETE" }));
 }
 
 // ── 보관 · 휴지통 (서버 V16) ──

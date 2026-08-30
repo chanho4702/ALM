@@ -14,8 +14,9 @@ import {
 } from "@chanho/react";
 import type { SortDirection, TableColumn } from "@chanho/react";
 import { Tag } from "@chanho/react";
-import type { Issue, IssuePriority, IssueType, Sprint, User, WorkflowStatus } from "../store/types";
+import type { Component, Issue, IssuePriority, IssueType, Sprint, User, WorkflowStatus } from "../store/types";
 import {
+  listComponents,
   bulkDeleteIssues,
   listIssues,
   listIssuesPage,
@@ -60,6 +61,8 @@ export function IssueListPage() {
   const [label, setLabel] = useState(ALL);
   const [type, setType] = useState(ALL);
   const [labelOptions, setLabelOptions] = useState<string[]>([]);
+  const [componentId, setComponentId] = useState(ALL);
+  const [componentOptions, setComponentOptions] = useState<Component[]>([]);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -83,6 +86,7 @@ export function IssueListPage() {
         priority: priority === ALL ? undefined : (priority as IssuePriority),
         assigneeId: assigneeId === ALL ? undefined : assigneeId,
         label: label === ALL ? undefined : label,
+        componentId: componentId === ALL ? undefined : componentId,
         type: type === ALL ? undefined : (type as IssueType),
       },
       { page, size: PAGE_SIZE },
@@ -97,7 +101,8 @@ export function IssueListPage() {
     const all = await listIssues(projectId);
     setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
     setStatuses(await listProjectStatuses(projectId));
-  }, [projectId, text, status, priority, assigneeId, label, type, page]);
+    setComponentOptions(await listComponents(projectId));
+  }, [projectId, text, status, priority, assigneeId, label, componentId, type, page]);
 
   // 필터가 바뀌면 첫 페이지로
   useEffect(() => {
@@ -388,6 +393,14 @@ export function IssueListPage() {
               ...labelOptions.map((l) => ({ value: l, label: l })),
             ]}
           />
+          {componentOptions.length > 0 ? (
+            <Select
+              label="컴포넌트"
+              value={componentId}
+              onValueChange={setComponentId}
+              options={[{ value: ALL, label: "전체" }, ...componentOptions.map((c) => ({ value: c.id, label: c.name }))]}
+            />
+          ) : null}
           <Select
             label="타입"
             value={type}

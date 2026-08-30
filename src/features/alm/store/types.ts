@@ -25,6 +25,21 @@ export interface Project {
   createdAt: string;
 }
 
+/** 컴포넌트 기본 담당자 규칙 — project(프로젝트 규칙) | lead(컴포넌트 리더) | unassigned */
+export type ComponentDefaultAssignee = "project" | "lead" | "unassigned";
+
+/** 컴포넌트(지라 Components) — 프로젝트 하위 구성 단위, 이슈는 여러 개를 가질 수 있다 */
+export interface Component {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  leadId: string | null;
+  defaultAssignee: ComponentDefaultAssignee;
+  issueCount: number;
+  createdAt: string;
+}
+
 /** 프로젝트 바로 가기 — 사이드바/헤더의 외부 링크(위키·저장소·대시보드) */
 export interface ProjectShortcut {
   id: string;
@@ -173,6 +188,8 @@ export interface Issue {
   /** 보관 시각 — 보관함 목록에서만 값이 있다(활성 이슈는 null/없음) */
   archivedAt?: string | null;
   labels: string[]; // 자유 문자열 라벨
+  /** 컴포넌트 id 목록(순서 유지). 없으면 빈 배열로 본다 */
+  componentIds?: string[];
   order: number; // 컬럼/목록 내 정렬
   createdAt: string;
   updatedAt: string;
@@ -477,6 +494,7 @@ export interface JiraData {
   archivedIssues: Issue[];
   /** 휴지통 프로젝트 — projects 밖으로 옮긴다 */
   trashedProjects: Project[];
+  components: Component[];
   schemes: SettingsScheme[];
   projectSettings: ProjectSettingsEntry[];
   /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */

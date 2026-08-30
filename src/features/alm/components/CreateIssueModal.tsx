@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Button, Modal, Select, TextArea, TextField, useToast } from "@chanho/react";
-import type { Issue, IssuePriority, IssueType, Project, User } from "../store/types";
-import { createIssue, listUsers, resolveSettings } from "../store/jiraStore";
+import { Button, Checkbox, Modal, Select, TextArea, TextField, useToast } from "@chanho/react";
+import type { Component, Issue, IssuePriority, IssueType, Project, User } from "../store/types";
+import { createIssue, listComponents, listUsers, resolveSettings } from "../store/jiraStore";
 import {
   priorityName,
   ISSUE_TYPES,
@@ -50,10 +50,29 @@ export function CreateIssueModal({
   const [assigneeId, setAssigneeId] = useState(UNASSIGNED);
   const [dueDate, setDueDate] = useState("");
   const [labelsText, setLabelsText] = useState("");
+  const [components, setComponents] = useState<Component[]>([]);
+  const [componentIds, setComponentIds] = useState<string[]>([]);
 
   useEffect(() => {
     void listUsers().then(setUsers);
   }, []);
+
+  // 프로젝트가 바뀌면 그 프로젝트의 컴포넌트를 읽는다
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    void listComponents(projectId)
+      .then((list) => {
+        if (!cancelled) setComponents(list);
+      })
+      .catch(() => {
+        if (!cancelled) setComponents([]);
+      });
+    setComponentIds([]);
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   // 열릴 때마다 현재 프로젝트를 기본값으로 재설정한다
   useEffect(() => {
@@ -103,6 +122,7 @@ export function CreateIssueModal({
           .split(",")
           .map((l) => l.trim())
           .filter(Boolean),
+        componentIds,
       });
       toast({ title: `${issue.key}를 만들었습니다`, appearance: "success" });
       reset();
@@ -184,6 +204,20 @@ export function CreateIssueModal({
             onChange={(e) => setLabelsText(e.target.value)}
             placeholder="콤마로 구분 (예: backend, api)"
           />
+          {components.length > 0 ? (
+            <div className="board-settings-checks" role="group" aria-label="컴포넌트">
+              {components.map((c) => (
+                <Checkbox
+                  key={c.id}
+                  label={c.name}
+                  checked={componentIds.includes(c.id)}
+                  onCheckedChange={() =>
+                    setComponentIds((prev) => (prev.includes(c.id) ? prev.filter((id) => id !== c.id) : [...prev, c.id]))
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="project-form-actions">
           <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>

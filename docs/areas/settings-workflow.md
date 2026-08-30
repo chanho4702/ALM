@@ -112,3 +112,9 @@
 `outward === inward`면 대칭(양방향) — 역방향도 중복으로 막고 방향 없이(outward) 보인다. 쓰이는 타입은 대칭 여부를
 못 바꾸고 삭제 불가. 이슈 상세의 링크 종류 Select는 타입마다 `id:out`(+비대칭이면 `id:in`) 옵션을 `useLinkTypes()`로 만든다.
 타임라인 의존선은 여전히 `blocks` id를 본다.
+
+## 컴포넌트 (2026-08-30)
+
+프로젝트별 `Component`(name·description·leadId·defaultAssignee project|lead|unassigned). 이슈는 `componentIds: string[]`(순서 유지·중복
+제거·같은 프로젝트만). 담당자 없이 만든 이슈는 **첫 컴포넌트의 규칙이 프로젝트 기본 담당자보다 우선**한다(unassigned면 미지정, lead면
+리더가 있을 때만). 컴포넌트를 지우면 이슈에서 떨어진다. 화면: 프로젝트 설정 > 컴포넌트, 이슈 만들기/상세 체크박스, 목록 필터.

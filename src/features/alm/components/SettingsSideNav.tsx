@@ -7,6 +7,7 @@ import { ProjectAvatar } from "./ProjectAvatar";
 export const PROJECT_SETTINGS_SECTIONS = [
   { id: "general", label: "일반" },
   { id: "members", label: "사용자·권한" },
+  { id: "components", label: "컴포넌트" },
   { id: "workflow", label: "워크플로" },
   { id: "types", label: "이슈 타입" },
   { id: "import", label: "가져오기" },

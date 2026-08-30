@@ -163,3 +163,7 @@ export const unarchiveProject = impl.unarchiveProject;
 export const listTrashedProjects = impl.listTrashedProjects;
 export const restoreProject = impl.restoreProject;
 export const purgeProject = impl.purgeProject;
+export const listComponents = impl.listComponents;
+export const createComponent = impl.createComponent;
+export const updateComponent = impl.updateComponent;
+export const deleteComponent = impl.deleteComponent;

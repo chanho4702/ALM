@@ -198,6 +198,7 @@ describe("jiraApi issues", () => {
         dueDate: "2026-08-21",
         estimateHours: 2.5,
         labels: ["backend"],
+        componentIds: [],
         resolution: null,
         fixVersionId: null,
       },

@@ -1,5 +1,7 @@
 import type {
   PriorityDef,
+  Component,
+  ComponentDefaultAssignee,
   LinkTypeDef,
   ProjectShortcut,
   UserPreferences,
@@ -255,6 +257,7 @@ function normalize(data: JiraData): JiraData {
   data.statusDefs ??= [];
   // 전역 이슈 타입 레지스트리 — 기본 5종은 항상 있다
   data.archivedIssues ??= [];
+  data.components ??= [];
   data.trashedProjects ??= [];
   data.linkTypes ??= BUILTIN_LINK_TYPES.map((t) => ({ ...t }));
   for (const builtin of BUILTIN_LINK_TYPES) {
@@ -530,6 +533,7 @@ export async function purgeProject(id: string): Promise<void> {
   );
   data.trashedProjects.splice(index, 1);
   data.archivedIssues = data.archivedIssues.filter((i) => i.projectId !== id);
+  data.components = data.components.filter((c) => c.projectId !== id);
   data.sprints = data.sprints.filter((s) => s.projectId !== id);
   data.issues = data.issues.filter((i) => i.projectId !== id);
   data.comments = data.comments.filter((c) => !issueIds.has(c.issueId));
@@ -1439,6 +1443,7 @@ export async function listIssues(
     priority?: IssuePriority;
     assigneeId?: string;
     label?: string;
+    componentId?: string;
     type?: IssueType;
   },
 ): Promise<Issue[]> {
@@ -1456,6 +1461,7 @@ export async function listIssues(
   if (filter?.priority) issues = issues.filter((i) => i.priority === filter.priority);
   if (filter?.assigneeId) issues = issues.filter((i) => i.assigneeId === filter.assigneeId);
   if (filter?.label) issues = issues.filter((i) => i.labels.includes(filter.label!));
+  if (filter?.componentId) issues = issues.filter((i) => (i.componentIds ?? []).includes(filter.componentId!));
   if (filter?.type) issues = issues.filter((i) => i.type === filter.type);
   // order 동률(보드 컬럼별 재번호로 발생 가능)은 key로 결정적으로 정렬한다
   return clone([...issues].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)));
@@ -1554,6 +1560,7 @@ export async function createIssue(input: {
   parentId?: string | null;
   dueDate?: string | null;
   labels?: string[];
+  componentIds?: string[];
   estimateHours?: number | null;
   /** 보존할 키(이관·CSV) — `{프로젝트키}-{번호}` 형식, 유일해야 한다. 번호는 카운터를 앞당긴다 */
   key?: string;
@@ -1593,6 +1600,7 @@ export async function createIssue(input: {
   }
   assertCanEdit(data, project.id);
   if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
+  const componentIdsForCreate = validateComponentIds(data, project.id, input.componentIds);
   const seq = preservedSeq ?? (data.issueCounters[project.id] ?? 0) + 1;
   // 삭제돼도 감소하지 않는다 → 키 미재사용. 보존 키는 카운터를 그 번호 이상으로 앞당긴다
   data.issueCounters[project.id] = Math.max(data.issueCounters[project.id] ?? 0, seq);
@@ -1614,7 +1622,7 @@ export async function createIssue(input: {
         .sort((a, b) => a.order - b.order)
         .find((s) => s.kind === "new")?.id ?? "todo"),
     priority: resolvePriority(data, project.id, input.priority),
-    assigneeId: input.assigneeId ?? (project.defaultAssignee === "lead" ? project.leadId : null),
+    assigneeId: input.assigneeId ?? resolveDefaultAssigneeFor(data, project, componentIdsForCreate),
     reporterId: CURRENT_USER_ID,
     sprintId: input.sprintId ?? null,
     parentId: null, // 계층 검증 후 아래에서 지정
@@ -1623,6 +1631,7 @@ export async function createIssue(input: {
     resolution: null,
     fixVersionId: null,
     labels: input.labels ?? [],
+    componentIds: componentIdsForCreate,
     order: maxOrder + 1,
     createdAt: now,
     updatedAt: now,
@@ -1664,6 +1673,7 @@ export async function updateIssue(
       | "sprintId"
       | "dueDate"
       | "labels"
+      | "componentIds"
       | "estimateHours"
       | "resolution"
       | "fixVersionId"
@@ -1712,6 +1722,7 @@ export async function updateIssue(
   }
   const { resolution: explicitResolution, ...rest } = patch;
   if (rest.priority !== undefined) rest.priority = resolvePriority(data, issue.projectId, rest.priority);
+  if (rest.componentIds !== undefined) rest.componentIds = validateComponentIds(data, issue.projectId, rest.componentIds);
   Object.assign(issue, rest);
   applyResolutionRule(data, issue, before.status, explicitResolution);
   if (patch.type !== undefined && issue.parentId !== null) {
@@ -2951,6 +2962,127 @@ export async function deletePriority(id: string): Promise<void> {
   [...data.priorities].sort((a, b) => a.order - b.order).forEach((p, i) => (p.order = i + 1));
   persist();
   notifyPrioritiesChanged();
+}
+
+// ── 컴포넌트 (지라 Components) ──────────────────────────────
+
+const COMPONENT_ASSIGNEE_RULES: ComponentDefaultAssignee[] = ["project", "lead", "unassigned"];
+
+/** 이슈에 붙일 컴포넌트 검증 — 같은 프로젝트, 순서 유지·중복 제거 */
+function validateComponentIds(data: JiraData, projectId: string, ids: string[] | undefined): string[] {
+  const result: string[] = [];
+  for (const id of ids ?? []) {
+    if (result.includes(id)) continue;
+    const component = data.components.find((c) => c.id === id);
+    if (!component) throw new Error("컴포넌트를 찾을 수 없습니다");
+    if (component.projectId !== projectId) throw new Error(`다른 프로젝트의 컴포넌트입니다: ${component.name}`);
+    result.push(id);
+  }
+  return result;
+}
+
+/** 담당자 없이 만든 이슈의 담당자 — 첫 컴포넌트의 규칙이 프로젝트 규칙보다 우선한다(지라) */
+function resolveDefaultAssigneeFor(data: JiraData, project: Project, componentIds: string[]): string | null {
+  for (const id of componentIds) {
+    const component = data.components.find((c) => c.id === id);
+    if (!component) continue;
+    if (component.defaultAssignee === "unassigned") return null;
+    if (component.defaultAssignee === "lead" && component.leadId) return component.leadId;
+  }
+  return project.defaultAssignee === "lead" ? project.leadId : null;
+}
+
+function componentWithCount(data: JiraData, component: Component): Component {
+  return {
+    ...component,
+    issueCount: data.issues.filter((i) => (i.componentIds ?? []).includes(component.id)).length,
+  };
+}
+
+export async function listComponents(projectId: string): Promise<Component[]> {
+  const data = load();
+  return clone(
+    data.components
+      .filter((c) => c.projectId === projectId)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((c) => componentWithCount(data, c)),
+  );
+}
+
+function requireComponentName(name: string | undefined): string {
+  const trimmed = name?.trim() ?? "";
+  if (!trimmed) throw new Error("컴포넌트 이름을 입력하세요");
+  if (trimmed.length > 80) throw new Error("컴포넌트 이름은 80자 이하여야 합니다");
+  return trimmed;
+}
+
+function requireAssigneeRule(rule: string | undefined): ComponentDefaultAssignee {
+  if (!rule) return "project";
+  if (!COMPONENT_ASSIGNEE_RULES.includes(rule as ComponentDefaultAssignee)) {
+    throw new Error("기본 담당자는 project/lead/unassigned 중 하나입니다");
+  }
+  return rule as ComponentDefaultAssignee;
+}
+
+export async function createComponent(
+  projectId: string,
+  input: { name: string; description?: string; leadId?: string | null; defaultAssignee?: ComponentDefaultAssignee },
+): Promise<Component> {
+  const data = load();
+  if (!data.projects.some((p) => p.id === projectId)) throw new Error("프로젝트를 찾을 수 없습니다");
+  assertCanAdmin(data, projectId);
+  const name = requireComponentName(input.name);
+  if (data.components.some((c) => c.projectId === projectId && c.name === name)) {
+    throw new Error(`컴포넌트 이름이 중복됩니다: ${name}`);
+  }
+  const component: Component = {
+    id: `c-${nextId()}`,
+    projectId,
+    name,
+    description: input.description?.trim() ?? "",
+    leadId: input.leadId ?? null,
+    defaultAssignee: requireAssigneeRule(input.defaultAssignee),
+    issueCount: 0,
+    createdAt: new Date().toISOString(),
+  };
+  data.components.push(component);
+  persist();
+  return clone(component);
+}
+
+export async function updateComponent(
+  id: string,
+  patch: Partial<Pick<Component, "name" | "description" | "leadId" | "defaultAssignee">>,
+): Promise<Component> {
+  const data = load();
+  const component = data.components.find((c) => c.id === id);
+  if (!component) throw new Error("컴포넌트를 찾을 수 없습니다");
+  assertCanAdmin(data, component.projectId);
+  if (patch.name !== undefined) {
+    const name = requireComponentName(patch.name);
+    if (data.components.some((c) => c.id !== id && c.projectId === component.projectId && c.name === name)) {
+      throw new Error(`컴포넌트 이름이 중복됩니다: ${name}`);
+    }
+    component.name = name;
+  }
+  if (patch.description !== undefined) component.description = patch.description.trim();
+  if (patch.leadId !== undefined) component.leadId = patch.leadId;
+  if (patch.defaultAssignee !== undefined) component.defaultAssignee = requireAssigneeRule(patch.defaultAssignee);
+  persist();
+  return clone(componentWithCount(data, component));
+}
+
+/** 지우면 이슈에서 떨어진다 */
+export async function deleteComponent(id: string): Promise<void> {
+  const data = load();
+  const component = data.components.find((c) => c.id === id);
+  if (!component) throw new Error("컴포넌트를 찾을 수 없습니다");
+  assertCanAdmin(data, component.projectId);
+  data.components = data.components.filter((c) => c.id !== id);
+  for (const issue of [...data.issues, ...data.archivedIssues]) {
+    if (issue.componentIds?.includes(id)) issue.componentIds = issue.componentIds.filter((c) => c !== id);
+  }
+  persist();
 }
 
 // ── 보관 (지라 "보관된 업무 항목") ──────────────────────────────

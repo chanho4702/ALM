@@ -46,6 +46,7 @@ import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
 import { ProjectShortcutsPanel } from "../components/ProjectShortcutsPanel";
+import { ComponentsPanel } from "../components/ComponentsPanel";
 import { PROJECT_COLOR_OPTIONS } from "../components/ProjectAvatar";
 import { TYPE_ICON_OPTIONS } from "../components/typeIcons";
 import { JiraImportPanel } from "../components/JiraImportPanel";
@@ -522,6 +523,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
       <main className="jira-content">
         {section === "general" ? general : null}
         {section === "members" ? <ProjectMembersPanel projectId={project.id} /> : null}
+        {section === "components" ? <ComponentsPanel projectId={project.id} canManage={myRole === "admin"} /> : null}
         {section === "workflow" ? workflow : null}
         {section === "types" ? types : null}
         {section === "import" && resolved ? (

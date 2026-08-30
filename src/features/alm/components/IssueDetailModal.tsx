@@ -1,27 +1,14 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
-import {
-  Avatar,
-  Button,
-  Comment as CommentBlock,
-  InlineEdit,
-  Lozenge,
-  Modal,
-  ProgressBar,
-  Select,
-  Tabs,
-  Tag,
-  TextArea,
-  TextField,
-  useToast,
-} from "@chanho/react";
+import { Avatar, Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextArea, TextField, useToast } from "@chanho/react";
 import type {
   Activity,
   Comment,
   Issue,
   IssuePriority,
   LinkTypeDef,
+  Component,
   IssueResolution,
   IssueType,
   ProjectVersion,
@@ -31,6 +18,7 @@ import type {
   Worklog,
 } from "../store/types";
 import {
+  listComponents,
   addComment,
   addIssueLink,
   addWorklog,
@@ -123,6 +111,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [labelDraft, setLabelDraft] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [projectIssues, setProjectIssues] = useState<Issue[]>([]);
+  const [componentOptions, setComponentOptions] = useState<Component[]>([]);
   const [children, setChildren] = useState<Issue[]>([]);
   const [links, setLinks] = useState<IssueLinkView[]>([]);
   const [worklogs, setWorklogs] = useState<Worklog[]>([]);
@@ -167,6 +156,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     setChildren(childList);
     setLinks(linkList);
     setProjectIssues(allIssues);
+    setComponentOptions(await listComponents(projectId).catch(() => []));
     setWorklogs(worklogList);
   };
 
@@ -241,6 +231,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         | "sprintId"
         | "dueDate"
         | "labels"
+        | "componentIds"
         | "estimateHours"
       | "resolution"
       | "fixVersionId"
@@ -780,6 +771,27 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               void applyPatch({ dueDate: e.target.value || null }, "마감일을 저장했습니다")
             }
           />
+          {componentOptions.length > 0 ? (
+            <div className="board-settings-checks issue-components-field" role="group" aria-label="컴포넌트">
+              {componentOptions.map((c) => {
+                const current = issue.componentIds ?? [];
+                const checked = current.includes(c.id);
+                return (
+                  <Checkbox
+                    key={c.id}
+                    label={c.name}
+                    checked={checked}
+                    onCheckedChange={() =>
+                      void applyPatch(
+                        { componentIds: checked ? current.filter((id) => id !== c.id) : [...current, c.id] },
+                        checked ? "컴포넌트를 뺐습니다" : "컴포넌트를 붙였습니다",
+                      )
+                    }
+                  />
+                );
+              })}
+            </div>
+          ) : null}
           <div className="issue-labels-field">
             <TextField
               label="라벨 추가"
