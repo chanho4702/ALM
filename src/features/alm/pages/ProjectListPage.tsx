@@ -149,7 +149,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
       key: "star",
       adjustable: false,
       header: "",
-      width: "48px",
+      width: "44px",
       render: (project) => starButton(project),
     },
     {
