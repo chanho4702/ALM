@@ -7,6 +7,7 @@ import type { Project } from "../store/types";
 import { deleteProject, listIssues } from "../store/jiraStore";
 import { listStarredProjectIds, pruneProject, toggleProjectStar } from "../store/uiStore";
 import { ProjectAvatar } from "../components/ProjectAvatar";
+import { useTablePrefs } from "../components/useTablePrefs";
 
 export interface ProjectListPageProps {
   projects: Project[];
@@ -51,6 +52,16 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
   }, [projects]);
 
   const [showArchived, setShowArchived] = useState(false);
+  const [sortKey, setSortKey] = useState<string | undefined>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const tablePrefs = useTablePrefs("projects");
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  };
   const visible = useMemo(() => {
     const text = filter.trim().toLowerCase();
     if (!text) return projects;
@@ -58,6 +69,30 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
       (p) => p.name.toLowerCase().includes(text) || p.key.toLowerCase().includes(text),
     );
   }, [projects, filter, showArchived]);
+  const sortedVisible = useMemo(() => {
+    if (!sortKey) return visible;
+    const dir = sortDirection === "asc" ? 1 : -1;
+    return [...visible].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "key":
+          cmp = a.key.localeCompare(b.key);
+          break;
+        case "category":
+          cmp = a.category.localeCompare(b.category);
+          break;
+        case "issues":
+          cmp = (issueCounts[a.id] ?? 0) - (issueCounts[b.id] ?? 0);
+          break;
+        case "createdAt":
+          cmp = a.createdAt.localeCompare(b.createdAt);
+          break;
+        default:
+          cmp = a.name.localeCompare(b.name);
+      }
+      return cmp * dir;
+    });
+  }, [visible, sortKey, sortDirection, issueCounts]);
 
   const handleDelete = async () => {
     if (!deleting) return;
@@ -112,12 +147,14 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
   const columns: TableColumn<Project>[] = [
     {
       key: "star",
+      adjustable: false,
       header: "",
       width: "48px",
       render: (project) => starButton(project),
     },
     {
       key: "name",
+      sortable: true,
       header: "이름",
       render: (project) => (
         <span className="project-name-cell">
@@ -129,18 +166,21 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
     },
     {
       key: "key",
+      sortable: true,
       header: "키",
       width: "88px",
       render: (project) => <span className="issue-key-cell">{project.key}</span>,
     },
     {
       key: "category",
+      sortable: true,
       header: "범주",
       width: "120px",
       render: (project) => project.category || "—",
     },
     {
       key: "issues",
+      sortable: true,
       header: "이슈",
       width: "88px",
       align: "right",
@@ -148,6 +188,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
     },
     {
       key: "createdAt",
+      sortable: true,
       header: "생성일",
       width: "112px",
       align: "right",
@@ -155,6 +196,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
     },
     {
       key: "manage",
+      adjustable: false,
       header: "",
       width: "56px",
       align: "right",
@@ -225,8 +267,17 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
               <Table
                 aria-label="프로젝트 목록"
                 columns={columns}
-                rows={visible}
+                rows={sortedVisible}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={handleSort}
                 onRowClick={(project) => navigate(`/projects/${project.id}/board`)}
+                resizable
+                reorderable
+                columnOrder={tablePrefs.order}
+                columnWidths={tablePrefs.widths}
+                onColumnOrderChange={tablePrefs.setOrder}
+                onColumnWidthsChange={tablePrefs.setWidths}
               />
             ) : (
               <div className="project-grid">

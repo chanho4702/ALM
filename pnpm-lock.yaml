@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@chanho/react':
-        specifier: file:../design-system/artifacts/chanho-react-0.6.0.tgz
-        version: file:../design-system/artifacts/chanho-react-0.6.0.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: file:../design-system/artifacts/chanho-react-0.7.0.tgz
+        version: file:../design-system/artifacts/chanho-react-0.7.0.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@chanho/tokens':
         specifier: file:../design-system/artifacts/chanho-tokens-0.3.0.tgz
         version: file:../design-system/artifacts/chanho-tokens-0.3.0.tgz
@@ -177,9 +177,9 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
-  '@chanho/react@file:../design-system/artifacts/chanho-react-0.6.0.tgz':
-    resolution: {integrity: sha512-p7bEc55YiNEOYnDjdFAnAqt/P+7zbPYf1cxjjADyLgXbGGiJkvBHtt7Q8G4TrL90HH+m/8fQj85u5oesSqV0/w==, tarball: file:../design-system/artifacts/chanho-react-0.6.0.tgz}
-    version: 0.6.0
+  '@chanho/react@file:../design-system/artifacts/chanho-react-0.7.0.tgz':
+    resolution: {integrity: sha512-cSOf4oRwcNGFrb39gv1kEOUh+RD0h2sHnfhb4aUv/3SvxJYOfotfgo4SpRPM1hRj9f/2ZLGiZyd5HW3NsSBMvg==, tarball: file:../design-system/artifacts/chanho-react-0.7.0.tgz}
+    version: 0.7.0
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -2408,7 +2408,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@chanho/react@file:../design-system/artifacts/chanho-react-0.6.0.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@chanho/react@file:../design-system/artifacts/chanho-react-0.7.0.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@chanho/tokens': file:../design-system/artifacts/chanho-tokens-0.3.0.tgz
       radix-ui: 1.6.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

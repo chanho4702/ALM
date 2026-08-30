@@ -40,6 +40,7 @@ import {
   statusName,
 } from "../components/labels";
 import { usePriorities } from "../components/usePriorities";
+import { useTablePrefs } from "../components/useTablePrefs";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
 const ALL = "all";
@@ -50,6 +51,7 @@ const PAGE_SIZE = 50;
 export function IssueListPage() {
   const { projectId } = useParams();
   const issueTypes = useIssueTypes();
+  const tablePrefs = useTablePrefs("issues");
   const priorities = usePriorities();
   const PRIORITIES = priorities.map((d) => d.id);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
@@ -237,6 +239,7 @@ export function IssueListPage() {
   const columns: TableColumn<Issue>[] = [
     {
       key: "select",
+      adjustable: false,
       header: "",
       width: "36px",
       render: (issue) => (
@@ -492,6 +495,12 @@ export function IssueListPage() {
               onSort={handleSort}
               onRowClick={(issue) => openIssue(issue.key)}
               selectedId={selectedId}
+              resizable
+              reorderable
+              columnOrder={tablePrefs.order}
+              columnWidths={tablePrefs.widths}
+              onColumnOrderChange={tablePrefs.setOrder}
+              onColumnWidthsChange={tablePrefs.setWidths}
             />
           </div>
         )}

@@ -20,7 +20,14 @@ export interface SavedFilter {
   query: string;
 }
 
+/** 테이블별 열 순서·너비 — DS Table의 columnOrder/columnWidths와 같은 모양 */
+export interface TablePrefs {
+  order?: string[];
+  widths?: Record<string, number>;
+}
+
 interface UiState {
+  tablePrefs: Record<string, TablePrefs>;
   recentProjectIds: string[];
   starredProjectIds: string[];
   sideNavCollapsed: boolean;
@@ -29,6 +36,7 @@ interface UiState {
 }
 
 const DEFAULT_STATE: UiState = {
+  tablePrefs: {},
   recentProjectIds: [],
   starredProjectIds: [],
   sideNavCollapsed: false,
@@ -42,6 +50,7 @@ function load(): UiState {
   try {
     const parsed = JSON.parse(raw) as Partial<UiState>;
     return {
+      tablePrefs: parsed.tablePrefs ?? {},
       recentProjectIds: parsed.recentProjectIds ?? [],
       starredProjectIds: parsed.starredProjectIds ?? [],
       sideNavCollapsed: parsed.sideNavCollapsed ?? false,
@@ -56,6 +65,17 @@ function load(): UiState {
 function persist(state: UiState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   window.dispatchEvent(new Event(UI_CHANGED_EVENT));
+}
+
+export async function getTablePrefs(tableId: string): Promise<TablePrefs> {
+  return { ...(load().tablePrefs[tableId] ?? {}) };
+}
+
+/** 부분 갱신 — order만 또는 widths만 바꿔도 나머지는 남는다 */
+export async function setTablePrefs(tableId: string, patch: TablePrefs): Promise<void> {
+  const state = load();
+  state.tablePrefs = { ...state.tablePrefs, [tableId]: { ...(state.tablePrefs[tableId] ?? {}), ...patch } };
+  persist(state);
 }
 
 export async function listRecentProjectIds(): Promise<string[]> {
