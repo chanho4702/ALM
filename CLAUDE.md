@@ -2,12 +2,13 @@
 
 지라(Jira)를 모방한 **자체 ALM 제품**의 프론트엔드. 지라 클론이 아니라 지라의 검증된 구조 위에
 ALM 특색(한국어 스마트 검색, 필터 URL 공유, 저장 필터 사이드바, 단순 시간추적)을 얹는다.
-현재는 프론트 단독 — localStorage 목업이 백엔드를 대신한다.
+프로덕션 빌드는 alm-backend REST(`jiraApi.ts`)를 쓰고, 테스트·목업 개발은 localStorage 목업(`jiraMock.ts`)을 쓴다 — `jiraStore.ts` 파사드가 고른다.
 
 ## 불변 규칙
 
 1. **화면은 `src/features/alm/store/jiraStore.ts`의 async 함수만 호출한다.**
-   localStorage 접근·데이터 가공을 화면에 두지 않는다. 백엔드(jira-service) 교체 지점은 이 파일 하나.
+   localStorage 접근·데이터 가공을 화면에 두지 않는다. `jiraStore.ts`는 파사드 — 목업(`jiraMock.ts`)과
+   REST(`jiraApi.ts`)를 `USE_REST`로 고른다(프로덕션 = REST). 목업에 함수를 추가하면 파사드 export도 추가한다.
 2. **UI는 100% `@chanho/react` 디자인 시스템.** 다른 UI 라이브러리 금지. 커스텀 마크업은
    디자인 토큰(`--chanho-*`)만 사용. 함정 목록: `docs/areas/design-system.md` (특히
    Checkbox/Switch는 `onCheckedChange`, Select는 빈 문자열 value 금지 → 센티널).

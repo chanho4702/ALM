@@ -1,7 +1,7 @@
 // alm-backend Project/Issue/Sprint REST 계약 어댑터.
 // 서버가 아직 저장하지 않는 ALM 확장 필드는 조용히 유실시키지 않고 명시적으로 거부한다.
 import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
-import { sharedApiFetch } from "./apiClient";
+import { sharedApiFetch, sharedAuthClient } from "./apiClient";
 import type { IssueQuery } from "./searchQuery";
 import {
   extractApiError,
@@ -45,6 +45,8 @@ import type {
   StatusColor,
   IssueTypeDef,
   IssueTypeLevel,
+  User,
+  ProjectRole,
 } from "./types";
 
 async function json<T>(response: Response): Promise<T> {
@@ -1043,4 +1045,26 @@ export async function moveIssueType(id: string, delta: -1 | 1): Promise<void> {
 export async function deleteIssueType(id: string): Promise<void> {
   await json(await sharedApiFetch(`/api/alm/settings/issue-types/${encodeURIComponent(id)}`, { method: "DELETE" }));
   notifyIssueTypesChanged();
+}
+
+// ── 사용자 — 디렉터리 서비스가 아직 없다. 현재 사용자는 /api/me, 목록은 현재 사용자뿐 ──
+
+let cachedMe: User | null = null;
+
+/** JWT sub가 사용자 id(서버의 actorId/assigneeId와 같은 숫자 문자열) */
+export async function getCurrentUser(): Promise<User> {
+  if (cachedMe) return cachedMe;
+  const me = await sharedAuthClient.fetchMe();
+  cachedMe = { id: me.sub ?? me.email, name: me.name ?? me.email };
+  return cachedMe;
+}
+
+/** 사용자 디렉터리(org-service/Keycloak) 연동 전까지 담당자 후보는 본인뿐이다 */
+export async function listUsers(): Promise<User[]> {
+  return [await getCurrentUser()];
+}
+
+/** 권한 판정은 서버(org-service)가 한다 — 화면은 낙관적으로 열어 두고 거부는 응답으로 받는다 */
+export async function getMyProjectRole(): Promise<ProjectRole | null> {
+  return "admin";
 }
