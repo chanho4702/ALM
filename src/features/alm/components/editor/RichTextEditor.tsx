@@ -60,6 +60,7 @@ export function RichTextEditor({
   usersRef.current = users;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
   const suggestionRef = useRef<SuggestionState | null>(null);
   const setSuggestionState = (next: SuggestionState | null) => {
@@ -96,12 +97,14 @@ export function RichTextEditor({
                 setSuggestionState(null);
                 return;
               }
+              // 모달처럼 transform이 걸린 조상 안에서는 fixed가 뷰포트 기준이 아니므로 래퍼 기준 절대 좌표로 둔다
               const rect = props.clientRect?.() ?? null;
+              const base = wrapperRef.current?.getBoundingClientRect();
               setSuggestionState({
                 items,
                 highlight: Math.min(highlight, items.length - 1),
-                left: rect?.left ?? 0,
-                top: rect ? rect.bottom + 4 : 0,
+                left: rect && base ? rect.left - base.left : 0,
+                top: rect && base ? rect.bottom - base.top + 4 : 0,
                 command: (user) => props.command(user as unknown as Record<string, unknown>),
               });
             };
@@ -175,12 +178,12 @@ export function RichTextEditor({
   if (!editor) return null;
 
   return (
-    <div className="rich-text-editor">
+    <div className="rich-text-editor" ref={wrapperRef}>
       <Toolbar editor={editor} />
       <EditorContent editor={editor} style={{ minHeight }} className="rich-text-editor-body" />
       {suggestion ? (
         <ul
-          className="editor-suggestions"
+          className="editor-suggestions rich-text-suggestions"
           role="listbox"
           aria-label="멘션 후보"
           style={{ left: suggestion.left, top: suggestion.top }}

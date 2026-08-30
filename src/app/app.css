@@ -3657,3 +3657,121 @@ body {
 .editor-suggestions [aria-selected="true"] button {
   background: var(--chanho-color-background-neutral-hovered);
 }
+
+.rich-text-suggestions {
+  position: absolute;
+}
+
+/* ── 프로젝트 만들기 2단계(템플릿 → 세부 정보) ─────────── */
+.pcreate-steps {
+  display: flex;
+  gap: var(--chanho-space-300);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.pcreate-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.pcreate-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--chanho-color-border-default);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.pcreate-steps .is-current {
+  color: var(--chanho-color-text-default);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.pcreate-steps .is-current .pcreate-step-index,
+.pcreate-steps .is-done .pcreate-step-index {
+  background: var(--chanho-color-background-brand);
+  border-color: var(--chanho-color-background-brand);
+  color: var(--chanho-color-text-inverse, #fff);
+}
+
+.pcreate-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--chanho-space-300);
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .pcreate-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pcreate-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  padding: var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-large);
+  background: var(--chanho-color-background-subtle);
+}
+
+.pcreate-preview-head {
+  display: flex;
+  gap: var(--chanho-space-150);
+  align-items: flex-start;
+}
+
+.pcreate-preview-head p {
+  margin: var(--chanho-space-50) 0 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.pcreate-preview-facts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--chanho-space-50);
+  margin: 0;
+}
+
+.pcreate-preview-facts dt {
+  font-size: var(--chanho-font-size-50);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chanho-color-text-muted);
+  margin-top: var(--chanho-space-100);
+}
+
+.pcreate-preview-facts dd {
+  margin: 0;
+}
+
+.pcreate-preview-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-50);
+}
+
+.pcreate-preview-muted {
+  color: var(--chanho-color-text-muted);
+  font-size: var(--chanho-font-size-75);
+}
+
+.pcreate-lead {
+  margin: calc(-1 * var(--chanho-space-200)) 0 0;
+  color: var(--chanho-color-text-subtle);
+}
+
+.pcreate-page {
+  width: min(1040px, 100%);
+}

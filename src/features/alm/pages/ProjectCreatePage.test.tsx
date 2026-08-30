@@ -29,27 +29,46 @@ beforeEach(() => {
 });
 
 describe("ProjectCreatePage", () => {
+  it("2단계: 템플릿을 고르고 다음 → 세부 정보 화면에 선택한 템플릿 미리보기와 키 예시가 보인다", async () => {
+    const user = userEvent.setup();
+    renderCreate();
+    const grid = await screen.findByTestId("template-grid");
+    await user.click(within(grid).getByRole("radio", { name: /스프린트 단위로 계획/ }));
+    await user.click(screen.getByRole("button", { name: "다음" }));
+
+    const preview = await screen.findByRole("complementary", { name: "선택한 템플릿" });
+    expect(within(preview).getByText("스크럼")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("키 *"), "pay");
+    expect(within(preview).getByText("PAY-1")).toBeInTheDocument();
+
+    // 뒤로 가면 템플릿 선택이 유지된다
+    await user.click(screen.getByRole("button", { name: "뒤로" }));
+    expect(within(await screen.findByTestId("template-grid")).getByRole("radio", { name: /스프린트 단위로 계획/ })).toHaveAttribute("aria-checked", "true");
+  });
+
   it("영문 이름을 입력하면 키를 이니셜로 자동 제안하고, 직접 수정하면 제안을 멈춘다", async () => {
     const user = userEvent.setup();
     renderCreate();
 
-    await user.type(await screen.findByLabelText("이름"), "Payment Service");
-    expect(screen.getByLabelText("키")).toHaveValue("PS");
+    await user.click(await screen.findByRole("button", { name: "다음" }));
+    await user.type(await screen.findByLabelText("이름 *"), "Payment Service");
+    expect(screen.getByLabelText("키 *")).toHaveValue("PS");
 
     // 키를 직접 수정 → 소문자는 대문자로, 이후 이름을 바꿔도 유지
-    await user.clear(screen.getByLabelText("키"));
-    await user.type(screen.getByLabelText("키"), "pay");
-    expect(screen.getByLabelText("키")).toHaveValue("PAY");
-    await user.type(screen.getByLabelText("이름"), " Extra");
-    expect(screen.getByLabelText("키")).toHaveValue("PAY");
+    await user.clear(screen.getByLabelText("키 *"));
+    await user.type(screen.getByLabelText("키 *"), "pay");
+    expect(screen.getByLabelText("키 *")).toHaveValue("PAY");
+    await user.type(screen.getByLabelText("이름 *"), " Extra");
+    expect(screen.getByLabelText("키 *")).toHaveValue("PAY");
   });
 
   it("만들기 → 새 프로젝트 보드로 이동한다", async () => {
     const user = userEvent.setup();
     renderCreate();
 
-    await user.type(await screen.findByLabelText("이름"), "결제 서비스");
-    await user.type(screen.getByLabelText("키"), "PAY");
+    await user.click(await screen.findByRole("button", { name: "다음" }));
+    await user.type(await screen.findByLabelText("이름 *"), "결제 서비스");
+    await user.type(screen.getByLabelText("키 *"), "PAY");
     await user.type(screen.getByLabelText("설명"), "결제 도메인");
     await user.click(screen.getByRole("button", { name: "프로젝트 만들기" }));
 
@@ -95,8 +114,9 @@ describe("프로젝트 템플릿", () => {
     const grid = await screen.findByTestId("template-grid");
 
     await user.click(within(grid).getByRole("radio", { name: /스프린트 단위로 계획/ }));
-    await user.type(screen.getByLabelText("이름"), "스크럼 팀");
-    await user.type(screen.getByLabelText("키"), "SCR");
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    await user.type(await screen.findByLabelText("이름 *"), "스크럼 팀");
+    await user.type(screen.getByLabelText("키 *"), "SCR");
     await user.click(screen.getByRole("button", { name: "프로젝트 만들기" }));
 
     await waitFor(() => {
