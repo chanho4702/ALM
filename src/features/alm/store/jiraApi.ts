@@ -631,7 +631,7 @@ export async function bulkDeleteIssues(
   return { deleted, failed };
 }
 
-// ── CSV/이관 가져오기 — 서버는 키를 직접 발급하므로 키 보존은 서버 이관 API까지 목업 전용 ──
+// ── CSV/이관 가져오기 — 서버 일괄 API(키 보존·행 단위 실패)로 한 번에 보낸다 ──
 
 export interface ImportResult {
   created: number;
@@ -654,26 +654,29 @@ export async function importIssues(
   }[],
 ): Promise<ImportResult> {
   if (inputs.length === 0) throw new Error("가져올 이슈가 없습니다");
-  let created = 0;
-  const failed: ImportResult["failed"] = [];
-  for (const [index, input] of inputs.entries()) {
-    try {
-      if (input.key) throw new Error("서버는 아직 키 보존 가져오기를 지원하지 않습니다");
-      const { estimateHours, key: _key, ...rest } = input;
-      const issue = await createIssue({ projectId, ...rest });
-      if (estimateHours !== undefined && estimateHours !== null) {
-        await updateIssue(issue.id, { estimateHours });
-      }
-      created += 1;
-    } catch (error) {
-      failed.push({
-        row: index + 1,
-        title: input.key ?? input.title,
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-  return { created, failed };
+  const items = inputs.map((input) => ({
+    key: input.key ?? null,
+    title: input.title,
+    description: input.description ?? "",
+    type: input.type ? toApiIssueType(input.type) : null,
+    status: input.status ?? null,
+    priority: input.priority ? toApiIssuePriority(input.priority) : null,
+    assigneeId: input.assigneeId ? toBackendId(input.assigneeId) : null,
+    details: {
+      parentId: null,
+      sprintId: null,
+      dueDate: input.dueDate ?? null,
+      estimateHours: input.estimateHours ?? null,
+      labels: input.labels ?? [],
+    },
+  }));
+  return json<ImportResult>(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/issues/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    }),
+  );
 }
 
 // ── 워처 · 알림 — 서버 V9. 문장은 서버가 만들지 않으므로 여기서 type + detail로 만든다 ──

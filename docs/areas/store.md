@@ -114,7 +114,7 @@
 `store/csv.ts`(순수): `parseCsv`/`toCsv`(RFC 4180), `issuesToCsv`(사람이 읽는 이름으로 내보냄),
 `csvToIssueInputs`(우리 헤더 + 지라 영문 헤더 별칭, 행 단위 오류 분리). `importIssues(projectId, inputs)`는
 행마다 `createIssue` — `key`가 있으면 보존하고 카운터를 그 번호 이상으로 앞당긴다(`{프로젝트키}-N` 형식·유일
-검증). REST 어댑터는 서버가 키를 발급하므로 키 보존을 거부한다(서버 이관 API 후속).
+검증). REST 어댑터는 서버 일괄 API(`POST /api/alm/projects/{id}/issues/import`)로 한 번에 보내고 서버가 키를 보존한다.
 
 ## 대량 변경 (2026-08-30)
 

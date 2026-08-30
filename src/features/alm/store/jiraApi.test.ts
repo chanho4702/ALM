@@ -99,15 +99,20 @@ describe("jiraApi projects", () => {
 });
 
 describe("jiraApi issues", () => {
-  it("목록 DTO를 매핑한 뒤 기존 화면 필터 의미론을 유지한다", async () => {
-    vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
-      response(200, [ISSUE, { ...ISSUE, id: 8, key: "ALM-8", type: "TASK", priority: "LOW" }]),
+  it("목록은 서버 검색 페이지 응답을 매핑하고 필터를 쿼리로 넘긴다 (클라이언트 전량 필터 없음)", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      response(200, { items: [ISSUE], page: 0, size: 200, total: 1 }),
     );
 
     const result = await listIssues("3", { type: "bug", text: "callback" });
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "7", type: "bug", priority: "high", order: 4 });
+    expect(result[0]).toMatchObject({ id: "7", type: "bug", priority: "high" });
+    const url = String(spy.mock.calls[0][0]);
+    expect(url).toContain("/api/alm/issues/search?");
+    expect(url).toContain("projectIds=3");
+    expect(url).toContain("types=BUG");
+    expect(url).toContain("text=callback");
   });
 
   it("생성 요청의 enum과 assignee id를 백엔드 계약으로 바꾼다", async () => {
