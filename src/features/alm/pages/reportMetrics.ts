@@ -49,7 +49,7 @@ function localDay(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function dayOf(iso: string): string {
+export function dayOf(iso: string): string {
   return localDay(new Date(iso));
 }
 
@@ -59,21 +59,21 @@ function parseDay(day: string): Date {
 }
 
 /** 그 로컬 날짜의 끝(23:59:59.999)을 ISO로 — 이력 비교는 ISO 문자열로 한다 */
-function endOfLocalDay(day: string): string {
+export function endOfLocalDay(day: string): string {
   const date = parseDay(day);
   date.setHours(23, 59, 59, 999);
   return date.toISOString();
 }
 
-function startOfLocalDay(day: string): string {
+export function startOfLocalDay(day: string): string {
   return parseDay(day).toISOString();
 }
 
-function addDays(day: string, count: number): string {
+export function addDays(day: string, count: number): string {
   return localDay(new Date(parseDay(day).getTime() + count * DAY_MS));
 }
 
-function daysBetween(from: string, to: string): number {
+export function daysBetween(from: string, to: string): number {
   return Math.round((parseDay(to).getTime() - parseDay(from).getTime()) / DAY_MS);
 }
 
@@ -83,7 +83,7 @@ function daysBetween(from: string, to: string): number {
  * `ignoreSprintMovesAt`은 "완료 처리로 한꺼번에 옮긴 순간"을 재생에서 뺀다 — 완료된 스프린트
  * 리포트는 이관 직전의 소속으로 이슈를 세야 미완료 목록이 비지 않는다.
  */
-function stateAt(
+export function stateAt(
   issue: Issue,
   changes: IssueChange[],
   atExclusiveEnd: string,
@@ -112,7 +112,7 @@ function stateAt(
 }
 
 /** 이력에 한 번이라도 이 스프린트가 등장한 이슈 + 현재 소속 이슈 */
-function candidates(sprintId: string, issues: Issue[], changes: IssueChange[]): Issue[] {
+export function candidates(sprintId: string, issues: Issue[], changes: IssueChange[]): Issue[] {
   const touched = new Set(
     changes
       .filter(

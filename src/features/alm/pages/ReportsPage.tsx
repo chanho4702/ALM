@@ -34,6 +34,25 @@ import { IssueMiniList, type IssueMiniRow } from "../components/DashboardCards";
 import { estimateSummary, formatPlannedRange, RESOLUTION_LABELS } from "../components/labels";
 import { todayKey } from "./dashboardMetrics";
 import { burndownSeries, sprintReport, type BurndownUnit } from "./reportMetrics";
+import { burnupSeries, controlChart, cumulativeFlow, velocitySeries } from "./reportMetricsExt";
+import {
+  BurnupCard,
+  ControlChartCard,
+  CumulativeFlowCard,
+  VelocityCard,
+} from "../components/ReportCharts";
+
+/** 리포트 종류 — 스프린트 기준(번다운·번업)과 프로젝트 기준(벨로시티·누적 흐름·컨트롤) */
+type ReportKind = "burndown" | "burnup" | "velocity" | "cfd" | "control";
+const REPORT_OPTIONS: { value: ReportKind; label: string }[] = [
+  { value: "burndown", label: "번다운" },
+  { value: "burnup", label: "번업" },
+  { value: "velocity", label: "벨로시티" },
+  { value: "cfd", label: "누적 흐름도" },
+  { value: "control", label: "컨트롤 차트" },
+];
+const SPRINT_SCOPED = new Set<ReportKind>(["burndown", "burnup"]);
+const RANGE_DAYS = 30;
 
 const UNIT_LABELS: Record<BurndownUnit, string> = { hours: "예상 시간", count: "이슈 수" };
 
@@ -61,6 +80,7 @@ export function ReportsPage() {
   const [sprintId, setSprintId] = useState<string | null>(null);
   // null = 아직 고르지 않음. 예상 미입력이 있으면 이슈 수 기준이 정직하다 — 시간 기준은 빈 이슈를 0으로 센다
   const [unit, setUnit] = useState<BurndownUnit | null>(null);
+  const [kind, setKind] = useState<ReportKind>("burndown");
 
   const generation = useRef(0);
   const reload = useCallback(async () => {
@@ -129,6 +149,37 @@ export function ReportsPage() {
     [users],
   );
 
+  const burnup = useMemo(() => {
+    if (!sprint || !issues || kind !== "burnup") return null;
+    return burnupSeries({ sprint, issues, changes, statuses, unit: effectiveUnit, today });
+  }, [sprint, issues, changes, statuses, effectiveUnit, today, kind]);
+  const velocity = useMemo(
+    () =>
+      issues && kind === "velocity"
+        ? velocitySeries({ sprints, issues, changes, statuses, unit: effectiveUnit })
+        : null,
+    [sprints, issues, changes, statuses, effectiveUnit, kind],
+  );
+  const rangeFrom = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - (RANGE_DAYS - 1));
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }, []);
+  const flow = useMemo(
+    () =>
+      issues && kind === "cfd"
+        ? cumulativeFlow({ issues, changes, statuses, from: rangeFrom, to: today })
+        : null,
+    [issues, changes, statuses, rangeFrom, today, kind],
+  );
+  const control = useMemo(
+    () =>
+      issues && kind === "control"
+        ? controlChart({ issues, changes, statuses, from: rangeFrom, to: today })
+        : null,
+    [issues, changes, statuses, rangeFrom, today, kind],
+  );
+
   if (issues === null) {
     return (
       <div className="board-loading">
@@ -137,12 +188,50 @@ export function ReportsPage() {
     );
   }
 
+  const kindSelect = (
+    <Select
+      label="리포트"
+      value={kind}
+      options={REPORT_OPTIONS}
+      onValueChange={(next) => setKind(next as ReportKind)}
+    />
+  );
+
+  // 프로젝트 기준 리포트는 스프린트가 없어도 보인다
+  if (!SPRINT_SCOPED.has(kind)) {
+    return (
+      <>
+        <div className="dashboard">
+          <div className="reports-toolbar">
+            {kindSelect}
+            <RadioGroup
+              value={effectiveUnit}
+              onValueChange={(next) => setUnit(next as BurndownUnit)}
+              aria-label="집계 단위"
+              className="reports-units"
+            >
+              <Radio value="hours" label={UNIT_LABELS.hours} />
+              <Radio value="count" label={UNIT_LABELS.count} />
+            </RadioGroup>
+          </div>
+          {velocity ? <VelocityCard rows={velocity} unit={effectiveUnit} /> : null}
+          {flow ? <CumulativeFlowCard points={flow} /> : null}
+          {control ? <ControlChartCard chart={control} onOpen={openIssue} /> : null}
+        </div>
+        {issueModal}
+      </>
+    );
+  }
+
   if (sprints.length === 0 || !sprint || !series || !report) {
     return (
-      <EmptyState
-        title="아직 스프린트가 없습니다"
-        description="백로그에서 스프린트를 만들고 시작하면 번다운과 리포트가 나타납니다."
-      />
+      <div className="dashboard">
+        <div className="reports-toolbar">{kindSelect}</div>
+        <EmptyState
+          title="아직 스프린트가 없습니다"
+          description="백로그에서 스프린트를 만들고 시작하면 번다운과 리포트가 나타납니다."
+        />
+      </div>
     );
   }
 
@@ -153,6 +242,7 @@ export function ReportsPage() {
     <>
       <div className="dashboard">
         <div className="reports-toolbar">
+          {kindSelect}
           <Select
             label="스프린트"
             value={sprint.id}
@@ -168,6 +258,22 @@ export function ReportsPage() {
           </p>
         </div>
 
+        {kind === "burnup" && burnup ? (
+          <>
+            <RadioGroup
+              value={effectiveUnit}
+              onValueChange={(next) => setUnit(next as BurndownUnit)}
+              aria-label="번업 단위"
+              className="reports-units"
+            >
+              <Radio value="hours" label={UNIT_LABELS.hours} />
+              <Radio value="count" label={UNIT_LABELS.count} />
+            </RadioGroup>
+            <BurnupCard series={burnup} sprintName={sprint.name} />
+          </>
+        ) : null}
+
+        {kind === "burndown" ? (
         <Card padding="md" title="번다운" role="region" aria-label="번다운">
           <div className="reports-burndown">
             <RadioGroup
@@ -289,6 +395,7 @@ export function ReportsPage() {
             )}
           </div>
         </Card>
+        ) : null}
 
         <Card padding="md" title="스프린트 리포트" role="region" aria-label="스프린트 리포트">
           <div className="reports-report">

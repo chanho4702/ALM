@@ -103,3 +103,37 @@ describe("ReportsPage", () => {
     expect(await screen.findByRole("dialog")).toHaveTextContent("프로젝트 스캐폴드 구성");
   });
 });
+
+describe("ReportsPage 확장 리포트", () => {
+  it("리포트 종류를 바꾸면 번업·벨로시티·누적 흐름도·컨트롤 차트가 표와 함께 나온다", async () => {
+    const user = userEvent.setup();
+    renderReports();
+    await screen.findByRole("region", { name: "번다운" });
+
+    const pick = async (label: string) => {
+      await user.click(screen.getByRole("combobox", { name: "리포트" }));
+      await user.click(await screen.findByRole("option", { name: label }));
+    };
+
+    await pick("번업");
+    expect(await screen.findByRole("region", { name: "번업" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "번업 값" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "번다운" })).not.toBeInTheDocument();
+
+    await pick("벨로시티");
+    const velocity = await screen.findByRole("region", { name: "벨로시티" });
+    expect(velocity).toHaveTextContent(/완료된 스프린트가 없습니다|평균 완료/);
+    expect(screen.queryByRole("region", { name: "스프린트 리포트" })).not.toBeInTheDocument();
+
+    await pick("누적 흐름도");
+    const flow = await screen.findByRole("region", { name: "누적 흐름도" });
+    expect(within(flow).getByRole("table", { name: "누적 흐름 값" })).toBeInTheDocument();
+    // 시드 8건: 마지막 날 합계가 8이다
+    const rows = within(flow).getAllByRole("row");
+    const lastCells = within(rows[rows.length - 1]).getAllByRole("cell").map((c) => Number(c.textContent));
+    expect(lastCells[1] + lastCells[2] + lastCells[3]).toBe(8);
+
+    await pick("컨트롤 차트");
+    expect(await screen.findByRole("region", { name: "컨트롤 차트" })).toHaveTextContent(/사이클 타임|완료된 이슈가 없습니다/);
+  });
+});
