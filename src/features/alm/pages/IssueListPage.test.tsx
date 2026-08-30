@@ -229,3 +229,13 @@ describe("IssueListPage CSV", () => {
     expect(within(row).getByText("완료")).toBeInTheDocument();
   });
 });
+
+describe("IssueListPage 페이징", () => {
+  it("범위와 총 건수를 보여주고, 한 페이지 안이면 다음이 비활성이다", async () => {
+    renderIssues();
+    const pager = await screen.findByRole("navigation", { name: "페이지" });
+    expect(pager).toHaveTextContent("1–8 / 8건");
+    expect(within(pager).getByRole("button", { name: "다음" })).toBeDisabled();
+    expect(within(pager).getByRole("button", { name: "이전" })).toBeDisabled();
+  });
+});

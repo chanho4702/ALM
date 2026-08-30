@@ -18,6 +18,7 @@ import type { Issue, IssuePriority, IssueType, Sprint, User, WorkflowStatus } fr
 import {
   bulkDeleteIssues,
   listIssues,
+  listIssuesPage,
   listProjectStatuses,
   listSprints,
   listUsers,
@@ -40,6 +41,8 @@ import {
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
 const ALL = "all";
 const PRIORITIES: IssuePriority[] = ["high", "medium", "low"];
+/** 한 페이지 — 서버 검색과 같은 기본값 */
+const PAGE_SIZE = 50;
 
 // 정렬용 위계: 우선순위 높음→낮음 (상태는 카테고리 의미 위계 KIND_ORDER 사용)
 const PRIORITY_ORDER: Record<IssuePriority, number> = { high: 0, medium: 1, low: 2 };
@@ -65,19 +68,27 @@ export function IssueListPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const toast = useToast();
 
   const reload = useCallback(async () => {
     if (!projectId) return;
-    const list = await listIssues(projectId, {
-      text: text.trim() || undefined,
-      status: status === ALL ? undefined : status,
-      priority: priority === ALL ? undefined : (priority as IssuePriority),
-      assigneeId: assigneeId === ALL ? undefined : assigneeId,
-      label: label === ALL ? undefined : label,
-      type: type === ALL ? undefined : (type as IssueType),
-    });
+    const result = await listIssuesPage(
+      projectId,
+      {
+        text: text.trim() || undefined,
+        status: status === ALL ? undefined : status,
+        priority: priority === ALL ? undefined : (priority as IssuePriority),
+        assigneeId: assigneeId === ALL ? undefined : assigneeId,
+        label: label === ALL ? undefined : label,
+        type: type === ALL ? undefined : (type as IssueType),
+      },
+      { page, size: PAGE_SIZE },
+    );
+    const list = result.items;
     setIssues(list);
+    setTotal(result.total);
     // 사라진 이슈는 선택에서도 빠진다
     setSelected((prev) => new Set([...prev].filter((id) => list.some((i) => i.id === id))));
     setSprints(await listSprints(projectId));
@@ -85,7 +96,12 @@ export function IssueListPage() {
     const all = await listIssues(projectId);
     setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
     setStatuses(await listProjectStatuses(projectId));
-  }, [projectId, text, status, priority, assigneeId, label, type]);
+  }, [projectId, text, status, priority, assigneeId, label, type, page]);
+
+  // 필터가 바뀌면 첫 페이지로
+  useEffect(() => {
+    setPage(0);
+  }, [text, status, priority, assigneeId, label, type]);
 
   useEffect(() => {
     void listUsers().then(setUsers);
@@ -437,6 +453,22 @@ export function IssueListPage() {
           </div>
         ) : (
           <div className="issue-table-scroll">
+            <div className="issue-pager" role="navigation" aria-label="페이지">
+              <span className="issue-pager-range">
+                {`${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} / ${total}건`}
+              </span>
+              <Button size="small" variant="ghost" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                이전
+              </Button>
+              <Button
+                size="small"
+                variant="ghost"
+                disabled={(page + 1) * PAGE_SIZE >= total}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                다음
+              </Button>
+            </div>
             <Table
               aria-label="이슈 목록"
               columns={columns}

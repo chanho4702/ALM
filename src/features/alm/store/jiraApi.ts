@@ -2,6 +2,7 @@
 // 서버가 아직 저장하지 않는 ALM 확장 필드는 조용히 유실시키지 않고 명시적으로 거부한다.
 import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
 import { sharedApiFetch } from "./apiClient";
+import type { IssueQuery } from "./searchQuery";
 import {
   extractApiError,
   mapIssue,
@@ -108,42 +109,93 @@ export interface IssueFilter {
   type?: IssueType;
 }
 
-function filterIssues(issues: Issue[], filter?: IssueFilter): Issue[] {
-  if (!filter) return issues;
-  let result = issues;
-  if (filter.text) {
-    const text = filter.text.toLowerCase();
-    result = result.filter(
-      (issue) =>
-        issue.title.toLowerCase().includes(text) ||
-        issue.key.toLowerCase().includes(text) ||
-        issue.description.toLowerCase().includes(text),
-    );
-  }
-  if (filter.status) result = result.filter((issue) => issue.status === filter.status);
-  if (filter.priority) result = result.filter((issue) => issue.priority === filter.priority);
-  if (filter.assigneeId) result = result.filter((issue) => issue.assigneeId === filter.assigneeId);
-  if (filter.label) result = result.filter((issue) => issue.labels.includes(filter.label!));
-  if (filter.type) result = result.filter((issue) => issue.type === filter.type);
-  return result;
+
+interface IssuePageDto {
+  items: IssueDto[];
+  page: number;
+  size: number;
+  total: number;
 }
 
+export interface IssuePage {
+  items: Issue[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+/** 서버 검색 파라미터 — 목록 값은 반복 파라미터로 보낸다 */
+function searchParams(entries: Record<string, string | string[] | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(entries)) {
+    if (value === undefined || value === "") continue;
+    if (Array.isArray(value)) value.forEach((v) => params.append(key, v));
+    else params.set(key, value);
+  }
+  return params.toString();
+}
+
+/** 필터를 서버가 거른다 — 클라이언트 전량 필터(BACKLOG #5)를 쓰지 않는다 */
+export async function listIssuesPage(
+  projectId: string,
+  filter: IssueFilter | undefined,
+  paging: { page: number; size: number },
+): Promise<IssuePage> {
+  const query = searchParams({
+    projectIds: toBackendId(projectId).toString(),
+    text: filter?.text,
+    statuses: filter?.status,
+    priorities: filter?.priority ? toApiIssuePriority(filter.priority) : undefined,
+    types: filter?.type ? toApiIssueType(filter.type) : undefined,
+    assignees: filter?.assigneeId ? toBackendId(filter.assigneeId).toString() : undefined,
+    labels: filter?.label,
+    sort: "key",
+    dir: "asc",
+    page: String(paging.page),
+    size: String(paging.size),
+  });
+  const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`));
+  return {
+    items: dto.items.map((row, index) => mapIssue(row, dto.page * dto.size + index + 1)),
+    page: dto.page,
+    size: dto.size,
+    total: dto.total,
+  };
+}
+
+/** 전량이 필요한 화면(보드·백로그·리포트)용 — 서버 최대 페이지 크기로 끝까지 읽는다 */
 export async function listIssues(projectId: string, filter?: IssueFilter): Promise<Issue[]> {
-  const rows = await json<IssueDto[]>(
-    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/issues`),
-  );
-  return filterIssues(rows.map((row, index) => mapIssue(row, index + 1)), filter);
+  const all: Issue[] = [];
+  for (let page = 0; ; page += 1) {
+    const chunk = await listIssuesPage(projectId, filter, { page, size: 200 });
+    all.push(...chunk.items);
+    if (all.length >= chunk.total || chunk.items.length === 0) break;
+  }
+  return all;
 }
 
-/** 백엔드에 key 단건 조회가 생기기 전까지 접근 가능한 프로젝트를 순회한다. */
 export async function getIssueByKey(key: string): Promise<Issue | null> {
-  const normalized = key.trim().toUpperCase();
-  const projects = await listProjects();
-  for (const project of projects) {
-    const issue = (await listIssues(project.id)).find((candidate) => candidate.key === normalized);
-    if (issue) return issue;
-  }
-  return null;
+  const response = await sharedApiFetch(`/api/alm/issues/by-key/${encodeURIComponent(key.trim().toUpperCase())}`);
+  if (response.status === 404) return null;
+  return mapIssue(await json<IssueDto>(response));
+}
+
+/** 교차 프로젝트 검색(검색 페이지·모달) — 카테고리 필터는 기본 상태 id로만 서버에 전달한다 */
+export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
+  const params = searchParams({
+    projectIds: query.projectIds.map((id) => toBackendId(id).toString()),
+    text: query.text.trim() || undefined,
+    statuses: [...query.statuses, ...query.statusIds],
+    priorities: query.priorities.map(toApiIssuePriority),
+    types: query.types.map(toApiIssueType),
+    assignees: query.assigneeIds.map((id) => (id === "unassigned" ? id : toBackendId(id).toString())),
+    labels: query.labels,
+    sort: query.sort,
+    dir: query.sort === "priority" || query.sort === "due" ? "asc" : "desc",
+    size: "200",
+  });
+  const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${params}`));
+  return dto.items.map((row, index) => mapIssue(row, index + 1));
 }
 
 export interface IssueCreateInput {

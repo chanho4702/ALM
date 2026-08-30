@@ -1803,6 +1803,30 @@ export async function importIssues(
   return { created, failed };
 }
 
+// ── 페이징 ───────────────────────────────────────────────────
+
+export interface IssuePage {
+  items: Issue[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+/**
+ * 필터 + 페이지 — 목업은 `listIssues`를 자른다. REST는 서버 검색(`/api/alm/issues/search`)으로
+ * total을 받는다. 화면은 이 계약만 쓰고 전량을 들고 있지 않는다(BACKLOG #5 해소).
+ */
+export async function listIssuesPage(
+  projectId: string,
+  filter: Parameters<typeof listIssues>[1],
+  paging: { page: number; size: number },
+): Promise<IssuePage> {
+  const all = await listIssues(projectId, filter);
+  const size = Math.max(1, paging.size);
+  const page = Math.max(0, paging.page);
+  return { items: all.slice(page * size, page * size + size), page, size, total: all.length };
+}
+
 // ── 워처 ─────────────────────────────────────────────────────
 
 export interface WatchersView {

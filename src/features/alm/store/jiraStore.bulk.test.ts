@@ -89,3 +89,18 @@ describe("가져오기", () => {
     });
   });
 });
+
+describe("페이징", () => {
+  it("listIssuesPage는 필터 적용 후 total과 page 슬라이스를 돌려준다", async () => {
+    const { listIssuesPage } = await import("./jiraStore");
+    const first = await listIssuesPage("p1", {}, { page: 0, size: 3 });
+    expect(first.total).toBe(8);
+    expect(first.items).toHaveLength(3);
+    const last = await listIssuesPage("p1", {}, { page: 2, size: 3 });
+    expect(last.items).toHaveLength(2);
+    expect(last.page).toBe(2);
+    const filtered = await listIssuesPage("p1", { status: "todo" }, { page: 0, size: 50 });
+    expect(filtered.total).toBe(filtered.items.length);
+    expect(filtered.items.every((i) => i.status === "todo")).toBe(true);
+  });
+});

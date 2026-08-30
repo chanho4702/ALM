@@ -3165,3 +3165,17 @@ body {
   margin-left: var(--chanho-space-50);
   font-variant-numeric: tabular-nums;
 }
+
+.issue-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+  margin-bottom: var(--chanho-space-100);
+}
+
+.issue-pager-range {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
