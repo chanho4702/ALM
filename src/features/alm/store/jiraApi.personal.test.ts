@@ -60,14 +60,14 @@ describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", ()
         : response(200, { notifications: { assigned: false }, startPage: null }),
     );
     expect(await getMyPreferences()).toEqual({
-      notifications: { assigned: false, statusChanged: true, commented: true },
+      notifications: { assigned: false, statusChanged: true, commented: true, mentioned: true },
       autoWatch: { created: true, commented: true, edited: false },
       startPage: "home",
     });
     const saved = await saveMyPreferences({ startPage: "projects" });
     const body = JSON.parse(spy.mock.calls[2][1]!.body as string);
     expect(body).toEqual({
-      notifications: { assigned: false, statusChanged: true, commented: true },
+      notifications: { assigned: false, statusChanged: true, commented: true, mentioned: true },
       autoWatch: { created: true, commented: true, edited: false },
       startPage: "projects",
     });

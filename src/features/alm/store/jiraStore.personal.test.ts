@@ -80,7 +80,7 @@ describe("프로젝트 바로 가기", () => {
 describe("개인 설정(알림·자동 관찰·시작 화면)", () => {
   it("기본값은 알림 전부 켜짐·만든/댓글 단 이슈 자동 관찰·홈 시작", async () => {
     expect(await getMyPreferences()).toEqual({
-      notifications: { assigned: true, statusChanged: true, commented: true },
+      notifications: { assigned: true, statusChanged: true, commented: true, mentioned: true },
       autoWatch: { created: true, commented: true, edited: false },
       startPage: "home",
     });
@@ -88,7 +88,7 @@ describe("개인 설정(알림·자동 관찰·시작 화면)", () => {
 
   it("저장하면 부분 갱신되고 시작 화면은 정해진 값만 받는다", async () => {
     const saved = await saveMyPreferences({ notifications: { commented: false }, startPage: "projects" });
-    expect(saved.notifications).toEqual({ assigned: true, statusChanged: true, commented: false });
+    expect(saved.notifications).toEqual({ assigned: true, statusChanged: true, commented: false, mentioned: true });
     expect(saved.startPage).toBe("projects");
     expect((await getMyPreferences()).startPage).toBe("projects");
     await expect(saveMyPreferences({ startPage: "mars" as never })).rejects.toThrow(

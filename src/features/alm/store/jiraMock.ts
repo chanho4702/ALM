@@ -54,6 +54,7 @@ import { WORKFLOW_ANY_NODE } from "./types";
 import type { IssueQuery } from "./searchQuery";
 import { getTemplate } from "./projectTemplates";
 import type { ProjectTemplateId } from "./projectTemplates";
+import { extractMentionIds, htmlToText, newMentionIds } from "./richText";
 
 const STORAGE_KEY = "alm.jira.v1";
 
@@ -930,8 +931,18 @@ function pushNotification(
   });
 }
 
+/** 본문에서 @멘션된 사용자에게 — 워처 여부와 무관, 본인·모르는 id 제외 */
+function notifyMentions(data: JiraData, issue: Issue, userIds: string[], where: string, at: string): void {
+  const actorName = userLabel(data, CURRENT_USER_ID);
+  for (const userId of userIds) {
+    if (userId === CURRENT_USER_ID || !data.users.some((u) => u.id === userId)) continue;
+    pushNotification(data, userId, issue, `${actorName} 님이 ${where}에서 나를 멘션했습니다`, at, "mentioned");
+  }
+}
+
 function notifyIssueChanges(data: JiraData, before: Issue, after: Issue, at: string): void {
   const actorName = userLabel(data, CURRENT_USER_ID);
+  notifyMentions(data, after, newMentionIds(before.description, after.description), `${after.key} 설명`, at);
   if (preferencesOf(data, CURRENT_USER_ID).autoWatch.edited) addWatcher(data, after.id, CURRENT_USER_ID, at);
   if (before.assigneeId !== after.assigneeId && after.assigneeId) {
     // 새 담당자는 자동 워처가 되고, 본인이 아니면 배정 알림을 받는다
@@ -1457,7 +1468,7 @@ export async function listIssues(
       (i) =>
         i.title.toLowerCase().includes(text) ||
         i.key.toLowerCase().includes(text) ||
-        i.description.toLowerCase().includes(text),
+        htmlToText(i.description).toLowerCase().includes(text),
     );
   }
   if (filter?.status) issues = issues.filter((i) => i.status === filter.status);
@@ -1483,7 +1494,7 @@ export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
       (i) =>
         i.title.toLowerCase().includes(text) ||
         i.key.toLowerCase().includes(text) ||
-        i.description.toLowerCase().includes(text),
+        htmlToText(i.description).toLowerCase().includes(text),
     );
   }
   if (query.projectIds.length > 0) {
@@ -1540,7 +1551,7 @@ export async function searchIssues(text: string, limit = 20): Promise<Issue[]> {
       (i) =>
         i.key.toLowerCase().includes(query) ||
         i.title.toLowerCase().includes(query) ||
-        i.description.toLowerCase().includes(query),
+        htmlToText(i.description).toLowerCase().includes(query),
     )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return clone(matches.slice(0, limit));
@@ -2282,6 +2293,7 @@ export async function addComment(issueId: string, body: string): Promise<Comment
   for (const userId of notificationRecipients(data, issue, CURRENT_USER_ID)) {
     pushNotification(data, userId, issue, message, comment.createdAt, "commented");
   }
+  notifyMentions(data, issue, extractMentionIds(trimmed), `${issue.key} 코멘트`, comment.createdAt);
   persist();
   return clone(comment);
 }
@@ -2292,9 +2304,14 @@ export async function updateComment(id: string, body: string): Promise<Comment> 
   if (!comment) throw new Error("코멘트를 찾을 수 없습니다");
   if (comment.authorId !== CURRENT_USER_ID) throw new Error("본인 댓글만 수정할 수 있습니다");
   const trimmed = body.trim();
+  const previousBody = comment?.body ?? "";
   if (!trimmed) throw new Error("코멘트 내용을 입력하세요");
   comment.body = trimmed;
   comment.updatedAt = new Date().toISOString();
+  {
+    const issueOfComment = data.issues.find((i) => i.id === comment!.issueId);
+    if (issueOfComment) notifyMentions(data, issueOfComment, newMentionIds(previousBody, comment!.body), `${issueOfComment.key} 코멘트`, new Date().toISOString());
+  }
   persist();
   return clone(comment);
 }
@@ -3499,7 +3516,7 @@ export async function listActivity(issueId: string): Promise<Activity[]> {
 // ── 개인 설정 · 바로 가기 · 공지 배너 (지라 메뉴 대조 2026-08-30) ────────────
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
-  notifications: { assigned: true, statusChanged: true, commented: true },
+  notifications: { assigned: true, statusChanged: true, commented: true, mentioned: true },
   autoWatch: { created: true, commented: true, edited: false },
   startPage: "home",
 };

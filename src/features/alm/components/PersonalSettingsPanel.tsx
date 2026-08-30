@@ -97,6 +97,11 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
             checked={prefs.notifications.commented}
             onCheckedChange={(v) => setNotification("commented", v)}
           />
+          <Switch
+            label="코멘트나 설명에서 나를 멘션할 때"
+            checked={prefs.notifications.mentioned}
+            onCheckedChange={(v) => setNotification("mentioned", v)}
+          />
         </div>
       </Card>
       ) : null}

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { clearEditor, typeInEditor } from "./editor/editorTestUtils";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -142,11 +143,11 @@ describe("IssueDetailModal 코멘트/활동 탭 (W3)", () => {
     expect(within(comments).getByText("이서연")).toBeInTheDocument();
 
     // 작성 → 현재 유저(김찬호) 명의로 목록에 추가, 입력 초기화
-    await user.type(within(comments).getByLabelText("코멘트"), "리뷰 완료했습니다");
+    typeInEditor("코멘트", "리뷰 완료했습니다");
     await user.click(within(comments).getByRole("button", { name: "코멘트 남기기" }));
     expect(await within(comments).findByText("리뷰 완료했습니다")).toBeInTheDocument();
     expect(within(comments).getAllByText("김찬호")).toHaveLength(2); // 시드 1 + 새 코멘트
-    expect(within(comments).getByLabelText("코멘트")).toHaveValue("");
+    expect(within(comments).getByRole("textbox", { name: "코멘트" })).toHaveTextContent("");
   });
 
   it("빈 코멘트 제출은 스토어가 거부하고 danger Toast를 보여준다", async () => {
@@ -270,9 +271,9 @@ describe("IssueDetailModal 댓글 수정/삭제", () => {
     const comments = await within(dialog).findByTestId("issue-comments");
     await user.click(within(comments).getByRole("button", { name: "수정" }));
 
-    const editField = within(comments).getByLabelText("코멘트 수정");
-    await user.clear(editField);
-    await user.type(editField, "dnd-kit v6로 업그레이드했습니다.");
+    expect(within(comments).getByRole("textbox", { name: "코멘트 수정" })).toBeInTheDocument();
+    clearEditor("코멘트 수정");
+    typeInEditor("코멘트 수정", "dnd-kit v6로 업그레이드했습니다.");
     await user.click(within(comments).getByRole("button", { name: "저장" }));
 
     expect(

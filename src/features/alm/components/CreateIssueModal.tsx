@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Button, Checkbox, Modal, Select, TextArea, TextField, useToast } from "@chanho/react";
+import { Button, Checkbox, Modal, Select, TextField, useToast } from "@chanho/react";
+import { RichTextEditor } from "./editor/RichTextEditor";
 import type { Component, Issue, IssuePriority, IssueType, Project, Sprint, User } from "../store/types";
 import {
   addIssueLink,
@@ -276,12 +277,13 @@ export function CreateIssueModal({
           onChange={(e) => setTitle(e.target.value)}
           placeholder="무엇을 해야 하나요?"
         />
-        <TextArea
+        <RichTextEditor
           label="설명"
-          rows={4}
-          placeholder="배경, 완료 조건, 참고 링크…"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
+          users={users}
+          placeholder="배경, 완료 조건, 참고 링크… (@로 멘션)"
+          minHeight={120}
         />
         <div className="create-issue-assignee">
           <Select

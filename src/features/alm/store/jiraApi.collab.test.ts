@@ -79,7 +79,7 @@ describe("jiraApi 코멘트·워크로그", () => {
     const created = await addComment("7", "확인");
     expect(spy).toHaveBeenCalledWith(
       "/api/alm/issues/7/comments",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ body: "확인" }) }),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ body: "확인", mentionedUserIds: [] }) }),
     );
     expect(created).toMatchObject({ id: "5", issueId: "7", authorId: "1", body: "확인" });
     expect(created.updatedAt).toBeUndefined();

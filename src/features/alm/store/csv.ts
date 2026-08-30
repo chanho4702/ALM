@@ -1,4 +1,5 @@
 import type { Issue, IssuePriority, IssueTypeDef, User, WorkflowStatus } from "./types";
+import { htmlToText } from "./richText";
 
 /** CSV 변환에 필요한 이름표 — 화면이 이미 들고 있는 목록을 그대로 넘긴다 */
 export interface CsvContext {
@@ -90,7 +91,7 @@ export function issuesToCsv(issues: Issue[], ctx: CsvContext): string {
     issue.estimateHours === null ? "" : String(issue.estimateHours),
     issue.createdAt.slice(0, 10),
     issue.updatedAt.slice(0, 10),
-    issue.description,
+    htmlToText(issue.description),
   ]);
   return "﻿" + toCsv([[...CSV_HEADERS], ...rows]);
 }

@@ -71,6 +71,7 @@ import type {
 } from "./types";
 import type { IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock";
 import { DEFAULT_PREFERENCES, LINK_TYPES_CHANGED_EVENT, PRIORITIES_CHANGED_EVENT } from "./jiraMock";
+import { extractMentionIds, newMentionIds } from "./richText";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -308,6 +309,7 @@ export async function createIssue(input: IssueCreateInput): Promise<Issue> {
         assigneeId: input.assigneeId == null ? null : toBackendId(input.assigneeId),
         details: {
           parentId: input.parentId == null ? null : toBackendId(input.parentId),
+          mentionedUserIds: mentionIdsForServer(input.description ?? ""),
           sprintId: input.sprintId == null ? null : toBackendId(input.sprintId),
           dueDate: input.dueDate ?? null,
           estimateHours: null,
@@ -393,6 +395,10 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
               : toBackendId(patch.fixVersionId),
       },
       expectedVersion: current.version,
+      mentionedUserIds:
+        patch.description === undefined
+          ? []
+          : newMentionIds(current.description ?? "", patch.description ?? "").filter((id) => /^\d+$/.test(id)).map(Number),
     }),
   });
   return mapIssue(await json(response));
@@ -800,7 +806,7 @@ interface NotificationDto {
   issueId: number | null;
   issueKey: string;
   actorId: number;
-  type: "ASSIGNED" | "STATUS_CHANGED" | "COMMENTED";
+  type: "ASSIGNED" | "STATUS_CHANGED" | "COMMENTED" | "MENTIONED";
   detail: string | null;
   read: boolean;
   createdAt: string;
@@ -817,6 +823,8 @@ function notificationMessage(dto: NotificationDto): string {
       return `${actor} 님이 ${dto.issueKey}를 나에게 할당했습니다`;
     case "STATUS_CHANGED":
       return `${actor} 님이 ${dto.issueKey}를 ${dto.detail ?? ""}(으)로 옮겼습니다`;
+    case "MENTIONED":
+      return `${actor} 님이 ${dto.issueKey}에서 나를 멘션했습니다`;
     default:
       return `${actor} 님이 ${dto.issueKey}에 코멘트를 남겼습니다`;
   }
@@ -1430,20 +1438,28 @@ export async function listComments(issueId: string): Promise<Comment[]> {
   return rows.map(mapComment);
 }
 
+/** 본문의 멘션 id → 서버 숫자 id(모르는 형식은 버린다) */
+function mentionIdsForServer(html: string): number[] {
+  return extractMentionIds(html)
+    .filter((id) => /^\d+$/.test(id))
+    .map((id) => Number(id));
+}
+
 export async function addComment(issueId: string, body: string): Promise<Comment> {
   const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({ body, mentionedUserIds: mentionIdsForServer(body) }),
   });
   return mapComment(await json(response));
 }
 
 export async function updateComment(id: string, body: string): Promise<Comment> {
+  // 수정 전 본문을 모르므로 본문의 멘션 전부를 보낸다 — 서버가 본인·설정으로 거른다
   const response = await sharedApiFetch(`/api/alm/comments/${toBackendId(id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({ body, mentionedUserIds: mentionIdsForServer(body) }),
   });
   return mapComment(await json(response));
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
-import { Avatar, Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextArea, TextField, useToast } from "@chanho/react";
+import { Avatar, Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
 import type {
   Activity,
   Comment,
@@ -51,6 +51,8 @@ import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
 import { WatchButton } from "./WatchButton";
+import { RichTextEditor } from "./editor/RichTextEditor";
+import { RichTextView } from "./editor/RichTextView";
 import {
   priorityName,
   ISSUE_TYPES,
@@ -571,12 +573,13 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             onSave={(next) => void applyPatch({ title: next }, "제목을 저장했습니다")}
           />
           <form className="issue-description-form" onSubmit={handleDescriptionSubmit}>
-            <TextArea
+            <RichTextEditor
               label="설명"
-              rows={5}
-              placeholder="이슈 설명을 입력하세요"
               value={descriptionDraft}
-              onChange={(e) => setDescriptionDraft(e.target.value)}
+              onChange={setDescriptionDraft}
+              users={users}
+              placeholder="이슈 설명을 입력하세요 — @로 멘션"
+              minHeight={140}
             />
             <Button type="submit" size="small" disabled={descriptionDraft === issue.description}>
               설명 저장
@@ -984,11 +987,13 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                     >
                       {editing ? (
                         <div className="issue-comment-edit">
-                          <TextArea
+                          <RichTextEditor
                             label="코멘트 수정"
-                            rows={3}
                             value={commentEditDraft}
-                            onChange={(e) => setCommentEditDraft(e.target.value)}
+                            onChange={setCommentEditDraft}
+                            users={users}
+                            minHeight={72}
+                            autoFocus
                           />
                           <div className="issue-comment-edit-actions">
                             <Button
@@ -1004,7 +1009,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                           </div>
                         </div>
                       ) : (
-                        comment.body
+                        <RichTextView html={comment.body} />
                       )}
                     </CommentBlock>
                   );
@@ -1013,12 +1018,13 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   <p className="issue-comment-empty">아직 코멘트가 없습니다</p>
                 ) : null}
                 <form className="issue-comment-form" onSubmit={handleCommentSubmit}>
-                  <TextArea
+                  <RichTextEditor
                     label="코멘트"
-                    rows={3}
-                    placeholder="코멘트를 입력하세요"
                     value={commentDraft}
-                    onChange={(e) => setCommentDraft(e.target.value)}
+                    onChange={setCommentDraft}
+                    users={users}
+                    placeholder="코멘트를 입력하세요 — @로 멘션"
+                    minHeight={72}
                   />
                   <Button type="submit" size="small">
                     코멘트 남기기

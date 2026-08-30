@@ -203,6 +203,7 @@ describe("jiraApi issues", () => {
         fixVersionId: null,
       },
       expectedVersion: 2,
+      mentionedUserIds: [],
     });
   });
 

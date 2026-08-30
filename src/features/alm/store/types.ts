@@ -105,6 +105,8 @@ export interface NotificationPreferences {
   assigned: boolean;
   statusChanged: boolean;
   commented: boolean;
+  /** 코멘트·설명에서 @멘션됐을 때 — 워처가 아니어도 받는다 */
+  mentioned: boolean;
 }
 export interface AutoWatchPreferences {
   created: boolean;

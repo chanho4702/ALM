@@ -683,7 +683,7 @@ body {
 /* ── 전역 이슈 만들기 / 검색 모달 ───────────────────────── */
 
 .create-issue-modal.create-issue-modal {
-  width: min(680px, calc(100vw - 32px));
+  width: min(760px, calc(100vw - 32px));
 }
 
 .create-issue-divider {
@@ -1646,12 +1646,12 @@ body {
 
 /* Modal 기본 폭(480px) 확장 — 클래스 중복으로 명시도를 올려 모듈 CSS를 확실히 이긴다 */
 .issue-detail-modal.issue-detail-modal {
-  width: min(720px, calc(100vw - 32px));
+  width: min(1040px, calc(100vw - 32px));
 }
 
 .issue-detail-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 200px;
+  grid-template-columns: minmax(0, 1fr) 280px;
   gap: var(--chanho-space-300);
   margin-top: var(--chanho-space-200);
 }
@@ -3479,3 +3479,181 @@ body {
 .worklog-num { text-align: right !important; }
 .worklog-total { margin: 0 0 var(--chanho-space-100); font-size: var(--chanho-font-size-75); }
 .worklog-days { list-style: none; margin: var(--chanho-space-150) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--chanho-space-100); font-size: var(--chanho-font-size-75); color: var(--chanho-color-text-subtle); }
+
+/* ── 리치 텍스트 에디터(설명·코멘트) ─────────────────────── */
+.rich-text-editor {
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+  position: relative;
+}
+
+.rich-text-editor:focus-within {
+  border-color: var(--chanho-color-border-brand);
+  box-shadow: var(--chanho-focus-ring);
+}
+
+.rich-text-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: var(--chanho-space-50);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.rich-text-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--chanho-radius-small);
+  background: transparent;
+  color: var(--chanho-color-text-subtle);
+  cursor: pointer;
+}
+
+.rich-text-tool:hover {
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-default);
+}
+
+.rich-text-tool.is-active {
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-brand);
+}
+
+.rich-text-tool:focus-visible {
+  outline: none;
+  box-shadow: var(--chanho-focus-ring);
+}
+
+.rich-text-editor-body .rich-text-content {
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  outline: none;
+  min-height: inherit;
+}
+
+.rich-text-content {
+  font-size: var(--chanho-font-size-100);
+  line-height: 1.6;
+  color: var(--chanho-color-text-default);
+}
+
+.rich-text-content p {
+  margin: 0 0 var(--chanho-space-100);
+}
+
+.rich-text-content p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-content h2,
+.rich-text-content h3 {
+  margin: var(--chanho-space-150) 0 var(--chanho-space-100);
+  line-height: 1.3;
+}
+
+.rich-text-content h2 {
+  font-size: var(--chanho-font-size-200);
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0 0 var(--chanho-space-100);
+  padding-left: var(--chanho-space-300);
+}
+
+.rich-text-content blockquote {
+  margin: 0 0 var(--chanho-space-100);
+  padding-left: var(--chanho-space-150);
+  border-left: 3px solid var(--chanho-color-border-default);
+  color: var(--chanho-color-text-subtle);
+}
+
+.rich-text-content pre {
+  margin: 0 0 var(--chanho-space-100);
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-subtle);
+  font-size: var(--chanho-font-size-75);
+  overflow-x: auto;
+}
+
+.rich-text-content code {
+  font-family: var(--chanho-font-family-mono, monospace);
+  font-size: var(--chanho-font-size-75);
+  background: var(--chanho-color-background-subtle);
+  padding: 0 var(--chanho-space-50);
+  border-radius: var(--chanho-radius-small);
+}
+
+.rich-text-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.rich-text-content a {
+  color: var(--chanho-color-text-link);
+}
+
+/* 플레이스홀더 — TipTap Placeholder 확장이 첫 빈 문단에 클래스를 붙인다 */
+.rich-text-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--chanho-color-text-muted);
+}
+
+.rich-text-view .rich-text-readonly {
+  padding: 0;
+}
+
+.rich-text-empty {
+  margin: 0;
+  color: var(--chanho-color-text-muted);
+  font-size: var(--chanho-font-size-75);
+}
+
+.user-mention {
+  display: inline;
+  padding: 1px var(--chanho-space-50);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-brand);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.editor-suggestions {
+  position: fixed;
+  z-index: 60;
+  margin: 0;
+  padding: var(--chanho-space-50);
+  list-style: none;
+  background: var(--chanho-color-background-surface);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  box-shadow: var(--chanho-shadow-overlay);
+  min-width: 200px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.editor-suggestions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border-radius: var(--chanho-radius-small);
+  cursor: pointer;
+  color: var(--chanho-color-text-default);
+  font: inherit;
+}
+
+.editor-suggestions [aria-selected="true"] button {
+  background: var(--chanho-color-background-neutral-hovered);
+}
