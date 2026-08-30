@@ -31,7 +31,7 @@ const ISSUE: IssueDto = {
   projectId: 3,
   title: "로그인 오류",
   description: "OIDC callback 실패",
-  type: "BUG",
+  type: "bug",
   status: "todo",
   priority: "HIGH",
   assigneeId: null,
@@ -111,7 +111,7 @@ describe("jiraApi issues", () => {
     const url = String(spy.mock.calls[0][0]);
     expect(url).toContain("/api/alm/issues/search?");
     expect(url).toContain("projectIds=3");
-    expect(url).toContain("types=BUG");
+    expect(url).toContain("types=bug");
     expect(url).toContain("text=callback");
   });
 
@@ -133,7 +133,7 @@ describe("jiraApi issues", () => {
     const body = JSON.parse(spy.mock.calls[0][1]!.body as string);
     expect(body).toMatchObject({
       title: "로그인 오류",
-      type: "BUG",
+      type: "bug",
       priority: "HIGH",
       assigneeId: 2,
       details: {
@@ -166,7 +166,7 @@ describe("jiraApi issues", () => {
     expect(body).toEqual({
       title: ISSUE.title,
       description: ISSUE.description,
-      type: "BUG",
+      type: "bug",
       status: "inprogress",
       priority: "MEDIUM",
       assigneeId: null,
@@ -409,5 +409,43 @@ describe("jiraApi changes", () => {
     await listProjectChanges("3");
 
     expect(spy.mock.calls[0][0]).toBe("/api/alm/projects/3/changes");
+  });
+});
+
+describe("jiraApi settings", () => {
+  it("프로젝트 설정을 해석하고 상태 목록을 order순으로 돌려준다", async () => {
+    const { resolveSettings, listProjectStatuses } = await import("./jiraApi");
+    const resolved = {
+      source: "scheme",
+      scheme: { id: "scheme-default", name: "기본 스킴", isDefault: true, body: { statuses: [], transitions: [], layout: {}, enabledTypes: [] } },
+      body: {
+        statuses: [
+          { id: "done", name: "완료", category: "done", order: 3, kind: "complete", color: "success" },
+          { id: "todo", name: "할 일", category: "todo", order: 1, kind: "new", color: "neutral" },
+        ],
+        transitions: [],
+        layout: {},
+        enabledTypes: ["task", "subtask"],
+      },
+    };
+    vi.spyOn(client, "sharedApiFetch").mockImplementation(() => Promise.resolve(response(200, resolved)));
+    expect((await resolveSettings("3")).scheme.name).toBe("기본 스킴");
+    const statuses = await listProjectStatuses("3");
+    expect(statuses.map((s) => s.id)).toEqual(["todo", "done"]);
+    expect(statuses[1]).toMatchObject({ kind: "complete", color: "success" });
+  });
+
+  it("이슈 타입 생성은 서버로 보내고 변경 이벤트를 쏜다", async () => {
+    const { createIssueType, ISSUE_TYPES_CHANGED_EVENT } = await import("./jiraApi");
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      response(201, { id: "it-1", name: "개선", icon: "lightbulb", color: "warning", level: "standard", description: "", order: 6, builtIn: false }),
+    );
+    const heard = vi.fn();
+    window.addEventListener(ISSUE_TYPES_CHANGED_EVENT, heard);
+    const created = await createIssueType({ name: "개선", level: "standard", icon: "lightbulb", color: "warning" });
+    expect(created.id).toBe("it-1");
+    expect(String(spy.mock.calls[0][0])).toBe("/api/alm/settings/issue-types");
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.removeEventListener(ISSUE_TYPES_CHANGED_EVENT, heard);
   });
 });

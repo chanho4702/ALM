@@ -21,7 +21,8 @@ export interface ProjectDto {
   updatedAt: string;
 }
 
-export type IssueTypeDto = "TASK" | "STORY" | "BUG" | "EPIC" | "SUBTASK";
+/** 서버 V11부터 이슈 타입은 레지스트리 id(task/bug/it-*)다. 옛 응답의 대문자 enum 이름도 소문자로 받는다 */
+export type IssueTypeDto = string;
 export type IssuePriorityDto = "HIGH" | "MEDIUM" | "LOW";
 
 export interface IssueDto {
@@ -66,22 +67,6 @@ export function mapProject(dto: ProjectDto): Project {
   };
 }
 
-const ISSUE_TYPES_FROM_API: Record<IssueTypeDto, IssueType> = {
-  TASK: "task",
-  STORY: "story",
-  BUG: "bug",
-  EPIC: "epic",
-  SUBTASK: "subtask",
-};
-
-const ISSUE_TYPES_TO_API: Record<IssueType, IssueTypeDto> = {
-  task: "TASK",
-  story: "STORY",
-  bug: "BUG",
-  epic: "EPIC",
-  subtask: "SUBTASK",
-};
-
 const PRIORITIES_FROM_API: Record<IssuePriorityDto, IssuePriority> = {
   HIGH: "high",
   MEDIUM: "medium",
@@ -95,10 +80,7 @@ const PRIORITIES_TO_API: Record<IssuePriority, IssuePriorityDto> = {
 };
 
 export function toApiIssueType(type: IssueType): IssueTypeDto {
-  const dto = ISSUE_TYPES_TO_API[type];
-  // 서버의 IssueType은 아직 enum — 사용자 정의 타입은 서버 이관(V9)까지 목업 전용이다
-  if (!dto) throw new Error("서버가 아직 사용자 정의 이슈 타입을 지원하지 않습니다");
-  return dto;
+  return type.trim().toLowerCase();
 }
 
 export interface SprintDto {
@@ -253,7 +235,7 @@ export function toApiIssuePriority(priority: IssuePriority): IssuePriorityDto {
  * V2 이전 응답에 확장 필드가 없으면 화면 계약을 깨지 않도록 기본값으로 채운다.
  */
 export function mapIssue(dto: IssueDto, order = 1): Issue {
-  const type = ISSUE_TYPES_FROM_API[dto.type];
+  const type = String(dto.type ?? "task").toLowerCase();
   const priority = PRIORITIES_FROM_API[dto.priority];
   if (!type) throw new Error(`지원하지 않는 이슈 타입입니다: ${dto.type}`);
   if (!priority) throw new Error(`지원하지 않는 우선순위입니다: ${dto.priority}`);

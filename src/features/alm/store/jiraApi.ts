@@ -36,6 +36,15 @@ import type {
   Notification,
   AuditEntry,
   SystemStats,
+  SettingsBody,
+  SettingsScheme,
+  WorkflowStatus,
+  StatusCategory,
+  StatusDef,
+  StatusKind,
+  StatusColor,
+  IssueTypeDef,
+  IssueTypeLevel,
 } from "./types";
 
 async function json<T>(response: Response): Promise<T> {
@@ -814,4 +823,224 @@ export async function listAuditLog(
 
 export async function systemStats(): Promise<SystemStats> {
   return (await json(await sharedApiFetch("/api/alm/admin/stats"))) as SystemStats;
+}
+
+// ── 설정 — 서버 V11(레지스트리·스킴·프로젝트 설정). 목업 스토어와 같은 시그니처 ──
+
+interface SchemeDto {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  body: SettingsBody;
+}
+
+interface ResolvedDto {
+  body: SettingsBody;
+  source: "scheme" | "custom";
+  scheme: SchemeDto;
+}
+
+export interface ResolvedSettings {
+  body: SettingsBody;
+  source: "scheme" | "custom";
+  scheme: SettingsScheme;
+}
+
+const mapScheme = (dto: SchemeDto): SettingsScheme => ({
+  id: dto.id,
+  name: dto.name,
+  isDefault: dto.isDefault,
+  body: dto.body,
+});
+const mapResolved = (dto: ResolvedDto): ResolvedSettings => ({
+  body: dto.body,
+  source: dto.source,
+  scheme: mapScheme(dto.scheme),
+});
+const jsonBody = (body: unknown): RequestInit => ({
+  method: "PUT",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+const postJson = (body: unknown): RequestInit => ({ ...jsonBody(body), method: "POST" });
+
+export async function listSchemes(): Promise<SettingsScheme[]> {
+  const rows = (await json(await sharedApiFetch("/api/alm/settings/schemes"))) as SchemeDto[];
+  return rows.map(mapScheme);
+}
+
+export async function countSchemeProjects(schemeId: string): Promise<number> {
+  const dto = (await json(
+    await sharedApiFetch(`/api/alm/settings/schemes/${encodeURIComponent(schemeId)}/projects/count`),
+  )) as { count: number };
+  return dto.count;
+}
+
+export async function createScheme(name: string): Promise<SettingsScheme> {
+  return mapScheme((await json(await sharedApiFetch("/api/alm/settings/schemes", postJson({ name })))) as SchemeDto);
+}
+
+export async function updateScheme(
+  id: string,
+  patch: { name?: string; body?: SettingsBody },
+): Promise<SettingsScheme> {
+  return mapScheme(
+    (await json(
+      await sharedApiFetch(`/api/alm/settings/schemes/${encodeURIComponent(id)}`, jsonBody(patch)),
+    )) as SchemeDto,
+  );
+}
+
+export async function deleteScheme(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/schemes/${encodeURIComponent(id)}`, { method: "DELETE" }));
+}
+
+export async function setDefaultScheme(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/schemes/${encodeURIComponent(id)}/default`, { method: "POST" }));
+}
+
+export async function resolveSettings(projectId: string): Promise<ResolvedSettings> {
+  return mapResolved(
+    (await json(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings`))) as ResolvedDto,
+  );
+}
+
+export async function listProjectStatuses(projectId: string): Promise<WorkflowStatus[]> {
+  const resolved = await resolveSettings(projectId);
+  return [...resolved.body.statuses].sort((a, b) => a.order - b.order);
+}
+
+/** projectId → (statusId → WorkflowStatus) — 접근 가능한 프로젝트 전부를 해석한다 */
+export async function statusMetaByProject(): Promise<Record<string, Record<string, WorkflowStatus>>> {
+  const projects = await listProjects();
+  const entries = await Promise.all(
+    projects.map(async (project) => {
+      const statuses = await listProjectStatuses(project.id);
+      return [project.id, Object.fromEntries(statuses.map((s) => [s.id, s]))] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+export async function listAllStatuses(): Promise<{ id: string; name: string }[]> {
+  return (await listStatusDefs()).map((d) => ({ id: d.id, name: d.name }));
+}
+
+export async function assignScheme(projectId: string, schemeId: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/scheme`, jsonBody({ schemeId })));
+}
+
+export async function setProjectCustom(projectId: string, custom: boolean): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/custom`, jsonBody({ custom })));
+}
+
+export async function updateProjectCustomSettings(projectId: string, body: SettingsBody): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/custom-body`, jsonBody(body)));
+}
+
+// 상태 카테고리
+export async function listStatusCategories(): Promise<StatusCategory[]> {
+  return (await json(await sharedApiFetch("/api/alm/settings/categories"))) as StatusCategory[];
+}
+
+export async function createStatusCategory(input: {
+  name: string;
+  kind: StatusKind;
+  color: StatusColor;
+}): Promise<StatusCategory> {
+  return (await json(await sharedApiFetch("/api/alm/settings/categories", postJson(input)))) as StatusCategory;
+}
+
+export async function updateStatusCategory(
+  id: string,
+  patch: Partial<Pick<StatusCategory, "name" | "kind" | "color">>,
+): Promise<StatusCategory> {
+  return (await json(
+    await sharedApiFetch(`/api/alm/settings/categories/${encodeURIComponent(id)}`, jsonBody(patch)),
+  )) as StatusCategory;
+}
+
+export async function moveStatusCategory(id: string, delta: -1 | 1): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/categories/${encodeURIComponent(id)}/move`, postJson({ delta })));
+}
+
+export async function deleteStatusCategory(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/categories/${encodeURIComponent(id)}`, { method: "DELETE" }));
+}
+
+// 상태 레지스트리
+export async function listStatusDefs(): Promise<StatusDef[]> {
+  return (await json(await sharedApiFetch("/api/alm/settings/statuses"))) as StatusDef[];
+}
+
+export async function statusDefUsage(): Promise<Record<string, number>> {
+  return (await json(await sharedApiFetch("/api/alm/settings/statuses/usage"))) as Record<string, number>;
+}
+
+export async function createStatusDef(input: {
+  name: string;
+  categoryId: string;
+  description?: string;
+}): Promise<StatusDef> {
+  return (await json(await sharedApiFetch("/api/alm/settings/statuses", postJson(input)))) as StatusDef;
+}
+
+export async function updateStatusDef(
+  id: string,
+  patch: Partial<Pick<StatusDef, "name" | "categoryId" | "description">>,
+): Promise<StatusDef> {
+  return (await json(
+    await sharedApiFetch(`/api/alm/settings/statuses/${encodeURIComponent(id)}`, jsonBody(patch)),
+  )) as StatusDef;
+}
+
+export async function deleteStatusDef(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/statuses/${encodeURIComponent(id)}`, { method: "DELETE" }));
+}
+
+// 이슈 타입 레지스트리
+export const ISSUE_TYPES_CHANGED_EVENT = "alm:issue-types-changed";
+const notifyIssueTypesChanged = () => {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(ISSUE_TYPES_CHANGED_EVENT));
+};
+
+export async function listIssueTypes(): Promise<IssueTypeDef[]> {
+  return (await json(await sharedApiFetch("/api/alm/settings/issue-types"))) as IssueTypeDef[];
+}
+
+export async function issueTypeUsage(): Promise<Record<string, number>> {
+  return (await json(await sharedApiFetch("/api/alm/settings/issue-types/usage"))) as Record<string, number>;
+}
+
+export async function createIssueType(input: {
+  name: string;
+  level: IssueTypeLevel;
+  icon: string;
+  color: IssueTypeDef["color"];
+  description?: string;
+}): Promise<IssueTypeDef> {
+  const created = (await json(await sharedApiFetch("/api/alm/settings/issue-types", postJson(input)))) as IssueTypeDef;
+  notifyIssueTypesChanged();
+  return created;
+}
+
+export async function updateIssueType(
+  id: string,
+  patch: Partial<Pick<IssueTypeDef, "name" | "icon" | "color" | "level" | "description">>,
+): Promise<IssueTypeDef> {
+  const updated = (await json(
+    await sharedApiFetch(`/api/alm/settings/issue-types/${encodeURIComponent(id)}`, jsonBody(patch)),
+  )) as IssueTypeDef;
+  notifyIssueTypesChanged();
+  return updated;
+}
+
+export async function moveIssueType(id: string, delta: -1 | 1): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/issue-types/${encodeURIComponent(id)}/move`, postJson({ delta })));
+  notifyIssueTypesChanged();
+}
+
+export async function deleteIssueType(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/settings/issue-types/${encodeURIComponent(id)}`, { method: "DELETE" }));
+  notifyIssueTypesChanged();
 }
