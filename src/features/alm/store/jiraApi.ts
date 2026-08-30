@@ -515,3 +515,65 @@ export async function rankIssue(
 export async function deleteIssue(id: string): Promise<void> {
   await json(await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}`, { method: "DELETE" }));
 }
+
+// ── 대량 변경 — 서버 일괄 API가 없어 이슈마다 호출한다 (목업과 같은 결과 형태) ──
+
+export interface BulkIssuePatch {
+  status?: string;
+  priority?: IssuePriority;
+  assigneeId?: string | null;
+  sprintId?: string | null;
+  fixVersionId?: string | null;
+  addLabels?: string[];
+  removeLabels?: string[];
+}
+
+export interface BulkResult {
+  updated: number;
+  failed: { id: string; key: string; reason: string }[];
+}
+
+export async function bulkUpdateIssues(ids: string[], patch: BulkIssuePatch): Promise<BulkResult> {
+  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
+  let updated = 0;
+  const failed: BulkResult["failed"] = [];
+  for (const id of ids) {
+    try {
+      const current = mapIssue(await issueDto(id));
+      const remove = new Set(patch.removeLabels ?? []);
+      const labels =
+        patch.addLabels || patch.removeLabels
+          ? [...new Set([...current.labels.filter((l) => !remove.has(l)), ...(patch.addLabels ?? [])])]
+          : undefined;
+      await updateIssue(id, {
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+        ...(patch.assigneeId !== undefined ? { assigneeId: patch.assigneeId } : {}),
+        ...(patch.sprintId !== undefined ? { sprintId: patch.sprintId } : {}),
+        ...(patch.fixVersionId !== undefined ? { fixVersionId: patch.fixVersionId } : {}),
+        ...(labels ? { labels } : {}),
+      });
+      updated += 1;
+    } catch (error) {
+      failed.push({ id, key: id, reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { updated, failed };
+}
+
+export async function bulkDeleteIssues(
+  ids: string[],
+): Promise<{ deleted: number; failed: BulkResult["failed"] }> {
+  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
+  let deleted = 0;
+  const failed: BulkResult["failed"] = [];
+  for (const id of ids) {
+    try {
+      await deleteIssue(id);
+      deleted += 1;
+    } catch (error) {
+      failed.push({ id, key: id, reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { deleted, failed };
+}

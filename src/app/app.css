@@ -3076,3 +3076,35 @@ body {
 .project-list-content.settings-page {
   width: 100%;
 }
+
+/* ── 이슈 목록 대량 작업 ──────────────────────────────────── */
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin-bottom: var(--chanho-space-150);
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-subtle);
+}
+
+.bulk-bar-count {
+  flex: 1;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-select {
+  display: inline-flex;
+  align-items: center;
+}
+
+.issue-select input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--chanho-color-background-brand);
+  cursor: pointer;
+}

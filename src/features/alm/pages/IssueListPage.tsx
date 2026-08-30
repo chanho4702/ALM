@@ -6,13 +6,23 @@ import {
   Lozenge,
   Select,
   Spinner,
+  Button,
+  Modal,
   Table,
   TextField,
+  useToast,
 } from "@chanho/react";
 import type { SortDirection, TableColumn } from "@chanho/react";
 import { Tag } from "@chanho/react";
-import type { Issue, IssuePriority, IssueType, User, WorkflowStatus } from "../store/types";
-import { listIssues, listProjectStatuses, listUsers } from "../store/jiraStore";
+import type { Issue, IssuePriority, IssueType, Sprint, User, WorkflowStatus } from "../store/types";
+import {
+  bulkDeleteIssues,
+  listIssues,
+  listProjectStatuses,
+  listSprints,
+  listUsers,
+} from "../store/jiraStore";
+import { BulkEditModal } from "../components/BulkEditModal";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { useIssueTypes } from "../components/useIssueTypes";
@@ -47,6 +57,12 @@ export function IssueListPage() {
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  // 대량 변경 — 선택은 화면 상태, 적용은 스토어(bulkUpdateIssues)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const toast = useToast();
 
   const reload = useCallback(async () => {
     if (!projectId) return;
@@ -59,6 +75,9 @@ export function IssueListPage() {
       type: type === ALL ? undefined : (type as IssueType),
     });
     setIssues(list);
+    // 사라진 이슈는 선택에서도 빠진다
+    setSelected((prev) => new Set([...prev].filter((id) => list.some((i) => i.id === id))));
+    setSprints(await listSprints(projectId));
     // 라벨 선택지는 필터와 무관한 프로젝트 전체 라벨 합집합
     const all = await listIssues(projectId);
     setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
@@ -139,7 +158,57 @@ export function IssueListPage() {
     issue.dueDate < today &&
     statusKind(statuses, issue.status) !== "complete";
 
+  const toggleSelected = (id: string, checked: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  const handleBulkDelete = async () => {
+    try {
+      const result = await bulkDeleteIssues([...selected]);
+      toast({
+        title: `${result.deleted}개 이슈를 삭제했습니다`,
+        appearance: result.failed.length > 0 ? "info" : "success",
+      });
+      if (result.failed.length > 0) {
+        toast({
+          title: `${result.failed.length}개는 지우지 못했습니다`,
+          description: result.failed.map((f) => `${f.key}: ${f.reason}`).join(" · "),
+          appearance: "danger",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "삭제 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+    setConfirmingDelete(false);
+    setSelected(new Set());
+    await reload();
+  };
+
   const columns: TableColumn<Issue>[] = [
+    {
+      key: "select",
+      header: "",
+      width: "36px",
+      render: (issue) => (
+        // 행 클릭(상세 열기)과 분리 — 체크박스 클릭은 행으로 올라가지 않는다
+        <span className="issue-select" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`${issue.key} 선택`}
+            checked={selected.has(issue.id)}
+            onChange={(e) => toggleSelected(issue.id, e.target.checked)}
+          />
+        </span>
+      ),
+    },
     {
       key: "type",
       header: "타입",
@@ -292,6 +361,39 @@ export function IssueListPage() {
             ]}
           />
         </div>
+        {issues && issues.length > 0 ? (
+          <div className="bulk-bar" role="toolbar" aria-label="대량 작업">
+            <span className="bulk-bar-count">
+              {selected.size > 0 ? `${selected.size}개 선택` : "이슈를 골라 한 번에 바꿉니다"}
+            </span>
+            <Button
+              size="small"
+              variant="ghost"
+              onClick={() => setSelected(new Set(sortedIssues.map((i) => i.id)))}
+            >
+              모두 선택
+            </Button>
+            <Button
+              size="small"
+              variant="ghost"
+              disabled={selected.size === 0}
+              onClick={() => setSelected(new Set())}
+            >
+              선택 해제
+            </Button>
+            <Button size="small" disabled={selected.size === 0} onClick={() => setBulkOpen(true)}>
+              대량 변경
+            </Button>
+            <Button
+              size="small"
+              variant="danger"
+              disabled={selected.size === 0}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              삭제
+            </Button>
+          </div>
+        ) : null}
         {issues === null ? (
           <div className="board-loading">
             <Spinner size="large" label="이슈 불러오는 중" />
@@ -316,6 +418,43 @@ export function IssueListPage() {
           </div>
         )}
       </section>
+      <BulkEditModal
+        open={bulkOpen}
+        issueIds={[...selected]}
+        statuses={statuses}
+        users={users}
+        sprints={sprints}
+        onOpenChange={setBulkOpen}
+        onDone={() => {
+          setSelected(new Set());
+          void reload();
+        }}
+      />
+      {confirmingDelete ? (
+        <Modal
+          trigger={<span hidden />}
+          title="이슈 삭제"
+          open
+          onOpenChange={(next) => {
+            if (!next) setConfirmingDelete(false);
+          }}
+        >
+          <div className="project-delete-confirm">
+            <p>
+              선택한 이슈 {selected.size}개를 삭제합니다. 하위 작업·코멘트·첨부가 함께 지워지며 되돌릴
+              수 없습니다.
+            </p>
+            <div className="project-delete-actions">
+              <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
+                취소
+              </Button>
+              <Button variant="danger" onClick={() => void handleBulkDelete()}>
+                삭제
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
       {issueModal}
     </>
   );

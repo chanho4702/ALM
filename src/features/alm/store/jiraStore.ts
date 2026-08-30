@@ -1719,6 +1719,93 @@ export async function rankIssue(
   return clone(issue);
 }
 
+// ── 대량 변경 ────────────────────────────────────────────────
+
+export interface BulkIssuePatch {
+  status?: string;
+  priority?: IssuePriority;
+  assigneeId?: string | null;
+  sprintId?: string | null;
+  fixVersionId?: string | null;
+  addLabels?: string[];
+  removeLabels?: string[];
+}
+
+export interface BulkResult {
+  updated: number;
+  failed: { id: string; key: string; reason: string }[];
+}
+
+/**
+ * 여러 이슈에 같은 변경을 적용한다 — 이슈마다 `updateIssue`를 거치므로 전이 규칙·권한·타입 검증이
+ * 그대로 먹는다. 막힌 이슈는 사유와 함께 실패 목록에 남기고 나머지는 적용한다(전부 롤백하지 않는다).
+ * 이미 같은 값인 필드는 변경으로 세지 않는다.
+ */
+export async function bulkUpdateIssues(ids: string[], patch: BulkIssuePatch): Promise<BulkResult> {
+  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
+  const data = load();
+  let updated = 0;
+  const failed: BulkResult["failed"] = [];
+  for (const id of ids) {
+    const issue = data.issues.find((i) => i.id === id);
+    if (!issue) {
+      failed.push({ id, key: id, reason: "이슈를 찾을 수 없습니다" });
+      continue;
+    }
+    const next: Parameters<typeof updateIssue>[1] = {};
+    if (patch.status !== undefined && patch.status !== issue.status) next.status = patch.status;
+    if (patch.priority !== undefined && patch.priority !== issue.priority) {
+      next.priority = patch.priority;
+    }
+    if (patch.assigneeId !== undefined && patch.assigneeId !== issue.assigneeId) {
+      next.assigneeId = patch.assigneeId;
+    }
+    if (patch.sprintId !== undefined && patch.sprintId !== issue.sprintId) {
+      next.sprintId = patch.sprintId;
+    }
+    if (patch.fixVersionId !== undefined && patch.fixVersionId !== issue.fixVersionId) {
+      next.fixVersionId = patch.fixVersionId;
+    }
+    if (patch.addLabels || patch.removeLabels) {
+      const remove = new Set(patch.removeLabels ?? []);
+      const labels = [
+        ...new Set([...issue.labels.filter((l) => !remove.has(l)), ...(patch.addLabels ?? [])]),
+      ];
+      if (labels.join("\u0000") !== issue.labels.join("\u0000")) next.labels = labels;
+    }
+    if (Object.keys(next).length === 0) continue;
+    try {
+      await updateIssue(id, next);
+      updated += 1;
+    } catch (error) {
+      failed.push({
+        id,
+        key: issue.key,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { updated, failed };
+}
+
+export async function bulkDeleteIssues(
+  ids: string[],
+): Promise<{ deleted: number; failed: BulkResult["failed"] }> {
+  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
+  let deleted = 0;
+  const failed: BulkResult["failed"] = [];
+  for (const id of ids) {
+    const key = load().issues.find((i) => i.id === id)?.key ?? id;
+    try {
+      await deleteIssue(id);
+      deleted += 1;
+    } catch (error) {
+      failed.push({ id, key, reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { deleted, failed };
+}
+
 export async function deleteIssue(id: string): Promise<void> {
   const data = load();
   const index = data.issues.findIndex((i) => i.id === id);

@@ -102,6 +102,14 @@
 - REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
   규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
 
+## 대량 변경 (2026-08-30)
+
+`bulkUpdateIssues(ids, patch)` / `bulkDeleteIssues(ids)` — 이슈마다 `updateIssue`/`deleteIssue`를 거쳐
+전이 규칙·권한·타입 검증이 그대로 적용되고, 막힌 이슈는 `failed[{id,key,reason}]`로 분리한다(전부
+롤백 없음). 같은 값인 필드는 변경으로 세지 않는다. 라벨은 `addLabels`/`removeLabels` 합성. 화면은
+이슈 목록의 체크박스 + 대량 작업 툴바(`BulkEditModal`). REST 어댑터는 서버 일괄 API가 없어 이슈마다
+호출한다.
+
 ## 상태 카테고리 · 상태 레지스트리 (2026-08-30)
 
 `statusCategories`/`statusDefs` + `listStatusCategories`/`createStatusCategory`/`updateStatusCategory`/

@@ -167,3 +167,37 @@ describe("IssueListPage 타입", () => {
     expect(within(row).getByRole("img", { name: "버그" })).toBeInTheDocument();
   });
 });
+
+describe("IssueListPage 대량 변경", () => {
+  it("체크박스로 고른 이슈를 한 번에 바꾸고, 선택 삭제도 된다", async () => {
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.click(screen.getByRole("checkbox", { name: "ALM-4 선택" }));
+    await user.click(screen.getByRole("checkbox", { name: "ALM-3 선택" }));
+    const bar = screen.getByRole("toolbar", { name: "대량 작업" });
+    expect(bar).toHaveTextContent("2개 선택");
+
+    await user.click(within(bar).getByRole("button", { name: "대량 변경" }));
+    const dialog = await screen.findByRole("dialog", { name: "대량 변경" });
+    expect(dialog).toHaveTextContent("2개 이슈");
+    await user.click(within(dialog).getByRole("combobox", { name: "우선순위" }));
+    await user.click(await screen.findByRole("option", { name: "높음" }));
+    await user.click(within(dialog).getByRole("button", { name: "적용" }));
+    expect(await screen.findByText("2개 이슈를 변경했습니다")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(screen.getByText("ALM-3").closest("tr")!).getByText("높음")).toBeInTheDocument();
+    });
+
+    // 선택 삭제 — 확인 뒤 목록에서 사라진다
+    await user.click(screen.getByRole("checkbox", { name: "ALM-7 선택" }));
+    await user.click(within(screen.getByRole("toolbar", { name: "대량 작업" })).getByRole("button", { name: "삭제" }));
+    const confirm = await screen.findByRole("dialog", { name: "이슈 삭제" });
+    await user.click(within(confirm).getByRole("button", { name: "삭제" }));
+    expect(await screen.findByText("1개 이슈를 삭제했습니다")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("ALM-7")).not.toBeInTheDocument();
+    });
+  });
+});
