@@ -6,8 +6,9 @@
 `USE_REST`로 고른다: 테스트(vitest)는 항상 목업, 프로덕션 빌드는 REST, 개발은 `VITE_ALM_DATA=rest`.
 REST에 아직 없는 함수는 목업으로 떨어진다(혼합 모드). 코멘트·활동·보드·이슈 링크·하위/부모·워크로그는
 서버 V12(`/api/alm/issues/{id}/{comments,worklogs,links,activity}`, `/api/alm/boards`)로 옮겼다.
-**REST 미구현(서버화 남음)**: 프로젝트 멤버·역할, 사용자 디렉터리(REST `listUsers`는 본인만,
-`getMyProjectRole`은 낙관적 admin — 권한은 서버가 거부로 알린다), 프로젝트 템플릿(빈 템플릿만). 파사드는
+프로젝트 멤버·역할·사용자 디렉터리는 org-service REST(`/api/org/members`, `/api/org/grants`,
+`/api/org/me/permissions`)를 어댑터가 직접 부른다 — 역할 변경은 grant 삭제 후 재생성, 마지막 관리자 가드는
+클라이언트에서 목업과 같은 문구로 막는다. **REST 미구현(목업 폴백 남음)**: 프로젝트 템플릿(REST는 빈 템플릿만). 파사드는
 `scratchpad/facade.py`처럼 export 이름을 긁어 만든다 — 목업에 함수를 추가하면 파사드에도 줄을 추가한다.
 
 **파일**: `src/features/alm/store/jiraStore.ts` (~1400줄, 현재 localStorage 구현),
