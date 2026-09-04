@@ -36,6 +36,8 @@ describe("대시보드 (지라 Dashboards)", () => {
   it("만들면 바로 열리고, 가젯을 추가하면 그리드에 놓인다", async () => {
     const user = userEvent.setup();
     renderAt("/dashboards");
+    // 만들기 폼은 기본 접힘 — 버튼을 누르면 인라인 폼이 그 자리를 대신한다
+    await user.click(await screen.findByRole("button", { name: "대시보드 만들기" }));
     await user.type(await screen.findByLabelText("새 대시보드 이름"), "팀 현황");
     await user.click(screen.getByRole("button", { name: "대시보드 만들기" }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/\/dashboards\/d-/));

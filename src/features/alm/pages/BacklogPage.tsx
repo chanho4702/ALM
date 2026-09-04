@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "react-router";
+import { Plus } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -50,6 +51,8 @@ export function BacklogPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [newTitle, setNewTitle] = useState("");
+  /** 백로그 하단 인라인 생성 열림 여부 — 보드 컬럼 생성과 같은 토글 */
+  const [creating, setCreating] = useState(false);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
   const [completingSprint, setCompletingSprint] = useState<Sprint | null>(null);
@@ -154,6 +157,7 @@ export function BacklogPage() {
       if (!projectId) throw new Error("프로젝트를 찾을 수 없습니다");
       await createIssue({ projectId, title: newTitle }); // sprintId 생략 = 백로그로 생성
       setNewTitle(""); // 성공했을 때만 입력 초기화
+      setCreating(false); // 보드 컬럼 인라인 생성과 같은 패턴 — 성공하면 닫는다
     });
   };
 
@@ -174,6 +178,10 @@ export function BacklogPage() {
   return (
     <>
       <div className="view-actions">
+        <div className="backlog-heading">
+          <h2>백로그</h2>
+          <span className="backlog-heading-count">{`이슈 ${issues.length}개`}</span>
+        </div>
         <Button
           variant="secondary"
           onClick={() =>
@@ -274,15 +282,49 @@ export function BacklogPage() {
               <p className="sprint-panel-empty">백로그가 비어 있습니다</p>
             ) : null}
           </BacklogDropZone>
-          <form className="backlog-create-form" onSubmit={handleCreateIssue}>
-            <TextField
-              label="새 이슈 제목"
-              placeholder="무엇을 해야 하나요?"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-            />
-            <Button type="submit">만들기</Button>
-          </form>
+          {/* 보드 컬럼과 같은 인라인 생성 패턴 — 평소엔 ghost 버튼, 누르면 필드가 열린다 */}
+          {creating ? (
+            <form className="backlog-create-form" onSubmit={handleCreateIssue}>
+              <TextField
+                label="새 이슈 제목"
+                className="visually-hidden-label"
+                placeholder="무엇을 해야 하나요?"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setNewTitle("");
+                    setCreating(false);
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                size="small"
+                variant="ghost"
+                onClick={() => {
+                  setNewTitle("");
+                  setCreating(false);
+                }}
+              >
+                취소
+              </Button>
+              <Button type="submit" size="small" disabled={!newTitle.trim()}>
+                만들기
+              </Button>
+            </form>
+          ) : (
+            <Button
+              variant="ghost"
+              size="small"
+              className="backlog-create-toggle"
+              iconBefore={<Plus size={14} />}
+              onClick={() => setCreating(true)}
+            >
+              이슈 만들기
+            </Button>
+          )}
         </section>
         <DragOverlay>
           {activeIssue ? (

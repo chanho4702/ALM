@@ -4,7 +4,6 @@ import {
   Avatar,
   EmptyState,
   Lozenge,
-  Select,
   Spinner,
   Button,
   Modal,
@@ -23,6 +22,7 @@ import {
   listProjectStatuses,
   listSprints,
   listUsers,
+  resolveSettings,
 } from "../store/jiraStore";
 import { BulkEditModal } from "../components/BulkEditModal";
 import { CsvImportModal } from "../components/CsvImportModal";
@@ -30,6 +30,8 @@ import { issuesToCsv } from "../store/csv";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { useIssueTypes } from "../components/useIssueTypes";
+import { FilterDropdown } from "../components/FilterDropdown";
+import { formatDate } from "../components/time";
 import {
   priorityAppearance,
   priorityName,
@@ -39,6 +41,7 @@ import {
   statusKind,
   statusName,
 } from "../components/labels";
+import { resolveFields } from "../components/fieldConfig";
 import { usePriorities } from "../components/usePriorities";
 import { useTablePrefs } from "../components/useTablePrefs";
 
@@ -66,6 +69,8 @@ export function IssueListPage() {
   const [componentId, setComponentId] = useState(ALL);
   const [componentOptions, setComponentOptions] = useState<Component[]>([]);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
+  /** 프로젝트 필드 구성 — 대량 변경에서 숨긴 필드를 뺀다 */
+  const [fields, setFields] = useState(() => resolveFields(null));
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   // 대량 변경 — 선택은 화면 상태, 적용은 스토어(bulkUpdateIssues)
@@ -104,6 +109,7 @@ export function IssueListPage() {
     setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
     setStatuses(await listProjectStatuses(projectId));
     setComponentOptions(await listComponents(projectId));
+    setFields(resolveFields((await resolveSettings(projectId)).body));
   }, [projectId, text, status, priority, assigneeId, label, componentId, type, page]);
 
   // 필터가 바뀌면 첫 페이지로
@@ -185,6 +191,9 @@ export function IssueListPage() {
     issue.dueDate < today &&
     statusKind(statuses, issue.status) !== "complete";
 
+  // 표 위 툴바의 "모두 선택" — 현재 페이지 전체가 선택되어 있는가
+  const allSelected = sortedIssues.length > 0 && sortedIssues.every((i) => selected.has(i.id));
+
   const toggleSelected = (id: string, checked: boolean) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -257,20 +266,20 @@ export function IssueListPage() {
     {
       key: "type",
       header: "타입",
-      width: "48px",
+      width: "44px",
       render: (issue) => <IssueTypeGlyph type={issue.type} />,
     },
     {
       key: "key",
       header: "키",
-      width: "88px",
+      width: "80px",
       render: (issue) => <span className="issue-key-cell">{issue.key}</span>,
     },
     { key: "title", header: "제목", sortable: true },
     {
       key: "labels",
       header: "라벨",
-      width: "130px",
+      width: "120px",
       render: (issue) =>
         issue.labels.length > 0 ? (
           <span className="issue-card-labels">
@@ -295,7 +304,7 @@ export function IssueListPage() {
       key: "priority",
       header: "우선순위",
       sortable: true,
-      width: "96px",
+      width: "88px",
       render: (issue) => (
         <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
           {priorityName(priorities, issue.priority)}
@@ -306,7 +315,7 @@ export function IssueListPage() {
       key: "assignee",
       header: "담당자",
       sortable: true,
-      width: "140px",
+      width: "136px",
       render: (issue) =>
         issue.assigneeId ? (
           <span className="issue-assignee-cell">
@@ -321,12 +330,12 @@ export function IssueListPage() {
       key: "dueDate",
       header: "마감일",
       sortable: true,
-      width: "116px",
+      width: "100px",
       align: "right",
       render: (issue) =>
         issue.dueDate ? (
           <span className={isOverdue(issue) ? "due-cell is-overdue" : "due-cell"}>
-            {new Date(issue.dueDate).toLocaleDateString("ko-KR")}
+            {formatDate(issue.dueDate)}
           </span>
         ) : (
           "—"
@@ -336,121 +345,114 @@ export function IssueListPage() {
       key: "createdAt",
       header: "생성일",
       sortable: true,
-      width: "116px",
+      width: "100px",
       align: "right",
-      render: (issue) => new Date(issue.createdAt).toLocaleDateString("ko-KR"),
+      render: (issue) => formatDate(issue.createdAt),
     },
     {
       key: "updatedAt",
       header: "수정일",
       sortable: true,
-      width: "116px",
+      width: "100px",
       align: "right",
-      render: (issue) => new Date(issue.updatedAt).toLocaleDateString("ko-KR"),
+      render: (issue) => formatDate(issue.updatedAt),
     },
   ];
 
   return (
     <>
       <section>
-        <div className="issue-filter-bar">
-          <TextField
-            label="검색"
-            placeholder="제목·설명·키 검색"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <Select
+        {/* 지라 이슈 검색과 같은 칩 드롭다운 한 줄 — 스토어 필터 계약이 단일 값이라 단일 선택 모드 */}
+        <div className="issue-filter-bar" data-testid="issue-filter-bar">
+          <div className="issue-filter-search visually-hidden-label">
+            <TextField
+              label="검색"
+              placeholder="제목·설명·키 검색"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </div>
+          <FilterDropdown
             label="상태"
-            value={status}
-            onValueChange={setStatus}
+            multiple={false}
+            clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
               ...statuses.map((s) => ({ value: s.id, label: s.name })),
             ]}
+            selected={[status]}
+            onToggle={setStatus}
           />
-          <Select
+          <FilterDropdown
             label="우선순위"
-            value={priority}
-            onValueChange={setPriority}
+            multiple={false}
+            clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
               ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
             ]}
+            selected={[priority]}
+            onToggle={setPriority}
           />
-          <Select
+          <FilterDropdown
             label="담당자"
-            value={assigneeId}
-            onValueChange={setAssigneeId}
+            multiple={false}
+            clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
               ...users.map((u) => ({ value: u.id, label: u.name })),
             ]}
+            selected={[assigneeId]}
+            onToggle={setAssigneeId}
           />
-          <Select
+          <FilterDropdown
             label="라벨"
-            value={label}
-            onValueChange={setLabel}
+            multiple={false}
+            clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
               ...labelOptions.map((l) => ({ value: l, label: l })),
             ]}
+            selected={[label]}
+            onToggle={setLabel}
           />
           {componentOptions.length > 0 ? (
-            <Select
+            <FilterDropdown
               label="컴포넌트"
-              value={componentId}
-              onValueChange={setComponentId}
-              options={[{ value: ALL, label: "전체" }, ...componentOptions.map((c) => ({ value: c.id, label: c.name }))]}
+              multiple={false}
+              clearValue={ALL}
+              options={[
+                { value: ALL, label: "전체" },
+                ...componentOptions.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              selected={[componentId]}
+              onToggle={setComponentId}
             />
           ) : null}
-          <Select
+          <FilterDropdown
             label="타입"
-            value={type}
-            onValueChange={setType}
+            multiple={false}
+            clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
               ...issueTypes.map((t) => ({ value: t.id, label: t.name })),
             ]}
+            selected={[type]}
+            onToggle={setType}
           />
         </div>
-        {issues && issues.length > 0 ? (
+        {/* 지라처럼 고른 게 있을 때만 나타난다 — 0건이면 표 위 툴바가 자리를 지킨다 */}
+        {selected.size > 0 ? (
           <div className="bulk-bar" role="toolbar" aria-label="대량 작업">
-            <span className="bulk-bar-count">
-              {selected.size > 0 ? `${selected.size}개 선택` : "이슈를 골라 한 번에 바꿉니다"}
-            </span>
-            <Button
-              size="small"
-              variant="ghost"
-              onClick={() => setSelected(new Set(sortedIssues.map((i) => i.id)))}
-            >
-              모두 선택
-            </Button>
-            <Button
-              size="small"
-              variant="ghost"
-              disabled={selected.size === 0}
-              onClick={() => setSelected(new Set())}
-            >
+            <span className="bulk-bar-count">{`${selected.size}개 선택`}</span>
+            <Button size="small" variant="ghost" onClick={() => setSelected(new Set())}>
               선택 해제
             </Button>
-            <Button size="small" disabled={selected.size === 0} onClick={() => setBulkOpen(true)}>
+            <Button size="small" onClick={() => setBulkOpen(true)}>
               대량 변경
             </Button>
-            <Button
-              size="small"
-              variant="danger"
-              disabled={selected.size === 0}
-              onClick={() => setConfirmingDelete(true)}
-            >
+            <Button size="small" variant="danger" onClick={() => setConfirmingDelete(true)}>
               삭제
-            </Button>
-            <span className="bulk-bar-divider" aria-hidden />
-            <Button size="small" variant="secondary" onClick={exportCsv}>
-              CSV 내보내기
-            </Button>
-            <Button size="small" variant="secondary" onClick={() => setImportOpen(true)}>
-              CSV 가져오기
             </Button>
           </div>
         ) : null}
@@ -469,40 +471,72 @@ export function IssueListPage() {
             </Button>
           </div>
         ) : (
-          <div className="issue-table-scroll">
-            <div className="issue-pager" role="navigation" aria-label="페이지">
-              <span className="issue-pager-range">
+          <>
+            <div className="issue-toolbar" role="toolbar" aria-label="이슈 목록 도구">
+              <span className="issue-toolbar-check">
+                <input
+                  type="checkbox"
+                  aria-label="모두 선택"
+                  checked={allSelected}
+                  ref={(el) => {
+                    // 일부만 고른 상태는 중간(indeterminate)으로 — DOM 속성이라 ref로만 세운다
+                    if (el) el.indeterminate = selected.size > 0 && !allSelected;
+                  }}
+                  onChange={(e) =>
+                    setSelected(e.target.checked ? new Set(sortedIssues.map((i) => i.id)) : new Set())
+                  }
+                />
+              </span>
+              <span className="issue-toolbar-range">
                 {`${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} / ${total}건`}
               </span>
-              <Button size="small" variant="ghost" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                이전
-              </Button>
-              <Button
-                size="small"
-                variant="ghost"
-                disabled={(page + 1) * PAGE_SIZE >= total}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                다음
-              </Button>
+              <div className="issue-toolbar-actions">
+                <Button size="small" variant="secondary" onClick={exportCsv}>
+                  CSV 내보내기
+                </Button>
+                <Button size="small" variant="secondary" onClick={() => setImportOpen(true)}>
+                  CSV 가져오기
+                </Button>
+                <span className="bulk-bar-divider" aria-hidden />
+                <div className="issue-pager" role="navigation" aria-label="페이지">
+                  <Button
+                    size="small"
+                    variant="ghost"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    이전
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="ghost"
+                    disabled={(page + 1) * PAGE_SIZE >= total}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    다음
+                  </Button>
+                </div>
+              </div>
             </div>
-            <Table
-              aria-label="이슈 목록"
-              columns={columns}
-              rows={sortedIssues}
-              sortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={handleSort}
-              onRowClick={(issue) => openIssue(issue.key)}
-              selectedId={selectedId}
-              resizable
-              reorderable
-              columnOrder={tablePrefs.order}
-              columnWidths={tablePrefs.widths}
-              onColumnOrderChange={tablePrefs.setOrder}
-              onColumnWidthsChange={tablePrefs.setWidths}
-            />
-          </div>
+            <div className="issue-table-scroll">
+              <Table
+                aria-label="이슈 목록"
+                columns={columns}
+                rows={sortedIssues}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                onRowClick={(issue) => openIssue(issue.key)}
+                selectedId={selectedId}
+                resizable
+                reorderable
+                columnOrder={tablePrefs.order}
+                columnWidths={tablePrefs.widths}
+                onColumnOrderChange={tablePrefs.setOrder}
+                onColumnWidthsChange={tablePrefs.setWidths}
+              />
+            </div>
+          </>
         )}
       </section>
       <BulkEditModal
@@ -511,6 +545,7 @@ export function IssueListPage() {
         statuses={statuses}
         users={users}
         sprints={sprints}
+        fields={fields}
         onOpenChange={setBulkOpen}
         onDone={() => {
           setSelected(new Set());

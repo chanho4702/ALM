@@ -56,6 +56,7 @@ describe("alm-backend DTO mapping", () => {
       url: "",
       archivedAt: null,
       deletedAt: null,
+      purgeAt: null,
       createdAt: "2026-08-16T00:00:00Z",
     });
   });

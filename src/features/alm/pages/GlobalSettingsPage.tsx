@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Navigate, useParams } from "react-router";
 import { Badge, Button, Card, Checkbox, Lozenge, Modal, PageHeader, Select, TextField, useToast } from "@chanho/react";
 import type {
+  IssueFieldConfig,
   IssueType,
   SettingsScheme,
   WorkflowStatus,
@@ -18,6 +19,8 @@ import {
 } from "../store/jiraStore";
 import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
+import { FieldConfigEditor } from "../components/FieldConfigEditor";
+import { normalizeFields, sameFields } from "../components/fieldConfig";
 import {
   typeName,
 } from "../components/labels";
@@ -34,7 +37,7 @@ import { PersonalSettingsPanel } from "../components/PersonalSettingsPanel";
 import { BannerPanel } from "../components/BannerPanel";
 import { useIssueTypes } from "../components/useIssueTypes";
 
-type Aspect = "workflow" | "types";
+type Aspect = "workflow" | "types" | "fields";
 
 /**
  * 전역 관리(⚙ /settings/:section) — 지라 관리자 화면 모방.
@@ -45,9 +48,12 @@ export function GlobalSettingsPage() {
   const toast = useToast();
   const { section = "types" } = useParams();
   const issueTypes = useIssueTypes();
-  const aspect: Aspect = section === "workflows" ? "workflow" : "types";
+  const aspect: Aspect =
+    section === "workflows" ? "workflow" : section === "fields" ? "fields" : "types";
   const [schemes, setSchemes] = useState<SettingsScheme[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  /** 스킴 id → 필드 구성 초안 (필드 구성 구획은 카드 안에서 바로 편집한다) */
+  const [fieldDrafts, setFieldDrafts] = useState<Record<string, IssueFieldConfig[]>>({});
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<SettingsScheme | null>(null);
   const [editTypes, setEditTypes] = useState<IssueType[]>([]);
@@ -62,6 +68,7 @@ export function GlobalSettingsPage() {
   const reload = useCallback(async () => {
     const list = await listSchemes();
     setSchemes(list);
+    setFieldDrafts(Object.fromEntries(list.map((s) => [s.id, normalizeFields(s.body)])));
     const { countSchemeProjects } = await import("../store/jiraStore");
     const entries = await Promise.all(
       list.map(async (s) => [s.id, await countSchemeProjects(s.id)] as const),
@@ -192,6 +199,14 @@ export function GlobalSettingsPage() {
             </Button>
           </form>
 
+          {aspect === "fields" ? (
+            <p className="admin-scheme-note">
+              끈 필드는 이슈 만들기·상세 속성 패널·대량 변경에서 사라집니다(데이터는 남습니다).
+              필수 필드는 만들기에서 값이 없으면 저장되지 않습니다. 해결과 상위 항목은 필수로 지정할 수
+              없고, 첨부·링크는 만든 뒤에 붙는 값이라 필수로 켜도 만들기를 막지 않습니다.
+            </p>
+          ) : null}
+
           <ul className="admin-scheme-list" data-testid="scheme-list">
             {schemes.map((scheme) => (
               <li key={scheme.id}>
@@ -239,6 +254,43 @@ export function GlobalSettingsPage() {
                         ) : null}
                       </div>
                     </>
+                  ) : aspect === "fields" ? (
+                    <form
+                      className="admin-scheme-fields"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void run("저장 실패", async () => {
+                          await updateScheme(scheme.id, {
+                            // 빈 배열은 서버가 "기본값으로 되돌리기"로 읽는다 — 항상 13개를 보낸다
+                            body: {
+                              ...scheme.body,
+                              fields: fieldDrafts[scheme.id] ?? normalizeFields(scheme.body),
+                            },
+                          });
+                          toast({ title: "필드 구성을 저장했습니다", appearance: "success" });
+                        });
+                      }}
+                    >
+                      <FieldConfigEditor
+                        value={fieldDrafts[scheme.id] ?? normalizeFields(scheme.body)}
+                        labelPrefix={scheme.name}
+                        onChange={(next) =>
+                          setFieldDrafts((prev) => ({ ...prev, [scheme.id]: next }))
+                        }
+                      />
+                      <div className="admin-scheme-actions">
+                        <Button
+                          type="submit"
+                          size="small"
+                          disabled={sameFields(
+                            fieldDrafts[scheme.id] ?? normalizeFields(scheme.body),
+                            normalizeFields(scheme.body),
+                          )}
+                        >
+                          저장
+                        </Button>
+                      </div>
+                    </form>
                   ) : (
                     <>
                       <div className="admin-scheme-preview">

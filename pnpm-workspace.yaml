@@ -8,4 +8,4 @@ minimumReleaseAgeExclude:
   - '@chanho4702/tokens'
 # react가 선언한 tokens 의존(별칭)을 우리 것과 하나로 — 두 벌 설치되면 CSS 변수가 갈린다
 overrides:
-  "@chanho/tokens": "npm:@chanho4702/tokens@0.3.0"
+  "@chanho/tokens": "npm:@chanho4702/tokens@0.4.0"

@@ -24,6 +24,7 @@ export interface ProjectDto {
   url?: string | null;
   archivedAt?: string | null;
   deletedAt?: string | null;
+  purgeAt?: string | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -82,6 +83,7 @@ export function mapProject(dto: ProjectDto): Project {
     url: dto.url ?? "",
     archivedAt: dto.archivedAt ?? null,
     deletedAt: dto.deletedAt ?? null,
+    purgeAt: dto.purgeAt ?? null,
     createdAt: dto.createdAt,
   };
 }

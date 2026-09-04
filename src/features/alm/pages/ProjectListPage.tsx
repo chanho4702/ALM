@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Star } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button, Dropdown, EmptyState, Lozenge, Modal, PageHeader, Switch, Table, TextField, useToast } from "@chanho/react";
 import type { TableColumn } from "@chanho/react";
@@ -8,6 +8,7 @@ import { deleteProject, listIssues } from "../store/jiraStore";
 import { listStarredProjectIds, pruneProject, toggleProjectStar } from "../store/uiStore";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { useTablePrefs } from "../components/useTablePrefs";
+import { formatDate } from "../components/time";
 
 export interface ProjectListPageProps {
   projects: Project[];
@@ -123,7 +124,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
         void handleStarToggle(project);
       }}
     >
-      {starredIds.includes(project.id) ? "★" : "☆"}
+      <Star size={16} fill={starredIds.includes(project.id) ? "currentColor" : "none"} />
     </Button>
   );
 
@@ -149,7 +150,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
       key: "star",
       adjustable: false,
       header: "",
-      width: "44px",
+      width: "56px", /* 별표 버튼이 셀 안에 온전히 들어가야 잘린 … 잔상이 안 생긴다 */
       render: (project) => starButton(project),
     },
     {
@@ -192,7 +193,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
       header: "생성일",
       width: "112px",
       align: "right",
-      render: (project) => new Date(project.createdAt).toLocaleDateString("ko-KR"),
+      render: (project) => formatDate(project.createdAt),
     },
     {
       key: "manage",
@@ -296,7 +297,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
                     <div className="project-card-meta">
                       <span>이슈 {issueCounts[project.id] ?? 0}개</span>
                       <span aria-hidden>·</span>
-                      <span>{new Date(project.createdAt).toLocaleDateString("ko-KR")} 생성</span>
+                      <span>{formatDate(project.createdAt)} 생성</span>
                     </div>
                     <div className="project-card-actions">
                       <Button

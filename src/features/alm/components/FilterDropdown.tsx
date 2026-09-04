@@ -12,13 +12,30 @@ export interface FilterDropdownProps {
   options: FilterOption[];
   selected: string[];
   onToggle: (value: string) => void;
+  /**
+   * false면 단일 선택(라디오) — 스토어 필터 계약이 단일 값인 화면(이슈 목록)용.
+   * 고르면 패널이 닫힌다. @default true
+   */
+  multiple?: boolean;
+  /**
+   * 단일 모드에서 "전체"에 해당하는 값. `selected`가 이 값이면 트리거는
+   * 필터 이름만 보여주고 활성 표시를 하지 않는다(라디오는 켜진 채로 남는다).
+   */
+  clearValue?: string;
 }
 
 /**
  * 지라 이슈 검색의 필터 드롭다운 모방 — 체크박스 멀티 선택, 열린 채로 여러 개 토글.
  * 트리거는 선택 요약("상태: 진행 중 외 1")을 보여준다.
  */
-export function FilterDropdown({ label, options, selected, onToggle }: FilterDropdownProps) {
+export function FilterDropdown({
+  label,
+  options,
+  selected,
+  onToggle,
+  multiple = true,
+  clearValue,
+}: FilterDropdownProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -39,21 +56,26 @@ export function FilterDropdown({ label, options, selected, onToggle }: FilterDro
     };
   }, [open]);
 
-  const first = options.find((o) => o.value === selected[0]);
+  // "전체"는 선택으로 세지 않는다 — 트리거가 필터 이름만 보이도록
+  const active = clearValue === undefined ? selected : selected.filter((v) => v !== clearValue);
+  const first = options.find((o) => o.value === active[0]);
   const summary =
-    selected.length === 0 || !first
+    active.length === 0 || !first
       ? null
-      : selected.length === 1
+      : active.length === 1
         ? first.label
-        : `${first.label} 외 ${selected.length - 1}`;
+        : `${first.label} 외 ${active.length - 1}`;
+
+  const choose = (value: string) => {
+    onToggle(value);
+    if (!multiple) setOpen(false);
+  };
 
   return (
     <div className="filter-dropdown" ref={rootRef}>
       <button
         type="button"
-        className={
-          selected.length > 0 ? "filter-dropdown-trigger is-active" : "filter-dropdown-trigger"
-        }
+        className={active.length > 0 ? "filter-dropdown-trigger is-active" : "filter-dropdown-trigger"}
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
@@ -64,15 +86,36 @@ export function FilterDropdown({ label, options, selected, onToggle }: FilterDro
         </span>
       </button>
       {open ? (
-        <div className="filter-dropdown-panel" role="group" aria-label={`${label} 필터`}>
-          {options.map((option) => (
-            <Checkbox
-              key={option.value}
-              label={option.label}
-              checked={selected.includes(option.value)}
-              onCheckedChange={() => onToggle(option.value)}
-            />
-          ))}
+        <div
+          className="filter-dropdown-panel"
+          role={multiple ? "group" : "radiogroup"}
+          aria-label={`${label} 필터`}
+        >
+          {options.map((option) =>
+            multiple ? (
+              <Checkbox
+                key={option.value}
+                label={option.label}
+                checked={selected.includes(option.value)}
+                onCheckedChange={() => choose(option.value)}
+              />
+            ) : (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={selected.includes(option.value)}
+                className={
+                  selected.includes(option.value)
+                    ? "filter-dropdown-option is-selected"
+                    : "filter-dropdown-option"
+                }
+                onClick={() => choose(option.value)}
+              >
+                {option.label}
+              </button>
+            ),
+          )}
         </div>
       ) : null}
     </div>

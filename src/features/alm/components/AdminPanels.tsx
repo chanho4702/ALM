@@ -3,6 +3,7 @@ import { Button, Card, Lozenge, Select, Table } from "@chanho/react";
 import type { TableColumn } from "@chanho/react";
 import type { AuditEntry, SystemStats, User } from "../store/types";
 import { listAuditLog, listUsers, systemStats } from "../store/jiraStore";
+import { formatDateTime } from "./time";
 
 const ALL = "all";
 const PAGE_SIZE = 50;
@@ -66,7 +67,7 @@ export function AdminAuditPanel() {
       key: "at",
       header: "시각",
       width: "160px",
-      render: (row) => new Date(row.at).toLocaleString("ko-KR"),
+      render: (row) => formatDateTime(row.at),
     },
     {
       key: "eventType",

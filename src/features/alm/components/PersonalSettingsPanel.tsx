@@ -12,7 +12,7 @@ const START_PAGE_OPTIONS: { value: StartPage; label: string }[] = [
 /**
  * 개인 설정 — 지라 "개인 설정 > 일반·알림"의 축약판. 알림은 이벤트별 제품 내 수신 on/off,
  * 자동 관찰은 내가 만든/댓글 단/수정한 이슈를 워처로 붙일지, 시작 화면은 로고 클릭·첫 진입 위치.
- * 이메일은 메일 서버 연동 전이라 없다.
+ * 이메일은 서버 메일 설정(ALM_MAIL_HOST)이 있을 때만 실제로 발송되며, 없으면 안내를 띄운다.
  */
 export interface PersonalSettingsPanelProps {
   /** general = 시작 화면·자동 관찰(지라 개인 설정 > 일반), notifications = 알림 수신(지라 > 알림) */
@@ -77,6 +77,7 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
   return (
     <div className="project-settings personal-settings" aria-busy={loading}>
       {part === "notifications" ? (
+        <>
       <Card padding="lg" title="알림">
         <p className="settings-help">
           어떤 일이 있을 때 앱 안 알림을 받을지 정합니다. 본인이 한 행동은 알리지 않습니다.
@@ -104,6 +105,25 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
           />
         </div>
       </Card>
+      <Card padding="lg" title="이메일">
+        <p className="settings-help">
+          위에서 켠 알림이 알림함에 생길 때 같은 내용을 이메일로도 받습니다. 주소는 로그인 계정의 이메일입니다.
+        </p>
+        <div className="settings-toggle-list">
+          <Switch
+            label="이메일로도 받기"
+            checked={prefs.emailEnabled}
+            onCheckedChange={(v) => setPrefs((p) => ({ ...p, emailEnabled: v }))}
+          />
+        </div>
+        {!loading && prefs.mailConfigured === false ? (
+          <p className="settings-help settings-help-warning" role="status">
+            메일 서버가 구성되지 않아 지금은 발송되지 않습니다. 관리자가 <code>ALM_MAIL_HOST</code>를 설정하면
+            이 설정대로 보내집니다.
+          </p>
+        ) : null}
+      </Card>
+        </>
       ) : null}
       {part === "general" ? (
         <>

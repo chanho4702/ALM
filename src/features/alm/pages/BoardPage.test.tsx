@@ -56,12 +56,13 @@ describe("BoardPage", () => {
     expect(screen.queryByText("ALM-7")).not.toBeInTheDocument();
     expect(screen.queryByText("ALM-8")).not.toBeInTheDocument();
 
-    // 카드 구성: 제목 · 우선순위 Lozenge(한국어 라벨) · 담당자 Avatar
+    // 카드 구성: 제목 · 우선순위 아이콘(접근성 이름은 남는다) · 담당자 Avatar
     expect(within(todo).getByText("백로그 화면 구현")).toBeInTheDocument(); // ALM-4 제목
-    expect(within(todo).getByText("보통")).toBeInTheDocument(); // ALM-4 medium
-    expect(within(todo).getByText("낮음")).toBeInTheDocument(); // ALM-5 low
+    // 우선순위 레지스트리는 비동기 로드 — 로드 전엔 Lozenge 폴백이라 아이콘을 기다린다
+    expect(await within(todo).findByRole("img", { name: "우선순위: 보통" })).toBeInTheDocument(); // ALM-4 medium
+    expect(within(todo).getByRole("img", { name: "우선순위: 낮음" })).toBeInTheDocument(); // ALM-5 low
     expect(within(todo).getByRole("img", { name: "박준영" })).toBeInTheDocument(); // ALM-4 담당자
-    expect(within(done).getByText("높음")).toBeInTheDocument(); // ALM-1 high
+    expect(within(done).getByRole("img", { name: "우선순위: 높음" })).toBeInTheDocument(); // ALM-1 high
   });
 
   it("커스텀 워크플로 상태는 보드에 컬럼으로 나타나고 그 상태의 카드가 담긴다", async () => {
@@ -113,7 +114,7 @@ describe("보드 컬럼 인라인 생성", () => {
     renderBoard();
 
     const inprogress = await screen.findByRole("region", { name: "진행 중" });
-    await user.click(within(inprogress).getByRole("button", { name: "+ 이슈 만들기" }));
+    await user.click(within(inprogress).getByRole("button", { name: "이슈 만들기" }));
     await user.type(
       within(inprogress).getByLabelText("진행 중 컬럼에 이슈 만들기"),
       "인라인 생성 이슈",
@@ -126,6 +127,30 @@ describe("보드 컬럼 인라인 생성", () => {
     expect(
       within(screen.getByTestId("board-column-inprogress")).getByText("인라인 생성 이슈"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("보드 툴바 스프린트 완료", () => {
+  it("스크럼 보드에서 스프린트를 완료하면 컬럼이 EmptyState로 바뀐다", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByRole("region", { name: "할 일" });
+
+    await user.click(screen.getByRole("button", { name: "스프린트 완료" }));
+    const dialog = await screen.findByRole("dialog", { name: "스프린트 완료" });
+    // 미완료 건수는 보드 필터가 아니라 스프린트 전체 기준 (시드 s1: ALM-1만 완료)
+    expect(dialog).toHaveTextContent("미완료 이슈 4건");
+    await user.click(within(dialog).getByRole("button", { name: "완료 처리" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "진행 중인 스프린트가 없습니다" }),
+    ).toBeInTheDocument();
+  });
+
+  it("칸반 보드에는 스프린트 완료 버튼이 없다", async () => {
+    renderBoard("/projects/p1/boards/b2");
+    await screen.findByText("백엔드 팀", { selector: ".board-name" });
+    expect(screen.queryByRole("button", { name: "스프린트 완료" })).not.toBeInTheDocument();
   });
 });
 
@@ -249,7 +274,7 @@ describe("담당자 스윔레인", () => {
 
     // 그룹 해제 → 단일 3컬럼 복귀
     await user.click(screen.getByRole("combobox", { name: "그룹" }));
-    await user.click(await screen.findByRole("option", { name: "없음" }));
+    await user.click(await screen.findByRole("option", { name: "그룹 없음" }));
     await waitFor(() => {
       expect(screen.queryByTestId("swimlane-u1")).not.toBeInTheDocument();
     });

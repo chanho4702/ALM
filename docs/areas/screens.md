@@ -10,7 +10,7 @@
 |---|---|---|
 | `/home` | HomePage | For you 홈: 인사말 → 이어서 하기 카드 → 추천 작업/나에게 배정됨/최근 업데이트/별표 탭 |
 | `/search` | SearchPage | 이슈 검색: 기본(필터 드롭다운)/스마트 2모드 → search.md |
-| `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `categories`(상태 카테고리)·`statuses`(상태 레지스트리)·`issue-types`(이슈 타입 레지스트리)·`types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
+| `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `categories`(상태 카테고리)·`statuses`(상태 레지스트리)·`issue-types`(이슈 타입 레지스트리)·`fields`(필드 구성 — 스킴별 표시/필수)·`types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
 | `/projects` | ProjectListPage | 디렉터리: 테이블 기본(★/이름/키/이슈/생성일/⋯) + 카드 토글 + 검색 |
 | `/projects/new` | ProjectCreatePage | 템플릿(빈/스크럼/칸반/버그 트래킹) 미리보기 생성 |
 | `/projects/:id/board` | BoardRedirect | 기본 보드로 redirect (?issue 쿼리 보존) |
@@ -21,7 +21,7 @@
 | `/projects/:id/releases` | ReleasesPage(lazy) | 릴리스 허브: 버전 만들기·진행률·릴리스(미완료 이관 선택)·보관·삭제 |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
-| `/projects/:id/settings/:section` | ProjectSettingsPage(lazy) | **프로젝트 뷰(ProjectLayout) 바깥의 별도 페이지.** 구획 `general`/`members`/`workflow`/`types`/`import`(지라 CSV 이관 마법사), `/settings`는 `general`로 redirect. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
+| `/projects/:id/settings/:section` | ProjectSettingsPage(lazy) | **프로젝트 뷰(ProjectLayout) 바깥의 별도 페이지.** 구획 `general`/`members`/`components`/`workflow`/`types`/`fields`(필드 구성 — 커스텀일 때만 편집)/`import`(지라 CSV 이관 마법사), `/settings`는 `general`로 redirect. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
 | 그 외 전부 | → `/home` | |
 
 이슈 상세는 페이지가 아니라 **`?issue=ALM-3` 쿼리로 여는 모달**(`useIssueModal` +
@@ -45,8 +45,8 @@
 
 - 클릭 가능한 요소는 button (백로그 행만 예외적으로 내부에 Dropdown 버튼이 있어
   `role="button"`+tabIndex+Enter/Space 처리 — button-in-button 방지 패턴).
-- 시간 표기 혼재: 상대시간 `relTime`은 HomePage 로컬 함수. 다른 화면은 toLocaleDateString/
-  toLocaleString/원본 ISO 혼용 — 공용 시간 유틸로 추출 후보.
+- 시간 표기는 `components/time.ts` 하나로 통일했다(2026-09-04): 날짜 `2026-09-04`, 일시 `2026-09-04 14:03`,
+  상대 `3시간 전`. 새 화면도 `toLocale*`를 직접 쓰지 말고 이 헬퍼를 쓴다.
 - `/projects/:projectId` 인덱스 라우트가 없어 bare URL은 빈 아울렛(수동 진입 시에만 해당).
 - IssueListPage가 필터 변경마다 라벨 옵션·상태 목록까지 재조회(최초 1회면 충분).
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { Button, Lozenge } from "@chanho/react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Star } from "lucide-react";
 import type { Project, ProjectShortcut } from "../store/types";
 import { listProjectShortcuts } from "../store/jiraStore";
 import { SHORTCUTS_CHANGED_EVENT } from "./ProjectShortcutsPanel";
@@ -76,7 +76,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
       </nav>
 
       <header className="project-header">
-        <ProjectAvatar project={current} size="lg" />
+        <ProjectAvatar project={current} size="md" />
         <h1 className="project-header-name">{current.name}</h1>
         {current.archivedAt ? (
           <Lozenge appearance="neutral" data-testid="project-archived-lozenge">
@@ -91,7 +91,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
           aria-pressed={starred}
           onClick={() => void toggleProjectStar(current.id)}
         >
-          {starred ? "★" : "☆"}
+          <Star size={16} fill={starred ? "currentColor" : "none"} aria-hidden />
         </Button>
         {shortcuts.length > 0 ? (
           <nav aria-label="바로 가기" className="project-shortcuts">

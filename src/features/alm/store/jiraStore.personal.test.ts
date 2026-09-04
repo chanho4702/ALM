@@ -83,6 +83,8 @@ describe("개인 설정(알림·자동 관찰·시작 화면)", () => {
       notifications: { assigned: true, statusChanged: true, commented: true, mentioned: true },
       autoWatch: { created: true, commented: true, edited: false },
       startPage: "home",
+      emailEnabled: false,
+      mailConfigured: false,
     });
   });
 

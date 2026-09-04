@@ -64,5 +64,15 @@ describe("프로젝트 보관·휴지통", () => {
     expect(await screen.findByText("프로젝트 ALM를 복원했습니다")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "휴지통이 비어 있습니다" })).toBeInTheDocument();
     expect(await listProjects()).toHaveLength(1);
+  }, 30_000); // App 전체 마운트 + 삭제→휴지통→복원 왕복 — 병렬 워커 부하에서 기본 15s를 넘긴다
+});
+
+describe("휴지통 자동 비우기 카운트다운", () => {
+  it("purgeAt까지 남은 일수를 올림해 보여주고, 지났으면 '곧 영구 삭제'", async () => {
+    const { purgeCountdown } = await import("./TrashPage");
+    const now = Date.parse("2026-09-04T00:00:00Z");
+    expect(purgeCountdown("2026-09-14T12:00:00Z", now)).toBe("11일 후 영구 삭제");
+    expect(purgeCountdown("2026-09-05T00:00:00Z", now)).toBe("1일 후 영구 삭제");
+    expect(purgeCountdown("2026-09-03T00:00:00Z", now)).toBe("곧 영구 삭제");
   });
 });

@@ -35,6 +35,12 @@ GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름�
 `statusCategory/statusName/statusAppearance/CATEGORY_ORDER`를 경유한다(기본 3상태 폴백 내장).
 `STATUS_LABELS`/`STATUS_APPEARANCE` 직접 인덱싱은 카테고리 값에만 허용(예: 대시보드 타일 라벨).
 
+## 2026-09-04 추가 함정
+
+- **모달 안 Select/Dropdown은 DS 0.8.0 이상에서만 마우스로 고를 수 있다.** 0.7.0까지는 팝업 z(400)가 모달 블랭킷(500)보다
+  낮아 옵션 클릭이 오버레이에 막혔다(jsdom 테스트는 포인터 가림을 모르므로 통과했다 — 실제 브라우저로 확인할 것).
+  0.8.0은 `--chanho-z-popover`(550)를 쓴다.
+
 ## 2026-08-30 추가 함정
 
 - **Card는 border-box가 아니다.** `width:100%`에 padding이 더해져 그리드 셀을 넘친다. alm-front는

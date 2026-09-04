@@ -4,14 +4,20 @@ import { Button, EmptyState, Modal, PageHeader, useToast } from "@chanho/react";
 import type { Project } from "../store/types";
 import { listTrashedProjects, purgeProject, restoreProject } from "../store/jiraStore";
 import { ProjectAvatar } from "../components/ProjectAvatar";
+import { formatDateTime } from "../components/time";
+
+/** 서버가 준 자동 영구 삭제 예정 시각 → "n일 후 영구 삭제". 목업은 purgeAt이 없어 표시하지 않는다 */
+export function purgeCountdown(purgeAt: string, now: number = Date.now()): string {
+  const days = Math.ceil((Date.parse(purgeAt) - now) / 86_400_000);
+  if (Number.isNaN(days)) return "";
+  return days <= 0 ? "곧 영구 삭제" : `${days}일 후 영구 삭제`;
+}
 
 export interface TrashPageProps {
   onProjectsChanged: () => void | Promise<void>;
 }
 
 /** 프로젝트 휴지통(지라) — 삭제한 프로젝트를 복원하거나 영구 삭제한다 */
-const formatDateTime = (iso: string) => new Date(iso).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
-
 export function TrashPage({ onProjectsChanged }: TrashPageProps) {
   const navigate = useNavigate();
   const toast = useToast();
@@ -63,6 +69,9 @@ export function TrashPage({ onProjectsChanged }: TrashPageProps) {
               <span className="trash-name">{project.name}</span>
               <span className="issue-key-cell">{project.key}</span>
               <span className="trash-at">{project.deletedAt ? `삭제 ${formatDateTime(project.deletedAt)}` : ""}</span>
+              {project.purgeAt ? (
+                <span className="trash-at trash-purge-at">{purgeCountdown(project.purgeAt)}</span>
+              ) : null}
               <div className="trash-actions">
                 <Button
                   size="small"

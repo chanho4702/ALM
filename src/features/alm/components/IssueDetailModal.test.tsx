@@ -38,7 +38,7 @@ describe("IssueDetailModal", () => {
     expect(within(dialog).getByRole("button", { name: "제목 편집" })).toHaveTextContent(
       "백로그 화면 구현",
     );
-    expect(within(dialog).getByTestId("issue-status-lozenge")).toHaveTextContent("할 일");
+    expect(within(dialog).getByRole("combobox", { name: "상태" })).toHaveTextContent("할 일");
     expect(within(dialog).getByLabelText("설명")).toBeInTheDocument();
 
     // 상태 Select: 할 일 → 완료
@@ -47,7 +47,7 @@ describe("IssueDetailModal", () => {
 
     // 모달 Lozenge 반영
     await waitFor(() => {
-      expect(within(dialog).getByTestId("issue-status-lozenge")).toHaveTextContent("완료");
+      expect(within(dialog).getByRole("combobox", { name: "상태" })).toHaveTextContent("완료");
     });
     // 모달을 연 채로 보드 카드가 완료 컬럼으로 이동 (모달 뒤 보드는 aria-hidden이라 testid로 조회)
     await waitFor(() => {
@@ -170,7 +170,7 @@ describe("IssueDetailModal 코멘트/활동 탭 (W3)", () => {
     await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
     await user.click(await screen.findByRole("option", { name: "완료" }));
     await waitFor(() => {
-      expect(within(dialog).getByTestId("issue-status-lozenge")).toHaveTextContent("완료");
+      expect(within(dialog).getByRole("combobox", { name: "상태" })).toHaveTextContent("완료");
     });
 
     // 활동 탭으로 전환 → created + status 로그가 시간순으로 보인다
@@ -325,6 +325,7 @@ describe("IssueDetailModal 이슈 관계", () => {
     renderBoard("/projects/p1/board?issue=ALM-1");
     const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
 
+    await user.click(within(dialog).getByRole("button", { name: "하위 이슈" }));
     await user.type(within(dialog).getByLabelText("하위 이슈 추가"), "세부 구현");
     await user.click(within(dialog).getByRole("button", { name: "추가" }));
 
@@ -342,7 +343,8 @@ describe("IssueDetailModal 이슈 관계", () => {
     expect(within(linksSection).getByText("차단됨")).toBeInTheDocument();
     expect(within(linksSection).getByText("ALM-3")).toBeInTheDocument();
 
-    // 관련 링크 추가: ALM-2 ↔ ALM-5
+    // 관련 링크 추가: ALM-2 ↔ ALM-5 — 폼은 기본 접힘이라 [+ 링크]로 먼저 편다
+    await user.click(within(linksSection).getByRole("button", { name: "링크" }));
     await user.click(within(linksSection).getByRole("combobox", { name: "종류" }));
     await user.click(await screen.findByRole("option", { name: "관련됨" }));
     await user.click(within(linksSection).getByRole("combobox", { name: "대상 이슈" }));
@@ -382,12 +384,14 @@ describe("IssueDetailModal 이슈 관계", () => {
     const user = userEvent.setup();
     renderBoard("/projects/p1/board?issue=ALM-1");
     const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    await user.click(within(dialog).getByRole("button", { name: "하위 이슈" }));
     await user.type(within(dialog).getByLabelText("하위 이슈 추가"), "1단계");
     await user.click(within(dialog).getByRole("button", { name: "추가" }));
     const childrenSection = within(dialog).getByTestId("issue-children");
     await user.click(await within(childrenSection).findByText("1단계"));
 
     const childDialog = await screen.findByRole("dialog", { name: /ALM-\d+/ });
+    await user.click(within(childDialog).getByRole("button", { name: "하위 이슈" }));
     await user.type(within(childDialog).getByLabelText("하위 이슈 추가"), "2단계");
     await user.click(within(childDialog).getByRole("button", { name: "추가" }));
     expect(await within(childDialog).findByText("2단계")).toBeInTheDocument();
@@ -398,7 +402,7 @@ describe("IssueDetailModal 이슈 관계", () => {
     const parentDialog = await screen.findByRole("dialog", { name: "ALM-1" });
     const nested = await within(parentDialog).findByRole("list", { name: /의 하위 이슈$/ });
     expect(within(nested).getByText("2단계")).toBeInTheDocument();
-  });
+  }, 30_000); // 4단계 모달 흐름 + 접힘 토글 2회 — 병렬 워커 부하에서 기본 15s를 넘긴다
 });
 
 describe("IssueDetailModal 해결", () => {

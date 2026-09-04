@@ -23,6 +23,8 @@ import type {
   IssueLinkType,
   IssuePriority,
   IssueResolution,
+  IssueFieldConfig,
+  IssueFieldId,
   StatusCategory,
   StatusColor,
   StatusDef,
@@ -50,7 +52,7 @@ import type {
 } from "./types";
 import { CURRENT_USER_ID } from "../../../mock/users";
 import { createSeedData } from "../../../mock/seed";
-import { WORKFLOW_ANY_NODE } from "./types";
+import { ISSUE_FIELD_IDS, ISSUE_FIELD_NAMES, WORKFLOW_ANY_NODE } from "./types";
 import type { IssueQuery } from "./searchQuery";
 import { getTemplate } from "./projectTemplates";
 import type { ProjectTemplateId } from "./projectTemplates";
@@ -59,6 +61,59 @@ import { extractMentionIds, htmlToText, newMentionIds } from "./richText";
 const STORAGE_KEY = "alm.jira.v1";
 
 let cache: JiraData | null = null;
+
+/**
+ * 필수로 지정할 수 없는 필드와 그 사유 — 서버 400 문구와 한 글자까지 같아야 한다.
+ * 해결은 완료 상태에서만 입력하고, 상위 항목은 최상위 이슈에 존재할 수 없다.
+ */
+const NEVER_REQUIRED_FIELDS: Partial<Record<IssueFieldId, string>> = {
+  resolution: "해결은 완료 상태에서만 입력하므로 필수로 지정할 수 없습니다",
+  parent: "상위 항목은 최상위 이슈가 있어야 하므로 필수로 지정할 수 없습니다",
+};
+
+/** 기본 필드 구성 — 13종 전부 보이고 필수는 없다 */
+function defaultFieldConfigs(): IssueFieldConfig[] {
+  return ISSUE_FIELD_IDS.map((id) => ({ id, visible: true, required: false }));
+}
+
+/**
+ * 이슈 생성 시 필수 필드 검사 — 값을 준 필드만 본다(우선순위는 기본값이 늘 있으므로 대상이 아니고,
+ * 해결·첨부·링크는 만들기 경로에 값 자체가 없다).
+ */
+function assertRequiredFields(
+  body: SettingsBody,
+  values: Partial<Record<IssueFieldId, unknown>>,
+): void {
+  for (const field of normalizeFieldConfigs(body.fields)) {
+    if (!field.required) continue;
+    if (!(field.id in values)) continue;
+    const value = values[field.id];
+    const missing =
+      value === undefined ||
+      value === null ||
+      (typeof value === "string" && value.trim() === "") ||
+      (Array.isArray(value) && value.length === 0);
+    if (missing) throw new Error(`${withJosa(ISSUE_FIELD_NAMES[field.id])} 필수입니다`);
+  }
+}
+
+/** 받침 유무로 은/는을 고른다 — "담당자는 필수입니다" / "설명은 필수입니다" */
+function withJosa(name: string): string {
+  const last = name.trim().at(-1) ?? "";
+  const code = last.charCodeAt(0);
+  const hangul = code >= 0xac00 && code <= 0xd7a3;
+  const hasFinal = hangul && (code - 0xac00) % 28 !== 0;
+  return `${name}${hasFinal ? "은" : "는"}`;
+}
+
+/** 저장/응답용 정규화 — 빠진 id는 기본값으로 채우고 순서를 고정한다(구버전 호환) */
+function normalizeFieldConfigs(fields?: IssueFieldConfig[] | null): IssueFieldConfig[] {
+  const byId = new Map((fields ?? []).map((f) => [f.id, f]));
+  return ISSUE_FIELD_IDS.map((id) => {
+    const found = byId.get(id);
+    return { id, visible: found?.visible ?? true, required: found?.required ?? false };
+  });
+}
 
 /** 디폴트 스킴 본문 — 상태 id를 기존 status 값과 동일하게 두어 저장 데이터와 100% 호환 */
 function defaultSettingsBody(): SettingsBody {
@@ -71,6 +126,7 @@ function defaultSettingsBody(): SettingsBody {
     enabledTypes: ["task", "story", "bug", "epic", "subtask"],
     enabledPriorities: ["highest", "high", "medium", "low", "lowest"],
     defaultPriority: "medium",
+    fields: defaultFieldConfigs(),
   };
 }
 
@@ -111,7 +167,12 @@ function enrichStatuses(data: JiraData, statuses: WorkflowStatus[]): WorkflowSta
 }
 
 function enrichBody(data: JiraData, body: SettingsBody): SettingsBody {
-  return { ...body, statuses: enrichStatuses(data, body.statuses) };
+  // 필드 구성은 읽을 때 13종을 다 채운다 — 화면이 없는 id를 만나지 않게(구버전 호환)
+  return {
+    ...body,
+    statuses: enrichStatuses(data, body.statuses),
+    fields: normalizeFieldConfigs(body.fields),
+  };
 }
 
 function enrichScheme(data: JiraData, scheme: SettingsScheme): SettingsScheme {
@@ -157,6 +218,7 @@ function cloneBody(body: SettingsBody): SettingsBody {
     enabledTypes: [...body.enabledTypes],
     enabledPriorities: [...(body.enabledPriorities ?? defaultSettingsBody().enabledPriorities)],
     defaultPriority: body.defaultPriority ?? "medium",
+    fields: normalizeFieldConfigs(body.fields),
     ...(body.transitions
       ? { transitions: body.transitions.map((t) => ({ ...t, from: [...t.from] })) }
       : {}),
@@ -275,11 +337,13 @@ function normalize(data: JiraData): JiraData {
   for (const scheme of data.schemes ?? []) {
     scheme.body.enabledPriorities ??= defaultSettingsBody().enabledPriorities;
     scheme.body.defaultPriority ??= "medium";
+    scheme.body.fields = normalizeFieldConfigs(scheme.body.fields);
   }
   for (const entry of data.projectSettings ?? []) {
     if (entry.custom) {
       entry.custom.enabledPriorities ??= defaultSettingsBody().enabledPriorities;
       entry.custom.defaultPriority ??= "medium";
+      entry.custom.fields = normalizeFieldConfigs(entry.custom.fields);
     }
   }
   for (const issue of data.issues) {
@@ -1576,6 +1640,8 @@ export async function createIssue(input: {
   labels?: string[];
   componentIds?: string[];
   estimateHours?: number | null;
+  /** 수정 버전 — 서버도 생성 경로에서 받는다(다른 프로젝트·보관된 버전은 거부) */
+  fixVersionId?: string | null;
   /** 보존할 키(이관·CSV) — `{프로젝트키}-{번호}` 형식, 유일해야 한다. 번호는 카운터를 앞당긴다 */
   key?: string;
 }): Promise<Issue> {
@@ -1596,12 +1662,10 @@ export async function createIssue(input: {
   if (input.estimateHours !== undefined && input.estimateHours !== null && !(input.estimateHours > 0)) {
     throw new Error("예상 시간은 0보다 커야 합니다");
   }
+  // 프로젝트 설정 해석은 한 군데(resolvedBody)로 통일한다 — 커스텀 > 스킴 > 기본을 여기저기서 다시 풀지 않는다
+  const bodyForCreate = resolvedBody(data, project.id);
   // 타입은 프로젝트 설정(enabledTypes)을 따른다 — 미지정이면 task, task가 꺼져 있으면 첫 활성 타입
-  const settingsEntryForCreate = data.projectSettings.find((e) => e.projectId === project.id);
-  const enabledTypes =
-    settingsEntryForCreate?.custom?.enabledTypes ??
-    data.schemes.find((s) => s.id === settingsEntryForCreate?.schemeId)?.body.enabledTypes ??
-    defaultSettingsBody().enabledTypes;
+  const enabledTypes = bodyForCreate.enabledTypes;
   const resolvedType =
     input.type ??
     (enabledTypes.includes("task")
@@ -1615,6 +1679,19 @@ export async function createIssue(input: {
   assertCanEdit(data, project.id);
   if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
   const componentIdsForCreate = validateComponentIds(data, project.id, input.componentIds);
+  if (input.fixVersionId) assertVersionAssignable(data, input.fixVersionId, project.id);
+  // 필드 구성의 필수 검사 — 만들기에서만 한다(수정은 기존 이슈를 갑자기 막지 않으려고 검사하지 않는다)
+  assertRequiredFields(bodyForCreate, {
+    description: input.description === undefined ? "" : htmlToText(input.description),
+    assignee: input.assigneeId,
+    labels: input.labels,
+    components: componentIdsForCreate,
+    // parent는 저장 단계에서 required 자체가 막히므로 생성 검사 대상이 아니다
+    sprint: input.sprintId,
+    dueDate: input.dueDate,
+    fixVersion: input.fixVersionId,
+    estimate: input.estimateHours,
+  });
   const seq = preservedSeq ?? (data.issueCounters[project.id] ?? 0) + 1;
   // 삭제돼도 감소하지 않는다 → 키 미재사용. 보존 키는 카운터를 그 번호 이상으로 앞당긴다
   data.issueCounters[project.id] = Math.max(data.issueCounters[project.id] ?? 0, seq);
@@ -1643,7 +1720,7 @@ export async function createIssue(input: {
     dueDate: input.dueDate ?? null,
     estimateHours: input.estimateHours ?? null,
     resolution: null,
-    fixVersionId: null,
+    fixVersionId: input.fixVersionId ?? null,
     labels: input.labels ?? [],
     componentIds: componentIdsForCreate,
     order: maxOrder + 1,
@@ -2370,6 +2447,27 @@ function validateSettingsBody(data: JiraData, body: SettingsBody): void {
   if (enabledPriorities.length === 0) throw new Error("우선순위는 최소 1개 활성화해야 합니다");
   if (!enabledPriorities.includes(body.defaultPriority ?? "medium")) {
     throw new Error("기본 우선순위는 활성화된 우선순위 중에서 골라야 합니다");
+  }
+  validateFieldConfigs(body.fields);
+}
+
+/** 필드 구성 규칙 — 서버(SettingsBody 검증)와 같은 문구를 쓴다 */
+function validateFieldConfigs(fields?: IssueFieldConfig[] | null): void {
+  if (!fields) return;
+  const seen = new Set<string>();
+  for (const field of fields) {
+    if (!(ISSUE_FIELD_IDS as readonly string[]).includes(field.id)) {
+      throw new Error(`없는 필드입니다: ${field.id}`);
+    }
+    if (seen.has(field.id)) {
+      throw new Error(`같은 필드를 두 번 넣을 수 없습니다: ${ISSUE_FIELD_NAMES[field.id]}`);
+    }
+    seen.add(field.id);
+    if (field.required && !field.visible) {
+      throw new Error(`숨긴 필드는 필수로 지정할 수 없습니다: ${ISSUE_FIELD_NAMES[field.id]}`);
+    }
+    const neverRequired = NEVER_REQUIRED_FIELDS[field.id];
+    if (field.required && neverRequired) throw new Error(neverRequired);
   }
 }
 
@@ -3519,6 +3617,9 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   notifications: { assigned: true, statusChanged: true, commented: true, mentioned: true },
   autoWatch: { created: true, commented: true, edited: false },
   startPage: "home",
+  emailEnabled: false,
+  // 목업에는 메일 서버가 없다 — 화면이 "구성되지 않음" 안내를 그리는 경로를 그대로 탄다
+  mailConfigured: false,
 };
 
 const START_PAGES: readonly string[] = ["home", "projects", "last-project"];
@@ -3529,6 +3630,8 @@ function preferencesOf(data: JiraData, userId: string): UserPreferences {
     notifications: { ...DEFAULT_PREFERENCES.notifications, ...stored?.notifications },
     autoWatch: { ...DEFAULT_PREFERENCES.autoWatch, ...stored?.autoWatch },
     startPage: stored?.startPage ?? DEFAULT_PREFERENCES.startPage,
+    emailEnabled: stored?.emailEnabled ?? DEFAULT_PREFERENCES.emailEnabled,
+    mailConfigured: false,
   };
 }
 
@@ -3547,6 +3650,8 @@ export async function saveMyPreferences(patch: UserPreferencesPatch): Promise<Us
     notifications: { ...current.notifications, ...patch.notifications },
     autoWatch: { ...current.autoWatch, ...patch.autoWatch },
     startPage: patch.startPage ?? current.startPage,
+    emailEnabled: patch.emailEnabled ?? current.emailEnabled,
+    mailConfigured: false,
   };
   data.preferences[CURRENT_USER_ID] = next;
   persist();

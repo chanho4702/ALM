@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
 import { Avatar, Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
@@ -47,6 +47,7 @@ import {
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { useIssueTypes } from "./useIssueTypes";
+import { Plus } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
@@ -65,6 +66,8 @@ import {
   typeName,
 } from "./labels";
 import { usePriorities } from "./usePriorities";
+import { resolveFields } from "./fieldConfig";
+import { formatDateTime } from "./time";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const NO_VERSION = "__no_version__";
@@ -106,6 +109,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const PRIORITIES = priorities.map((d) => d.id);
   const levelOf = (typeId: string) => typeLevel(issueTypes, typeId);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
+  /** 프로젝트 설정의 필드 구성 — 숨긴 필드는 속성 패널·첨부·링크·하위 이슈에서 뺀다 */
+  const [fields, setFields] = useState(() => resolveFields(null));
   const [worklogHours, setWorklogHours] = useState("");
   const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [worklogComment, setWorklogComment] = useState("");
@@ -114,11 +119,21 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [childType, setChildType] = useState<IssueType>("subtask");
   const [linkKind, setLinkKind] = useState<LinkKind>(LINK_KIND_DEFAULT);
   const [linkTargetId, setLinkTargetId] = useState<string | null>(null);
+  // 하위 이슈·링크 추가 폼은 기본 접힘 — 지라처럼 섹션 헤더의 + 버튼으로 편다
+  const [subtaskFormOpen, setSubtaskFormOpen] = useState(false);
+  const [linkFormOpen, setLinkFormOpen] = useState(false);
+  const linkFormRef = useRef<HTMLDivElement>(null);
   const [, setSearchParams] = useSearchParams();
   /** 수정 중인 코멘트 id — null이면 보기 모드 */
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [commentEditDraft, setCommentEditDraft] = useState("");
   const toast = useToast();
+
+  useEffect(() => {
+    if (!linkFormOpen) return;
+    // Select는 ref/autoFocus를 받지 않아 열릴 때만 첫 combobox로 포커스를 옮긴다
+    linkFormRef.current?.querySelector<HTMLElement>('[role="combobox"]')?.focus();
+  }, [linkFormOpen]);
 
   /** 코멘트·활동 재조회 — 속성 저장/코멘트 작성 후 호출 (활동로그는 스토어 부수효과) */
   const refreshLogs = async (issueId: string) => {
@@ -191,6 +206,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       if (!cancelled) {
         setEnabledTypes(settings.body.enabledTypes);
         setStatuses([...settings.body.statuses].sort((a, b) => a.order - b.order));
+        setFields(resolveFields(settings.body));
       }
       await refreshRelations(found.id, found.projectId);
     })();
@@ -201,7 +217,6 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   }, [issueKey]);
 
   const userName = (id: string) => users.find((u) => u.id === id)?.name ?? "알 수 없음";
-  const formatDateTime = (iso: string) => new Date(iso).toLocaleString("ko-KR");
 
   const applyPatch = async (
     patch: Partial<
@@ -545,33 +560,35 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       }}
       className="issue-detail-modal"
     >
+      {/* 모달 헤더 줄 — 왼쪽 상위 경로·키, 오른쪽 관심 등록(닫기 버튼 옆) */}
+      <div className="issue-detail-header">
+        <nav className="issue-ancestors" aria-label="상위 항목 경로">
+          {(fields.parent.visible ? ancestors : []).map((a) => (
+            <span key={a.id} className="issue-ancestor">
+              <button type="button" className="issue-ancestor-link" onClick={() => switchIssue(a.key)}>
+                <IssueTypeGlyph type={a.type} />
+                {a.key}
+              </button>
+              <span aria-hidden="true" className="issue-ancestor-sep">
+                /
+              </span>
+            </span>
+          ))}
+          <span className="issue-ancestor-current">{issue.key}</span>
+        </nav>
+        <div className="issue-detail-toolbar">
+          <WatchButton issueId={issue.id} userNames={Object.fromEntries(users.map((u) => [u.id, u.name]))} />
+        </div>
+      </div>
       <div className="issue-detail-body">
         <div className="issue-detail-main">
-          <div className="issue-detail-toolbar">
-            <WatchButton issueId={issue.id} userNames={Object.fromEntries(users.map((u) => [u.id, u.name]))} />
-          </div>
-          {ancestors.length > 0 ? (
-            <nav className="issue-ancestors" aria-label="상위 항목 경로">
-              {ancestors.map((a) => (
-                <span key={a.id} className="issue-ancestor">
-                  <button type="button" className="issue-ancestor-link" onClick={() => switchIssue(a.key)}>
-                    <IssueTypeGlyph type={a.type} />
-                    {a.key}
-                  </button>
-                  <span aria-hidden="true" className="issue-ancestor-sep">
-                    /
-                  </span>
-                </span>
-              ))}
-              <span className="issue-ancestor-current">{issue.key}</span>
-            </nav>
-          ) : null}
           <InlineEdit
             label="제목"
             value={issue.title}
             viewClassName="issue-title-view"
             onSave={(next) => void applyPatch({ title: next }, "제목을 저장했습니다")}
           />
+          {fields.description.visible ? (
           <form className="issue-description-form" onSubmit={handleDescriptionSubmit}>
             <RichTextEditor
               label="설명"
@@ -585,24 +602,39 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               설명 저장
             </Button>
           </form>
+          ) : null}
+          {fields.attachments.visible ? (
           <IssueAttachments
             issueId={issue.id}
             userNames={Object.fromEntries(users.map((u) => [u.id, u.name]))}
             canEdit={canEdit}
             onChanged={() => void onIssueChanged()}
           />
+          ) : null}
 
-          {/* 하위 이슈 — 계층 깊이 제한 없음: 모든 이슈가 자식을 가질 수 있다 */}
-          {issue ? (
+          {/* 하위 이슈 — 계층 깊이 제한 없음: 모든 이슈가 자식을 가질 수 있다.
+              상위 항목 필드를 끄면 계층 UI 전체(브레드크럼·상위 Select·하위 이슈)를 숨긴다 */}
+          {issue && fields.parent.visible ? (
             <section className="issue-relations" data-testid="issue-children">
-              <h4>
-                하위 이슈{" "}
-                {children.length > 0 ? (
-                  <span className="issue-relations-count">
-                    (완료 {doneChildren}/{children.length})
-                  </span>
-                ) : null}
-              </h4>
+              <div className="issue-relations-head">
+                <h4>
+                  하위 이슈{" "}
+                  {children.length > 0 ? (
+                    <span className="issue-relations-count">
+                      (완료 {doneChildren}/{children.length})
+                    </span>
+                  ) : null}
+                </h4>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  aria-expanded={subtaskFormOpen}
+                  iconBefore={<Plus size={14} />}
+                  onClick={() => setSubtaskFormOpen((open) => !open)}
+                >
+                  하위 이슈
+                </Button>
+              </div>
               <ul className="issue-relation-list">
                 {children.map((child) => (
                   <li key={child.id}>
@@ -641,8 +673,17 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   </li>
                 ))}
               </ul>
-              {issue ? (
-                <form className="issue-relation-add" onSubmit={handleSubtaskSubmit}>
+              {subtaskFormOpen ? (
+                <form
+                  className="issue-relation-add"
+                  onSubmit={handleSubtaskSubmit}
+                  // Esc는 모달까지 올라가면 모달이 닫힌다 — 폼만 닫고 멈춘다
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape") return;
+                    event.stopPropagation();
+                    setSubtaskFormOpen(false);
+                  }}
+                >
                   <Select
                     label="하위 타입"
                     value={childType}
@@ -653,10 +694,19 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                     label="하위 이슈 추가"
                     placeholder="하위 작업 제목"
                     value={subtaskDraft}
+                    autoFocus
                     onChange={(e) => setSubtaskDraft(e.target.value)}
                   />
                   <Button type="submit" size="small" disabled={!subtaskDraft.trim()}>
                     추가
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="small"
+                    onClick={() => setSubtaskFormOpen(false)}
+                  >
+                    취소
                   </Button>
                 </form>
               ) : null}
@@ -664,8 +714,20 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           ) : null}
 
           {/* 이슈 링크 — 차단함/차단됨/관련 */}
+          {fields.links.visible ? (
           <section className="issue-relations" data-testid="issue-links">
-            <h4>링크</h4>
+            <div className="issue-relations-head">
+              <h4>링크</h4>
+              <Button
+                variant="ghost"
+                size="small"
+                aria-expanded={linkFormOpen}
+                iconBefore={<Plus size={14} />}
+                onClick={() => setLinkFormOpen((open) => !open)}
+              >
+                링크
+              </Button>
+            </div>
             {linkGroups.map((group) =>
               group.items.length > 0 ? (
                 <div key={group.title} className="issue-link-group">
@@ -699,7 +761,16 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                 </div>
               ) : null,
             )}
-            <div className="issue-link-add">
+            {linkFormOpen ? (
+            <div
+              className="issue-link-add"
+              ref={linkFormRef}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return;
+                event.stopPropagation();
+                setLinkFormOpen(false);
+              }}
+            >
               <Select
                 label="종류"
                 value={linkKind}
@@ -720,16 +791,20 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               <Button size="small" disabled={!linkTargetId} onClick={() => void handleLinkAdd()}>
                 링크 추가
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => setLinkFormOpen(false)}
+              >
+                취소
+              </Button>
             </div>
+            ) : null}
           </section>
+          ) : null}
         </div>
         <aside className="issue-props">
-          <Lozenge
-            appearance={statusAppearance(statuses, issue.status)}
-            data-testid="issue-status-lozenge"
-          >
-            {statusName(statuses, issue.status)}
-          </Lozenge>
           {isBlocked ? (
             <Lozenge appearance="danger" data-testid="issue-blocked-lozenge">
               차단됨
@@ -751,7 +826,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
           />
           {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}
-          {statusKind(statuses, issue.status) === "complete" ? (
+          {fields.resolution.visible && statusKind(statuses, issue.status) === "complete" ? (
             <Select
               label="해결"
               value={issue.resolution ?? "done"}
@@ -761,7 +836,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               }
             />
           ) : null}
-          {issue ? (
+          {issue && fields.parent.visible ? (
             <Select
               label="상위 항목"
               value={issue.parentId ?? NO_PARENT}
@@ -772,6 +847,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               onValueChange={(v) => void handleParentChange(v)}
             />
           ) : null}
+          {fields.assignee.visible ? (
           <Select
             label="담당자"
             value={issue.assigneeId ?? UNASSIGNED}
@@ -783,6 +859,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               void applyPatch({ assigneeId: v === UNASSIGNED ? null : v }, "담당자를 변경했습니다")
             }
           />
+          ) : null}
+          {fields.priority.visible ? (
           <Select
             label="우선순위"
             value={issue.priority}
@@ -791,6 +869,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               void applyPatch({ priority: v as IssuePriority }, "우선순위를 변경했습니다")
             }
           />
+          ) : null}
+          {fields.sprint.visible ? (
           <Select
             label="스프린트"
             value={issue.sprintId ?? BACKLOG}
@@ -805,6 +885,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               void applyPatch({ sprintId: v === BACKLOG ? null : v }, "스프린트를 변경했습니다")
             }
           />
+          ) : null}
+          {fields.fixVersion.visible ? (
           <Select
             label="수정 버전"
             value={issue.fixVersionId ?? NO_VERSION}
@@ -819,6 +901,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               void applyPatch({ fixVersionId: v === NO_VERSION ? null : v }, "수정 버전을 변경했습니다")
             }
           />
+          ) : null}
+          {fields.dueDate.visible ? (
           <TextField
             label="마감일"
             type="date"
@@ -827,7 +911,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               void applyPatch({ dueDate: e.target.value || null }, "마감일을 저장했습니다")
             }
           />
-          {componentOptions.length > 0 ? (
+          ) : null}
+          {fields.components.visible && componentOptions.length > 0 ? (
             <div className="board-settings-checks issue-components-field" role="group" aria-label="컴포넌트">
               {componentOptions.map((c) => {
                 const current = issue.componentIds ?? [];
@@ -848,6 +933,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               })}
             </div>
           ) : null}
+          {fields.labels.visible ? (
           <div className="issue-labels-field">
             <TextField
               label="라벨 추가"
@@ -864,6 +950,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               </div>
             ) : null}
           </div>
+          ) : null}
+          {fields.estimate.visible ? (
           <TextField
             label="예상 시간 (h)"
             type="number"
@@ -874,7 +962,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             onChange={(e) => setEstimateDraft(e.target.value)}
             onBlur={() => void handleEstimateBlur()}
           />
-          {loggedHours > 0 || issue.estimateHours !== null ? (
+          ) : null}
+          {fields.estimate.visible && (loggedHours > 0 || issue.estimateHours !== null) ? (
             <div className="issue-time-tracking" data-testid="issue-time-tracking">
               <span className={overEstimate ? "issue-time-label is-over" : "issue-time-label"}>
                 기록 {loggedHours}h

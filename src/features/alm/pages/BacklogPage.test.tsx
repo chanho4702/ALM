@@ -127,13 +127,34 @@ describe("BacklogPage", () => {
     renderBacklog();
 
     const backlog = await screen.findByRole("region", { name: "백로그 목록" });
+    // 인라인 생성은 접혀 있다 — ghost 버튼으로 필드를 연다 (보드 컬럼과 같은 패턴)
+    await user.click(within(backlog).getByRole("button", { name: "이슈 만들기" }));
     await user.type(within(backlog).getByLabelText("새 이슈 제목"), "성능 개선 조사");
     await user.click(within(backlog).getByRole("button", { name: "만들기" }));
 
     // 시드 카운터가 8이므로 다음 키는 ALM-9, 백로그(sprintId=null)로 생성된다
     expect(await within(backlog).findByText("ALM-9")).toBeInTheDocument();
     expect(within(backlog).getByText("성능 개선 조사")).toBeInTheDocument();
-    expect(within(backlog).getByLabelText("새 이슈 제목")).toHaveValue(""); // 성공 시 입력 초기화
+    // 성공하면 인라인 폼이 닫히고(보드 컬럼과 같은 패턴) 다시 여는 버튼이 남는다
+    expect(within(backlog).queryByLabelText("새 이슈 제목")).not.toBeInTheDocument();
+    expect(within(backlog).getByRole("button", { name: "이슈 만들기" })).toBeInTheDocument();
+  });
+
+  it("인라인 생성은 Esc로 닫히고 입력이 남지 않는다", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+
+    const backlog = await screen.findByRole("region", { name: "백로그 목록" });
+    await user.click(within(backlog).getByRole("button", { name: "이슈 만들기" }));
+    await user.type(within(backlog).getByLabelText("새 이슈 제목"), "잠깐 쓴 제목");
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(within(backlog).queryByLabelText("새 이슈 제목")).not.toBeInTheDocument();
+    });
+    // 다시 열면 이전 초안이 남아 있지 않다
+    await user.click(within(backlog).getByRole("button", { name: "이슈 만들기" }));
+    expect(within(backlog).getByLabelText("새 이슈 제목")).toHaveValue("");
   });
 
   it("스프린트 만들기 → planned 패널이 생기고, 활성 스프린트가 있으면 시작이 거부된다", async () => {

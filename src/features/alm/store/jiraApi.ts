@@ -287,6 +287,8 @@ export interface IssueCreateInput {
   dueDate?: string | null;
   labels?: string[];
   componentIds?: string[];
+  fixVersionId?: string | null;
+  estimateHours?: number | null;
 }
 
 function assertCreateFieldsSupported(_input: IssueCreateInput): void {
@@ -312,9 +314,10 @@ export async function createIssue(input: IssueCreateInput): Promise<Issue> {
           mentionedUserIds: mentionIdsForServer(input.description ?? ""),
           sprintId: input.sprintId == null ? null : toBackendId(input.sprintId),
           dueDate: input.dueDate ?? null,
-          estimateHours: null,
+          estimateHours: input.estimateHours ?? null,
           labels: input.labels ?? [],
           componentIds: (input.componentIds ?? []).map(toBackendId),
+          fixVersionId: input.fixVersionId == null ? null : toBackendId(input.fixVersionId),
         },
       }),
     },
@@ -1887,6 +1890,9 @@ interface PreferenceDto {
   notifications?: Partial<UserPreferences["notifications"]> | null;
   autoWatch?: Partial<UserPreferences["autoWatch"]> | null;
   startPage?: string | null;
+  emailEnabled?: boolean | null;
+  /** 읽기 전용 — 요청에 실어도 서버가 무시한다 */
+  mailConfigured?: boolean | null;
 }
 
 function mapPreferences(dto: PreferenceDto): UserPreferences {
@@ -1896,6 +1902,8 @@ function mapPreferences(dto: PreferenceDto): UserPreferences {
     autoWatch: { ...DEFAULT_PREFERENCES.autoWatch, ...(dto.autoWatch ?? {}) },
     startPage:
       startPage === "projects" || startPage === "last-project" ? startPage : "home",
+    emailEnabled: dto.emailEnabled === true,
+    mailConfigured: dto.mailConfigured === true,
   };
 }
 
@@ -1906,10 +1914,11 @@ export async function getMyPreferences(): Promise<UserPreferences> {
 /** 서버는 전체 문서를 받는다 — 현재 값 위에 패치를 얹어 보낸다 */
 export async function saveMyPreferences(patch: UserPreferencesPatch): Promise<UserPreferences> {
   const current = await getMyPreferences();
-  const next: UserPreferences = {
+  const next: PreferenceDto = {
     notifications: { ...current.notifications, ...patch.notifications },
     autoWatch: { ...current.autoWatch, ...patch.autoWatch },
     startPage: patch.startPage ?? current.startPage,
+    emailEnabled: patch.emailEnabled ?? current.emailEnabled,
   };
   const response = await sharedApiFetch("/api/alm/me/preferences", {
     method: "PUT",

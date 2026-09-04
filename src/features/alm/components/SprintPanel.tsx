@@ -204,24 +204,27 @@ export function SprintPanel({
         {period ? <span className="sprint-panel-period">{period}</span> : null}
         <Badge appearance={sprint.state === "active" ? "brand" : "neutral"}>{issues.length}</Badge>
         <PanelEstimateSummary issues={issues} />
-        <Button
-          variant="subtle"
-          size="small"
-          aria-label={`${sprint.name} 계획 수정`}
-          onClick={() => onEditPlan(sprint)}
-        >
-          계획 수정
-        </Button>
-        {sprint.state === "planned" ? (
-          <Button size="small" onClick={() => onStart(sprint)}>
-            스프린트 시작
+        {/* 액션 둘을 한 그룹으로 — 머리글 메타와 버튼 사이가 벌어지지 않게 (지라 백로그) */}
+        <div className="sprint-panel-actions">
+          <Button
+            variant="subtle"
+            size="small"
+            aria-label={`${sprint.name} 계획 수정`}
+            onClick={() => onEditPlan(sprint)}
+          >
+            계획 수정
           </Button>
-        ) : null}
-        {sprint.state === "active" ? (
-          <Button size="small" variant="subtle" onClick={() => onComplete(sprint)}>
-            스프린트 완료
-          </Button>
-        ) : null}
+          {sprint.state === "planned" ? (
+            <Button size="small" onClick={() => onStart(sprint)}>
+              스프린트 시작
+            </Button>
+          ) : null}
+          {sprint.state === "active" ? (
+            <Button size="small" variant="secondary" onClick={() => onComplete(sprint)}>
+              스프린트 완료
+            </Button>
+          ) : null}
+        </div>
       </header>
       {sprint.goal ? <p className="sprint-panel-goal">{sprint.goal}</p> : null}
       <BacklogDropZone panelId={sprint.id} issueIds={issues.map((i) => i.id)}>

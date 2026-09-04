@@ -63,6 +63,8 @@ describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", ()
       notifications: { assigned: false, statusChanged: true, commented: true, mentioned: true },
       autoWatch: { created: true, commented: true, edited: false },
       startPage: "home",
+      emailEnabled: false,
+      mailConfigured: false,
     });
     const saved = await saveMyPreferences({ startPage: "projects" });
     const body = JSON.parse(spy.mock.calls[2][1]!.body as string);
@@ -70,8 +72,23 @@ describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", ()
       notifications: { assigned: false, statusChanged: true, commented: true, mentioned: true },
       autoWatch: { created: true, commented: true, edited: false },
       startPage: "projects",
+      emailEnabled: false,
     });
     expect(saved.startPage).toBe("projects");
+  });
+
+  it("이메일 수신(V19)은 서버 값을 읽고 패치로 켤 수 있으며 mailConfigured는 보내지 않는다", async () => {
+    const spy = fetchSpy((_path, init) =>
+      init?.method === "PUT"
+        ? response(200, { emailEnabled: true, mailConfigured: true, startPage: "home" })
+        : response(200, { emailEnabled: false, mailConfigured: true }),
+    );
+    expect(await getMyPreferences()).toMatchObject({ emailEnabled: false, mailConfigured: true });
+    const saved = await saveMyPreferences({ emailEnabled: true });
+    const body = JSON.parse(spy.mock.calls[2][1]!.body as string);
+    expect(body.emailEnabled).toBe(true);
+    expect(body.mailConfigured).toBeUndefined();
+    expect(saved).toMatchObject({ emailEnabled: true, mailConfigured: true });
   });
 
   it("배너는 누구나 읽고 관리자 경로로 저장한다", async () => {

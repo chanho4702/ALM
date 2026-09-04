@@ -1,5 +1,6 @@
 import { Button, EmptyState, Modal } from "@chanho/react";
 import type { Notification } from "../store/types";
+import { formatDateTime } from "./time";
 
 export interface NotificationsModalProps {
   notifications: Notification[];
@@ -19,7 +20,6 @@ export function NotificationsModal({
   onMarkAllRead,
 }: NotificationsModalProps) {
   const unread = notifications.filter((n) => !n.read).length;
-  const formatDateTime = (iso: string) => new Date(iso).toLocaleString("ko-KR");
 
   return (
     <Modal

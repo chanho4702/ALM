@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Modal, Select, TextField, useToast } from "@chanho/react";
-import type { IssuePriority, Sprint, User, WorkflowStatus } from "../store/types";
+import type { IssueFieldConfig, IssueFieldId, IssuePriority, Sprint, User, WorkflowStatus } from "../store/types";
 import { bulkUpdateIssues } from "../store/jiraStore";
 import type { BulkIssuePatch } from "../store/jiraStore";
 import { priorityName } from "./labels";
+import { resolveFields } from "./fieldConfig";
 import { usePriorities } from "./usePriorities";
 
 const KEEP = "__keep__"; // "변경 안 함" 센티널 — Select는 빈 문자열 value를 쓰지 않는다
@@ -19,6 +20,8 @@ export interface BulkEditModalProps {
   statuses: WorkflowStatus[];
   users: User[];
   sprints: Sprint[];
+  /** 프로젝트의 필드 구성 — 숨긴 필드는 대량 변경 선택지에서 뺀다. 없으면 전부 보인다 */
+  fields?: Record<IssueFieldId, IssueFieldConfig>;
   onOpenChange: (open: boolean) => void;
   /** 적용이 끝나면(일부 실패 포함) 호출 — 목록 재조회용 */
   onDone: () => void;
@@ -34,10 +37,13 @@ export function BulkEditModal({
   statuses,
   users,
   sprints,
+  fields,
   onOpenChange,
   onDone,
 }: BulkEditModalProps) {
   const toast = useToast();
+  const fieldConfig = fields ?? resolveFields(null);
+  const show = (id: IssueFieldId) => fieldConfig[id].visible;
   const priorities = usePriorities();
   const PRIORITIES = priorities.map((d) => d.id);
   const [status, setStatus] = useState(KEEP);
@@ -120,6 +126,7 @@ export function BulkEditModal({
               ...statuses.map((s) => ({ value: s.id, label: s.name })),
             ]}
           />
+          {show("priority") ? (
           <Select
             label="우선순위"
             value={priority}
@@ -129,6 +136,8 @@ export function BulkEditModal({
               ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
             ]}
           />
+          ) : null}
+          {show("assignee") ? (
           <Select
             label="담당자"
             value={assignee}
@@ -139,6 +148,8 @@ export function BulkEditModal({
               ...users.map((u) => ({ value: u.id, label: u.name })),
             ]}
           />
+          ) : null}
+          {show("sprint") ? (
           <Select
             label="스프린트"
             value={sprint}
@@ -151,6 +162,9 @@ export function BulkEditModal({
                 .map((s) => ({ value: s.id, label: s.name })),
             ]}
           />
+          ) : null}
+          {show("labels") ? (
+          <>
           <TextField
             label="라벨 추가"
             placeholder="콤마로 구분"
@@ -163,6 +177,8 @@ export function BulkEditModal({
             value={removeLabels}
             onChange={(e) => setRemoveLabels(e.target.value)}
           />
+          </>
+          ) : null}
         </div>
         <div className="create-issue-actions">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

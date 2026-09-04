@@ -267,24 +267,29 @@ body {
 .project-header {
   display: flex;
   align-items: center;
-  gap: var(--chanho-space-150);
-  padding: var(--chanho-space-150) var(--chanho-space-400) 0;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-100) var(--chanho-space-400) 0;
 }
 
 .project-header-name {
   margin: 0;
-  font-size: var(--chanho-font-size-400);
+  font-size: var(--chanho-font-size-300);
   font-weight: var(--chanho-font-weight-bold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 헤더 별표 — 꺼졌을 때는 보조 톤, 켜지면 아래 .project-star.is-starred가 노란 별로 */
+.project-header .project-star {
+  color: var(--chanho-color-text-subtle);
+}
+
 /* 가로 뷰 탭 — 밑줄 액티브 (지라의 요약/보드/타임라인 탭) */
 .project-tabs {
   display: flex;
   gap: var(--chanho-space-100);
-  padding: var(--chanho-space-100) var(--chanho-space-400) 0;
+  padding: var(--chanho-space-50) var(--chanho-space-400) 0;
   border-bottom: 1px solid var(--chanho-color-border-default);
   overflow-x: auto;
   overflow-y: hidden; /* auto면 -1px 마진 트릭 때문에 세로 스크롤바가 생긴다 */
@@ -326,7 +331,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--chanho-space-100);
-  padding: var(--chanho-space-200) var(--chanho-space-400) 0;
+  padding: var(--chanho-space-150) var(--chanho-space-400) 0;
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }
@@ -495,6 +500,13 @@ body {
 /* 별표 토글 — 켜지면 경고 톤(노란 별) */
 .project-star.is-starred {
   color: var(--chanho-color-text-warning);
+}
+
+/* 별표 버튼은 열(56px) 안쪽에 온전히 들어가야 한다 — 넘치면 td의 text-overflow가
+   잘린 말줄임(`·`처럼 보이는 점)을 셀 경계에 남긴다 (2026-09-04 손질 §9) */
+.project-star {
+  padding: 0;
+  min-width: 28px;
 }
 
 /* 키 이니셜 아바타 — 스틸 블루 단일 액센트 */
@@ -872,6 +884,12 @@ body {
 
 /* ── 상세 검색 (/search) ────────────────────────────────── */
 
+/* 검색은 결과 표가 주인공 — 이슈 목록처럼 전체 폭을 쓴다(제목 줄바꿈 해소, 2026-09-04) */
+.project-list-content.search-page {
+  width: 100%;
+  max-width: none;
+}
+
 .search-chips {
   display: flex;
   flex-wrap: wrap;
@@ -952,6 +970,30 @@ body {
   border-radius: var(--chanho-radius-medium);
   background: var(--chanho-color-background-surface-raised);
   box-shadow: var(--chanho-shadow-overlay);
+}
+
+/* 단일 선택 모드(multiple=false)의 라디오 항목 — 스토어 필터 계약이 단일 값인 화면용 */
+.filter-dropdown-option {
+  display: block;
+  width: 100%;
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border: 0;
+  border-radius: var(--chanho-radius-small);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.filter-dropdown-option:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.filter-dropdown-option.is-selected {
+  background: var(--chanho-color-background-brand-subtle);
+  color: var(--chanho-color-text-brand);
+  font-weight: var(--chanho-font-weight-medium);
 }
 
 .search-count {
@@ -1316,10 +1358,29 @@ body {
   display: flex;
   align-items: center;
   gap: var(--chanho-space-100);
+  flex-wrap: wrap;
 }
 
 .board-toolbar-spacer {
   flex: 1;
+}
+
+/* 활성 스프린트 남은 일수 — 스프린트 Lozenge 뒤 보조 정보 */
+.board-sprint-days {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 그룹 Select — 라벨을 숨긴 대신 폭을 고정해 툴바 오른쪽 줄맞춤을 잡는다.
+   DS Select 트리거는 min-width:180px가 기본이라 이 툴바에서만 풀어준다. */
+.board-toolbar-title .board-group-select {
+  flex: 0 0 140px;
+  width: 140px;
+}
+
+.board-toolbar-title .board-group-select > button {
+  min-width: 0;
+  width: 100%;
 }
 
 /* 담당자 스윔레인 — 가로 밴드 */
@@ -1348,15 +1409,23 @@ body {
   font-weight: var(--chanho-font-weight-semibold);
 }
 
+/* 라벨을 숨긴 뒤로는 컨트롤 높이가 같아 가운데 정렬이 맞는다 (지라 보드 한 줄 툴바) */
 .board-filter-bar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
-  gap: var(--chanho-space-150);
+  gap: var(--chanho-space-100);
 }
 
-.board-filter-bar > div:first-child {
-  min-width: 220px; /* 검색 TextField */
+.board-filter-bar .board-filter-search {
+  flex: 0 0 220px;
+  width: 220px;
+  min-width: 0;
+}
+
+/* 타입·라벨 Select는 DS 기본 폭(180) 그대로 — 라벨 이름이 잘리지 않게 */
+.board-filter-bar .board-filter-select {
+  flex: 0 0 auto;
 }
 
 /* 담당자 아바타 스택 — 클릭 토글, 선택 시 브랜드 링 */
@@ -1364,7 +1433,6 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding-bottom: 2px;
 }
 
 .board-avatar-toggle {
@@ -1396,7 +1464,7 @@ body {
 .board-columns {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(240px, 1fr);
+  grid-auto-columns: minmax(260px, 1fr);
   gap: var(--chanho-space-200);
   align-items: start;
   overflow-x: auto;
@@ -1406,8 +1474,8 @@ body {
 .board-column {
   display: flex;
   flex-direction: column;
-  gap: var(--chanho-space-150);
-  padding: var(--chanho-space-150);
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-100);
   border: 1px solid transparent;
   border-radius: var(--chanho-radius-large);
   background: var(--chanho-color-background-subtle);
@@ -1477,7 +1545,44 @@ body {
 .board-column-header {
   display: flex;
   align-items: center;
-  gap: var(--chanho-space-100);
+  gap: var(--chanho-space-50);
+  padding: 0 var(--chanho-space-50);
+}
+
+/* 상태 이름 — 지라의 플레인 텍스트 머리글(Lozenge 대체). 이름이 곧 식별자다 */
+.board-column-name {
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+  margin-right: var(--chanho-space-50);
+}
+
+/* 상태 카테고리 색 점 — 색은 거들기만 한다(색만으로 구분하지 않는다) */
+.board-column-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--chanho-radius-full);
+}
+
+.board-column-dot.is-info {
+  background: var(--chanho-color-background-info);
+}
+
+.board-column-dot.is-success {
+  background: var(--chanho-color-background-success);
+}
+
+.board-column-dot.is-danger {
+  background: var(--chanho-color-background-danger);
+}
+
+.board-column-dot.is-warning {
+  background: var(--chanho-color-background-warning);
+}
+
+.board-column-dot.is-neutral {
+  background: var(--chanho-color-text-subtle);
 }
 
 .board-column-cards {
@@ -1490,6 +1595,7 @@ body {
 /* 컬럼 하단 인라인 생성 — 지라의 "+ 만들기" */
 .board-column-add {
   justify-content: flex-start;
+  gap: var(--chanho-space-50);
   color: var(--chanho-color-text-subtle);
 }
 
@@ -1526,6 +1632,34 @@ body {
   display: flex;
   align-items: center;
   gap: var(--chanho-space-100);
+}
+
+/* 카드 우선순위 — Lozenge 대신 색 있는 아이콘(지라). 이름은 aria-label·title이 갖는다 */
+.issue-priority-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.issue-priority-mark.is-info {
+  color: var(--chanho-color-text-info);
+}
+
+.issue-priority-mark.is-success {
+  color: var(--chanho-color-text-success);
+}
+
+.issue-priority-mark.is-danger {
+  color: var(--chanho-color-text-danger);
+}
+
+.issue-priority-mark.is-warning {
+  color: var(--chanho-color-text-warning);
+}
+
+.issue-priority-mark.is-neutral {
+  color: var(--chanho-color-text-subtle);
 }
 
 .issue-card-labels {
@@ -1584,14 +1718,11 @@ body {
 
 /* ── 타임라인 (간트) ────────────────────────────────────── */
 
-/* 툴바 → 간트(또는 대체 목록) → 일정 표를 세로로 쌓는다 */
+/* 툴바 → 간트(또는 대체 목록) → 일정 표를 세로로 쌓는다.
+   차트가 이미 자기 테두리를 가지므로 바깥 카드는 두지 않는다(이중 프레임 방지) */
 .timeline {
   display: flex;
   flex-direction: column;
-  padding: var(--chanho-space-200);
-  border: 1px solid var(--chanho-color-border-default);
-  border-radius: var(--chanho-radius-large);
-  background: var(--chanho-color-background-surface);
 }
 
 
@@ -1654,6 +1785,40 @@ body {
   width: min(1040px, calc(100vw - 32px));
 }
 
+/* 헤더 한 줄 — DS 모달 헤더(제목 + ×) 자리에 상위 경로와 관심 등록을 얹는다.
+   헤더의 h2는 dialog 접근 이름이라 지우지 않고 시각적으로만 감춘다(:has로 헤더 div를 특정). */
+.issue-detail-modal > div:has(> h2) {
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 24px;
+}
+
+.issue-detail-modal > div > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* DS 헤더 줄(닫기 버튼 24px + 아래 여백 space-100)만큼 끌어올려 × 와 같은 줄에 앉힌다 */
+.issue-detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  min-height: 24px;
+  margin-top: calc(-24px - var(--chanho-space-100));
+  margin-right: calc(24px + var(--chanho-space-100));
+}
+
+.issue-detail-header .issue-ancestors {
+  flex: 1;
+  min-width: 0;
+}
+
 .issue-detail-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
@@ -1679,9 +1844,9 @@ body {
   min-width: 0;
 }
 
-/* InlineEdit 보기 모드 텍스트를 제목 크기로 */
+/* InlineEdit 보기 모드 텍스트를 제목 크기로 — 헤더 바로 아래의 이슈 제목 */
 .issue-title-view {
-  font-size: var(--chanho-font-size-200);
+  font-size: var(--chanho-font-size-400);
   font-weight: var(--chanho-font-weight-semibold);
 }
 
@@ -1699,11 +1864,23 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--chanho-space-150);
+  gap: var(--chanho-space-100);
 }
 
 .issue-props > div {
   width: 100%; /* Select 필드(div 래퍼)는 패널 폭에 맞춘다 (Lozenge는 span이라 영향 없음) */
+}
+
+/* 속성 패널 필드 라벨 — 값이 주인공이라 라벨은 작고 흐리게 */
+.issue-props label {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 컴포넌트 체크박스는 라벨이 곧 값이다 — 위 축소에서 되돌린다 */
+.issue-components-field label {
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-default);
 }
 
 .issue-labels-field {
@@ -1745,6 +1922,14 @@ body {
 .issue-relations {
   display: flex;
   flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+/* 섹션 제목 + 오른쪽 접힘 토글(+ 하위 이슈 / + 링크) */
+.issue-relations-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--chanho-space-100);
 }
 
@@ -1825,7 +2010,7 @@ body {
 
 .issue-link-add {
   display: grid;
-  grid-template-columns: 110px 1fr auto;
+  grid-template-columns: 110px 1fr auto auto;
   gap: var(--chanho-space-100);
   align-items: end;
 }
@@ -1941,11 +2126,34 @@ body {
   margin: 0;
   font-size: var(--chanho-font-size-100);
   font-weight: var(--chanho-font-weight-semibold);
-  color: var(--chanho-color-text-subtle);
+  color: var(--chanho-color-text-default);
 }
 
-.sprint-panel-header > button {
+/* 액션 그룹 — 계획 수정·시작/완료를 오른쪽 한 덩어리로 (지라) */
+.sprint-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
   margin-left: auto;
+}
+
+/* 백로그 상단 머리글 — 왼쪽 제목, 오른쪽은 .view-actions의 버튼 */
+.backlog-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--chanho-space-100);
+  margin-right: auto;
+}
+
+.backlog-heading h2 {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.backlog-heading-count {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
 }
 
 /* 계획 기간 — 이름 옆 보조 정보로 읽히도록 subtle */
@@ -2027,7 +2235,7 @@ body {
 .sprint-panel-issues {
   display: flex;
   flex-direction: column;
-  gap: var(--chanho-space-50);
+  gap: 0; /* 행 사이는 간격이 아니라 .backlog-row의 border-top이 가른다 */
   min-height: 40px; /* 빈 패널도 드롭 영역 확보 */
   border: 1px solid transparent;
   border-radius: var(--chanho-radius-medium);
@@ -2051,16 +2259,24 @@ body {
   font-size: var(--chanho-font-size-100);
 }
 
+/* 플랫 리스트 행 — 카드 테두리를 걷어내고 행 사이 실선 하나로 (지라 백로그) */
 .backlog-row {
   display: flex;
   align-items: center;
   gap: var(--chanho-space-100);
-  padding: var(--chanho-space-100) var(--chanho-space-150);
-  border: 1px solid var(--chanho-color-border-default);
-  border-radius: var(--chanho-radius-medium);
-  background: var(--chanho-color-background-surface);
+  min-height: 36px;
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border: 0;
+  border-top: 1px solid var(--chanho-color-border-default);
+  border-radius: 0;
+  background: none;
   cursor: pointer;
   transition: background 120ms ease;
+}
+
+/* 첫 행 위에는 선을 긋지 않는다 — 목록 머리글과 붙어 보이지 않게 */
+.sprint-panel-issues > *:first-child .backlog-row {
+  border-top-color: transparent;
 }
 
 /* role="button" 행 — 키보드 포커스 표시 */
@@ -2091,33 +2307,73 @@ body {
 
 .backlog-create-form {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--chanho-space-100);
+  padding-top: var(--chanho-space-100);
 }
 
 .backlog-create-form > div {
   flex: 1; /* TextField 래퍼가 남은 폭을 채운다 */
 }
 
+/* 인라인 생성 여는 ghost 버튼 — 보드 컬럼의 "+ 이슈 만들기"와 같은 톤 */
+.backlog-create-toggle {
+  align-self: flex-start;
+  justify-content: flex-start;
+  gap: var(--chanho-space-50);
+  color: var(--chanho-color-text-subtle);
+}
+
 /* ── 이슈 목록 ──────────────────────────────────────────── */
 
-/* 고정 그리드 대신 랩 — 검색은 넓게, Select들은 최소 폭 보장 */
+/* 검색 화면과 같은 칩 드롭다운 한 줄 — 라벨 없는 트리거라 가운데 정렬 (2026-09-04 손질 §4) */
 .issue-filter-bar {
   display: flex;
   flex-wrap: wrap;
+  gap: var(--chanho-space-100);
+  align-items: center;
+  margin-bottom: var(--chanho-space-200);
+}
+
+/* 라벨은 .visually-hidden-label로 감춘다(접근성 이름은 유지) — 칩과 높이를 맞추기 위해 */
+.issue-filter-search {
+  width: 280px;
+  min-width: 200px;
+}
+
+/* 표 위 한 줄 툴바 — 모두 선택 · 범위 | CSV · 페이지 이동 */
+.issue-toolbar {
+  display: flex;
+  align-items: center;
   gap: var(--chanho-space-150);
-  align-items: flex-end;
-  margin-bottom: var(--chanho-space-300);
+  margin-bottom: var(--chanho-space-100);
+  padding-inline: var(--chanho-space-50);
 }
 
-.issue-filter-bar > div:first-child {
-  flex: 2 1 240px;
-  min-width: 240px;
+.issue-toolbar-check {
+  display: inline-flex;
+  align-items: center;
 }
 
-.issue-filter-bar > div {
-  flex: 0 1 200px; /* 자라지 않는다 — 줄이 넘어간 마지막 Select가 한 줄을 다 차지하지 않게 */
-  min-width: 180px; /* DS Select 트리거 최소폭과 같아야 셰브런이 이웃과 겹치지 않는다 */
+.issue-toolbar-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--chanho-color-background-brand);
+  cursor: pointer;
+}
+
+.issue-toolbar-range {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin-left: auto;
 }
 
 .issue-key-cell {
@@ -2136,7 +2392,9 @@ body {
 /* ── 홈 (For you) — 지라처럼 가운데 단일 컬럼 ───────────── */
 
 .home-page {
-  max-width: 880px;
+  /* 이어서 하기 4장이 한 줄에 들어가는 폭 — .project-list-content의 min(960px) 를 덮는다 */
+  width: min(1040px, 100%);
+  max-width: 1040px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
@@ -2155,6 +2413,31 @@ body {
   line-height: 1.2;
 }
 
+/* 인사말 아래 오늘 요약 한 줄 — 각 항목은 해당 탭으로 가는 버튼 */
+.home-greeting-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin: var(--chanho-space-100) 0 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.home-greeting-summary button {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.home-greeting-summary button:hover {
+  color: var(--chanho-color-text-brand);
+  text-decoration: underline;
+}
+
 .home-section-title {
   margin: 0 0 var(--chanho-space-100);
   font-size: var(--chanho-font-size-100);
@@ -2165,7 +2448,7 @@ body {
 /* 이어서 하기 — 지라의 "Pick up where you left off" 카드 줄 */
 .home-resume-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--chanho-space-100);
 }
 
@@ -2494,17 +2777,52 @@ body {
 
 /* ── 타임라인(SVAR React Gantt) ─────────────────────────── */
 
+/* 툴바 — 왼쪽 요약, 오른쪽 오늘 버튼 + 일/주/월 세그먼트 */
 .timeline-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--chanho-space-150);
   flex-wrap: wrap;
+  padding-bottom: var(--chanho-space-100);
 }
 
-.timeline-hint {
+.timeline-summary {
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
+}
+
+.timeline-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+/* DS에 세그먼트 컴포넌트가 없어 Button(ghost/secondary) + aria-pressed로 묶는다 */
+.timeline-units {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-25);
+  padding: var(--chanho-space-25);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-subtle);
+}
+
+.timeline-units button {
+  min-width: 36px;
+}
+
+/* 조작 설명은 화면에서 빼고 차트의 aria-describedby로만 남긴다 */
+.timeline-help {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .timeline-legend {
@@ -2519,15 +2837,17 @@ body {
 /* 라이브러리 테마(Willow)의 변수를 우리 토큰으로 덮는다 — 라이트/다크가 토큰과 함께 바뀐다 */
 .timeline-chart {
   height: 520px;
-  border: 1px solid var(--chanho-color-border-default);
-  border-radius: var(--chanho-radius-medium);
+  border-top: 1px solid var(--chanho-color-border-default);
+  /* 간트 내용이 짧아도 패널 바닥까지 같은 면으로 — 다크에서 경계가 드러난다 */
+  background: var(--chanho-color-background-surface);
   overflow: hidden;
 }
 
 /* 테마 래퍼(.wx-willow-theme)가 같은 변수를 자기 스코프에 다시 정의하므로 그 아래에서 덮는다 */
 .timeline-chart .wx-willow-theme {
   --wx-font-family: inherit;
-  --wx-font-size: var(--chanho-font-size-75);
+  --wx-font-size: var(--chanho-font-size-100);
+  --wx-font-size-sm: var(--chanho-font-size-75);
   --wx-color-font: var(--chanho-color-text-default);
   --wx-color-secondary-font: var(--chanho-color-text-subtle);
   --wx-color-primary: var(--chanho-color-background-brand);
@@ -2538,12 +2858,23 @@ body {
   --wx-gantt-border: 1px solid var(--chanho-color-border-default);
   --wx-gantt-border-color: var(--chanho-color-border-default);
   --wx-gantt-task-color: var(--chanho-color-background-brand);
-  --wx-gantt-task-fill-color: var(--chanho-color-background-brand);
+  /* 진행률 채움 — 막대 색을 inverse 쪽으로 섞어 라이트는 더 진하게, 다크는 더 밝게 */
+  --wx-gantt-task-fill-color: color-mix(
+    in srgb,
+    var(--chanho-color-background-brand) 55%,
+    var(--chanho-color-background-inverse)
+  );
   --wx-gantt-task-border-color: var(--chanho-color-border-brand);
   --wx-gantt-task-font-color: var(--chanho-color-text-inverse);
-  --wx-gantt-summary-color: var(--chanho-color-background-warning);
-  --wx-gantt-summary-fill-color: var(--chanho-color-background-warning);
-  --wx-gantt-summary-border-color: var(--chanho-color-background-warning);
+  /* 에픽 요약 막대는 중립 inverse — 자식 막대(brand 계열)와 색이 겹치지 않고,
+     text-inverse와의 대비가 두 테마 모두 확보된다(amber는 라이트에서 2.1:1로 떨어진다) */
+  --wx-gantt-summary-color: var(--chanho-color-background-inverse);
+  --wx-gantt-summary-fill-color: color-mix(
+    in srgb,
+    var(--chanho-color-background-inverse) 82%,
+    var(--chanho-color-background-brand)
+  );
+  --wx-gantt-summary-border-color: var(--chanho-color-background-inverse);
   --wx-gantt-summary-font-color: var(--chanho-color-text-inverse);
   --wx-gantt-link-color: var(--chanho-color-text-subtle);
   --wx-gantt-link-color-hovered: var(--chanho-color-text-link);
@@ -2556,10 +2887,208 @@ body {
   --wx-gantt-holiday-color: var(--chanho-color-text-subtle);
   --wx-gantt-bar-border-radius: var(--chanho-radius-small);
   --wx-gantt-icon-color: var(--chanho-color-text-subtle);
+  /* 왼쪽 패널·차트의 가로줄을 없앤다(지라 타임라인엔 행 구분선이 없다) */
+  --wx-grid-body-row-border: none;
+  --wx-grid-body-cell-border: none;
+  --wx-timescale-border: none;
+  --wx-timescale-font-color: var(--chanho-color-text-subtle);
+  --wx-grid-header-font-color: var(--chanho-color-text-subtle);
+  --wx-grid-header-text-transform: none;
 }
 
 .timeline-chart .wx-gantt {
   height: 100%;
+}
+
+/* 배경 격자는 라이브러리가 캔버스 이미지로 그린다(클래스 없는 div) — 통째로 끄고
+   아래 tl-edge/tl-weekend로 상위 단위 경계와 주말만 다시 그린다 */
+.timeline-chart .wx-gantt .wx-area > div:not([class]) {
+  display: none;
+}
+
+/* highlightTime이 돌려준 클래스는 위치·높이 규칙이 없다(라이브러리 기본 .wx-weekend에만 있다) */
+.timeline-chart .wx-gantt .wx-gantt-holidays > * {
+  position: absolute;
+  height: 100%;
+}
+
+.timeline-chart .wx-gantt .tl-weekend {
+  background: var(--chanho-color-background-neutral);
+}
+
+/* 주/월이 바뀌는 칸에만 옅은 세로선 — border-default를 그대로 쓰면 표처럼 보인다 */
+.timeline-chart .wx-gantt .tl-edge {
+  border-left: 1px solid
+    color-mix(in srgb, var(--chanho-color-border-default) 55%, transparent);
+}
+
+/* 오늘 — 본문은 danger 세로선, 눈금 머리는 danger 알약(둘 다 highlightTime이 붙인 칸) */
+.timeline-chart .wx-gantt .wx-gantt-holidays > .tl-today-cell {
+  border-left: 2px solid var(--chanho-color-background-danger);
+}
+
+/* 주·월 눈금에선 칸이 하루보다 넓다 — 선 대신 옅은 띠로 "오늘이 든 칸"을 표시 */
+.timeline-chart .wx-gantt .wx-gantt-holidays > .tl-today-span {
+  border-left: 0;
+  background: color-mix(
+    in srgb,
+    var(--chanho-color-background-danger-subtle) 32%,
+    transparent
+  );
+}
+
+.timeline-chart .wx-gantt .wx-scale .tl-today-cell {
+  background: var(--chanho-color-background-danger-subtle);
+  color: var(--chanho-color-text-danger);
+  font-weight: var(--chanho-font-weight-bold);
+}
+
+/* 눈금 머리 — 두 줄 모두 작고 옅게, 줄 사이 경계선 없이 */
+.timeline-chart .wx-gantt .wx-scale .wx-row:not(:last-child) {
+  border-bottom: none;
+}
+
+.timeline-chart .wx-gantt .wx-scale .wx-row:first-child .wx-cell {
+  justify-content: flex-start;
+  padding-left: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.timeline-chart .wx-gantt .wx-scale .wx-cell {
+  font-size: var(--chanho-font-size-75);
+}
+
+/* 왼쪽 패널 — 이슈 한 열, 에픽은 굵게, 키는 작고 옅게 */
+.timeline-chart .wx-gantt .wx-grid .wx-header .wx-cell {
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.tl-name {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tl-name-key {
+  flex: none;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.tl-name-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 자식을 가진 상위(에픽) 행 */
+.timeline-chart .wx-gantt .wx-grid .wx-row:has(.wx-toggle-icon) .tl-name-title {
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.timeline-chart .wx-gantt .wx-grid .wx-row:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+/* 막대 — 높이 24(행 40)로 눕히고 라벨은 왼쪽 정렬.
+   라이브러리가 height/lineHeight를 인라인으로 박아 !important가 필요하다.
+   margin-top으로 4px 내려 의존선(막대 중앙 기준)과 시각 중심을 맞춘다. */
+.timeline-chart .wx-gantt .wx-bars .wx-bar {
+  height: 24px !important;
+  margin-top: 4px;
+  line-height: normal;
+  text-align: left;
+  border: 0;
+}
+
+.tl-bar-text {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--chanho-space-100);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--chanho-font-size-75);
+}
+
+/* 막대가 좁으면 라벨을 오른쪽 바깥에 옅게 */
+.tl-bar-text.is-out {
+  position: absolute;
+  top: 0;
+  left: calc(100% + var(--chanho-space-100));
+  padding: 0;
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 상태 색 — 완료는 success, 나머지는 brand. 진행 정도는 채움으로 남는다 */
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almDone,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointDone {
+  background-color: var(--chanho-color-background-success);
+}
+
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almDone .wx-progress-percent {
+  background-color: var(--chanho-color-background-success);
+}
+
+/* 마감일이 없어 하루로 눕는 이슈 — 막대 대신 점 마커 */
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointNew,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointActive,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointDone {
+  background-color: transparent;
+}
+
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointNew .wx-progress-wrapper,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointActive .wx-progress-wrapper,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointDone .wx-progress-wrapper {
+  display: none;
+}
+
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointNew::before,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointActive::before,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointDone::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: var(--chanho-radius-full);
+  background: var(--chanho-color-background-brand);
+}
+
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointNew::before {
+  background: var(--chanho-color-background-surface);
+  box-shadow: inset 0 0 0 2px var(--chanho-color-background-brand);
+}
+
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointDone::before {
+  background: var(--chanho-color-background-success);
+}
+
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointNew .tl-bar-text.is-out,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointActive .tl-bar-text.is-out,
+.timeline-chart .wx-gantt .wx-bars .wx-bar.almPointDone .tl-bar-text.is-out {
+  left: 18px;
+  color: var(--chanho-color-text-default);
+}
+
+/* 의존선 — 얇고 옅게 */
+.timeline-chart .wx-gantt .wx-line > .wx-line-draw {
+  stroke-width: 1.5;
+}
+
+/* 그리드와 차트를 가르는 손잡이 */
+.timeline-chart .wx-gantt .wx-resizer {
+  background-color: var(--chanho-color-border-default);
 }
 
 /* ── 프로젝트 멤버·역할 ─────────────────────────────────── */
@@ -2587,11 +3116,20 @@ body {
 
 /* ── 리포트(번다운·스프린트 리포트) ─────────────────────── */
 
+/* 리포트/스프린트 Select는 라벨을 감췄다 — 메타 문장까지 한 줄에 가운데 정렬 */
 .reports-toolbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--chanho-space-200);
   flex-wrap: wrap;
+}
+
+.reports-toolbar .dash-sprint-meta {
+  margin: 0;
+}
+
+.reports-select {
+  min-width: 160px;
 }
 
 .reports-burndown,
@@ -2656,7 +3194,11 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
   gap: var(--chanho-space-200);
-  align-items: start;
+  align-items: stretch; /* 같은 행 카드 높이를 맞춘다 — 들쭉날쭉한 아랫변 제거 */
+}
+
+.dashboard-grid > * {
+  height: 100%;
 }
 
 .dash-empty {
@@ -2923,7 +3465,8 @@ body {
 }
 
 .issue-table-scroll table {
-  min-width: 1040px;
+  /* 제목을 뺀 고정 열 합(908px)보다 넉넉히 커야 제목이 남는 폭을 먹는다 (2026-09-04 손질 §4) */
+  min-width: 1120px;
 }
 
 .issue-table-scroll td {
@@ -2993,6 +3536,17 @@ th:last-child > [role="separator"] {
 
 .release-row.is-archived {
   opacity: 0.7;
+}
+
+/* 인라인 만들기 폼 — 만들기 옆에 취소가 붙어 한 줄로 (member-add 3열 + 취소) */
+.release-create-form.release-create-form {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+}
+
+@media (max-width: 640px) {
+  .release-create-form.release-create-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .release-row-head {
@@ -3276,12 +3830,11 @@ th:last-child > [role="separator"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* 표 위 툴바 안의 페이지 이동 — 범위 표시는 툴바 왼쪽(.issue-toolbar-range)이 맡는다 */
 .issue-pager {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--chanho-space-100);
-  margin-bottom: var(--chanho-space-100);
+  gap: var(--chanho-space-50);
 }
 
 .issue-pager-range {
@@ -3349,6 +3902,11 @@ th:last-child > [role="separator"] {
   margin: 0 0 var(--chanho-space-150);
   color: var(--chanho-color-text-muted);
   font-size: var(--chanho-font-size-75);
+}
+/* 메일 서버 미구성 안내 — 스위치를 켜도 아무것도 오지 않는 것이 최악이라 먼저 알린다 */
+.settings-help-warning {
+  margin-top: var(--chanho-space-150);
+  color: var(--chanho-color-text-warning);
 }
 .settings-empty {
   margin: 0 0 var(--chanho-space-150);
@@ -3445,12 +4003,14 @@ th:last-child > [role="separator"] {
 }
 .trash-name { font-weight: var(--chanho-font-weight-medium); }
 .trash-at { color: var(--chanho-color-text-subtle); font-size: var(--chanho-font-size-75); }
+/* 자동 영구 삭제 카운트다운 — 되돌릴 수 없는 일이 다가오니 경고 톤 */
+.trash-purge-at { color: var(--chanho-color-text-warning); }
 .trash-actions { margin-left: auto; display: flex; gap: var(--chanho-space-100); }
 .project-list-side-actions { display: flex; align-items: center; gap: var(--chanho-space-150); }
 .issue-danger-actions { display: flex; gap: var(--chanho-space-100); }
 
 /* 대시보드 · 가젯 */
-.dashboard-create { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--chanho-space-150); align-items: end; margin-bottom: var(--chanho-space-200); }
+.dashboard-create { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: var(--chanho-space-150); align-items: end; margin-bottom: var(--chanho-space-200); }
 .dashboard-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--chanho-space-100); }
 .dashboard-list-row { display: flex; align-items: center; gap: var(--chanho-space-150); padding: var(--chanho-space-150); border: 1px solid var(--chanho-color-border-default); border-radius: var(--chanho-radius-medium); background: var(--chanho-color-background-surface); }
 .dashboard-list-name { background: none; border: 0; padding: 0; font: inherit; font-weight: var(--chanho-font-weight-medium); color: var(--chanho-color-text-link); cursor: pointer; }
@@ -3775,4 +4335,103 @@ th:last-child > [role="separator"] {
 
 .pcreate-page {
   width: min(1040px, 100%);
+}
+
+/* ── 공통 유틸 (2026-09-04 손질) ── */
+
+/* 라벨 시각 숨김 — DS TextField/Select에 label 숨김 옵션이 없어 래퍼(또는 Select 루트)에 건다.
+   접근성 이름은 label 요소로 그대로 남는다. */
+.visually-hidden-label label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 이슈 필드 구성 (전역 스킴 카드 · 프로젝트 설정 공용) ── */
+
+.admin-scheme-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  margin-top: var(--chanho-space-150);
+}
+
+.field-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--chanho-font-size-100);
+}
+
+.field-config-table th,
+.field-config-table td {
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+  text-align: left;
+}
+
+.field-config-table thead th {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+/* 스위치 열은 좁게 — 이름 열이 남는 폭을 다 쓴다 */
+.field-config-table thead th:not(:first-child),
+.field-config-table td {
+  width: 5rem;
+}
+
+.field-config-table tbody th {
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-default);
+}
+
+.field-config-table tbody tr:last-child th,
+.field-config-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 읽기 전용(스킴 사용 중)의 상태 글자 — 비활성 Switch는 켜짐/꺼짐이 같아 보인다 */
+.field-config-state {
+  color: var(--chanho-color-text-subtle);
+}
+
+/* "완료 상태에서만 입력" 같은 행 도움말 — 색만으로 알리지 않고 문장으로 말한다 */
+.field-config-hint {
+  display: block;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-regular);
+}
+
+/* ── 만들기 모달: 필드 구성이 만든 상태들 ── */
+
+/* 에디터·체크박스 그룹처럼 DS label이 없는 자리에 다른 필드와 같은 라벨을 세운다 */
+.create-issue-field-label {
+  display: block;
+  margin-bottom: var(--chanho-space-50);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+/* 필수인데 고를 후보가 없는 필드 — 빈 자리를 숨기지 않고 무엇을 해야 하는지 말한다 */
+.create-issue-empty-note {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+/* 만들기 버튼 비활성 사유 — 오른쪽 정렬 액션 줄의 왼쪽 끝에 붙는다 */
+.create-issue-missing {
+  margin-right: auto;
+  align-self: center;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
 }

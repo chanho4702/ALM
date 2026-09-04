@@ -64,6 +64,34 @@
 - **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 프로젝트 템플릿·설정 스킴과 사용자
   디렉터리가 남아 있다.
 
+## UX 정비 2차 (2026-09-04, 전 화면 캡처 감사 → 지라 밀도·헤더 기준)
+
+명세와 근거는 `superpowers/specs/2026-09-04-ui-polish-pass.md`. 요지:
+
+- **시간 표기 통일**: `components/time.ts` — 날짜 `2026-09-04`, 일시 `2026-09-04 14:03`, 상대 `3시간 전`. 모든 화면이 이걸 쓴다.
+- **프로젝트 헤더 축소**: 아바타 md·제목 300·별표는 lucide Star — 콘텐츠가 y≈180→130에서 시작.
+- **보드**: 툴바 한 줄(검색·아바타·타입/라벨 라벨 시각 숨김), 스프린트 남은 일수 + `스프린트 완료`(백로그와 같은 모달),
+  컬럼 헤더는 상태 점 + 플레인 텍스트, 카드 우선순위는 레지스트리 아이콘(aria-label 병행), `+ 이슈 만들기` Plus 아이콘.
+- **백로그**: 제목 행(백로그 · 이슈 n개), 플랫 행(테두리 없음·구분선), 인라인 생성 토글(Enter/Esc).
+- **이슈 목록**: 검색 페이지와 같은 칩 드롭다운 한 줄(`FilterDropdown multiple={false}`), 대량 작업 바는 선택 시에만,
+  표 위 툴바(모두 선택·범위·CSV·이전/다음). ⚠️ DS `TableColumn.header`가 string이라 헤더 체크박스는 DS 갭.
+- **홈**: 오늘 요약 줄(배정·기한 지남·이번 주 마감 → 탭 이동), 이어서 하기 4장, 폭 1040.
+- **이슈 모달**: 헤더 한 줄(경로·키 ··· 관찰·닫기), 하위 이슈/링크 폼 기본 접힘(`+ 하위 이슈`/`+ 링크`), 속성 패널 밀도 축소,
+  상단 상태 Lozenge는 상태 Select로 통합.
+- **요약** 카드 행 높이 stretch, **리포트** 툴바 한 줄, **릴리스·대시보드 목록** 만들기 버튼 → 인라인 폼 토글.
+- **프로젝트 목록** 별표 열의 `·` 잔상 = 셀 폭 부족으로 잘린 말줄임표 → 열 56px.
+- 개인 설정 **이메일로도 받기**(서버 V19, 미구성 안내), 휴지통 **n일 후 영구 삭제**(`purgeAt`).
+- **타임라인 재구성**(사용자 피드백 "개구려"): 지라 타임라인 구조 — 왼쪽 한 열(글리프·키·제목), 격자 제거·주말 밴드·오늘 선,
+  둥근 막대(에픽 `background-inverse`·이슈 brand·완료 success), 마감 없는 이슈는 점 마커, 툴바 `오늘` + 일/주/월 세그먼트.
+  SVAR 함정: `markers`는 이 배포본에서 안 그려져 `highlightTime`으로 대체, 격자는 클래스 없는 div라 `.wx-area > div:not([class])`로 숨김,
+  **`onSelectTask`(PascalCase)여야 발화** — 소문자 `onselecttask`는 타입은 통과하지만 절대 안 불려 막대·행 클릭이 처음부터 안 됐었다(수정).
+- **이슈 필드 구성 스킴**(사용자 요청 "우측 항목 전역·프로젝트별 커스텀"): `SettingsBody.fields`(13종 표시/필수, 서버 f3108b7) →
+  전역 관리 **필드 구성** + 프로젝트 설정 **필드**(커스텀 전환 재사용), 만들기 모달(수정 버전 Select 추가)·상세 속성 패널·대량 변경이 따른다.
+  `parent`·`resolution`은 필수 불가, `attachments`·`links`는 필수여도 생성을 막지 않음, `fields: []`는 기본값 복원. 상세는 `areas/settings-workflow.md` "필드 구성".
+  ⚠️ DS 갭: disabled Switch가 checked여도 회색으로 그려져(specificity) 읽기 전용 표는 텍스트로 대체 — design-system 수정 후보.
+- **DS 0.8.0 / tokens 0.4.0**: 모달 안 Select·Dropdown 옵션이 블랭킷에 가려 마우스로 못 고르던 버그(사용자 발견 "우측이 하나도 수정 안 됨") —
+  z `popover`(550) 층 추가. wiki-front도 함께 올림.
+
 ## UX 정비 (2026-08-30, 실제 화면 감사 기반)
 
 브라우저로 전 화면을 찍어 확인한 결과로 고친 것들. 근거 없는 "예쁘게"는 하지 않았다.
@@ -85,14 +113,14 @@
 
 ## 디자인시스템 버전
 
-`@chanho/react` **0.7.0** · `@chanho/tokens` **0.3.0** (react 0.7.0: Dropdown 설명·그룹 제목·align, Table 열 너비 조절·순서 변경; wiki-front는 0.5.0). 파일 경로 고정은
-`package.json`과 `pnpm-workspace.yaml` overrides **두 곳**에 있다 — 하나만 올리면 무시된다.
+`@chanho/react` **0.8.0** · `@chanho/tokens` **0.4.0** (react 0.8.0/tokens 0.4.0: 모달 안 Select·Dropdown이 블랭킷에 가려 클릭 불가하던 버그 — z `popover` 층 추가; react 0.7.0: Dropdown 설명·그룹 제목·align, Table 열 너비 조절·순서 변경; wiki-front는 0.5.0 — 같은 버그가 있으니 올려야 한다).
+S-03(2026-09-04)부터 GitHub Packages(`npm:@chanho4702/*` 별칭)로 받는다. 버전 고정은 `package.json`과 `pnpm-workspace.yaml` overrides **두 곳**에 있다 — 하나만 올리면 무시된다.
 CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만들므로, 고정 버전이 뒤처지면
 파일이 없어 설치 단계에서 끊긴다(8-20~8-29 실패 원인).
 
 ## 품질 상태
 
-- 테스트 **496 케이스 / 67 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **543 케이스 / 71 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 

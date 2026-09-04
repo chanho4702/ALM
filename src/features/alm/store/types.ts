@@ -22,6 +22,8 @@ export interface Project {
   archivedAt?: string | null;
   /** 휴지통 이동 시각 — 휴지통 목록에서만 값이 있다 */
   deletedAt?: string | null;
+  /** 자동 영구 삭제 예정 시각(deletedAt + 보존 기간, 서버 계산) — 휴지통 목록에서만 값이 있다 */
+  purgeAt?: string | null;
   createdAt: string;
 }
 
@@ -118,11 +120,16 @@ export interface UserPreferences {
   notifications: NotificationPreferences;
   autoWatch: AutoWatchPreferences;
   startPage: StartPage;
+  /** 알림함에 새 알림이 생길 때 같은 내용을 이메일로도 받는다(서버 V19). 메일 서버가 없으면 켜도 발송되지 않는다 */
+  emailEnabled: boolean;
+  /** 서버에 메일 서버(ALM_MAIL_HOST)가 구성돼 있는지 — 읽기 전용, 화면 안내용 */
+  mailConfigured?: boolean;
 }
 export type UserPreferencesPatch = {
   notifications?: Partial<NotificationPreferences>;
   autoWatch?: Partial<AutoWatchPreferences>;
   startPage?: StartPage;
+  emailEnabled?: boolean;
 };
 
 /** 전역 공지 배너 — 관리자가 켜면 모든 화면 상단에 뜬다 */
@@ -340,6 +347,53 @@ export type WorkflowLayout = Record<string, { x: number; y: number }>;
 /** 캔버스의 가상 "모든 상태" 노드 id — 전역 전이(`from: []`)의 출발점 */
 export const WORKFLOW_ANY_NODE = "__any__";
 
+/**
+ * 구성 가능한 이슈 필드 — 프로젝트·타입·요약·상태는 항상 있으므로 목록에 없다.
+ * 순서는 만들기 모달·속성 패널의 표시 순서(지라 순서 고정)와 같다.
+ */
+export const ISSUE_FIELD_IDS = [
+  "description",
+  "assignee",
+  "priority",
+  "labels",
+  "components",
+  "parent",
+  "sprint",
+  "dueDate",
+  "fixVersion",
+  "resolution",
+  "estimate",
+  "attachments",
+  "links",
+] as const;
+
+export type IssueFieldId = (typeof ISSUE_FIELD_IDS)[number];
+
+/** 필드 이름 — 화면 라벨이자 검증 오류 문구(서버와 같은 말)의 원천 */
+export const ISSUE_FIELD_NAMES: Record<IssueFieldId, string> = {
+  description: "설명",
+  assignee: "담당자",
+  priority: "우선순위",
+  labels: "라벨",
+  components: "컴포넌트",
+  parent: "상위 항목",
+  sprint: "스프린트",
+  dueDate: "마감일",
+  fixVersion: "수정 버전",
+  resolution: "해결",
+  estimate: "예상 시간",
+  attachments: "첨부",
+  links: "링크",
+};
+
+export interface IssueFieldConfig {
+  id: IssueFieldId;
+  /** false면 만들기 모달·상세 속성 패널·대량 변경에서 숨긴다 */
+  visible: boolean;
+  /** true면 만들기 모달에서 필수(값 없으면 만들기 불가) — 서버도 생성 시 검사 */
+  required: boolean;
+}
+
 /** 설정 본문 — 스킴과 프로젝트 커스텀이 같은 형태를 공유한다 */
 export interface SettingsBody {
   statuses: WorkflowStatus[];
@@ -356,6 +410,11 @@ export interface SettingsBody {
   enabledPriorities: IssuePriority[];
   /** 우선순위 없이 만든 이슈에 붙는 값 — enabledPriorities 안에 있어야 한다 */
   defaultPriority: IssuePriority;
+  /**
+   * 이슈 필드 구성 — 없거나 비면 13종 전부 `visible:true, required:false`.
+   * 모르는 id는 거부하고, 빠진 id는 읽을 때 기본값으로 채운다(구버전 호환).
+   */
+  fields?: IssueFieldConfig[];
 }
 
 /** 지라식 설정 스킴 — 전역 관리가 정의하고 프로젝트에 배정한다 */

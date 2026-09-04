@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Badge, Button, Lozenge, TextField } from "@chanho/react";
+import { Plus } from "lucide-react";
+import { Badge, Button, TextField } from "@chanho/react";
 import type { LozengeProps } from "@chanho/react";
 import type { Issue, IssueStatus } from "../store/types";
 import { SortableIssueCard } from "./IssueCard";
@@ -67,9 +68,14 @@ export function BoardColumn({
       data-testid={`board-column-${status}`}
     >
       <header className="board-column-header">
-        <Lozenge appearance={appearance ?? STATUS_APPEARANCE[status as IssueStatus] ?? "neutral"}>
-          {label}
-        </Lozenge>
+        {/* 지라식 플레인 텍스트 머리글 — 색은 점으로만 거들고 이름이 진짜 식별자다 */}
+        <span
+          className={`board-column-dot is-${
+            appearance ?? STATUS_APPEARANCE[status as IssueStatus] ?? "neutral"
+          }`}
+          aria-hidden
+        />
+        <span className="board-column-name">{label}</span>
         <Badge appearance={overWip ? "danger" : "neutral"}>
           {wipLimit !== null ? `${issues.length}/${wipLimit}` : issues.length}
         </Badge>
@@ -130,9 +136,10 @@ export function BoardColumn({
             variant="ghost"
             size="small"
             className="board-column-add"
+            iconBefore={<Plus size={14} />}
             onClick={() => setCreating(true)}
           >
-            + 이슈 만들기
+            이슈 만들기
           </Button>
         )
       ) : null}

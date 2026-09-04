@@ -48,6 +48,29 @@ describe("HomePage (For you)", () => {
     expect(within(recommended).getAllByText("마감 임박").length).toBe(2);
   });
 
+  it("이어서 하기는 한 줄(최대 4장) — 프로젝트 2장까지, 나머지는 최근 이슈", async () => {
+    renderHome();
+    await screen.findByRole("heading", { name: /안녕하세요/ });
+
+    const cards = within(screen.getByTestId("resume-cards")).getAllByRole("button");
+    expect(cards).toHaveLength(4);
+  });
+
+  it("오늘 요약 줄의 '나에게 배정'을 누르면 해당 탭이 열린다", async () => {
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("heading", { name: /안녕하세요/ });
+
+    // 시드: 김찬호 담당 2건, 마감 임박(7일 내) 2건, 기한 지남 0건
+    const summary = screen.getByTestId("home-summary");
+    expect(summary).toHaveTextContent("나에게 배정 2");
+    expect(summary).toHaveTextContent("기한 지남 0");
+    expect(summary).toHaveTextContent("이번 주 마감 2");
+
+    await user.click(within(summary).getByRole("button", { name: /나에게 배정/ }));
+    expect(await screen.findByTestId("my-issues")).toBeInTheDocument();
+  });
+
   it("나에게 배정됨 탭: 내 담당 이슈만 보여준다 (시드: 김찬호 = ALM-1, ALM-3)", async () => {
     const user = userEvent.setup();
     renderHome();

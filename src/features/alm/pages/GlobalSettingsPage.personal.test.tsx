@@ -42,6 +42,18 @@ describe("개인 설정 (지라 개인 설정 > 일반·알림)", () => {
     expect((await getMyPreferences()).notifications.commented).toBe(false);
   });
 
+  it("알림 설정의 '이메일로도 받기'를 켜 저장하면 반영되고, 메일 서버 미구성 안내가 보인다", async () => {
+    const user = userEvent.setup();
+    renderAt("/settings/notifications");
+    const email = await screen.findByRole("switch", { name: "이메일로도 받기" });
+    expect(email).not.toBeChecked();
+    expect(await screen.findByRole("status")).toHaveTextContent("메일 서버가 구성되지 않아");
+    await user.click(email);
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("개인 설정을 저장했습니다")).toBeInTheDocument();
+    expect((await getMyPreferences()).emailEnabled).toBe(true);
+  });
+
   it("일반 설정에서 자동 관찰을 저장하면 스토어에 반영된다", async () => {
     const user = userEvent.setup();
     renderAt("/settings/personal");

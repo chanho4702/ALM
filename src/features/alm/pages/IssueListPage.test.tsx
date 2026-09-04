@@ -23,6 +23,21 @@ function renderIssues(initialPath = "/projects/p1/issues") {
   );
 }
 
+/** 칩 드롭다운 필터 바 — 표 헤더의 정렬 버튼과 이름이 겹쳐 범위를 좁힌다 */
+function filterBar() {
+  return within(screen.getByTestId("issue-filter-bar"));
+}
+
+/** 칩 드롭다운을 열고 단일 선택 라디오를 고른다 */
+async function pickFilter(
+  user: ReturnType<typeof userEvent.setup>,
+  filter: string,
+  option: string,
+) {
+  await user.click(filterBar().getByRole("button", { name: filter }));
+  await user.click(await filterBar().findByRole("radio", { name: option }));
+}
+
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
@@ -60,8 +75,7 @@ describe("IssueListPage", () => {
     expect(screen.getByText("ALM-2")).toBeInTheDocument();
 
     // 상태 필터 추가: 할 일 → ALM-4·5·6만 남는다
-    await user.click(screen.getByRole("combobox", { name: "상태" }));
-    await user.click(await screen.findByRole("option", { name: "할 일" }));
+    await pickFilter(user, "상태", "할 일");
     await waitFor(() => {
       expect(screen.queryByText("ALM-2")).not.toBeInTheDocument();
     });
@@ -77,16 +91,14 @@ describe("IssueListPage", () => {
     await screen.findByText("ALM-1");
 
     // 담당자 = 박준영 → ALM-4만
-    await user.click(screen.getByRole("combobox", { name: "담당자" }));
-    await user.click(await screen.findByRole("option", { name: "박준영" }));
+    await pickFilter(user, "담당자", "박준영");
     await waitFor(() => {
       expect(screen.getAllByRole("row")).toHaveLength(2); // 헤더 + ALM-4
     });
     expect(screen.getByText("ALM-4")).toBeInTheDocument();
 
     // 우선순위 = 높음까지 겹치면 결과 없음 (ALM-4는 보통)
-    await user.click(screen.getByRole("combobox", { name: "우선순위" }));
-    await user.click(await screen.findByRole("option", { name: "높음" }));
+    await pickFilter(user, "우선순위", "높음");
     expect(await screen.findByText("조건에 맞는 이슈가 없습니다")).toBeInTheDocument();
   });
 
@@ -124,8 +136,7 @@ describe("IssueListPage 확장 (설명 검색·라벨 필터·날짜 정렬)", (
     renderIssues();
     await screen.findByText("ALM-1");
 
-    await user.click(screen.getByRole("combobox", { name: "라벨" }));
-    await user.click(await screen.findByRole("option", { name: "backend" }));
+    await pickFilter(user, "라벨", "backend");
 
     await waitFor(() => {
       expect(screen.getAllByRole("row")).toHaveLength(2); // 헤더 + ALM-6
@@ -157,8 +168,7 @@ describe("IssueListPage 타입", () => {
     renderIssues();
     await screen.findByText("ALM-1");
 
-    await user.click(screen.getByRole("combobox", { name: "타입" }));
-    await user.click(await screen.findByRole("option", { name: "버그" }));
+    await pickFilter(user, "타입", "버그");
 
     await waitFor(() => {
       expect(screen.getAllByRole("row")).toHaveLength(2); // 헤더 + ALM-8
@@ -230,12 +240,30 @@ describe("IssueListPage CSV", () => {
   });
 });
 
-describe("IssueListPage 페이징", () => {
+describe("IssueListPage 표 위 툴바", () => {
   it("범위와 총 건수를 보여주고, 한 페이지 안이면 다음이 비활성이다", async () => {
     renderIssues();
-    const pager = await screen.findByRole("navigation", { name: "페이지" });
-    expect(pager).toHaveTextContent("1–8 / 8건");
+    const toolbar = await screen.findByRole("toolbar", { name: "이슈 목록 도구" });
+    expect(toolbar).toHaveTextContent("1–8 / 8건");
+    const pager = within(toolbar).getByRole("navigation", { name: "페이지" });
     expect(within(pager).getByRole("button", { name: "다음" })).toBeDisabled();
     expect(within(pager).getByRole("button", { name: "이전" })).toBeDisabled();
+    // CSV 동작도 같은 줄에 있다 (선택 0건이면 대량 작업 바는 숨는다)
+    expect(within(toolbar).getByRole("button", { name: "CSV 내보내기" })).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "대량 작업" })).not.toBeInTheDocument();
+  });
+
+  it("헤더 체크박스로 페이지 전체를 골랐다 풀 수 있다", async () => {
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.click(screen.getByRole("checkbox", { name: "모두 선택" }));
+    expect(await screen.findByRole("toolbar", { name: "대량 작업" })).toHaveTextContent("8개 선택");
+
+    await user.click(screen.getByRole("checkbox", { name: "모두 선택" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("toolbar", { name: "대량 작업" })).not.toBeInTheDocument();
+    });
   });
 });

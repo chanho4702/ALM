@@ -4,14 +4,12 @@ import { Button, EmptyState, useToast } from "@chanho/react";
 import type { Issue } from "../store/types";
 import { listArchivedIssues, restoreIssue } from "../store/jiraStore";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { formatDateTime } from "../components/time";
 
 /**
  * 프로젝트 보관함(지라 "보관된 업무 항목") — 보드·목록·검색에서 빠진 이슈를 보고 복원한다.
  * 보관은 삭제가 아니라 되돌릴 수 있는 정리다.
  */
-/** 보관 시각 — 로컬 표기 */
-const formatDateTime = (iso: string) => new Date(iso).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
-
 export function ArchivePage() {
   const { projectId = "" } = useParams();
   const toast = useToast();

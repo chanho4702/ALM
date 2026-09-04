@@ -15,6 +15,7 @@ import {
   useToast,
 } from "@chanho/react";
 import type {
+  IssueFieldConfig,
   ProjectDefaultAssignee,
   ProjectRole,
   IssueType,
@@ -43,6 +44,8 @@ import {
 import { pruneProject } from "../store/uiStore";
 import { StatusEditor } from "../components/StatusEditor";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
+import { FieldConfigEditor } from "../components/FieldConfigEditor";
+import { normalizeFields, sameFields } from "../components/fieldConfig";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
 import { ProjectShortcutsPanel } from "../components/ProjectShortcutsPanel";
@@ -110,6 +113,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const [statusesDraft, setStatusesDraft] = useState<WorkflowStatus[]>([]);
   const [transitionsDraft, setTransitionsDraft] = useState<WorkflowTransition[]>([]);
   const [layoutDraft, setLayoutDraft] = useState<WorkflowLayout>({});
+  const [fieldsDraft, setFieldsDraft] = useState<IssueFieldConfig[]>(() => normalizeFields(null));
 
   const currentProjectId = project?.id;
 
@@ -127,6 +131,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     setStatusesDraft([...resolvedSettings.body.statuses].sort((a, b) => a.order - b.order));
     setTransitionsDraft(resolvedSettings.body.transitions ?? []);
     setLayoutDraft(resolvedSettings.body.layout ?? {});
+    setFieldsDraft(normalizeFields(resolvedSettings.body));
   }, [currentProjectId]);
 
   useEffect(() => {
@@ -498,6 +503,51 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     </div>
   ) : null;
 
+  const fields = resolved ? (
+    <div className="project-settings">
+      <Card padding="lg" title="필드">
+        {schemeHeader}
+        <p className="admin-scheme-note">
+          끈 필드는 이 프로젝트의 이슈 만들기·상세 속성 패널·대량 변경에서 사라집니다(데이터는
+          남습니다). 첨부·링크는 만든 뒤에 붙는 값이라 필수로 켜도 만들기를 막지 않습니다.
+          커스텀으로 전환하면 필드만이 아니라 워크플로·이슈 타입까지 포함한 설정 본문
+          전체가 이 프로젝트만의 것이 됩니다.
+        </p>
+        {resolved.source === "custom" ? (
+          <form
+            className="project-create-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run("저장 실패", async () => {
+                await updateProjectCustomSettings(project.id, {
+                  ...resolved.body,
+                  fields: fieldsDraft,
+                });
+                toast({ title: "필드 구성을 저장했습니다", appearance: "success" });
+              });
+            }}
+          >
+            <FieldConfigEditor value={fieldsDraft} onChange={setFieldsDraft} />
+            <Button
+              type="submit"
+              size="small"
+              disabled={sameFields(fieldsDraft, normalizeFields(resolved.body))}
+            >
+              저장
+            </Button>
+          </form>
+        ) : (
+          <div data-testid="fields-readonly">
+            <FieldConfigEditor value={normalizeFields(resolved.body)} onChange={() => {}} readOnly />
+            <p className="admin-scheme-note">
+              스킴 자체 편집은 전역 관리(⚙), 이 프로젝트만 바꾸려면 커스텀으로 전환하세요.
+            </p>
+          </div>
+        )}
+      </Card>
+    </div>
+  ) : null;
+
   return (
     <div className="jira-main settings-main">
       <nav aria-label="브레드크럼" className="breadcrumbs">
@@ -526,6 +576,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         {section === "components" ? <ComponentsPanel projectId={project.id} canManage={myRole === "admin"} /> : null}
         {section === "workflow" ? workflow : null}
         {section === "types" ? types : null}
+        {section === "fields" ? fields : null}
         {section === "import" && resolved ? (
           <JiraImportPanel
             projectId={project.id}

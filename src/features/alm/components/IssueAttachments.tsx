@@ -8,6 +8,7 @@ import {
   listAttachments,
   uploadAttachment,
 } from "../store/jiraStore";
+import { formatDate } from "./time";
 
 /** 사람이 읽는 크기 — 1024 단위, 소수 한 자리 */
 export function formatBytes(bytes: number): string {
@@ -129,7 +130,7 @@ export function IssueAttachments({
                 {attachment.filename}
               </span>
               <span className="issue-attachment-meta">
-                {`${formatBytes(attachment.sizeBytes)} · ${userNames[attachment.uploadedBy] ?? "사용자"} · ${new Date(attachment.createdAt).toLocaleDateString("ko-KR")}`}
+                {`${formatBytes(attachment.sizeBytes)} · ${userNames[attachment.uploadedBy] ?? "사용자"} · ${formatDate(attachment.createdAt)}`}
               </span>
               <Button
                 variant="subtle"

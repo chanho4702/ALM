@@ -67,9 +67,11 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
 
   return (
     <div className="board-filter-bar" data-testid="board-filter-bar">
+      {/* 라벨은 접근성을 위해 DOM에 남기고 시각적으로만 숨긴다 (지라 보드 툴바 = 한 줄) */}
       <TextField
         label="보드 검색"
-        placeholder="제목·키 검색"
+        className="visually-hidden-label board-filter-search"
+        placeholder="보드 검색"
         value={quick.text}
         onChange={(e) => onChange({ ...quick, text: e.target.value })}
       />
@@ -111,18 +113,21 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
       </div>
       <Select
         label="타입"
+        className="visually-hidden-label board-filter-select"
         value={quick.type ?? ALL}
         options={[
-          { value: ALL, label: "전체" },
+          // 라벨을 시각적으로 숨겼으므로 기본 선택지가 무슨 필터인지 알려준다
+          { value: ALL, label: "모든 타입" },
           ...issueTypes.map((t) => ({ value: t.id, label: t.name })),
         ]}
         onValueChange={(v) => onChange({ ...quick, type: v === ALL ? null : v })}
       />
       <Select
         label="라벨"
+        className="visually-hidden-label board-filter-select"
         value={quick.label ?? ALL}
         options={[
-          { value: ALL, label: "전체" },
+          { value: ALL, label: "모든 라벨" },
           ...labelOptions.map((l) => ({ value: l, label: l })),
         ]}
         onValueChange={(v) => onChange({ ...quick, label: v === ALL ? null : v })}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { Button, EmptyState, Lozenge, PageHeader, Switch, TextField, useToast } from "@chanho/react";
+import { Plus } from "lucide-react";
 import type { Dashboard, User } from "../store/types";
 import { createDashboard, deleteDashboard, getCurrentUser, listDashboards } from "../store/jiraStore";
 
@@ -13,6 +14,8 @@ export function DashboardsPage() {
   const [me, setMe] = useState<User | null>(null);
   const [name, setName] = useState("");
   const [shared, setShared] = useState(false);
+  // 만들기 폼은 기본 접힘 — 헤더 오른쪽 [대시보드 만들기]로 편다(릴리스와 같은 패턴)
+  const [creating, setCreating] = useState(false);
 
   const reload = useCallback(async () => {
     const [list, user] = await Promise.all([listDashboards(), getCurrentUser()]);
@@ -55,14 +58,37 @@ export function DashboardsPage() {
 
   return (
     <main className="project-list-content">
-      <PageHeader title="대시보드" />
-      <form className="dashboard-create" onSubmit={handleCreate}>
-        <TextField label="새 대시보드 이름" placeholder="예: 팀 현황" value={name} onChange={(e) => setName(e.target.value)} />
-        <Switch label="모두에게 공유" checked={shared} onCheckedChange={setShared} />
-        <Button type="submit" disabled={!name.trim()}>
-          대시보드 만들기
-        </Button>
-      </form>
+      <PageHeader
+        title="대시보드"
+        actions={
+          creating ? null : (
+            <Button size="small" iconBefore={<Plus size={14} />} onClick={() => setCreating(true)}>
+              대시보드 만들기
+            </Button>
+          )
+        }
+      />
+      {creating ? (
+        <form
+          className="dashboard-create"
+          onSubmit={handleCreate}
+          // Esc는 폼만 닫는다
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.stopPropagation();
+            setCreating(false);
+          }}
+        >
+          <TextField label="새 대시보드 이름" placeholder="예: 팀 현황" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
+          <Switch label="모두에게 공유" checked={shared} onCheckedChange={setShared} />
+          <Button type="submit" disabled={!name.trim()}>
+            대시보드 만들기
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setCreating(false)}>
+            취소
+          </Button>
+        </form>
+      ) : null}
       {dashboards && dashboards.length === 0 ? (
         <EmptyState title="아직 대시보드가 없습니다" description="이름을 정하고 만들면 가젯을 배치할 수 있습니다." />
       ) : (

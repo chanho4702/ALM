@@ -199,9 +199,11 @@ export function ReportsPage() {
     );
   }
 
+  // 라벨은 접근성 이름으로 남기고 시각적으로만 감춘다 — 툴바를 한 줄로
   const kindSelect = (
     <Select
       label="리포트"
+      className="visually-hidden-label reports-select"
       value={kind}
       options={REPORT_OPTIONS}
       onValueChange={(next) => setKind(next as ReportKind)}
@@ -270,6 +272,7 @@ export function ReportsPage() {
           {kindSelect}
           <Select
             label="스프린트"
+            className="visually-hidden-label reports-select"
             value={sprint.id}
             options={sprints.map((item) => ({
               value: item.id,

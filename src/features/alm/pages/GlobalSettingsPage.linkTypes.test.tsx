@@ -39,6 +39,8 @@ describe("전역 관리 > 링크 타입 (지라 업무 항목 연결)", () => {
     // 이슈 상세 링크 종류 Select에 새 타입의 두 방향이 뜬다
     renderAt("/projects/p1/issues?issue=ALM-2");
     const dialog = await screen.findByRole("dialog", { name: /ALM-2/ });
+    // 링크 폼은 기본 접힘 — [+ 링크]로 먼저 편다
+    await user.click(await within(dialog).findByRole("button", { name: "링크" }));
     await user.click(within(dialog).getByRole("combobox", { name: "종류" }));
     expect(await screen.findByRole("option", { name: "의존함" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "의존됨" })).toBeInTheDocument();

@@ -10,6 +10,7 @@ export const PROJECT_SETTINGS_SECTIONS = [
   { id: "components", label: "컴포넌트" },
   { id: "workflow", label: "워크플로" },
   { id: "types", label: "이슈 타입" },
+  { id: "fields", label: "필드" },
   { id: "import", label: "가져오기" },
 ] as const;
 
@@ -21,6 +22,7 @@ export const GLOBAL_SETTINGS_SECTIONS = [
   { id: "statuses", label: "상태", group: "이슈 항목" },
   { id: "issue-types", label: "이슈 타입", group: "이슈 항목" },
   { id: "priorities", label: "우선순위", group: "이슈 항목" },
+  { id: "fields", label: "필드 구성", group: "이슈 항목" },
   { id: "link-types", label: "링크 타입", group: "이슈 항목" },
   { id: "types", label: "이슈 타입 스킴", group: "이슈 항목" },
   { id: "workflows", label: "워크플로 스킴", group: "이슈 항목" },

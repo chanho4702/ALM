@@ -16,6 +16,7 @@ import {
   type IssueMiniRow,
 } from "../components/DashboardCards";
 import { useIssueModal } from "../components/useIssueModal";
+import { relTime } from "../components/time";
 import {
   assigneeDistribution,
   dueRows,
@@ -33,16 +34,6 @@ const STAT_TILES: { key: string; label: string; kind: StatusKind | null; tone: s
   { key: "inprogress", label: KIND_LABELS.active, kind: "active", tone: "info" },
   { key: "done", label: KIND_LABELS.complete, kind: "complete", tone: "success" },
 ];
-
-/** 상대 시간 — 요약 목록의 "무엇이 방금 움직였나"용 */
-function relativeTime(iso: string, now = Date.now()): string {
-  const diffMinutes = Math.round((now - Date.parse(iso)) / 60000);
-  if (diffMinutes < 1) return "방금";
-  if (diffMinutes < 60) return `${diffMinutes}분 전`;
-  const hours = Math.round(diffMinutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  return `${Math.round(hours / 24)}일 전`;
-}
 
 function dueLabel(daysLeft: number): string {
   if (daysLeft < 0) return `${-daysLeft}일 지남`;
@@ -240,7 +231,7 @@ export function DashboardPage() {
             <IssueMiniList
               rows={recentlyUpdated(rows).map<IssueMiniRow>((issue) => ({
                 issue,
-                meta: relativeTime(issue.updatedAt),
+                meta: relTime(issue.updatedAt),
               }))}
               statuses={statuses}
               emptyText="최근 변경이 없습니다."

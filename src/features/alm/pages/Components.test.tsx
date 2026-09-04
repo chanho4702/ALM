@@ -55,8 +55,9 @@ describe("컴포넌트 (지라 Components)", () => {
     await createIssue({ projectId: "p1", title: "API 이슈", componentIds: [api.id] });
     renderAt("/projects/p1/issues");
     await screen.findByRole("table");
-    await user.click(await screen.findByRole("combobox", { name: "컴포넌트" }));
-    await user.click(await screen.findByRole("option", { name: "API" }));
+    const filterBar = within(screen.getByTestId("issue-filter-bar"));
+    await user.click(await filterBar.findByRole("button", { name: "컴포넌트" }));
+    await user.click(await filterBar.findByRole("radio", { name: "API" }));
     const table = await screen.findByRole("table");
     expect(await within(table).findByText("API 이슈")).toBeInTheDocument();
     expect(within(table).queryByText("칸반 보드 UI 구현")).not.toBeInTheDocument();

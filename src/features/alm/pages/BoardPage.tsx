@@ -14,6 +14,7 @@ import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Avatar, Button, Dropdown, EmptyState, Lozenge, Select, Spinner, useToast } from "@chanho/react";
 import type { Board, BoardSwimlane, Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
+  completeSprint,
   createIssue,
   getBoard,
   listBoardIssues,
@@ -25,6 +26,9 @@ import {
 } from "../store/jiraStore";
 import { BoardColumn } from "../components/BoardColumn";
 import { BoardSettingsModal } from "../components/BoardSettingsModal";
+import { SprintCompleteModal } from "../components/SprintCompleteModal";
+import { statusKind } from "../components/labels";
+import { remainingDays, todayKey } from "./dashboardMetrics";
 import {
   BoardFilterBar,
   EMPTY_QUICK_FILTER,
@@ -45,7 +49,13 @@ export function BoardPage() {
   const [board, setBoard] = useState<Board | null | undefined>(undefined);
   /** 스크럼 보드의 활성 스프린트 (칸반이면 null) */
   const [sprint, setSprint] = useState<Sprint | null>(null);
+  /** 프로젝트의 모든 스프린트 — 스프린트 완료 시 이관 후보 */
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
+  /** 프로젝트 전체 이슈 — 보드 필터 밖의 이슈까지 세야 하는 스프린트 완료 모달용 */
+  const [projectIssues, setProjectIssues] = useState<Issue[]>([]);
+  /** 완료 확인 중인 스프린트 (null이면 모달 닫힘) */
+  const [completingSprint, setCompletingSprint] = useState<Sprint | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   /** 프로젝트 워크플로 상태 (order순) — 컬럼 구성의 원천 */
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
@@ -68,16 +78,18 @@ export function BoardPage() {
       setBoard(null);
       return;
     }
-    const [boardIssues, sprints, epics, statusList] = await Promise.all([
+    const [boardIssues, sprintList, epics, statusList] = await Promise.all([
       listBoardIssues(found.id),
       found.type === "scrum" ? listSprints(projectId) : Promise.resolve([]),
+      // 에픽만 — 전체 이슈는 스프린트 완료 모달을 열 때만 받는다(리로드는 DnD·인라인 생성마다 돈다)
       listIssues(projectId, { type: "epic" }),
       listProjectStatuses(projectId),
     ]);
     setIssues(boardIssues);
     setStatuses(statusList);
     setEpicsById(Object.fromEntries(epics.map((e) => [e.id, e.title])));
-    setSprint(sprints.find((s) => s.state === "active") ?? null);
+    setSprints(sprintList);
+    setSprint(sprintList.find((s) => s.state === "active") ?? null);
     setBoard((prev) => {
       // 보드가 바뀌었을 때만 그룹핑을 보드 기본값으로 리셋 (화면 전환 유지)
       if (prev?.id !== found.id) setGroupBy(found.swimlane);
@@ -182,6 +194,21 @@ export function BoardPage() {
     await reload();
   };
 
+  /** 스프린트 완료 — 백로그 화면과 같은 스토어 호출·Toast 규약 */
+  const handleCompleteSprint = async (target: Sprint, moveUnfinishedTo: string | null) => {
+    try {
+      await completeSprint(target.id, { moveUnfinishedTo });
+      toast({ title: "스프린트를 완료했습니다", appearance: "success" });
+    } catch (error) {
+      toast({
+        title: "스프린트 완료 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+    await reload();
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveIssue(visibleIssues.find((i) => i.id === event.active.id) ?? null);
   };
@@ -218,6 +245,10 @@ export function BoardPage() {
     // 없는 보드 ID → 기본 보드로 (BoardRedirect가 해석)
     return <Navigate to={`/projects/${projectId}/board`} replace />;
   }
+
+  /** 활성 스프린트 종료까지 남은 일수 — 기간 미설정이면 표시 생략 (요약 화면과 같은 계산) */
+  const sprintDaysLeft =
+    board.type === "scrum" && sprint ? remainingDays(sprint.plannedEnd, todayKey()) : null;
 
   let content: ReactNode;
   if (board.type === "scrum" && !sprint) {
@@ -327,17 +358,37 @@ export function BoardPage() {
               {sprint.name}
             </Lozenge>
           ) : null}
+          {sprintDaysLeft !== null ? (
+            <span className="board-sprint-days">
+              {sprintDaysLeft < 0 ? `${-sprintDaysLeft}일 지남` : `${sprintDaysLeft}일 남음`}
+            </span>
+          ) : null}
           <span className="board-toolbar-spacer" />
           <Select
             label="그룹"
+            className="visually-hidden-label board-group-select"
             value={groupBy}
             options={[
-              { value: "none", label: "없음" },
+              { value: "none", label: "그룹 없음" },
               { value: "assignee", label: "담당자별" },
               { value: "epic", label: "에픽별" },
             ]}
             onValueChange={(v) => setGroupBy(v as BoardSwimlane)}
           />
+          {board.type === "scrum" && sprint ? (
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={() =>
+                void listIssues(projectId!).then((all) => {
+                  setProjectIssues(all); // 미완료 집계는 보드 필터 밖 이슈까지 봐야 한다
+                  setCompletingSprint(sprint);
+                })
+              }
+            >
+              스프린트 완료
+            </Button>
+          ) : null}
           <Dropdown
             trigger={
               <Button variant="ghost" size="small" aria-label="보드 메뉴">
@@ -364,6 +415,26 @@ export function BoardPage() {
         onOpenChange={setSettingsOpen}
         onSaved={reload}
         onDeleted={() => navigate(`/projects/${projectId}/board`)}
+      />
+      {/* 백로그와 같은 완료 흐름 — 미완료 이슈는 보드 필터 밖까지 세야 하므로 프로젝트 전체 이슈 기준 */}
+      <SprintCompleteModal
+        sprint={completingSprint}
+        unfinished={
+          completingSprint
+            ? projectIssues.filter(
+                (issue) =>
+                  issue.sprintId === completingSprint.id &&
+                  statusKind(statuses, issue.status) !== "complete",
+              )
+            : []
+        }
+        targets={sprints.filter((s) => s.id !== completingSprint?.id && s.state !== "done")}
+        statuses={statuses}
+        onClose={() => setCompletingSprint(null)}
+        onConfirm={(target, moveUnfinishedTo) => {
+          setCompletingSprint(null);
+          void handleCompleteSprint(target, moveUnfinishedTo);
+        }}
       />
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
       {issueModal}

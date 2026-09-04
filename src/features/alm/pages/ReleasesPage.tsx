@@ -12,7 +12,7 @@ import {
   TextField,
   useToast,
 } from "@chanho/react";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
 import type { Issue, ProjectVersion, VersionStatus, WorkflowStatus } from "../store/types";
 import {
   archiveVersion,
@@ -52,6 +52,8 @@ export function ReleasesPage() {
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [name, setName] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
+  // 만들기 폼은 기본 접힘 — 상단 [버전 만들기] 버튼으로 편다(백로그 인라인 생성과 같은 패턴)
+  const [creating, setCreating] = useState(false);
   const [releasing, setReleasing] = useState<ProjectVersion | null>(null);
   const toast = useToast();
 
@@ -97,6 +99,7 @@ export function ReleasesPage() {
       await createVersion(projectId, { name, releaseDate: releaseDate || null });
       setName("");
       setReleaseDate("");
+      setCreating(false);
     });
   };
 
@@ -131,25 +134,47 @@ export function ReleasesPage() {
   return (
     <>
       <div className="dashboard">
-        <Card padding="md" title="버전 만들기">
-          <form className="member-add" onSubmit={handleCreate}>
-            <TextField
-              label="버전 이름"
-              placeholder="예: 1.0"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <TextField
-              label="릴리스 예정일"
-              type="date"
-              value={releaseDate}
-              onChange={(e) => setReleaseDate(e.target.value)}
-            />
-            <Button type="submit" disabled={!name.trim()}>
+        {creating ? null : (
+          <div className="view-actions">
+            <Button size="small" iconBefore={<Plus size={14} />} onClick={() => setCreating(true)}>
               버전 만들기
             </Button>
-          </form>
-        </Card>
+          </div>
+        )}
+        {creating ? (
+          <Card padding="md" title="새 버전">
+            <form
+              className="member-add release-create-form"
+              onSubmit={handleCreate}
+              // Esc는 폼만 닫는다
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return;
+                event.stopPropagation();
+                setCreating(false);
+              }}
+            >
+              <TextField
+                label="버전 이름"
+                placeholder="예: 1.0"
+                value={name}
+                autoFocus
+                onChange={(e) => setName(e.target.value)}
+              />
+              <TextField
+                label="릴리스 예정일"
+                type="date"
+                value={releaseDate}
+                onChange={(e) => setReleaseDate(e.target.value)}
+              />
+              <Button type="submit" disabled={!name.trim()}>
+                버전 만들기
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setCreating(false)}>
+                취소
+              </Button>
+            </form>
+          </Card>
+        ) : null}
 
         {ordered.length === 0 ? (
           <EmptyState

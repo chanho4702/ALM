@@ -16,18 +16,7 @@ import {
   statusKind,
   statusName,
 } from "../components/labels";
-
-/** "3시간 전" 식 상대 시간 — 지라 홈의 시간 표기 모방 */
-function relTime(iso: string): string {
-  const diff = Date.now() - Date.parse(iso);
-  const hour = 3_600_000;
-  if (diff < hour) return "방금 전";
-  if (diff < 24 * hour) return `${Math.floor(diff / hour)}시간 전`;
-  const days = Math.floor(diff / (24 * hour));
-  if (days === 1) return "어제";
-  if (days < 7) return `${days}일 전`;
-  return new Date(iso).toLocaleDateString("ko-KR");
-}
+import { relTime } from "../components/time";
 
 /** 최근 업데이트 탭의 날짜 그룹 (지라: Today / Yesterday / …) */
 function dateBucket(iso: string): string {
@@ -60,6 +49,7 @@ export function HomePage() {
   const [statusMeta, setStatusMeta] = useState<Record<string, Record<string, WorkflowStatus>>>({});
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
+  const [tab, setTab] = useState("recommended"); // 오늘 요약 줄에서 탭을 바꿀 수 있게 제어 모드
 
   useEffect(() => {
     let cancelled = false;
@@ -93,18 +83,25 @@ export function HomePage() {
   const kindOf = (issue: Issue): StatusKind =>
     statusKind(Object.values(statusMeta[issue.projectId] ?? {}), issue.status);
 
-  /** 이어서 하기 — 최근 방문 프로젝트(없으면 전체 앞순) + 최근 업데이트 이슈 */
+  /**
+   * 이어서 하기 — 최근 방문 프로젝트(없으면 전체 앞순) + 최근 업데이트 이슈.
+   * 지라처럼 한 줄(최대 4장)로 끊는다: 프로젝트 2장까지, 남는 자리를 이슈로 채운다.
+   */
+  const RESUME_MAX = 4;
   const resumeProjects = useMemo(() => {
     const byRecent = recentIds
       .map((id) => projects.find((p) => p.id === id))
       .filter((p): p is Project => Boolean(p));
     const rest = projects.filter((p) => !recentIds.includes(p.id));
-    return [...byRecent, ...rest].slice(0, 3);
+    return [...byRecent, ...rest].slice(0, 2);
   }, [recentIds, projects]);
 
   const resumeIssues = useMemo(
-    () => [...(issues ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3),
-    [issues],
+    () =>
+      [...(issues ?? [])]
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, Math.max(0, RESUME_MAX - resumeProjects.length)),
+    [issues, resumeProjects.length],
   );
 
   /** 추천 작업 — 기한 지남 > 마감 임박(일주일) > 높은 우선순위 미배정 */
@@ -128,6 +125,21 @@ export function HomePage() {
     const byDue = (a: Recommendation, b: Recommendation) =>
       (a.issue.dueDate ?? "9999").localeCompare(b.issue.dueDate ?? "9999");
     return [...overdue.sort(byDue), ...dueSoon.sort(byDue), ...unassigned].slice(0, 8);
+  }, [issues, statusMeta]);
+
+  /** 오늘 요약 — 기한 지남/이번 주 마감 (추천 작업과 같은 기준: 미완료 + 마감일 기준 7일) */
+  const dueCounts = useMemo(() => {
+    if (!issues) return { overdue: 0, thisWeek: 0 };
+    const today = new Date().toISOString().slice(0, 10);
+    const soon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+    let overdue = 0;
+    let thisWeek = 0;
+    for (const issue of issues) {
+      if (kindOf(issue) === "complete" || !issue.dueDate) continue;
+      if (issue.dueDate < today) overdue += 1;
+      else if (issue.dueDate <= soon) thisWeek += 1;
+    }
+    return { overdue, thisWeek };
   }, [issues, statusMeta]);
 
   const myIssues = useMemo(
@@ -218,6 +230,22 @@ export function HomePage() {
       <header className="home-greeting">
         <p className="home-greeting-date">{todayLabel}</p>
         <h1 className="home-greeting-title">안녕하세요, {me.name}님</h1>
+        {projects.length > 0 ? (
+          // 오늘 요약 — 이미 계산한 값 재사용, 누르면 해당 탭으로 이동한다
+          <p className="home-greeting-summary" data-testid="home-summary">
+            <button type="button" onClick={() => setTab("assigned")}>
+              나에게 배정 {myIssues.length}
+            </button>
+            <span aria-hidden>·</span>
+            <button type="button" onClick={() => setTab("recommended")}>
+              기한 지남 {dueCounts.overdue}
+            </button>
+            <span aria-hidden>·</span>
+            <button type="button" onClick={() => setTab("recommended")}>
+              이번 주 마감 {dueCounts.thisWeek}
+            </button>
+          </p>
+        ) : null}
       </header>
 
       {projects.length === 0 ? (
@@ -269,6 +297,8 @@ export function HomePage() {
           <Tabs
             label="For you"
             className="home-tabs"
+            value={tab}
+            onValueChange={setTab}
             items={[
               {
                 value: "recommended",

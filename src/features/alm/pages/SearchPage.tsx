@@ -45,6 +45,7 @@ import {
   statusName,
 } from "../components/labels";
 import { usePriorities } from "../components/usePriorities";
+import { formatDate } from "../components/time";
 
 const CATEGORY_IDS = new Set(["todo", "inprogress", "done"]);
 
@@ -245,8 +246,7 @@ export function SearchPage() {
       header: "마감일",
       width: "112px",
       align: "right",
-      render: (issue) =>
-        issue.dueDate ? new Date(issue.dueDate).toLocaleDateString("ko-KR") : "—",
+      render: (issue) => (issue.dueDate ? formatDate(issue.dueDate) : "—"),
     },
   ];
 
