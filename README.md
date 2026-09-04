@@ -1,10 +1,23 @@
 # ALM Front
 
+**직접 호스팅하는 지라 대체 이슈 트래커 프론트엔드 — 스크럼·칸반 보드, 스프린트 백로그, 한국어 스마트 검색을 React 19로.**
+
+*A self-hosted Jira alternative: scrum and kanban boards, sprint backlogs, and Korean smart search in React 19.*
+
 [![CI](https://github.com/chanho4702/ALM/actions/workflows/ci.yml/badge.svg)](https://github.com/chanho4702/ALM/actions/workflows/ci.yml)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)
 ![Chanho Design System](https://img.shields.io/badge/Chanho%20DS-0.3.0-1B66C9)
+![Self-hosted](https://img.shields.io/badge/deployment-self--hosted-0b7285)
+
+## 특징
+
+- **다중 보드(스크럼·칸반)** — 프로젝트당 여러 보드를 두고 저장 필터·퀵 필터바·담당자 스윔레인·컬럼 WIP 제한을 지원하며, 카드 이동은 `@dnd-kit` 드래그로 한다.
+- **백로그와 스프린트** — 스프린트를 생성·시작·완료하고, 드래그로 스프린트와 백로그 사이를 옮기거나 패널 내 랭크를 바꾼다.
+- **이슈 계층과 링크** — 에픽에서 하위 작업까지 2단계 계층을 스토어가 규칙 검증하고, 차단함·차단됨·관련 링크로 미완료 차단자를 경고한다.
+- **한국어 스마트 검색** — JQL 대신 `상태:진행중 담당:김찬호 타입:버그` 같은 질의를 쓰고, 진실은 URL `q` 하나라 링크만 보내면 같은 검색이 열린다.
+- **타임라인·대시보드·워크로그** — 간트형 막대로 일정을 보고, 상태별·담당자별 분포를 집계하며, 이슈별 작업 시간을 예상 대비 진행률로 표시한다.
 
 Chanho Design System(`@chanho/react`·`@chanho/tokens`)을 100% 소비하는 독립 프론트 앱.
 **자체 ALM(Application Lifecycle Management) 제품** — 지라에서 영감을 받았지만 그대로 복제하지
