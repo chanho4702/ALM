@@ -1,6 +1,6 @@
-# 디자인 시스템 (@chanho/react 0.3.0 / @chanho/tokens 0.2.0)
+# 디자인 시스템 (@chanho/react 0.7.0 / @chanho/tokens 0.3.0)
 
-로컬 tgz 의존(`file:../design-system/artifacts/...`). Radix 기반. **다른 UI 라이브러리 금지**,
+GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름을 유지한다(S-03, 2026-09-04 — 전엔 `file:../design-system/artifacts/*.tgz`). 새 버전은 design-system에 `v*` 태그를 밀어 발행한 뒤 `package.json`과 `pnpm-workspace.yaml`의 `overrides` **두 곳**의 버전을 함께 올린다. Radix 기반. **다른 UI 라이브러리 금지**,
 커스텀 마크업은 토큰(`--chanho-*`)만.
 
 ## 함정 목록 (전부 실제로 밟았던 것)

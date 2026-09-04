@@ -2,5 +2,10 @@ packages:
   - "."
 allowBuilds:
   esbuild: true
+# 디자인시스템은 방금 발행된 버전을 바로 쓴다 — pnpm의 "최소 배포 경과 시간" 정책 예외
+minimumReleaseAgeExclude:
+  - '@chanho4702/react'
+  - '@chanho4702/tokens'
+# react가 선언한 tokens 의존(별칭)을 우리 것과 하나로 — 두 벌 설치되면 CSS 변수가 갈린다
 overrides:
-  "@chanho/tokens": "file:../design-system/artifacts/chanho-tokens-0.3.0.tgz"
+  "@chanho/tokens": "npm:@chanho4702/tokens@0.3.0"

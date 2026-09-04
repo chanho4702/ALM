@@ -6,48 +6,37 @@ on:
 
 permissions:
   contents: read
+  packages: read   # @chanho4702/* (GitHub Packages) 읽기
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: alm-front
-      - uses: actions/checkout@v4
-        with:
-          repository: chanho4702/design-system
-          token: ${{ secrets.DISPATCH_PAT }}
-          path: design-system   # file:../design-system/... 상대경로를 그대로 만족
       - uses: pnpm/action-setup@v4
         with:
-          version: 11   # wiki/alm package.json에 packageManager 필드 없음 — 명시 필요 (DS는 pnpm@11.10.0)
+          version: 11   # package.json에 packageManager 필드 없음 — 명시 필요
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com   # 러너 홈의 .npmrc에 NODE_AUTH_TOKEN 인증을 써 준다
+          scope: '@chanho4702'
 
-      - name: Build design-system artifacts (tgz)
-        working-directory: design-system
+      # 디자인시스템은 GitHub Packages(@chanho4702/*, 공개 패키지)에서 받는다 — 예전처럼 design-system을
+      # 체크아웃해 tgz를 다시 만들지 않는다(S-03, wiki-front와 같은 방식). 공개 패키지라 GITHUB_TOKEN으로 읽힌다.
+      - name: Test & build
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pnpm install --frozen-lockfile
-          pnpm build:tokens
-          pnpm --filter @chanho/react build
-          mkdir -p artifacts
-          pnpm --filter @chanho/tokens pack --pack-destination "$GITHUB_WORKSPACE/design-system/artifacts"
-          pnpm --filter @chanho/react  pack --pack-destination "$GITHUB_WORKSPACE/design-system/artifacts"
-          ls artifacts   # chanho-react-0.3.0.tgz, chanho-tokens-0.2.0.tgz 확인
-
-      - name: Test & build
-        working-directory: alm-front
-        run: |
-          pnpm install --no-frozen-lockfile   # file: tgz 재생성으로 integrity가 lock과 다를 수 있음
           pnpm test
           pnpm build
 
       - uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: alm-front/dist
+          path: dist
 
       - name: Dispatch deploy
         if: github.ref == 'refs/heads/main'

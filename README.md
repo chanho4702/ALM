@@ -26,7 +26,7 @@ MSA 템플릿의 프론트 3종 중 하나로 게이트웨이(:8000) 뒤, Keyclo
 | 언어 | TypeScript 5.7 (`strict`, `noUnusedLocals/Parameters`) |
 | 라우팅 | react-router 7 (`BrowserRouter basename="/alm"`) |
 | 드래그앤드롭 | `@dnd-kit/core`·`sortable`·`utilities` (칸반 보드) |
-| 디자인 시스템 | `@chanho/react` 0.3.0 + `@chanho/tokens` 0.2.0 (`file:../design-system/artifacts/*.tgz`) |
+| 디자인 시스템 | `@chanho/react` 0.7.0 + `@chanho/tokens` 0.3.0 — GitHub Packages `@chanho4702/*`를 pnpm alias로 `@chanho/*` 이름 그대로 사용(S-03) |
 | 테스트 | Vitest 3 + Testing Library(react·user-event·jest-dom), jsdom |
 | 패키지 매니저 | **pnpm** (`pnpm-lock.yaml`, `pnpm-workspace.yaml`) |
 
@@ -38,7 +38,7 @@ UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이�
 ## 빠른 시작
 
 ```bash
-pnpm install                       # ../design-system/artifacts 의 tarball 필요
+GH_PACKAGES_TOKEN=$(gh auth token) pnpm install   # 최초 1회 ~/.npmrc에 `//npm.pkg.github.com/:_authToken=${GH_PACKAGES_TOKEN}` 추가
 pnpm dev --port 5175 --strictPort  # http://localhost:5175/alm/
 pnpm test                          # vitest run (245 test cases)
 pnpm typecheck                     # tsc --noEmit
