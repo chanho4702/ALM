@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@chanho/react':
-        specifier: npm:@chanho4702/react@0.8.0
-        version: '@chanho4702/react@0.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)'
+        specifier: npm:@chanho4702/react@0.8.1
+        version: '@chanho4702/react@0.8.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)'
       '@chanho/tokens':
         specifier: npm:@chanho4702/tokens@0.4.0
         version: '@chanho4702/tokens@0.4.0'
@@ -201,8 +201,8 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
-  '@chanho4702/react@0.8.0':
-    resolution: {integrity: sha512-AWT7GRM4dgtKKrihqR1hJCm/L9Xw/AkXTatuH5vSJP5fGD6GmpwUYyte6PC9GYqo83x+0xTB+YEpvR/hsR6psw==, tarball: https://npm.pkg.github.com/download/@chanho4702/react/0.8.0/73c474cd4ffa6ab384d428ca722099abcfb16e4a}
+  '@chanho4702/react@0.8.1':
+    resolution: {integrity: sha512-+4AEhAjHO3JrBnikZsz+8slQ0e6is+Pa+1nPG9TCnpiGra6gLYIOEJuDRKqieLrmRoEU3fQ7NGGG8VzEqtpdcw==, tarball: https://npm.pkg.github.com/download/@chanho4702/react/0.8.1/b572ce13913ef20cf3b5bbee3a59f3e583bb999c}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -2708,7 +2708,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@chanho4702/react@0.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@chanho4702/react@0.8.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@chanho/tokens': '@chanho4702/tokens@0.4.0'
       radix-ui: 1.6.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
