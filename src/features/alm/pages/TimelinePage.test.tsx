@@ -64,12 +64,15 @@ describe("TimelinePage", () => {
     expect(screen.getByRole("table", { name: "일정 표" })).toBeInTheDocument();
   });
 
-  it("보기 단위를 바꿀 수 있다", async () => {
-    const user = userEvent.setup();
+  // 보기 단위 전환 자체는 간트가 그려지는 환경에서만 의미가 있다(jsdom은 항상 대체본).
+  // 여기서는 "차트가 없을 때 차트 전용 조작을 감추는지"를 지킨다.
+  it("대체본에서는 오늘·보기 단위 같은 차트 전용 조작을 감춘다", async () => {
     renderTimeline();
 
-    await user.click(await screen.findByRole("radio", { name: "주" }));
-
-    expect(screen.getByRole("radio", { name: "주" })).toBeChecked();
+    await screen.findByTestId("timeline");
+    expect(screen.queryByRole("group", { name: "보기 단위" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "오늘" })).not.toBeInTheDocument();
+    // 요약은 남는다 — 몇 건이 어느 기간에 걸쳐 있는지는 표에서도 유효하다
+    expect(screen.getByText(/이슈 8개/)).toBeInTheDocument();
   });
 });
