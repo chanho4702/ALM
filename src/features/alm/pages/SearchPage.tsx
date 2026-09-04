@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import {
-  Avatar,
   Button,
   Dropdown,
   EmptyState,
@@ -36,16 +35,18 @@ import { EMPTY_QUERY, parseSmartQuery, queryTokens, serializeQuery } from "../st
 import { saveFilter } from "../store/uiStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { PriorityGlyph } from "../components/PriorityGlyph";
+import { StatusGlyph } from "../components/StatusGlyph";
 import { useIssueTypes } from "../components/useIssueTypes";
 import { FilterDropdown } from "../components/FilterDropdown";
 import {
-  priorityAppearance,
   priorityName,
   statusAppearance,
   statusName,
 } from "../components/labels";
 import { usePriorities } from "../components/usePriorities";
 import { formatDate } from "../components/time";
+import { UserAvatar } from "../components/UserAvatar";
 
 const CATEGORY_IDS = new Set(["todo", "inprogress", "done"]);
 
@@ -138,6 +139,8 @@ export function SearchPage() {
   const tokens = useMemo(() => queryTokens(query, ctx), [query, ctx]);
 
   const userNames = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u.name])), [users]);
+  /** 담당자 셀의 프로필 사진 조회용 — 이름만 필요한 자리는 userNames를 계속 쓴다 */
+  const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
   const projectNames = useMemo(
     () => Object.fromEntries(projects.map((p) => [p.id, p.name])),
     [projects],
@@ -211,9 +214,12 @@ export function SearchPage() {
         const ws = statusMeta[issue.projectId]?.[issue.status];
         const statusList = ws ? [ws] : undefined;
         return (
-          <Lozenge appearance={statusAppearance(statusList, issue.status)}>
-            {statusName(statusList, issue.status)}
-          </Lozenge>
+          <span className="status-cell">
+            <StatusGlyph status={issue.status} statuses={statusList} />
+            <Lozenge appearance={statusAppearance(statusList, issue.status)}>
+              {statusName(statusList, issue.status)}
+            </Lozenge>
+          </span>
         );
       },
     },
@@ -222,9 +228,11 @@ export function SearchPage() {
       header: "우선순위",
       width: "104px",
       render: (issue) => (
-        <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
-          {priorityName(priorities, issue.priority)}
-        </Lozenge>
+        <span className="status-cell">
+          {/* 이름은 옆 텍스트가 갖는다 — 아이콘은 색·모양만 거든다 */}
+          <PriorityGlyph defs={priorities} priority={issue.priority} variant="icon" />
+          <span>{priorityName(priorities, issue.priority)}</span>
+        </span>
       ),
     },
     {
@@ -234,7 +242,7 @@ export function SearchPage() {
       render: (issue) =>
         issue.assigneeId ? (
           <span className="issue-assignee-cell">
-            <Avatar name={userNames[issue.assigneeId] ?? ""} size="small" />
+            <UserAvatar user={usersById[issue.assigneeId]} name={userNames[issue.assigneeId] ?? ""} size="small" />
             {userNames[issue.assigneeId]}
           </span>
         ) : (

@@ -1,6 +1,6 @@
 import type { BoardColumn, BoardFilter, BoardType, IssueStatus, IssueType } from "./types";
 
-export type ProjectTemplateId = "blank" | "scrum" | "kanban" | "bugtrack";
+export type ProjectTemplateId = "blank" | "scrum" | "kanban" | "bugtrack" | "demo";
 
 /** 템플릿이 만드는 샘플 이슈 — 삭제해도 무방한 온보딩용 더미 */
 export interface TemplateSampleIssue {
@@ -29,6 +29,11 @@ export interface ProjectTemplate {
   /** true면 Sprint 1(planned) 생성 */
   withSprint: boolean;
   samples: TemplateSampleIssue[];
+  /**
+   * true면 `store/sampleData.ts`의 공용 시더가 데모 데이터를 채운다(목업·REST 공통).
+   * 나머지 템플릿은 board/withSprint/samples만으로 끝난다 — 동작을 바꾸지 않는다.
+   */
+  richSeed?: boolean;
 }
 
 const DEFAULT_COLUMNS: BoardColumn[] = [
@@ -110,6 +115,18 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       { title: "예시: 다크 모드에서 글자가 안 보임", type: "bug", labels: ["bug"] },
       { title: "버그 접수 규칙 문서화", type: "task" },
     ],
+  },
+  {
+    id: "demo",
+    name: "데모 프로젝트 (풍부한 샘플)",
+    description: "스프린트·릴리스·컴포넌트·코멘트·워크로그까지 채워진 데모용.",
+    glyph: "★",
+    preview: ["할 일", "진행 중", "완료"],
+    includes: ["이슈 46개", "스프린트 3개", "릴리스 3개", "컴포넌트 4개", "대시보드 1개"],
+    board: { name: "데모 보드", type: "scrum", columns: DEFAULT_COLUMNS, filter: NO_FILTER },
+    withSprint: false, // 스프린트는 시더가 3개 만든다
+    samples: [], // 이슈도 시더가 만든다
+    richSeed: true,
   },
 ];
 

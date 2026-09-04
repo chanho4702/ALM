@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card, Select, Switch, useToast } from "@chanho/react";
-import type { StartPage, UserPreferences } from "../store/types";
-import { DEFAULT_PREFERENCES, getMyPreferences, saveMyPreferences } from "../store/jiraStore";
+import type { StartPage, User, UserPreferences } from "../store/types";
+import {
+  AVATAR_MAX_BYTES,
+  DEFAULT_PREFERENCES,
+  getCurrentUser,
+  getMyPreferences,
+  removeMyAvatar,
+  saveMyPreferences,
+  uploadMyAvatar, formatAvatarLimit } from "../store/jiraStore";
+import { UserAvatar } from "./UserAvatar";
 
 const START_PAGE_OPTIONS: { value: StartPage; label: string }[] = [
   { value: "home", label: "홈(For you)" },
@@ -25,14 +33,28 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
   const [saved, setSaved] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [me, setMe] = useState<User | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    void getCurrentUser()
+      .then((user) => {
+        if (cancelled) return;
+        setMe(user);
+        setAvatarUrl((current) => current ?? user.avatarUrl ?? null);
+      })
+      .catch(() => {
+        // 프로필 카드만 못 그릴 뿐 나머지 설정은 살아 있어야 한다
+      });
     void getMyPreferences()
       .then((value) => {
         if (cancelled) return;
         setPrefs(value);
         setSaved(value);
+        if (value.avatarUrl) setAvatarUrl(value.avatarUrl);
       })
       .catch((error: unknown) => {
         toast({
@@ -55,6 +77,39 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
     setPrefs((p) => ({ ...p, notifications: { ...p.notifications, [key]: value } }));
   const setAutoWatch = (key: keyof UserPreferences["autoWatch"], value: boolean) =>
     setPrefs((p) => ({ ...p, autoWatch: { ...p.autoWatch, [key]: value } }));
+
+  /** 사진은 "저장" 버튼과 무관하게 즉시 반영한다(지라와 같은 동작) */
+  const runAvatar = async (failTitle: string, action: () => Promise<void>) => {
+    setAvatarBusy(true);
+    try {
+      await action();
+    } catch (error) {
+      toast({
+        title: failTitle,
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const handleAvatarPick = (files: FileList | null) => {
+    const file = files?.[0];
+    if (avatarInput.current) avatarInput.current.value = ""; // 같은 파일 재선택도 발화하게
+    if (!file) return;
+    void runAvatar("사진 올리기 실패", async () => {
+      setAvatarUrl(await uploadMyAvatar(file));
+      toast({ title: "프로필 사진을 변경했습니다", appearance: "success" });
+    });
+  };
+
+  const handleAvatarRemove = () =>
+    void runAvatar("사진 제거 실패", async () => {
+      await removeMyAvatar();
+      setAvatarUrl(null);
+      toast({ title: "프로필 사진을 제거했습니다", appearance: "success" });
+    });
 
   const handleSave = async () => {
     setSaving(true);
@@ -127,6 +182,45 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
       ) : null}
       {part === "general" ? (
         <>
+      <Card padding="lg" title="프로필" role="region" aria-label="프로필">
+        <div className="profile-card">
+          <UserAvatar
+            user={me ? { ...me, avatarUrl } : null}
+            name={me?.name ?? ""}
+            size="large"
+            className="profile-card-avatar"
+          />
+          <div className="profile-card-body">
+            <p className="profile-card-name">{me?.name ?? "사용자"}</p>
+            <p className="settings-help">
+              이슈·코멘트·보드에 보이는 프로필 사진입니다. PNG·JPG·WebP,{" "}
+              {formatAvatarLimit(AVATAR_MAX_BYTES)} 이하.
+            </p>
+            <div className="profile-card-actions">
+              {/* 실제 input은 시각적으로 숨기고 라벨이 버튼 역할 — 첨부 올리기와 같은 패턴 */}
+              <label className="issue-attachments-upload">
+                <input
+                  ref={avatarInput}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  aria-label="사진 올리기"
+                  disabled={avatarBusy}
+                  onChange={(e) => handleAvatarPick(e.target.files)}
+                />
+                <span className="issue-attachments-upload-text">사진 올리기</span>
+              </label>
+              <Button
+                variant="subtle"
+                size="small"
+                disabled={avatarBusy || !avatarUrl}
+                onClick={handleAvatarRemove}
+              >
+                제거
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
       <Card padding="lg" title="자동 관찰">
         <p className="settings-help">
           내가 상호작용한 이슈를 자동으로 관찰(워처 등록)합니다. 관찰 중인 이슈의 변화가 알림으로 옵니다.

@@ -1138,10 +1138,11 @@ body {
   color: var(--chanho-color-text-subtle);
 }
 
+/* 항목 사이는 항목 안(글리프↔Lozenge)보다 넓어야 쌍으로 읽힌다 */
 .admin-scheme-preview {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--chanho-space-50);
+  gap: var(--chanho-space-50) var(--chanho-space-150);
 }
 
 .admin-scheme-actions {
@@ -1173,7 +1174,8 @@ body {
 
 .status-editor-row {
   display: grid;
-  grid-template-columns: 72px 1fr auto;
+  /* 첫 칸은 상태 글리프 + 카테고리 Lozenge 한 쌍 */
+  grid-template-columns: 108px 1fr auto;
   gap: var(--chanho-space-100);
   align-items: center;
 }
@@ -1194,8 +1196,9 @@ body {
   align-items: end;
 }
 
+/* 상태 레지스트리 행 — 글리프+카테고리 · 이름 · 카테고리 · 아이콘 · 사용 수 · 액션 */
 .status-editor-row--registry {
-  grid-template-columns: 72px minmax(0, 1fr) 220px auto auto;
+  grid-template-columns: 108px minmax(0, 1fr) 200px 170px auto auto;
   align-items: end;
 }
 
@@ -1557,34 +1560,6 @@ body {
   margin-right: var(--chanho-space-50);
 }
 
-/* 상태 카테고리 색 점 — 색은 거들기만 한다(색만으로 구분하지 않는다) */
-.board-column-dot {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: var(--chanho-radius-full);
-}
-
-.board-column-dot.is-info {
-  background: var(--chanho-color-background-info);
-}
-
-.board-column-dot.is-success {
-  background: var(--chanho-color-background-success);
-}
-
-.board-column-dot.is-danger {
-  background: var(--chanho-color-background-danger);
-}
-
-.board-column-dot.is-warning {
-  background: var(--chanho-color-background-warning);
-}
-
-.board-column-dot.is-neutral {
-  background: var(--chanho-color-text-subtle);
-}
-
 .board-column-cards {
   display: flex;
   flex-direction: column;
@@ -1701,6 +1676,42 @@ body {
 
 .issue-type-glyph.is-neutral {
   background: var(--chanho-color-text-subtle);
+}
+
+/* 상태 글리프 — 카테고리 색을 아이콘 선 색으로만 쓴다(칠 없음). 이름은 늘 옆에 있고
+   aria-label/title이 "상태: …"를 갖는다 — 색만으로 구분하지 않는다 */
+.status-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-glyph.is-info {
+  color: var(--chanho-color-text-info);
+}
+
+.status-glyph.is-success {
+  color: var(--chanho-color-text-success);
+}
+
+.status-glyph.is-danger {
+  color: var(--chanho-color-text-danger);
+}
+
+.status-glyph.is-warning {
+  color: var(--chanho-color-text-warning);
+}
+
+.status-glyph.is-neutral {
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 상태 셀·행 — 글리프 + Lozenge를 한 줄로 */
+.status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
 }
 
 /* 지연된 마감일 — 완료 전인데 날짜가 지났다 */
@@ -1869,6 +1880,23 @@ body {
 
 .issue-props > div {
   width: 100%; /* Select 필드(div 래퍼)는 패널 폭에 맞춘다 (Lozenge는 span이라 영향 없음) */
+}
+
+/* 상태 필드 — DS Select 옵션은 문자열만 받으므로 글리프를 트리거 왼쪽에 세운다.
+   라벨+트리거 스택의 아래쪽(=트리거)에 맞춘다 */
+.issue-status-field {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--chanho-space-75);
+}
+
+.issue-status-field > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.issue-status-field .status-glyph {
+  padding-bottom: var(--chanho-space-100);
 }
 
 /* 속성 패널 필드 라벨 — 값이 주인공이라 라벨은 작고 흐리게 */
@@ -4434,4 +4462,42 @@ th:last-child > [role="separator"] {
   align-self: center;
   color: var(--chanho-color-text-subtle);
   font-size: var(--chanho-font-size-75);
+}
+
+/* ── 개인 설정 > 프로필 사진 (2026-09-05) ─────────────────── */
+
+.profile-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--chanho-space-300);
+}
+
+/*
+  DS Avatar의 크기는 small/medium/large(24/32/40) 세 단계뿐이라 프로필용 96px이 없다.
+  클래스를 두 번 써 특이도를 올려(0,2,0) 모듈 클래스를 이긴다 — DS에 xl이 생기면 지운다.
+*/
+.profile-card-avatar.profile-card-avatar {
+  width: 96px;
+  height: 96px;
+  font-size: var(--chanho-font-size-500);
+  flex: none;
+}
+
+.profile-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  min-width: 0;
+}
+
+.profile-card-name {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.profile-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
 }

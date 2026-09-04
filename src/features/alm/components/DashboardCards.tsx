@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
-import { Avatar, Lozenge } from "@chanho/react";
-import type { Issue, WorkflowStatus } from "../store/types";
+import { Lozenge } from "@chanho/react";
+import type { Issue, User, WorkflowStatus } from "../store/types";
 import { statusAppearance, statusName } from "./labels";
+import { StatusGlyph } from "./StatusGlyph";
+import { UserAvatar } from "./UserAvatar";
 
 export interface DistributionRow {
   id: string;
@@ -46,16 +48,21 @@ export function DistributionList({
   );
 }
 
-/** 담당자 행 앞 슬롯 — 사람은 아바타, 미지정·기타는 중립 원 */
-export function assigneeLead(row: DistributionRow) {
-  if (row.id === "unassigned" || row.id === "others") {
-    return (
-      <span className="dash-dist-lead-neutral" aria-hidden>
-        {row.id === "unassigned" ? "—" : "+"}
-      </span>
-    );
-  }
-  return <Avatar name={row.name} size="small" />;
+/**
+ * 담당자 행 앞 슬롯 — 사람은 아바타(프로필 사진), 미지정·기타는 중립 원.
+ * `usersById`를 주면 사진을 쓰고, 없으면 이름 이니셜로 떨어진다.
+ */
+export function assigneeLead(usersById: Record<string, User> = {}) {
+  return function AssigneeLead(row: DistributionRow) {
+    if (row.id === "unassigned" || row.id === "others") {
+      return (
+        <span className="dash-dist-lead-neutral" aria-hidden>
+          {row.id === "unassigned" ? "—" : "+"}
+        </span>
+      );
+    }
+    return <UserAvatar user={usersById[row.id]} name={row.name} size="small" />;
+  };
 }
 
 export interface IssueMiniRow {
@@ -90,9 +97,12 @@ export function IssueMiniList({
           <button type="button" className="dash-issue-row" onClick={() => onOpen(issue.key)}>
             <span className="dash-issue-key">{issue.key}</span>
             <span className="dash-issue-title">{issue.title}</span>
-            <Lozenge appearance={statusAppearance(statuses, issue.status)}>
-              {statusName(statuses, issue.status)}
-            </Lozenge>
+            <span className="status-cell">
+              <StatusGlyph status={issue.status} statuses={statuses} />
+              <Lozenge appearance={statusAppearance(statuses, issue.status)}>
+                {statusName(statuses, issue.status)}
+              </Lozenge>
+            </span>
             <span className="dash-issue-meta">{meta}</span>
           </button>
         </li>

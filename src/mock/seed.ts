@@ -2,17 +2,27 @@ import type {
   Activity,
   Board,
   Comment,
+  Component,
   Issue,
   IssueChange,
   ProjectMember,
   JiraData,
   Notification,
   Project,
+  ProjectVersion,
   Sprint,
+  Worklog,
 } from "../features/alm/store/types";
 import { MOCK_USERS } from "./users";
 
-export function createSeedData(): JiraData {
+/**
+ * 목업 시드.
+ *
+ * `rich`는 **개발 서버 첫 방문 화면이 비어 보이지 않게** 두 번째 프로젝트와 이슈를 더 얹는다.
+ * 테스트(vitest)는 항상 `rich: false`로 종전 8건(ALM-1~8)을 그대로 본다 — 시드 개수를 하드코딩한
+ * 단언(`toHaveLength(8)` 등)이 여럿이라 기본 시드를 키우면 우수수 깨진다(docs/areas/testing.md).
+ */
+export function createSeedData(options: { rich?: boolean } = {}): JiraData {
   const now = new Date().toISOString();
 
   const project: Project = {
@@ -198,7 +208,7 @@ export function createSeedData(): JiraData {
     role: index === 0 ? ("admin" as const) : ("editor" as const),
   }));
 
-  return {
+  const data: JiraData = {
     users: [...MOCK_USERS],
     projects: [project],
     sprints: [sprint],
@@ -225,10 +235,11 @@ export function createSeedData(): JiraData {
       { id: "inprogress", name: "진행 중", kind: "active" as const, color: "info" as const, order: 2, builtIn: true },
       { id: "done", name: "완료", kind: "complete" as const, color: "success" as const, order: 3, builtIn: true },
     ],
+    // 아이콘은 lucide 키(typeIcons.tsx) — 빈 문자열이면 카테고리 의미의 기본 아이콘으로 폴백한다
     statusDefs: [
-      { id: "todo", name: "할 일", categoryId: "todo", description: "" },
-      { id: "inprogress", name: "진행 중", categoryId: "inprogress", description: "" },
-      { id: "done", name: "완료", categoryId: "done", description: "" },
+      { id: "todo", name: "할 일", categoryId: "todo", description: "", icon: "circle" },
+      { id: "inprogress", name: "진행 중", categoryId: "inprogress", description: "", icon: "loader-circle" },
+      { id: "done", name: "완료", categoryId: "done", description: "", icon: "circle-check" },
     ],
     // 전역 이슈 타입 레지스트리 — 기본 5종 (계층·아이콘·색)
     issueTypes: [
@@ -263,7 +274,202 @@ export function createSeedData(): JiraData {
     dashboards: [],
     shortcuts: [],
     preferences: {},
+    avatars: {},
     banner: { enabled: false, level: "info", message: "" },
     issueCounters: { p1: 8 },
   };
+
+  if (options.rich) applyRichSeed(data, dayKey, daysAgo);
+  return data;
+}
+
+/**
+ * dev 전용 확장 시드 — ALM-9~17(9건)과 두 번째 프로젝트 "위키 제품"(WIKI-1~8)을 얹어
+ * 총 이슈 25건·프로젝트 2·스프린트 2·버전 1·컴포넌트 3·코멘트 6·워크로그 4를 만든다.
+ * ALM-1~8의 제목·상태·담당자는 손대지 않는다(테스트 계약).
+ */
+function applyRichSeed(
+  data: JiraData,
+  dayKey: (offsetDays: number) => string,
+  daysAgo: (days: number) => string,
+): void {
+  const now = new Date().toISOString();
+
+  // ── 컴포넌트 3 · 버전 1 (ALM 플랫폼) ──
+  const components: Component[] = [
+    { id: "cmp1", projectId: "p1", name: "프론트엔드", description: "웹 화면", leadId: "u1", defaultAssignee: "project", issueCount: 0, createdAt: now },
+    { id: "cmp2", projectId: "p1", name: "백엔드", description: "API·도메인", leadId: "u2", defaultAssignee: "project", issueCount: 0, createdAt: now },
+    { id: "cmp3", projectId: "p1", name: "인프라", description: "배포·모니터링", leadId: "u3", defaultAssignee: "project", issueCount: 0, createdAt: now },
+  ];
+  const version: ProjectVersion = {
+    id: "v1",
+    projectId: "p1",
+    name: "1.0.0",
+    description: "첫 정식 배포",
+    startDate: dayKey(-20),
+    releaseDate: dayKey(14),
+    status: "unreleased",
+    createdAt: now,
+  };
+
+  const almBase = {
+    projectId: "p1",
+    description: "",
+    type: "task" as const,
+    reporterId: "u1",
+    parentId: null as string | null,
+    dueDate: null as string | null,
+    estimateHours: null as number | null,
+    resolution: null as Issue["resolution"],
+    fixVersionId: null as string | null,
+    labels: [] as string[],
+    componentIds: [] as string[],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // ── ALM-9~17 (기존 8건 뒤에 이어 붙인다) ──
+  const almExtra: Issue[] = [
+    { ...almBase, id: "i9", key: "ALM-9", title: "검색 결과 정렬 옵션 추가", status: "done", resolution: "done", priority: "medium", assigneeId: "u2", sprintId: "s1", order: 3, labels: ["frontend"], componentIds: ["cmp1"], type: "story", fixVersionId: "v1", estimateHours: 5 },
+    { ...almBase, id: "i10", key: "ALM-10", title: "알림 배지 카운트가 갱신되지 않습니다", status: "inprogress", priority: "high", assigneeId: "u3", sprintId: "s1", order: 4, labels: ["frontend", "qa"], componentIds: ["cmp1"], type: "bug", dueDate: dayKey(3) },
+    { ...almBase, id: "i11", key: "ALM-11", title: "이슈 일괄 편집 API", status: "inprogress", priority: "high", assigneeId: "u2", sprintId: "s1", order: 5, labels: ["backend"], componentIds: ["cmp2"], type: "story", estimateHours: 8, fixVersionId: "v1" },
+    { ...almBase, id: "i12", key: "ALM-12", title: "첨부 파일 미리보기", status: "todo", priority: "medium", assigneeId: "u4", sprintId: "s1", order: 6, labels: ["frontend"], componentIds: ["cmp1"], estimateHours: 3 },
+    { ...almBase, id: "i13", key: "ALM-13", title: "감사 로그 보존 기간 설정", status: "todo", priority: "low", assigneeId: null, sprintId: null, order: 4, labels: ["backend", "security"], componentIds: ["cmp2"] },
+    { ...almBase, id: "i14", key: "ALM-14", title: "배포 파이프라인 캐시 정리", status: "todo", priority: "low", assigneeId: "u3", sprintId: null, order: 5, labels: ["infra"], componentIds: ["cmp3"] },
+    { ...almBase, id: "i15", key: "ALM-15", title: "이슈 상세 단축키 안내", status: "todo", priority: "lowest", assigneeId: null, sprintId: null, order: 6, labels: ["docs"], componentIds: ["cmp1"] },
+    { ...almBase, id: "i16", key: "ALM-16", title: "대량 이슈 목록 가상 스크롤", status: "todo", priority: "high", assigneeId: "u1", sprintId: null, order: 7, labels: ["performance"], componentIds: ["cmp1"], type: "story", estimateHours: 13, dueDate: dayKey(28) },
+    { ...almBase, id: "i17", key: "ALM-17", title: "워크플로 전이 규칙 문서화", status: "todo", priority: "medium", assigneeId: "u4", sprintId: null, order: 8, labels: ["docs"], componentIds: ["cmp2"] },
+  ];
+
+  // ── 두 번째 프로젝트: 위키 제품 ──
+  const wiki: Project = {
+    id: "p2",
+    key: "WIKI",
+    name: "위키 제품",
+    description: "문서 협업 도구 — 스페이스·페이지·권한",
+    category: "제품",
+    leadId: "u2",
+    defaultAssignee: "unassigned",
+    icon: "",
+    color: "",
+    url: "",
+    archivedAt: null,
+    deletedAt: null,
+    createdAt: now,
+  };
+  const wikiSprintStartedAt = daysAgo(3);
+  const wikiSprint: Sprint = {
+    id: "s2",
+    projectId: "p2",
+    name: "Sprint 1",
+    state: "active",
+    goal: "페이지 편집과 권한을 붙인다",
+    plannedStart: dayKey(-3),
+    plannedEnd: dayKey(11),
+    startedAt: wikiSprintStartedAt,
+  };
+  const wikiBase = { ...almBase, projectId: "p2", reporterId: "u2", componentIds: [] as string[] };
+  const wikiIssues: Issue[] = [
+    { ...wikiBase, id: "i18", key: "WIKI-1", title: "스페이스 생성 화면", status: "done", resolution: "done", priority: "high", assigneeId: "u2", sprintId: "s2", order: 1, labels: ["frontend"], type: "story" },
+    { ...wikiBase, id: "i19", key: "WIKI-2", title: "페이지 트리 지연 로딩", status: "inprogress", priority: "high", assigneeId: "u1", sprintId: "s2", order: 2, labels: ["performance"], type: "story", estimateHours: 8 },
+    { ...wikiBase, id: "i20", key: "WIKI-3", title: "인라인 코멘트 앵커 복원", status: "inprogress", priority: "medium", assigneeId: "u3", sprintId: "s2", order: 3, labels: ["frontend"], dueDate: dayKey(5) },
+    { ...wikiBase, id: "i21", key: "WIKI-4", title: "휴지통에서 페이지 복원", status: "todo", priority: "medium", assigneeId: "u4", sprintId: "s2", order: 4, labels: ["backend"] },
+    { ...wikiBase, id: "i22", key: "WIKI-5", title: "라벨 자동완성이 느립니다", status: "todo", priority: "high", assigneeId: null, sprintId: "s2", order: 5, labels: ["qa"], type: "bug" },
+    { ...wikiBase, id: "i23", key: "WIKI-6", title: "스페이스 권한 상속 정리", status: "todo", priority: "highest", assigneeId: "u2", sprintId: null, order: 6, labels: ["security"], type: "story", estimateHours: 13 },
+    { ...wikiBase, id: "i24", key: "WIKI-7", title: "PDF 내보내기 여백 조정", status: "todo", priority: "low", assigneeId: null, sprintId: null, order: 7, labels: ["docs"] },
+    { ...wikiBase, id: "i25", key: "WIKI-8", title: "첨부 이미지 썸네일 생성", status: "todo", priority: "lowest", assigneeId: "u3", sprintId: null, order: 8, labels: ["infra"] },
+  ];
+
+  const wikiBoard: Board = {
+    id: "b3",
+    projectId: "p2",
+    name: "메인 보드",
+    type: "scrum",
+    filter: { assigneeIds: [], types: [], labels: [] },
+    columns: [
+      { status: "todo", name: "할 일", wipLimit: null },
+      { status: "inprogress", name: "진행 중", wipLimit: null },
+      { status: "done", name: "완료", wipLimit: null },
+    ],
+    swimlane: "none",
+    isDefault: true,
+    createdAt: now,
+  };
+
+  const newIssues = [...almExtra, ...wikiIssues];
+  const activities: Activity[] = newIssues.map((issue) => ({
+    id: `a-rich-${issue.id}`,
+    issueId: issue.id,
+    actorId: issue.reporterId,
+    type: "created",
+    detail: "이슈 생성",
+    at: now,
+  }));
+
+  // 번다운이 그릴 계단 — 스프린트 편입은 시작 시각과 같은 순간이어야 한다
+  const changes: IssueChange[] = [];
+  for (const issue of newIssues) {
+    const startedAt = issue.projectId === "p2" ? wikiSprintStartedAt : daysAgo(5);
+    changes.push({
+      id: `ch-rich-${issue.id}-s`,
+      issueId: issue.id,
+      projectId: issue.projectId,
+      sprintId: issue.sprintId,
+      field: "status",
+      fromValue: null,
+      toValue: issue.sprintId ? "todo" : issue.status,
+      actorId: issue.reporterId,
+      at: startedAt,
+    });
+    if (issue.sprintId) {
+      changes.push({
+        id: `ch-rich-${issue.id}-p`,
+        issueId: issue.id,
+        projectId: issue.projectId,
+        sprintId: issue.sprintId,
+        field: "sprint",
+        fromValue: null,
+        toValue: issue.sprintId,
+        actorId: issue.reporterId,
+        at: startedAt,
+      });
+    }
+  }
+  changes.push(
+    { id: "ch-rich-i9-done", issueId: "i9", projectId: "p1", sprintId: "s1", field: "status", fromValue: "todo", toValue: "done", actorId: "u2", at: daysAgo(2) },
+    { id: "ch-rich-i18-done", issueId: "i18", projectId: "p2", sprintId: "s2", field: "status", fromValue: "todo", toValue: "done", actorId: "u2", at: daysAgo(1) },
+  );
+
+  const comments: Comment[] = [
+    { id: "c4", issueId: "i11", authorId: "u2", body: "<p>일괄 편집은 실패 건을 따로 돌려주는 계약으로 갑니다.</p>", createdAt: now },
+    { id: "c5", issueId: "i19", authorId: "u1", body: "<p>트리는 자식 개수만 먼저 받고 펼칠 때 조회합니다.</p>", createdAt: now },
+    { id: "c6", issueId: "i22", authorId: "u3", body: "<p>라벨 500개 넘는 스페이스에서 재현됩니다. 서버 검색으로 바꿔야 합니다.</p>", createdAt: now },
+  ];
+
+  const worklogs: Worklog[] = [
+    { id: "w3", issueId: "i11", authorId: "u2", hours: 4, comment: "일괄 편집 API 구현", workedOn: dayKey(-2), at: now },
+    { id: "w4", issueId: "i19", authorId: "u1", hours: 3, comment: "트리 지연 로딩", workedOn: dayKey(-1), at: now },
+  ];
+
+  const members: ProjectMember[] = MOCK_USERS.map((user, index) => ({
+    projectId: "p2",
+    userId: user.id,
+    role: index === 0 ? ("admin" as const) : ("editor" as const),
+  }));
+
+  data.projects.push(wiki);
+  data.sprints.push(wikiSprint);
+  data.issues.push(...newIssues);
+  data.boards.push(wikiBoard);
+  data.components.push(...components);
+  data.versions.push(version);
+  data.activities.push(...activities);
+  data.changes.push(...changes);
+  data.comments.push(...comments);
+  data.worklogs.push(...worklogs);
+  data.members.push(...members);
+  data.projectSettings.push({ projectId: "p2", schemeId: "scheme-default", custom: null });
+  data.links.push({ id: "l2", sourceId: "i11", targetId: "i9", type: "relates" });
+  data.issueCounters.p1 = 17;
+  data.issueCounters.p2 = 8;
 }

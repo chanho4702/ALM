@@ -3,9 +3,10 @@ import { MoreHorizontal } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Avatar, Badge, Button, Dropdown, Lozenge } from "@chanho/react";
-import type { Issue, Sprint, WorkflowStatus } from "../store/types";
+import { Badge, Button, Dropdown, Lozenge } from "@chanho/react";
+import type { Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { StatusGlyph } from "./StatusGlyph";
 import {
   priorityAppearance,
   priorityName,
@@ -15,6 +16,7 @@ import {
   statusName,
 } from "./labels";
 import { usePriorities } from "./usePriorities";
+import { UserAvatar } from "./UserAvatar";
 
 /** 이슈를 옮길 수 있는 대상. sprintId null = 백로그 */
 export interface MoveTarget {
@@ -24,8 +26,8 @@ export interface MoveTarget {
 
 export interface BacklogIssueRowProps {
   issue: Issue;
-  /** 담당자 이름. 미지정이면 undefined → Avatar 생략 */
-  assigneeName?: string;
+  /** 담당자. 미지정이면 undefined → 아바타 생략 */
+  assignee?: User;
   /** 프로젝트의 해석된 워크플로 상태 (이름/색 표시용) */
   statuses?: WorkflowStatus[];
   moveTargets: MoveTarget[];
@@ -37,7 +39,7 @@ export interface BacklogIssueRowProps {
 /** 백로그/스프린트 패널 공용 이슈 행. 행 클릭 = 상세 모달, 우측 ⋯ = Dropdown 액션 */
 export function BacklogIssueRow({
   issue,
-  assigneeName,
+  assignee,
   statuses,
   moveTargets,
   onMove,
@@ -62,13 +64,16 @@ export function BacklogIssueRow({
       <IssueTypeGlyph type={issue.type} />
       <span className="backlog-row-key">{issue.key}</span>
       <span className="backlog-row-title">{issue.title}</span>
-      <Lozenge appearance={statusAppearance(statuses, issue.status)}>
-        {statusName(statuses, issue.status)}
-      </Lozenge>
+      <span className="status-cell">
+        <StatusGlyph status={issue.status} statuses={statuses} />
+        <Lozenge appearance={statusAppearance(statuses, issue.status)}>
+          {statusName(statuses, issue.status)}
+        </Lozenge>
+      </span>
       <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
         {priorityName(priorities, issue.priority)}
       </Lozenge>
-      {assigneeName ? <Avatar name={assigneeName} size="small" /> : null}
+      {assignee ? <UserAvatar user={assignee} size="small" /> : null}
       {/*
         Dropdown 전체를 stopPropagation 래퍼로 감싼다.
         React Portal은 실제 DOM 위치와 무관하게 "렌더 트리(fiber)" 기준으로 합성 이벤트가 버블링된다
@@ -168,8 +173,8 @@ export interface SprintPanelProps {
   sprint: Sprint;
   /** 이 스프린트의 이슈 (order 오름차순) */
   issues: Issue[];
-  /** userId → 이름 (Avatar용) */
-  userNames: Record<string, string>;
+  /** userId → 사용자 (아바타·프로필 사진용) */
+  usersById: Record<string, User>;
   /** 프로젝트의 해석된 워크플로 상태 */
   statuses?: WorkflowStatus[];
   moveTargets: MoveTarget[];
@@ -186,7 +191,7 @@ export interface SprintPanelProps {
 export function SprintPanel({
   sprint,
   issues,
-  userNames,
+  usersById,
   statuses,
   moveTargets,
   onStart,
@@ -232,7 +237,7 @@ export function SprintPanel({
           <SortableBacklogRow
             key={issue.id}
             issue={issue}
-            assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
+            assignee={issue.assigneeId ? usersById[issue.assigneeId] : undefined}
             statuses={statuses}
             moveTargets={moveTargets}
             onMove={onMove}

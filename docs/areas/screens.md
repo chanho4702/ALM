@@ -12,7 +12,7 @@
 | `/search` | SearchPage | 이슈 검색: 기본(필터 드롭다운)/스마트 2모드 → search.md |
 | `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `categories`(상태 카테고리)·`statuses`(상태 레지스트리)·`issue-types`(이슈 타입 레지스트리)·`fields`(필드 구성 — 스킴별 표시/필수)·`types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
 | `/projects` | ProjectListPage | 디렉터리: 테이블 기본(★/이름/키/이슈/생성일/⋯) + 카드 토글 + 검색 |
-| `/projects/new` | ProjectCreatePage | 템플릿(빈/스크럼/칸반/버그 트래킹) 미리보기 생성 |
+| `/projects/new` | ProjectCreatePage | 템플릿(빈/스크럼/칸반/버그 트래킹/**데모 프로젝트**) 미리보기 생성. "데모 프로젝트"는 `store/sampleData.ts` 공용 시더가 이슈 46·스프린트 3·릴리스 3·컴포넌트 4·코멘트 15·워크로그 12를 채운다 — 목업·REST 같은 코드, 관리자 롤 불필요, 여러 번 만들면 키만 다른 데모가 하나씩 더 생긴다 |
 | `/projects/:id/board` | BoardRedirect | 기본 보드로 redirect (?issue 쿼리 보존) |
 | `/projects/:id/boards/:boardId` | BoardPage | 칸반: 동적 상태 컬럼, DnD, 퀵필터, 스윔레인(담당자/에픽), WIP |
 | `/projects/:id/backlog` | BacklogPage | 스프린트 패널 + 백로그, DnD 랭크/이동 |

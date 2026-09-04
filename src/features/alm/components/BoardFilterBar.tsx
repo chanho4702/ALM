@@ -1,6 +1,7 @@
-import { Avatar, Button, Select, TextField } from "@chanho/react";
+import { Button, Select, TextField } from "@chanho/react";
 import type { Issue, IssueType, User } from "../store/types";
 import { useIssueTypes } from "./useIssueTypes";
+import { UserAvatar } from "./UserAvatar";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → 센티널
 const ALL = "all";
@@ -91,7 +92,7 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
             title={user.name}
             onClick={() => toggleAssignee(user.id)}
           >
-            <Avatar name={user.name} size="small" />
+            <UserAvatar user={user} size="small" />
           </button>
         ))}
         <button

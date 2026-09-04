@@ -70,8 +70,15 @@ import type {
   AnnouncementBanner,
 } from "./types";
 import type { IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock";
-import { DEFAULT_PREFERENCES, LINK_TYPES_CHANGED_EVENT, PRIORITIES_CHANGED_EVENT } from "./jiraMock";
+import {
+  assertAvatarFile,
+  notifyAvatarChanged,
+  DEFAULT_PREFERENCES,
+  LINK_TYPES_CHANGED_EVENT,
+  PRIORITIES_CHANGED_EVENT,
+} from "./jiraMock";
 import { extractMentionIds, newMentionIds } from "./richText";
+import { seedDemoProject, type SampleDataApi } from "./sampleData";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -110,7 +117,32 @@ export async function createProject(input: {
   });
   const project = mapProject(await json(response));
   await applyTemplate(project.id, template);
+  // 데모 템플릿은 공용 시더(목업과 같은 코드)가 채운다 — 낙관적 락 충돌을 피하려 전부 순차다
+  if (template.richSeed) await seedDemoProject(project, sampleDataApi());
   return project;
+}
+
+/**
+ * 공용 시더(`sampleData.ts`)에 넘길 REST 함수 묶음. 이 객체가 타입 체크를 통과한다는 것이
+ * "시더가 부르는 스토어 함수를 REST 어댑터가 전부 갖고 있다"는 계약 검증이다.
+ */
+function sampleDataApi(): SampleDataApi {
+  return {
+    listUsers,
+    createComponent,
+    createVersion,
+    releaseVersion,
+    createSprint,
+    updateSprint,
+    startSprint,
+    completeSprint,
+    createIssue,
+    addIssueLink,
+    addComment,
+    addWorklog,
+    archiveIssue,
+    createDashboard,
+  };
 }
 
 /**
@@ -460,24 +492,20 @@ export async function startSprint(id: string): Promise<Sprint> {
 }
 
 /**
- * 무엇을 완료로 볼지는 워크플로 스킴을 가진 프론트가 알려준다 — 서버는 아직 상태 카테고리를
- * 모른다. doneStatuses에 없는 이슈는 백로그로 돌아간다.
+ * 무엇을 완료로 볼지는 서버가 워크플로 의미(complete)로 판단한다. 완료가 아닌 이슈는 백로그(또는 지정 스프린트)로 돌아간다.
  */
 export async function completeSprint(
   id: string,
-  doneStatuses: string[],
   options: { moveUnfinishedTo?: string | null } = {},
 ): Promise<Sprint> {
+  // 완료 판정(doneStatuses)은 보내지 않는다 — V11부터 서버가 워크플로 의미(complete)로 스스로 판단한다.
+  // 목업과 같은 시그니처라 화면(백로그·보드·릴리스)이 어댑터를 구분하지 않는다.
   const target = options.moveUnfinishedTo ?? null;
   const response = await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // 대상이 없으면 필드를 빼서 서버 기본값(백로그)에 맡긴다.
-    body: JSON.stringify(
-      target === null
-        ? { doneStatuses }
-        : { doneStatuses, moveUnfinishedToSprintId: toBackendId(target) },
-    ),
+    body: JSON.stringify(target === null ? {} : { moveUnfinishedToSprintId: toBackendId(target) }),
   });
   return mapSprint(await json(response));
 }
@@ -534,21 +562,17 @@ export async function updateVersion(
   return mapVersion(await json(response));
 }
 
-/** 완료 판정은 프론트가 알려준다(스프린트 완료와 같은 규칙). 대상이 없으면 이슈는 그대로 둔다. */
+/** 대상이 없으면 미해결 이슈는 그대로 둔다. */
 export async function releaseVersion(
   id: string,
-  doneStatuses: string[],
   options: { moveUnresolvedTo?: string | null } = {},
 ): Promise<ProjectVersion> {
+  // 완료 판정은 서버가 워크플로 의미로 한다(스프린트 완료와 같은 규칙) — 목업과 같은 시그니처
   const target = options.moveUnresolvedTo ?? null;
   const response = await sharedApiFetch(`/api/alm/versions/${toBackendId(id)}/release`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      target === null
-        ? { doneStatuses }
-        : { doneStatuses, moveUnresolvedToVersionId: toBackendId(target) },
-    ),
+    body: JSON.stringify(target === null ? {} : { moveUnresolvedToVersionId: toBackendId(target) }),
   });
   return mapVersion(await json(response));
 }
@@ -1056,17 +1080,19 @@ export async function statusDefUsage(): Promise<Record<string, number>> {
   return (await json(await sharedApiFetch("/api/alm/settings/statuses/usage"))) as Record<string, number>;
 }
 
+// `icon`(lucide 키, V20)은 그대로 실어 보내고 응답에서도 그대로 받는다 — 매핑 없음
 export async function createStatusDef(input: {
   name: string;
   categoryId: string;
   description?: string;
+  icon?: string;
 }): Promise<StatusDef> {
   return (await json(await sharedApiFetch("/api/alm/settings/statuses", postJson(input)))) as StatusDef;
 }
 
 export async function updateStatusDef(
   id: string,
-  patch: Partial<Pick<StatusDef, "name" | "categoryId" | "description">>,
+  patch: Partial<Pick<StatusDef, "name" | "categoryId" | "description" | "icon">>,
 ): Promise<StatusDef> {
   return (await json(
     await sharedApiFetch(`/api/alm/settings/statuses/${encodeURIComponent(id)}`, jsonBody(patch)),
@@ -1403,12 +1429,148 @@ export async function deletePriority(id: string): Promise<void> {
 
 let cachedMe: User | null = null;
 
-/** JWT sub가 사용자 id(서버의 actorId/assigneeId와 같은 숫자 문자열) */
+/** JWT sub가 사용자 id(서버의 actorId/assigneeId와 같은 숫자 문자열). 아바타는 캐시하지 않는다 */
 export async function getCurrentUser(): Promise<User> {
-  if (cachedMe) return cachedMe;
-  const me = await sharedAuthClient.fetchMe();
-  cachedMe = { id: me.sub ?? me.email, name: me.name ?? me.email };
-  return cachedMe;
+  if (!cachedMe) {
+    const me = await sharedAuthClient.fetchMe();
+    cachedMe = { id: me.sub ?? me.email, name: me.name ?? me.email };
+  }
+  const [withAvatar] = await attachAvatars([cachedMe]);
+  return withAvatar;
+}
+
+// ── 프로필 사진 (아바타, 서버 V20) ───────────────────────────
+//
+// 바이트(`GET /api/alm/users/{id}/avatar`)는 **Bearer 토큰이 필요해 `<img src="/api/...">`로
+// 직접 열 수 없다.** 인증은 메모리 access token이고(`auth/client.ts`) 쿠키는 refresh 전용이라
+// 브라우저가 `<img>` 요청에 Authorization 헤더를 붙이지 않는다 — 첨부 내려받기와 같은 제약이다.
+// 그래서 fetch로 받아 object URL로 바꾸고 캐시한다.
+//
+// 경로는 **서버가 준 `avatarUrl`을 그대로 쓴다**(프론트가 조립하지 않는다). 그 문자열에 버전이
+// 들어 있어 사진이 바뀌면 경로가 달라지고, 그때 이전 object URL을 revoke하고 새로 받는다.
+// 바이트 응답에 `Cache-Control: private, max-age=300`이 붙어 있어 브라우저 HTTP 캐시도 함께 탄다.
+
+/** 서버 상한 — 목업(200KB)과 달리 오브젝트 스토리지라 2MB까지 받는다(경계 포함) */
+export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+
+/** userId → { 서버가 준 경로, 표시용 object URL } */
+const avatarUrls = new Map<string, { path: string; url: string }>();
+
+/**
+ * 경로 목록은 **결과를 캐시하지 않는다** — 캐시하면 남이 바꾼 사진이 영원히 안 보인다.
+ * 대신 진행 중인 요청만 합쳐(in-flight dedup) 한 번의 화면 로드에서 여러 번 부르지 않게 한다.
+ * 비싼 쪽은 바이트이고 그건 아래 `avatarUrls`가 경로 단위로 막는다.
+ */
+let avatarIndexInFlight: Promise<Map<string, string>> | null = null;
+
+/** 이전 object URL을 브라우저에 돌려준다 — 사진 교체·삭제 때 쌓이지 않게 */
+function releaseAvatar(userId: string): void {
+  const entry = avatarUrls.get(userId);
+  if (!entry) return;
+  URL.revokeObjectURL(entry.url);
+  avatarUrls.delete(userId);
+}
+
+/**
+ * 테스트 전용: 모듈 캐시(현재 사용자·진행 중 목록 요청·object URL)를 비운다.
+ * 목업의 같은 이름 함수와 짝이며, 파사드는 테스트에서 항상 목업 쪽을 고른다.
+ */
+export function __resetForTest(): void {
+  cachedMe = null;
+  avatarIndexInFlight = null;
+  for (const userId of [...avatarUrls.keys()]) releaseAvatar(userId);
+}
+
+/** `GET /api/alm/users/avatars` 행 · `PUT /api/alm/me/avatar` 응답 (같은 모양) */
+interface AvatarRowDto {
+  userId: number | string;
+  /** 바이트 경로(버전 포함). 서버가 만든 것을 그대로 쓴다 */
+  avatarUrl?: string | null;
+  /** ISO-8601. avatarUrl이 없는 옛 응답을 위한 폴백 조립에만 쓴다 */
+  updatedAt?: string | null;
+}
+
+function avatarPathOf(userId: string, row: AvatarRowDto): string {
+  if (row.avatarUrl) return row.avatarUrl;
+  // 폴백: 서버가 경로를 안 주는 경우에만 조립한다(`?v`는 서버가 읽지 않는 캐시버스터)
+  return `/api/alm/users/${encodeURIComponent(userId)}/avatar?v=${encodeURIComponent(row.updatedAt ?? "")}`;
+}
+
+function avatarPathIndex(): Promise<Map<string, string>> {
+  if (avatarIndexInFlight) return avatarIndexInFlight;
+  avatarIndexInFlight = (async () => {
+    try {
+      const rows = await json<AvatarRowDto[]>(await sharedApiFetch("/api/alm/users/avatars"));
+      return new Map((rows ?? []).map((r) => [String(r.userId), avatarPathOf(String(r.userId), r)]));
+    } catch {
+      // 아바타는 부가 정보다 — 목록 조회가 실패해도 사용자 목록 자체는 이니셜로 그린다
+      return new Map<string, string>();
+    } finally {
+      avatarIndexInFlight = null;
+    }
+  })();
+  return avatarIndexInFlight;
+}
+
+async function avatarObjectUrl(userId: string, path: string): Promise<string | null> {
+  const cached = avatarUrls.get(userId);
+  if (cached?.path === path) return cached.url;
+  releaseAvatar(userId); // 사진이 바뀌었다
+  try {
+    const response = await sharedApiFetch(path);
+    // 목록에 있던 사용자가 404면 그 사이 지워진 경합이다 — 조용히 이니셜로 떨어진다
+    if (!response.ok) return null;
+    const url = URL.createObjectURL(await response.blob());
+    avatarUrls.set(userId, { path, url });
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+/** 사용자 배열에 avatarUrl을 채운다 — 사진이 있는 사람만 바이트를 받는다 */
+async function attachAvatars(users: User[]): Promise<User[]> {
+  const paths = await avatarPathIndex();
+  return Promise.all(
+    users.map(async (user) => {
+      const path = paths.get(user.id);
+      if (!path) {
+        releaseAvatar(user.id); // 사진이 지워졌다
+        return { ...user, avatarUrl: null };
+      }
+      return { ...user, avatarUrl: await avatarObjectUrl(user.id, path) };
+    }),
+  );
+}
+
+/**
+ * multipart PUT — Content-Type은 브라우저가 boundary와 함께 붙이므로 직접 쓰지 않는다.
+ * 사전 검증(`assertAvatarFile`)을 통과해도 서버가 매직 바이트로 거부할 수 있다(이름만 .png인
+ * GIF·SVG 등) — 그 `{error}` 문구는 그대로 위로 던져 화면이 띄운다.
+ */
+export async function uploadMyAvatar(file: File): Promise<string> {
+  assertAvatarFile(file, AVATAR_MAX_BYTES);
+  const body = new FormData();
+  body.append("file", file, file.name);
+  const saved = await json<AvatarRowDto | null>(
+    await sharedApiFetch("/api/alm/me/avatar", { method: "PUT", body }),
+  );
+  const userId = saved ? String(saved.userId) : (await getCurrentUser()).id;
+  releaseAvatar(userId);
+  // 방금 올린 바이트는 이미 로컬에 있다 — 왕복 없이 미리보기를 만들고, 응답이 준 새 경로로
+  // 캐시에 등록해 다음 목록 조회도 이 URL을 재사용한다(바이트를 두 번 받지 않는다).
+  const url = URL.createObjectURL(file);
+  // 응답 본문이 없어도(계약 밖 200) URL을 캐시에 등록해 둬야 다음 교체·삭제 때 revoke된다 — 누수 방지
+  const path = saved ? avatarPathOf(userId, saved) : `local:${Date.now()}`;
+  avatarUrls.set(userId, { path, url });
+  notifyAvatarChanged();
+  return url;
+}
+
+export async function removeMyAvatar(): Promise<void> {
+  await json(await sharedApiFetch("/api/alm/me/avatar", { method: "DELETE" }));
+  // 캐시된 object URL은 다음 조회에서 attachAvatars가 놓아준다(경로가 사라지므로)
+  notifyAvatarChanged();
 }
 
 
@@ -1739,10 +1901,12 @@ const ROLE_FROM_ORG: Record<OrgGrantDto["role"], ProjectRole> = { VIEWER: "viewe
 const ROLE_TO_ORG: Record<ProjectRole, OrgGrantDto["role"]> = { viewer: "VIEWER", editor: "EDITOR", admin: "ADMIN" };
 const ROLE_RANK: Record<ProjectRole, number> = { viewer: 1, editor: 2, admin: 3 };
 
-/** ACTIVE 멤버만 — 비활성 계정은 담당자·멤버 선택 UI에 나오면 안 된다 */
+/** ACTIVE 멤버만 — 비활성 계정은 담당자·멤버 선택 UI에 나오면 안 된다. 아바타는 ALM 쪽에서 합친다 */
 export async function listUsers(): Promise<User[]> {
   const rows = await json<OrgMemberDto[]>(await sharedApiFetch("/api/org/members"));
-  return rows.filter((m) => m.status === "ACTIVE").map((m) => ({ id: String(m.id), name: m.displayName }));
+  return attachAvatars(
+    rows.filter((m) => m.status === "ACTIVE").map((m) => ({ id: String(m.id), name: m.displayName })),
+  );
 }
 
 /** org-service는 grant 목록을 그 리소스의 ADMIN(또는 전역 관리자)에게만 연다 */
@@ -1758,10 +1922,14 @@ async function projectGrants(projectId: string): Promise<OrgGrantDto[]> {
 /** 역할 높은 순 → 이름순. 팀 grant는 개인 멤버 목록에 넣지 않는다(목업과 같은 모양) */
 export async function listProjectMembers(projectId: string): Promise<ProjectMemberView[]> {
   const [grants, users] = await Promise.all([projectGrants(projectId), listUsers()]);
-  const names = new Map(users.map((u) => [u.id, u.name]));
+  const directory = new Map(users.map((u) => [u.id, u]));
   return grants
     .map((g) => ({
-      user: { id: String(g.subjectId), name: names.get(String(g.subjectId)) ?? `사용자 ${g.subjectId}` },
+      user: directory.get(String(g.subjectId)) ?? {
+        id: String(g.subjectId),
+        name: `사용자 ${g.subjectId}`,
+        avatarUrl: null,
+      },
       role: ROLE_FROM_ORG[g.role],
     }))
     .sort((a, b) => ROLE_RANK[b.role] - ROLE_RANK[a.role] || a.user.name.localeCompare(b.user.name));
@@ -1893,6 +2061,12 @@ interface PreferenceDto {
   emailEnabled?: boolean | null;
   /** 읽기 전용 — 요청에 실어도 서버가 무시한다 */
   mailConfigured?: boolean | null;
+  /**
+   * 읽기 전용 — 프로필 사진이 있으면 서버 경로(`/api/alm/users/{id}/avatar?v=…`)가 온다.
+   * 그 경로는 Bearer 토큰이 필요해 그대로 `<img src>`에 못 넣는다 → 있다/없다만 보고
+   * 실제 표시 URL은 `getCurrentUser()`가 만든 object URL을 쓴다.
+   */
+  avatarUrl?: string | null;
 }
 
 function mapPreferences(dto: PreferenceDto): UserPreferences {
@@ -1908,7 +2082,11 @@ function mapPreferences(dto: PreferenceDto): UserPreferences {
 }
 
 export async function getMyPreferences(): Promise<UserPreferences> {
-  return mapPreferences(await json<PreferenceDto>(await sharedApiFetch("/api/alm/me/preferences")));
+  const dto = await json<PreferenceDto>(await sharedApiFetch("/api/alm/me/preferences"));
+  const prefs = mapPreferences(dto);
+  // 사진이 있을 때만 바이트를 받는다. 없으면 목업과 같은 shape(null)로 — 화면은 이니셜로 떨어진다
+  prefs.avatarUrl = dto.avatarUrl ? ((await getCurrentUser()).avatarUrl ?? null) : null;
+  return prefs;
 }
 
 /** 서버는 전체 문서를 받는다 — 현재 값 위에 패치를 얹어 보낸다 */

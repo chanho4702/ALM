@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Avatar, Button, Card, Dropdown, Select, Table, useToast } from "@chanho/react";
+import { Button, Card, Dropdown, Select, Table, useToast } from "@chanho/react";
 import type { ProjectRole, User } from "../store/types";
 import {
   addProjectMember,
@@ -10,6 +10,7 @@ import {
   updateProjectMemberRole,
   type ProjectMemberView,
 } from "../store/jiraStore";
+import { UserAvatar } from "./UserAvatar";
 
 /** org-service GrantRole과 같은 3단계 — 화면 문구만 한국어다 */
 const ROLE_OPTIONS: { value: ProjectRole; label: string; hint: string }[] = [
@@ -90,7 +91,7 @@ export function ProjectMembersPanel({ projectId }: { projectId: string }) {
             id: member.user.id,
             name: (
               <span className="member-name">
-                <Avatar name={member.user.name} size="small" />
+                <UserAvatar user={member.user} size="small" />
                 {member.user.name}
               </span>
             ),

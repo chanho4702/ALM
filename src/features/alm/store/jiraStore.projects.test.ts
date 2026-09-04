@@ -25,11 +25,11 @@ describe("users", () => {
   it("목업 유저 4명을 반환한다", async () => {
     const users = await listUsers();
     expect(users).toHaveLength(4);
-    expect(users[0]).toEqual({ id: "u1", name: "김찬호" });
+    expect(users[0]).toEqual({ id: "u1", name: "김찬호", avatarUrl: null });
   });
 
   it("현재 유저는 u1 고정이다", async () => {
-    await expect(getCurrentUser()).resolves.toEqual({ id: "u1", name: "김찬호" });
+    await expect(getCurrentUser()).resolves.toEqual({ id: "u1", name: "김찬호", avatarUrl: null });
   });
 });
 

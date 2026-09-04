@@ -65,6 +65,20 @@ describe("BoardPage", () => {
     expect(within(done).getByRole("img", { name: "우선순위: 높음" })).toBeInTheDocument(); // ALM-1 high
   });
 
+  it("컬럼 머리글이 상태 이름을 읽어 주는 아이콘(글리프)을 갖는다 — 색 단독 구분 금지", async () => {
+    renderBoard();
+    const todo = await screen.findByRole("region", { name: "할 일" });
+    // 이름은 머리글 텍스트가 갖고, 글리프는 카테고리 색 클래스로만 색을 받는다
+    const glyph = within(todo).getByRole("img", { name: "상태: 할 일" });
+    expect(glyph).toHaveClass("status-glyph", "is-neutral");
+    expect(within(screen.getByRole("region", { name: "진행 중" })).getByRole("img", {
+      name: "상태: 진행 중",
+    })).toHaveClass("is-info");
+    expect(within(screen.getByRole("region", { name: "완료" })).getByRole("img", {
+      name: "상태: 완료",
+    })).toHaveClass("is-success");
+  });
+
   it("커스텀 워크플로 상태는 보드에 컬럼으로 나타나고 그 상태의 카드가 담긴다", async () => {
     // 커스텀 전환 후 진행 중 카테고리에 "코드 리뷰" 상태 추가, ALM-2를 그 상태로 이동
     await setProjectCustom("p1", true);

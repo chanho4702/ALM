@@ -135,6 +135,12 @@ export const listActivity = impl.listActivity;
 export const DEFAULT_PREFERENCES = mock.DEFAULT_PREFERENCES;
 export const getMyPreferences = impl.getMyPreferences;
 export const saveMyPreferences = impl.saveMyPreferences;
+export const AVATAR_CHANGED_EVENT = impl.AVATAR_CHANGED_EVENT;
+export const uploadMyAvatar = impl.uploadMyAvatar;
+export const removeMyAvatar = impl.removeMyAvatar;
+/** 업로드 상한 — 목업 200KB(localStorage), REST 2MB(서버). 화면 안내 문구가 이 값을 읽는다 */
+export const AVATAR_MAX_BYTES = impl.AVATAR_MAX_BYTES;
+export const formatAvatarLimit = impl.formatAvatarLimit;
 export const listProjectShortcuts = impl.listProjectShortcuts;
 export const addProjectShortcut = impl.addProjectShortcut;
 export const updateProjectShortcut = impl.updateProjectShortcut;

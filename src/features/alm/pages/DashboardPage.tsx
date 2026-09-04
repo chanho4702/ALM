@@ -88,6 +88,8 @@ export function DashboardPage() {
   }, [rows, statuses]);
 
   const progress = useMemo(() => workProgress(rows, statuses), [rows, statuses]);
+  /** 담당자 행의 프로필 사진 조회용 — UserAvatar가 avatarUrl을 읽는다 */
+  const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
   const risky = useMemo(() => dueRows(rows, statuses, today), [rows, statuses, today]);
   const overdueCount = risky.filter((row) => row.overdue).length;
   const activeSprint = sprints.find((sprint) => sprint.state === "active") ?? null;
@@ -207,7 +209,7 @@ export function DashboardPage() {
               rows={assigneeDistribution(rows, users)}
               testId="assignee-stats"
               emptyText="배정된 이슈가 없습니다."
-              lead={assigneeLead}
+              lead={assigneeLead(usersById)}
             />
           </Card>
 

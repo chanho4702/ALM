@@ -11,7 +11,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Avatar, Button, Dropdown, EmptyState, Lozenge, Select, Spinner, useToast } from "@chanho/react";
+import { Button, Dropdown, EmptyState, Lozenge, Select, Spinner, useToast } from "@chanho/react";
 import type { Board, BoardSwimlane, Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   completeSprint,
@@ -37,6 +37,7 @@ import {
 import type { QuickFilter } from "../components/BoardFilterBar";
 import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
+import { UserAvatar } from "../components/UserAvatar";
 import { resolveMove } from "./boardDnd";
 
 const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
@@ -107,10 +108,8 @@ export function BoardPage() {
   /** ?issue=ALM-1 → 상세 모달 (URL 공유 가능) — 세 페이지 공용 훅 */
   const { openIssue, issueModal } = useIssueModal(reload);
 
-  const userNames = useMemo(
-    () => Object.fromEntries(users.map((u) => [u.id, u.name])),
-    [users],
-  );
+  /** userId → 사용자. 카드·스윔레인 아바타가 프로필 사진을 여기서 읽는다 */
+  const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
 
   /** 퀵 필터 적용 결과 — 컬럼 렌더와 DnD 모두 이 목록 기준 */
   const visibleIssues = useMemo(() => applyQuickFilter(issues, quick), [issues, quick]);
@@ -279,7 +278,7 @@ export function BoardPage() {
               >
                 <header className="board-swimlane-header">
                   {groupBy === "assignee" && band.key !== "unassigned" ? (
-                    <Avatar name={band.name} size="small" />
+                    <UserAvatar user={usersById[band.key]} name={band.name} size="small" />
                   ) : null}
                   {groupBy === "epic" && band.key !== "noepic" ? (
                     <Lozenge appearance="warning">에픽</Lozenge>
@@ -296,11 +295,12 @@ export function BoardPage() {
                         status={ws.id}
                         droppableId={`${band.key}:${ws.id}`}
                         issues={band.issues.filter((i) => i.status === ws.id)}
-                        userNames={userNames}
+                        usersById={usersById}
                         onOpenIssue={openIssue}
                         epicNames={epicNames}
                         columnName={column?.name ?? ws.name}
                         appearance={ws.color ?? "neutral"}
+                        workflowStatus={ws}
                         // 밴드별 개수는 전체 WIP 기준과 달라 오해 소지 — 스윔레인에선 표시 생략
                         wipLimit={null}
                       />
@@ -318,12 +318,13 @@ export function BoardPage() {
                     key={ws.id}
                     status={ws.id}
                     issues={visibleIssues.filter((i) => i.status === ws.id)}
-                    userNames={userNames}
+                    usersById={usersById}
                     onOpenIssue={openIssue}
                     epicNames={epicNames}
                     onCreateIssue={handleColumnCreate}
                     columnName={column?.name ?? ws.name}
                     appearance={ws.color ?? "neutral"}
+                    workflowStatus={ws}
                     wipLimit={column?.wipLimit ?? null}
                   />
                 );
@@ -334,8 +335,8 @@ export function BoardPage() {
             {activeIssue ? (
               <IssueCard
                 issue={activeIssue}
-                assigneeName={
-                  activeIssue.assigneeId ? userNames[activeIssue.assigneeId] : undefined
+                assignee={
+                  activeIssue.assigneeId ? usersById[activeIssue.assigneeId] : undefined
                 }
               />
             ) : null}

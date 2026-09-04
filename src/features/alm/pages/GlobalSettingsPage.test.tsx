@@ -229,6 +229,30 @@ describe("상태 카테고리·상태 레지스트리", () => {
     await user.click(within(menu).getByRole("button", { name: "워크플로 스킴" }));
     expect(await within(await screen.findByTestId("scheme-list")).findByText("작업 중")).toBeInTheDocument();
   });
+
+  it("상태 아이콘을 고르면 목록 글리프가 바뀌고, 새 상태는 카테고리 기본 아이콘으로 그려진다", async () => {
+    const user = userEvent.setup();
+    renderSettings("/settings/statuses");
+    const list = await screen.findByRole("list", { name: "상태 목록" });
+
+    // 기본 3상태는 시드 아이콘을 갖고, 카테고리 색으로 그려진다
+    // 목록 <ul>은 먼저 뜨고 행은 비동기로 채워진다 — find로 기다린다
+    expect(await within(list).findByRole("img", { name: "상태: 진행 중" })).toHaveClass("is-info");
+
+    // 아이콘을 "눈(검토)"으로 바꾼다 — 이름·색은 그대로고 모양만 달라진다
+    await user.click(within(list).getByRole("combobox", { name: "진행 중 아이콘" }));
+    await user.click(await screen.findByRole("option", { name: "눈(검토)" }));
+    await waitFor(() => {
+      expect(within(list).getByRole("combobox", { name: "진행 중 아이콘" })).toHaveTextContent(
+        "눈(검토)",
+      );
+    });
+
+    // 새 상태는 "카테고리 기본"으로 만들어도 글리프가 그려진다(빈 문자열 폴백)
+    await user.type(screen.getByLabelText("새 상태 이름"), "코드 리뷰");
+    await user.click(screen.getByRole("button", { name: "상태 추가" }));
+    expect(await within(list).findByRole("img", { name: "상태: 코드 리뷰" })).toBeInTheDocument();
+  });
 });
 
 describe("이슈 타입 레지스트리", () => {

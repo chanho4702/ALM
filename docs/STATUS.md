@@ -64,6 +64,19 @@
 - **아직 `jiraStore.ts` 런타임 전환은 하지 않았다.** 프로젝트 템플릿·설정 스킴과 사용자
   디렉터리가 남아 있다.
 
+## 2026-09-05 — 상태 아이콘 · 아바타 · 데모 데이터 (스펙 `superpowers/specs/2026-09-05-status-icons-avatar-sample-data.md`)
+
+- **상태 글리프**: `components/StatusGlyph.tsx` 하나 — 모양은 `StatusDef.icon`(lucide 키, 서버 V20), 색은 카테고리 색 토큰, `role="img"` + `aria-label="상태: …"`.
+  보드 컬럼·목록·검색·백로그·홈·요약·상세 Select·레지스트리 전부. 미지정(`""`)은 kind 폴백(circle/refresh-cw/circle-check).
+  우선순위는 `PriorityGlyph`(레지스트리 색). 메일은 플레인 텍스트라 이모지(📌🔄💬📣, 상태 ⚪🔵✅).
+- **아바타**: 개인 설정 > 일반의 프로필 카드에서 업로드(PNG/JPG/WebP, 서버 2MB·목업 200KB). `components/UserAvatar.tsx`가 DS `Avatar src`.
+  서버 바이트 엔드포인트는 Bearer가 필요해 `<img src>` 불가 → REST 어댑터가 fetch + object URL 캐시(`userId@updatedAt`). 위키·보드에는 아직 안 보임(ALM 저장).
+- **데모 프로젝트 템플릿**: 만들기 위저드 "데모 프로젝트" — `store/sampleData.ts` 시더가 파사드 함수만 호출해 목업·REST 공용
+  (이슈 46·스프린트 3·릴리스 3·컴포넌트 4·코멘트 15·워크로그 12·링크 5·대시보드 1). 실제 스택에 더미를 넣을 때도 이 템플릿.
+  목업 dev 기본 시드는 `rich`(프로젝트 2·이슈 25) — 테스트는 종전 8건 유지.
+- **경계면 버그**: REST `completeSprint`/`releaseVersion`이 `(id, doneStatuses, options)`라 화면 호출 `(id, options)`와 어긋나
+  REST 모드에서 스프린트 완료·릴리스가 깨졌었다 → 서버가 워크플로 의미로 완료를 판정하고 어댑터를 목업과 같은 시그니처로 통일.
+
 ## UX 정비 2차 (2026-09-04, 전 화면 캡처 감사 → 지라 밀도·헤더 기준)
 
 명세와 근거는 `superpowers/specs/2026-09-04-ui-polish-pass.md`. 요지:
@@ -120,7 +133,7 @@ CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만
 
 ## 품질 상태
 
-- 테스트 **546 케이스 / 71 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **584 케이스 / 76 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 

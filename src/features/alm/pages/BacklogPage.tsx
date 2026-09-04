@@ -82,7 +82,8 @@ export function BacklogPage() {
 
   const { openIssue, issueModal } = useIssueModal(reload);
 
-  const userNames = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u.name])), [users]);
+  /** userId → 사용자. 행·카드 아바타가 프로필 사진을 여기서 읽는다 */
+  const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
 
   // done 스프린트는 패널을 만들지 않는다 — active 먼저, planned 다음 (스펙 §4)
   const visibleSprints = useMemo(
@@ -247,7 +248,7 @@ export function BacklogPage() {
             key={sprint.id}
             sprint={sprint}
             issues={issues.filter((i) => i.sprintId === sprint.id)}
-            userNames={userNames}
+            usersById={usersById}
             statuses={statuses}
             moveTargets={moveTargets}
             onStart={(s) => void run("스프린트 시작 실패", "스프린트를 시작했습니다", () => startSprint(s.id))}
@@ -270,7 +271,7 @@ export function BacklogPage() {
               <SortableBacklogRow
                 key={issue.id}
                 issue={issue}
-                assigneeName={issue.assigneeId ? userNames[issue.assigneeId] : undefined}
+                assignee={issue.assigneeId ? usersById[issue.assigneeId] : undefined}
                 statuses={statuses}
                 moveTargets={moveTargets}
                 onMove={handleMove}
@@ -330,8 +331,8 @@ export function BacklogPage() {
           {activeIssue ? (
             <BacklogIssueRow
               issue={activeIssue}
-              assigneeName={
-                activeIssue.assigneeId ? userNames[activeIssue.assigneeId] : undefined
+              assignee={
+                activeIssue.assigneeId ? usersById[activeIssue.assigneeId] : undefined
               }
               moveTargets={[]}
               onMove={() => {}}

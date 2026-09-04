@@ -123,6 +123,49 @@ describe("전역 상태 레지스트리", () => {
   });
 });
 
+describe("상태 아이콘 (서버 V20 계약과 같은 규칙)", () => {
+  it("레지스트리는 저장 원본을, 워크플로 본문은 해석된 아이콘을 준다", async () => {
+    // 기본 3종 시드는 서버 V20와 같은 키다
+    const defs = await listStatusDefs();
+    expect(defs.map((d) => [d.id, d.icon])).toEqual([
+      ["todo", "circle"],
+      ["inprogress", "loader-circle"],
+      ["done", "circle-check"],
+    ]);
+
+    // 아이콘을 안 주고 만들면 저장 원본은 빈 문자열 — 편집기가 "미지정"을 보여야 한다
+    const review = await createStatusDef({ name: "코드 리뷰", categoryId: "inprogress" });
+    expect(review.icon).toBe("");
+    expect((await listStatusDefs()).find((d) => d.id === review.id)!.icon).toBe("");
+
+    // 반면 워크플로 본문의 icon은 해석된 값 — 미지정이면 kind 기본으로 채워져 빈 문자열이 없다
+    const scheme = (await listSchemes())[0];
+    await updateScheme(scheme.id, {
+      body: {
+        ...scheme.body,
+        statuses: [
+          ...scheme.body.statuses,
+          { id: review.id, name: "코드 리뷰", category: "inprogress", order: 4 },
+        ],
+      },
+    });
+    const statuses = await listProjectStatuses("p1");
+    expect(statuses.find((s) => s.id === review.id)!.icon).toBe("refresh-cw"); // active 기본
+    expect(statuses.find((s) => s.id === "done")!.icon).toBe("circle-check");
+    expect(statuses.every((s) => (s.icon ?? "") !== "")).toBe(true);
+  });
+
+  it("빈 문자열로 되돌리면 미지정으로 저장되고 본문은 다시 kind 기본으로 해석된다", async () => {
+    await updateStatusDef("done", { icon: "archive" });
+    expect((await listStatusDefs()).find((d) => d.id === "done")!.icon).toBe("archive");
+    expect((await listProjectStatuses("p1")).find((s) => s.id === "done")!.icon).toBe("archive");
+
+    await updateStatusDef("done", { icon: "" });
+    expect((await listStatusDefs()).find((d) => d.id === "done")!.icon).toBe("");
+    expect((await listProjectStatuses("p1")).find((s) => s.id === "done")!.icon).toBe("circle-check");
+  });
+});
+
 describe("완료 판정은 카테고리 의미에서 나온다", () => {
   it("사용자 카테고리(의미=완료)의 상태로 옮기면 해결이 채워지고, 다시 나오면 비워진다", async () => {
     const closed = await createStatusCategory({ name: "종료", kind: "complete", color: "neutral" });

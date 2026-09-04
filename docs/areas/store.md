@@ -212,9 +212,69 @@ REST 전환 때 계약이 바뀌지 않는다. `listProjectChanges(projectId, {f
 4. `queryIssues(IssueQuery)`는 GraphQL 인자로 1:1 매핑하도록 설계돼 있다.
 5. 낙관적 업데이트·실시간은 `../BACKLOG.md` 2번 참고.
 
+## 데모 데이터 시더 · 목업 시드 (2026-09-05)
+
+`store/sampleData.ts`의 `seedDemoProject(project, api)`는 "데모 프로젝트(풍부한 샘플)" 템플릿이
+만드는 데이터를 채운다. **스토어 함수만 부른다** — localStorage도 fetch도 직접 만지지 않고,
+목업(`jiraMock`)과 REST(`jiraApi`)가 각자 `SampleDataApi`를 채워 넘긴다(의존성 주입). 그래서 같은
+코드가 두 모드에서 그대로 돈다. 만드는 것: 이슈 46(에픽 4·표준 36·하위 작업 6, 그중 2건 보관),
+스프린트 3(완료·활성·계획), 릴리스 3(1.0 릴리스됨), 컴포넌트 4, 라벨 8종, 링크 5, 코멘트 15(멘션 2),
+워크로그 12, 가젯 5개 대시보드 1.
+
+- **전부 순차 호출**이다. REST는 낙관적 락(`expectedVersion`)이라 병렬로 부르면 409가 난다.
+  `Promise.all`을 넣지 말 것.
+- `completeSprint(id, options)`·`releaseVersion(id, options)`는 목업과 REST가 **같은 시그니처**다.
+  완료 판정은 서버가 워크플로 의미(`complete`)로 하므로 프론트가 `doneStatuses`를 보내지 않는다 —
+  화면도 시더도 어댑터를 구분하지 않는다. 되살리면 시더 계약 테스트가 컴파일에서 막는다.
+- 시더가 부르는 함수를 늘리면 `SampleDataApi`·`SAMPLE_DATA_API_FUNCTIONS` 둘 다에 넣는다 —
+  목록이 빠지면 컴파일이 깨지고, 어댑터에 함수가 없으면 계약 테스트가 잡는다.
+- 기존 4개 템플릿(빈/스크럼/칸반/버그)의 동작은 그대로다. 데모만 `richSeed: true`로 시더를 탄다.
+
+목업 기본 시드(`src/mock/seed.ts`)의 `createSeedData({ rich })`: `rich`는 **dev 서버에서만** 켜져
+(`import.meta.env.MODE === "development"`) 두 번째 프로젝트(위키 제품, WIKI-1~8)와 ALM-9~17을
+얹는다(총 이슈 25·스프린트 2·버전 1·컴포넌트 3·코멘트 6·워크로그 4). 테스트는 항상 `rich: false`라
+ALM-1~8 그대로다 — 시드 개수를 하드코딩한 단언이 여럿이라(testing.md) 기본 시드를 키울 수 없다.
+
 ## 보관·휴지통 (2026-08-30)
 
 목업은 보관된 이슈를 `data.archivedIssues`로, 휴지통 프로젝트를 `data.trashedProjects`로 **옮긴다** — 그래서 기존 조회
 (`data.issues`/`data.projects`)는 손대지 않고도 자동으로 빠진다. 서버는 같은 효과를 `@SQLRestriction`(issue.archived_at,
 project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 전용 가드(`assertCanEdit/assertCanAdmin`)로 막고,
 보관 해제·휴지통 이동만 `assertAdminIgnoringArchive`로 우회한다. `deleteProject`는 이제 휴지통 이동이며 실제 삭제는 `purgeProject`.
+
+## 프로필 사진 (아바타) (2026-09-05)
+
+`User.avatarUrl`은 **화면이 `<Avatar src>`에 그대로 넣을 수 있는 URL**이다. 사람을 그리는 자리는 전부
+`components/UserAvatar.tsx`를 쓴다(`<Avatar name>` 직접 사용 금지 — 사진이 있어도 이니셜로 나온다).
+프로젝트 아이콘은 별개다(`ProjectAvatar`).
+
+- 쓰기 경로는 `uploadMyAvatar(file)` / `removeMyAvatar()` 둘뿐이고, 자기 사진만 바꾼다. 상한은
+  `AVATAR_MAX_BYTES`(목업 200KB, REST 2MB)이며 **화면 안내 문구가 이 값을 읽는다** — 숫자를 화면에
+  하드코딩하지 말 것. 타입·크기 검증은 `assertAvatarFile`(목업 정본)을 REST도 함께 쓴다.
+- 목업은 `data.avatars[userId] = dataURL`로 localStorage에 넣는다(첨부 바이트와 달리 새로고침해도
+  남아야 하기 때문). base64가 약 1.37배로 부풀고 localStorage가 5MB라 상한이 서버보다 훨씬 작다.
+- **REST는 `<img src="/api/alm/users/{id}/avatar">`를 쓸 수 없다.** 인증이 메모리 Bearer 토큰이고
+  (`auth/client.ts`) 쿠키는 refresh 전용이라 브라우저가 `<img>` 요청에 Authorization 헤더를 붙이지
+  않는다(첨부 내려받기와 같은 제약). 어댑터가 `GET /api/alm/users/avatars`로
+  `[{userId, avatarUrl, updatedAt}]`를 받고, 사진이 있는 사용자만 `sharedApiFetch`로 바이트를 받아
+  object URL로 바꾼다. 조회가 실패하면 **avatarUrl을 null로 두고 목록 자체는 살린다**(부가 정보).
+- **바이트 경로는 서버가 준 `avatarUrl`을 그대로 쓴다 — 프론트가 조립하지 않는다.** 그 문자열에
+  버전이 들어 있어 사진이 바뀌면 경로가 달라진다. object URL은 userId별로 `{경로, url}`을 들고
+  있다가 경로가 바뀌면 이전 것을 `revokeObjectURL`로 놓아준다(바이트 응답에
+  `Cache-Control: private, max-age=300`이 붙어 브라우저 HTTP 캐시와 겹친다).
+- **경로 목록은 결과를 캐시하지 않는다** — 캐시하면 남이 바꾼 사진이 영원히 안 보인다. 진행 중인
+  요청만 합친다(in-flight dedup). 비싼 쪽은 바이트이고 그건 경로 단위 캐시가 막는다.
+- 업로드 응답 `{userId, avatarUrl, updatedAt}`으로 **방금 올린 로컬 바이트를 새 경로에 등록**한다 —
+  올린 직후 목록을 다시 불러도 바이트를 두 번 받지 않는다.
+- **선검증은 서버를 대신하지 않는다.** 서버는 확장자·MIME이 아니라 **매직 바이트**로 판별하므로
+  이름만 `.png`인 GIF·SVG는 통과 후 400이 난다. 화면은 서버 `{error}`를 항상 그대로 띄운다.
+  `assertAvatarFile`(목업·REST 공용)의 문구는 서버와 **글자까지 같다**: `빈 파일은 올릴 수 없습니다`,
+  `아바타는 PNG·JPG·WebP 이미지만 올릴 수 있습니다`, `아바타는 2MB 이하 이미지여야 합니다`.
+- 목록에 있던 사용자의 바이트가 404(`아바타가 없습니다`)면 그 사이 지워진 경합이다 — 에러를 띄우지
+  말고 조용히 이니셜로 떨어진다.
+- `getMyPreferences().avatarUrl`은 읽기 전용이다. REST의 개인 설정 응답 `avatarUrl`은 위 이유로
+  값 자체를 못 쓰므로 **있다/없다만** 보고 표시 URL은 `getCurrentUser()`가 만든 것을 쓴다.
+  `saveMyPreferences`는 avatarUrl을 보내지 않는다(저장소가 다르다).
+- 사진을 바꾸면 `AVATAR_CHANGED_EVENT`를 window에 발행한다 — 이미 그려진 상단바 아바타(`AppShell`)가
+  구독해 새로고침 없이 따라온다. 새 아바타 소비처가 오래 살아 있다면 같은 이벤트를 구독할 것.
+- 한계: 아바타는 ALM 서비스 저장이라 **위키·보드에는 아직 안 보인다**. org-service 이관은 후속.

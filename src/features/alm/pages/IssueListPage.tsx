@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import {
-  Avatar,
   EmptyState,
   Lozenge,
   Spinner,
@@ -29,11 +28,12 @@ import { CsvImportModal } from "../components/CsvImportModal";
 import { issuesToCsv } from "../store/csv";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { PriorityGlyph } from "../components/PriorityGlyph";
+import { StatusGlyph } from "../components/StatusGlyph";
 import { useIssueTypes } from "../components/useIssueTypes";
 import { FilterDropdown } from "../components/FilterDropdown";
 import { formatDate } from "../components/time";
 import {
-  priorityAppearance,
   priorityName,
   priorityRank,
   KIND_ORDER,
@@ -44,6 +44,7 @@ import {
 import { resolveFields } from "../components/fieldConfig";
 import { usePriorities } from "../components/usePriorities";
 import { useTablePrefs } from "../components/useTablePrefs";
+import { UserAvatar } from "../components/UserAvatar";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
 const ALL = "all";
@@ -129,6 +130,8 @@ export function IssueListPage() {
   const { openIssue, issueKey, issueModal } = useIssueModal(reload);
 
   const userNames = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u.name])), [users]);
+  /** 담당자 셀의 프로필 사진 조회용 — 이름만 필요한 자리는 userNames를 계속 쓴다 */
+  const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -293,22 +296,27 @@ export function IssueListPage() {
       key: "status",
       header: "상태",
       sortable: true,
-      width: "96px",
+      width: "112px",
       render: (issue) => (
-        <Lozenge appearance={statusAppearance(statuses, issue.status)}>
-          {statusName(statuses, issue.status)}
-        </Lozenge>
+        <span className="status-cell">
+          <StatusGlyph status={issue.status} statuses={statuses} />
+          <Lozenge appearance={statusAppearance(statuses, issue.status)}>
+            {statusName(statuses, issue.status)}
+          </Lozenge>
+        </span>
       ),
     },
     {
       key: "priority",
       header: "우선순위",
       sortable: true,
-      width: "88px",
+      width: "104px",
       render: (issue) => (
-        <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
-          {priorityName(priorities, issue.priority)}
-        </Lozenge>
+        <span className="status-cell">
+          {/* 이름은 옆 텍스트가 갖는다 — 아이콘은 색·모양만 거든다(중복 낭독 방지) */}
+          <PriorityGlyph defs={priorities} priority={issue.priority} variant="icon" />
+          <span>{priorityName(priorities, issue.priority)}</span>
+        </span>
       ),
     },
     {
@@ -319,7 +327,7 @@ export function IssueListPage() {
       render: (issue) =>
         issue.assigneeId ? (
           <span className="issue-assignee-cell">
-            <Avatar name={userNames[issue.assigneeId] ?? ""} size="small" />
+            <UserAvatar user={usersById[issue.assigneeId]} name={userNames[issue.assigneeId] ?? ""} size="small" />
             {userNames[issue.assigneeId]}
           </span>
         ) : (

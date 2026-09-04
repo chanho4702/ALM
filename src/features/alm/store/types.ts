@@ -1,6 +1,13 @@
 export interface User {
   id: string;
   name: string;
+  /**
+   * 프로필 사진 — 화면이 `<Avatar src>`에 그대로 넣을 수 있는 URL.
+   * 목업은 base64 dataURL, REST는 인증 헤더가 필요해 바이트를 받아 만든 object URL이다
+   * (`/api/alm/users/{id}/avatar`는 Bearer 토큰을 요구하므로 `<img src>`로 직접 못 연다).
+   * 없으면 이니셜 아바타.
+   */
+  avatarUrl?: string | null;
 }
 
 /** 담당자 없이 만든 이슈의 담당자 — 미지정 또는 프로젝트 리더(지라 "기본 담당자") */
@@ -124,6 +131,8 @@ export interface UserPreferences {
   emailEnabled: boolean;
   /** 서버에 메일 서버(ALM_MAIL_HOST)가 구성돼 있는지 — 읽기 전용, 화면 안내용 */
   mailConfigured?: boolean;
+  /** 내 프로필 사진 URL — 읽기 전용(저장은 uploadMyAvatar/removeMyAvatar). 없으면 null */
+  avatarUrl?: string | null;
 }
 export type UserPreferencesPatch = {
   notifications?: Partial<NotificationPreferences>;
@@ -181,6 +190,11 @@ export interface StatusDef {
   name: string;
   categoryId: string; // StatusCategory.id
   description: string;
+  /**
+   * lucide 아이콘 키 (`components/typeIcons.tsx`의 맵). 빈 문자열이면 카테고리 의미(kind)의
+   * 기본 아이콘으로 폴백한다 — 화면은 `labels.ts`의 `statusIcon()`만 쓴다.
+   */
+  icon: string;
 }
 /** 기본 우선순위 id 5종(지라 5단계) — 시드·CSV·REST 매핑이 쓴다. 사용자 우선순위는 `pr-*` */
 export type BuiltinIssuePriority = "highest" | "high" | "medium" | "low" | "lowest";
@@ -326,9 +340,11 @@ export interface WorkflowStatus {
   name: string;
   category: string; // StatusCategory.id
   order: number;
-  /** 해석(resolve) 시 채워지는 파생 — 카테고리 의미·색. 저장 데이터에는 없다 */
+  /** 해석(resolve) 시 채워지는 파생 — 카테고리 의미·색·아이콘. 저장 데이터에는 없다 */
   kind?: StatusKind;
   color?: StatusColor;
+  /** 레지스트리(`StatusDef.icon`)의 lucide 키. 빈 문자열/미지정은 kind 기본 아이콘 폴백 */
+  icon?: string;
 }
 
 /**
@@ -613,5 +629,7 @@ export interface JiraData {
   issueCounters: Record<string, number>;
   shortcuts: ProjectShortcut[];
   preferences: Record<string, UserPreferences>;
+  /** userId → 프로필 사진 dataURL (목업 전용 저장소 — 서버는 오브젝트 스토리지에 둔다) */
+  avatars: Record<string, string>;
   banner: AnnouncementBanner;
 }

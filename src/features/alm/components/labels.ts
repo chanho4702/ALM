@@ -131,6 +131,31 @@ export function statusAppearance(
   return CATEGORY_SET.has(category) ? STATUS_APPEARANCE[category as IssueStatus] : "neutral";
 }
 
+/**
+ * 카테고리 의미(kind)별 기본 상태 아이콘 — `StatusDef.icon`이 비었을 때의 폴백.
+ * 값은 `typeIcons.tsx`의 lucide 키다(이 파일은 순수 로직이라 아이콘 모듈을 import 하지 않는다 —
+ * `reportMetrics` 같은 비-React 모듈이 labels를 쓴다).
+ */
+export const KIND_DEFAULT_STATUS_ICON: Record<StatusKind, string> = {
+  new: "circle",
+  active: "refresh-cw",
+  complete: "circle-check",
+};
+
+export const DEFAULT_STATUS_ICON = "circle";
+
+/**
+ * 상태 id → lucide 아이콘 키. 레지스트리 값(`StatusDef.icon` → `WorkflowStatus.icon`)이 이기고,
+ * 비었으면 카테고리 의미(kind)의 기본 아이콘으로 폴백한다. 색은 절대 여기서 정하지 않는다 —
+ * 색은 `statusAppearance`(카테고리 색)가 단독 진실이고, 모양·이름과 항상 함께 쓰인다.
+ */
+export function statusIcon(statuses: WorkflowStatus[] | undefined, statusId: string): string {
+  const found = statuses?.find((s) => s.id === statusId);
+  const icon = found?.icon?.trim();
+  if (icon) return icon;
+  return KIND_DEFAULT_STATUS_ICON[statusKind(statuses, statusId)] ?? DEFAULT_STATUS_ICON;
+}
+
 /** 정렬용 카테고리 위계 (할 일 → 진행 중 → 완료) */
 export const CATEGORY_ORDER: Record<IssueStatus, number> = { todo: 0, inprogress: 1, done: 2 };
 

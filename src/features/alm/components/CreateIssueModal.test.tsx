@@ -58,5 +58,5 @@ describe("이슈 만들기 (지라식 대화상자)", () => {
       const linkList = await listIssueLinks(created.id);
       expect(linkList.map((l) => l.other.key)).toContain("ALM-5");
     });
-  });
+  }, 30_000); // 만들기 대화상자 왕복 2회 + Select 여러 개 — 병렬 워커 부하에서 기본 15s를 넘긴다
 });

@@ -65,6 +65,7 @@ describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", ()
       startPage: "home",
       emailEnabled: false,
       mailConfigured: false,
+      avatarUrl: null,
     });
     const saved = await saveMyPreferences({ startPage: "projects" });
     const body = JSON.parse(spy.mock.calls[2][1]!.body as string);

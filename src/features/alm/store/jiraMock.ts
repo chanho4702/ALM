@@ -57,6 +57,7 @@ import type { IssueQuery } from "./searchQuery";
 import { getTemplate } from "./projectTemplates";
 import type { ProjectTemplateId } from "./projectTemplates";
 import { extractMentionIds, htmlToText, newMentionIds } from "./richText";
+import { seedDemoProject, type SampleDataApi } from "./sampleData";
 
 const STORAGE_KEY = "alm.jira.v1";
 
@@ -138,6 +139,27 @@ const BUILTIN_CATEGORIES: StatusCategory[] = [
 ];
 const STATUS_KIND_LIST: StatusKind[] = ["new", "active", "complete"];
 
+/**
+ * 기본 3상태의 시드 아이콘(lucide 키) — 서버 V20 시드와 같은 값이다.
+ * 그 밖의 상태는 빈 문자열이고, 화면이 카테고리 의미(kind)의 기본 아이콘으로 폴백한다.
+ */
+const BUILTIN_STATUS_ICONS: Record<string, string> = {
+  todo: "circle",
+  inprogress: "loader-circle",
+  done: "circle-check",
+};
+
+/**
+ * 미지정(`icon === ""`) 상태의 카테고리 의미(kind)별 기본 아이콘 — 서버 폴백 표와 같다.
+ * `components/labels.ts`의 `KIND_DEFAULT_STATUS_ICON`과 값이 같지만, 스토어가 화면 모듈을
+ * import 하지 않으려고 여기 둔다(labels는 lucide를 모르는 순수 로직 모듈이다).
+ */
+const KIND_STATUS_ICON: Record<StatusKind, string> = {
+  new: "circle",
+  active: "refresh-cw",
+  complete: "circle-check",
+};
+
 function categoryById(data: JiraData, id: string): StatusCategory {
   return (
     data.statusCategories.find((c) => c.id === id) ??
@@ -162,6 +184,13 @@ function enrichStatuses(data: JiraData, statuses: WorkflowStatus[]): WorkflowSta
       order: s.order,
       kind: category.kind,
       color: category.color,
+      /*
+       * 아이콘도 읽을 때만 채우는 파생이고, **워크플로 본문에서는 해석까지 끝낸 값**이다 —
+       * 미지정이면 여기서 kind 기본으로 채운다(서버 `SchemeQueries.enrich`와 같은 계약).
+       * 그래서 본문의 `icon`에는 빈 문자열이 오지 않는다. 레지스트리 조회(`listStatusDefs`)는
+       * 반대로 저장 원본을 그대로 주므로 `""`가 온다 — 편집기가 "미지정"을 보여야 하기 때문.
+       */
+      icon: def?.icon?.trim() || KIND_STATUS_ICON[category.kind],
     };
   });
 }
@@ -189,6 +218,7 @@ function applyBodyToRegistry(data: JiraData, body: SettingsBody): void {
         name: status.name.trim(),
         categoryId: status.category,
         description: "",
+        icon: BUILTIN_STATUS_ICONS[status.id] ?? "",
       });
       continue;
     }
@@ -270,6 +300,7 @@ function normalize(data: JiraData): JiraData {
   }
   data.shortcuts ??= [];
   data.preferences ??= {};
+  data.avatars ??= {};
   data.banner ??= { enabled: false, level: "info", message: "" };
   for (const issue of data.issues) {
     issue.dueDate ??= null;
@@ -362,9 +393,14 @@ function normalize(data: JiraData): JiraData {
           name: status.name,
           categoryId: status.category,
           description: "",
+          icon: BUILTIN_STATUS_ICONS[status.id] ?? "",
         });
       }
     }
+  }
+  // 아이콘 도입 전 데이터: 기본 3상태는 시드 아이콘, 나머지는 빈 문자열(= kind 기본 아이콘 폴백)
+  for (const def of data.statusDefs) {
+    def.icon ??= BUILTIN_STATUS_ICONS[def.id] ?? "";
   }
   const defaultScheme = data.schemes.find((s) => s.isDefault)!;
   for (const project of data.projects) {
@@ -392,7 +428,8 @@ function load(): JiraData {
     }
   }
   if (!cache) {
-    cache = normalize(createSeedData());
+    // dev 서버만 확장 시드(프로젝트 2·이슈 25) — 테스트는 종전 8건을 그대로 본다
+    cache = normalize(createSeedData({ rich: import.meta.env.MODE === "development" }));
     persist();
   }
   return cache;
@@ -416,14 +453,21 @@ export function __resetForTest(): void {
   cache = null;
 }
 
+/** 저장된 아바타(dataURL)를 붙여 돌려준다 — 없으면 null(화면은 이니셜 아바타로 떨어진다) */
+function withAvatar(data: JiraData, user: User): User {
+  return { ...user, avatarUrl: data.avatars[user.id] ?? null };
+}
+
 export async function listUsers(): Promise<User[]> {
-  return clone(load().users);
+  const data = load();
+  return clone(data.users.map((u) => withAvatar(data, u)));
 }
 
 export async function getCurrentUser(): Promise<User> {
-  const user = load().users.find((u) => u.id === CURRENT_USER_ID);
+  const data = load();
+  const user = data.users.find((u) => u.id === CURRENT_USER_ID);
   if (!user) throw new Error("현재 사용자를 찾을 수 없습니다");
-  return clone(user);
+  return clone(withAvatar(data, user));
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -496,7 +540,29 @@ export async function createProject(input: {
       labels: sample.labels,
     });
   }
+  // 데모 템플릿은 공용 시더(REST와 같은 코드)가 채운다
+  if (template.richSeed) await seedDemoProject(project, sampleDataApi());
   return clone(project);
+}
+
+/** 공용 시더(`sampleData.ts`)에 넘길 목업 함수 묶음 — REST 어댑터와 시그니처가 같다 */
+function sampleDataApi(): SampleDataApi {
+  return {
+    listUsers,
+    createComponent,
+    createVersion,
+    releaseVersion,
+    createSprint,
+    updateSprint,
+    startSprint,
+    completeSprint,
+    createIssue,
+    addIssueLink,
+    addComment,
+    addWorklog,
+    archiveIssue,
+    createDashboard,
+  };
 }
 
 /** 키는 이슈 키 접두어라 불변 — 이름/설명만 수정 가능 */
@@ -1038,10 +1104,10 @@ export async function listProjectMembers(projectId: string): Promise<ProjectMemb
   return clone(
     data.members
       .filter((member) => member.projectId === projectId)
-      .map((member) => ({
-        user: data.users.find((u) => u.id === member.userId),
-        role: member.role,
-      }))
+      .map((member) => {
+        const user = data.users.find((u) => u.id === member.userId);
+        return { user: user ? withAvatar(data, user) : undefined, role: member.role };
+      })
       .filter((row): row is ProjectMemberView => row.user !== undefined)
       .sort(
         (a, b) => ROLE_RANK[b.role] - ROLE_RANK[a.role] || a.user.name.localeCompare(b.user.name),
@@ -2788,6 +2854,8 @@ export async function createStatusDef(input: {
   name: string;
   categoryId: string;
   description?: string;
+  /** lucide 아이콘 키. 생략·빈 문자열이면 화면이 카테고리 의미의 기본 아이콘으로 그린다 */
+  icon?: string;
 }): Promise<StatusDef> {
   const data = load();
   const name = input.name.trim();
@@ -2803,6 +2871,7 @@ export async function createStatusDef(input: {
     name,
     categoryId: input.categoryId,
     description: input.description?.trim() ?? "",
+    icon: input.icon?.trim() ?? "",
   };
   data.statusDefs.push(def);
   persist();
@@ -2812,7 +2881,7 @@ export async function createStatusDef(input: {
 /** 이름·카테고리 변경은 쓰는 곳 전부에 즉시 반영된다 (저장된 캐시도 함께 맞춘다) */
 export async function updateStatusDef(
   id: string,
-  patch: Partial<Pick<StatusDef, "name" | "categoryId" | "description">>,
+  patch: Partial<Pick<StatusDef, "name" | "categoryId" | "description" | "icon">>,
 ): Promise<StatusDef> {
   const data = load();
   const def = data.statusDefs.find((d) => d.id === id);
@@ -2840,6 +2909,7 @@ export async function updateStatusDef(
     }
   }
   if (patch.description !== undefined) def.description = patch.description.trim();
+  if (patch.icon !== undefined) def.icon = patch.icon.trim();
   for (const body of allBodies(data)) {
     for (const status of body.statuses) {
       if (status.id !== id) continue;
@@ -3636,7 +3706,74 @@ function preferencesOf(data: JiraData, userId: string): UserPreferences {
 }
 
 export async function getMyPreferences(): Promise<UserPreferences> {
-  return clone(preferencesOf(load(), CURRENT_USER_ID));
+  const data = load();
+  return clone({ ...preferencesOf(data, CURRENT_USER_ID), avatarUrl: data.avatars[CURRENT_USER_ID] ?? null });
+}
+
+// ── 프로필 사진 (아바타) ─────────────────────────────────────
+//
+// 목업은 localStorage에 base64 dataURL로 넣는다(첨부와 달리 새로고침해도 남아야 하기 때문).
+// 그래서 서버(2MB)보다 훨씬 작은 상한을 둔다 — base64는 약 1.37배로 부풀고 localStorage는 5MB다.
+
+/** 목업 상한. REST 어댑터는 서버와 같은 2MB를 쓴다 — 화면은 이 값을 읽어 안내 문구를 만든다 */
+export const AVATAR_MAX_BYTES = 200 * 1024;
+
+/** 사진을 바꾸면 이미 그려진 아바타(상단바 등)가 갱신되도록 알린다 — 우선순위 레지스트리와 같은 방식 */
+export const AVATAR_CHANGED_EVENT = "alm:avatar-changed";
+export function notifyAvatarChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(AVATAR_CHANGED_EVENT));
+}
+export const AVATAR_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+
+/** 상한 문구용 — 서버가 "2MB"라고 말하므로 MB 단위가 떨어지면 MB로 쓴다 */
+export function formatAvatarLimit(maxBytes: number): string {
+  const mb = maxBytes / (1024 * 1024);
+  return Number.isInteger(mb) ? `${mb}MB` : `${Math.round(maxBytes / 1024)}KB`;
+}
+
+/**
+ * 목업·REST 공통 사전 검증. **문구는 서버(alm-backend V20)와 글자까지 같다** — 같은 파일이
+ * 모드에 따라 다른 문장으로 거부되면 안 된다.
+ *
+ * 이건 어디까지나 사전 검증이다. 서버는 확장자·MIME이 아니라 **매직 바이트**로 판별하므로
+ * (이름만 .png인 GIF, SVG 등) 여기를 통과해도 400이 날 수 있다 — 화면은 서버 `{error}`를
+ * 항상 그대로 띄워야 한다.
+ */
+export function assertAvatarFile(file: File, maxBytes: number): void {
+  if (file.size === 0) throw new Error("빈 파일은 올릴 수 없습니다");
+  if (!(AVATAR_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+    throw new Error("아바타는 PNG·JPG·WebP 이미지만 올릴 수 있습니다");
+  }
+  if (file.size > maxBytes) {
+    throw new Error(`아바타는 ${formatAvatarLimit(maxBytes)} 이하 이미지여야 합니다`);
+  }
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다"));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** 올린 사진을 즉시 보여줄 수 있는 URL(목업은 dataURL)로 돌려준다 */
+export async function uploadMyAvatar(file: File): Promise<string> {
+  assertAvatarFile(file, AVATAR_MAX_BYTES);
+  const dataUrl = await readAsDataUrl(file);
+  const data = load();
+  data.avatars[CURRENT_USER_ID] = dataUrl;
+  persist();
+  notifyAvatarChanged();
+  return dataUrl;
+}
+
+export async function removeMyAvatar(): Promise<void> {
+  const data = load();
+  delete data.avatars[CURRENT_USER_ID];
+  persist();
+  notifyAvatarChanged();
 }
 
 /** 부분 갱신 — 빠진 키는 그대로 */
@@ -3655,7 +3792,8 @@ export async function saveMyPreferences(patch: UserPreferencesPatch): Promise<Us
   };
   data.preferences[CURRENT_USER_ID] = next;
   persist();
-  return clone(next);
+  // 아바타는 preferences에 저장하지 않는다(별도 저장소) — 읽기 전용으로 얹어 돌려준다
+  return clone({ ...next, avatarUrl: data.avatars[CURRENT_USER_ID] ?? null });
 }
 
 export async function listProjectShortcuts(projectId: string): Promise<ProjectShortcut[]> {

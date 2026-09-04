@@ -259,12 +259,11 @@ describe("jiraApi issues", () => {
     };
     const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(response(200, sprintDto));
 
-    const sprint = await completeSprint("5", ["done", "released"]);
+    const sprint = await completeSprint("5");
 
     expect(spy.mock.calls[0][0]).toBe("/api/alm/sprints/5/complete");
-    expect(JSON.parse(spy.mock.calls[0][1]!.body as string)).toEqual({
-      doneStatuses: ["done", "released"],
-    });
+    // 완료 판정은 서버가 워크플로 의미로 한다 — 본문에 doneStatuses를 싣지 않는다
+    expect(JSON.parse(spy.mock.calls[0][1]!.body as string)).toEqual({});
     expect(sprint).toEqual({
       id: "5",
       projectId: "3",
@@ -359,11 +358,10 @@ describe("jiraApi sprints", () => {
       .spyOn(client, "sharedApiFetch")
       .mockResolvedValueOnce(response(200, { ...SPRINT, state: "DONE" as const }));
 
-    await completeSprint("12", ["done"], { moveUnfinishedTo: "13" });
+    await completeSprint("12", { moveUnfinishedTo: "13" });
 
     expect(spy.mock.calls[0][0]).toBe("/api/alm/sprints/12/complete");
     expect(JSON.parse(String(spy.mock.calls[0][1]?.body))).toEqual({
-      doneStatuses: ["done"],
       moveUnfinishedToSprintId: 13,
     });
   });
@@ -373,9 +371,9 @@ describe("jiraApi sprints", () => {
       .spyOn(client, "sharedApiFetch")
       .mockResolvedValueOnce(response(200, { ...SPRINT, state: "DONE" as const }));
 
-    await completeSprint("12", ["done"]);
+    await completeSprint("12");
 
-    expect(JSON.parse(String(spy.mock.calls[0][1]?.body))).toEqual({ doneStatuses: ["done"] });
+    expect(JSON.parse(String(spy.mock.calls[0][1]?.body))).toEqual({});
   });
 
   it("서버 오류 메시지를 그대로 올린다", async () => {
@@ -457,6 +455,35 @@ describe("jiraApi settings", () => {
     const statuses = await listProjectStatuses("3");
     expect(statuses.map((s) => s.id)).toEqual(["todo", "done"]);
     expect(statuses[1]).toMatchObject({ kind: "complete", color: "success" });
+  });
+
+  it("상태 레지스트리의 icon(V20)을 요청·응답 양쪽으로 그대로 실어 나른다", async () => {
+    const { createStatusDef, listStatusDefs, updateStatusDef } = await import("./jiraApi");
+
+    const listSpy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      response(200, [
+        { id: "todo", name: "할 일", categoryId: "todo", description: "", icon: "circle" },
+        // 서버가 빈 문자열을 주면 화면이 카테고리 의미의 기본 아이콘으로 폴백한다
+        { id: "st-1", name: "코드 리뷰", categoryId: "inprogress", description: "", icon: "" },
+      ]),
+    );
+    const defs = await listStatusDefs();
+    expect(listSpy.mock.calls[0][0]).toBe("/api/alm/settings/statuses");
+    expect(defs.map((d) => d.icon)).toEqual(["circle", ""]);
+
+    const createSpy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      response(201, { id: "st-2", name: "검토", categoryId: "inprogress", description: "", icon: "eye" }),
+    );
+    const created = await createStatusDef({ name: "검토", categoryId: "inprogress", icon: "eye" });
+    expect(JSON.parse(String(createSpy.mock.calls[0][1]?.body))).toMatchObject({ icon: "eye" });
+    expect(created.icon).toBe("eye");
+
+    const patchSpy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      response(200, { id: "st-2", name: "검토", categoryId: "inprogress", description: "", icon: "" }),
+    );
+    await updateStatusDef("st-2", { icon: "" });
+    expect(patchSpy.mock.calls[0][0]).toBe("/api/alm/settings/statuses/st-2");
+    expect(JSON.parse(String(patchSpy.mock.calls[0][1]?.body))).toEqual({ icon: "" });
   });
 
   it("이슈 타입 생성은 서버로 보내고 변경 이벤트를 쏜다", async () => {

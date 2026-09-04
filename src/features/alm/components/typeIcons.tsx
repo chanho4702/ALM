@@ -1,10 +1,32 @@
 import {
+  Archive,
+  Ban,
   Bell,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ChevronsDown,
   ChevronsUp,
+  Circle,
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  CircleDot,
+  CirclePause,
+  CircleSlash,
+  CircleX,
+  Clock,
   Equal,
+  Eye,
+  GitPullRequest,
+  Hourglass,
+  LoaderCircle,
+  Pause,
+  Play,
+  RefreshCw,
+  Search,
+  ThumbsUp,
+  Timer,
   Bookmark,
   Bug,
   CheckSquare,
@@ -28,8 +50,9 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 /**
- * 이슈 타입 아이콘 — lucide 전체를 번들에 넣지 않으려고 고른 목록만 이름으로 매핑한다.
- * 레지스트리(`IssueTypeDef.icon`)는 이 키를 저장한다. 없는 키는 체크 박스로 폴백.
+ * 이슈 타입·우선순위·상태 아이콘 — lucide 전체를 번들에 넣지 않으려고 고른 목록만 이름으로 매핑한다.
+ * 레지스트리(`IssueTypeDef.icon`·`PriorityDef.icon`·`StatusDef.icon`)는 이 키를 저장한다.
+ * 없는 키는 소비 측에서 폴백한다(타입=체크 박스, 상태=카테고리 의미 기본 아이콘).
  */
 export const TYPE_ICONS: Record<string, LucideIcon> = {
   "check-square": CheckSquare,
@@ -57,6 +80,29 @@ export const TYPE_ICONS: Record<string, LucideIcon> = {
   equal: Equal,
   "chevron-down": ChevronDown,
   "chevrons-down": ChevronsDown,
+  // ── 상태 아이콘 (StatusDef.icon) ──
+  circle: Circle,
+  "loader-circle": LoaderCircle,
+  "refresh-cw": RefreshCw,
+  "circle-check": CircleCheck,
+  "check-circle-2": CheckCircle2,
+  "circle-dot": CircleDot,
+  "circle-dashed": CircleDashed,
+  "circle-pause": CirclePause,
+  "circle-slash": CircleSlash,
+  "circle-alert": CircleAlert,
+  "circle-x": CircleX,
+  hourglass: Hourglass,
+  eye: Eye,
+  clock: Clock,
+  timer: Timer,
+  play: Play,
+  pause: Pause,
+  ban: Ban,
+  "git-pull-request": GitPullRequest,
+  search: Search,
+  "thumbs-up": ThumbsUp,
+  archive: Archive,
 };
 
 export const TYPE_ICON_OPTIONS: { value: string; label: string }[] = [
@@ -88,3 +134,34 @@ export const TYPE_ICON_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export const DEFAULT_TYPE_ICON = "check-square";
+
+/**
+ * 상태 레지스트리(`StatusDef.icon`)의 아이콘 후보. 첫 항목은 "카테고리 기본"(빈 문자열)이 아니라
+ * 실제 키만 담는다 — 빈 값 처리는 `StatusRegistryPanel`이 센티널로 한다(Select 빈 문자열 금지).
+ * 워크플로 상태는 "진행 정도"를 읽는 자리라 원형·시계·검토 계열로 좁혔다.
+ */
+export const STATUS_ICON_OPTIONS: { value: string; label: string }[] = [
+  { value: "circle", label: "빈 원" },
+  { value: "circle-dashed", label: "점선 원" },
+  { value: "circle-dot", label: "점 찍힌 원" },
+  { value: "loader-circle", label: "회전 원" },
+  { value: "refresh-cw", label: "새로 고침" },
+  { value: "circle-check", label: "체크 원" },
+  { value: "check-circle-2", label: "체크 원(굵게)" },
+  { value: "circle-pause", label: "일시정지 원" },
+  { value: "circle-slash", label: "빗금 원" },
+  { value: "circle-alert", label: "경고 원" },
+  { value: "circle-x", label: "엑스 원" },
+  { value: "hourglass", label: "모래시계" },
+  { value: "clock", label: "시계" },
+  { value: "timer", label: "타이머" },
+  { value: "eye", label: "눈(검토)" },
+  { value: "search", label: "돋보기" },
+  { value: "git-pull-request", label: "풀 리퀘스트" },
+  { value: "thumbs-up", label: "엄지" },
+  { value: "play", label: "재생" },
+  { value: "pause", label: "정지" },
+  { value: "ban", label: "금지" },
+  { value: "archive", label: "보관" },
+];
+

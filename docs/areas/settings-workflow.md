@@ -24,16 +24,56 @@
 - `kind: "new" | "active" | "complete"` — **완료 판정·해결 규칙·번다운·보드 정렬·요약 타일은 전부
   의미에서 파생**한다. 화면은 `labels.ts`의 `statusKind()`/`KIND_ORDER`/`KIND_LABELS`를 쓴다.
   `statusCategory()`는 이제 카테고리 **id**(string)를 돌려주며 스마트 검색의 카테고리 필터만 쓴다.
-- `StatusDef { id, name, categoryId, description }` — 레지스트리. 이름은 전역 유일. 워크플로가 쓰는 동안
+- `StatusDef { id, name, categoryId, description, icon }` — 레지스트리. 이름은 전역 유일. 워크플로가 쓰는 동안
   못 지우고, 카테고리를 옮겨 어떤 워크플로의 의미가 비게 되면 거부한다.
 - `SettingsBody.statuses`는 **참조 + 캐시**(`{ id, name, category, order }`). 읽을 때(`resolveSettings`·
-  `listSchemes`·`listProjectStatuses`·`statusMetaByProject`)는 레지스트리가 이기고 `kind`/`color`가
+  `listSchemes`·`listProjectStatuses`·`statusMetaByProject`)는 레지스트리가 이기고 `kind`/`color`/`icon`이
   채워져 온다. 저장할 때 본문의 이름·카테고리는 **레지스트리로 관통**된다(`applyBodyToRegistry`) —
   커스텀 본문에서 바꾼 이름도 전역이다(지라와 같음, 프로젝트별 별명은 없다).
 - 편집 UI: 전역 관리 → **상태 카테고리**(`StatusCategoriesPanel`) · **상태**(`StatusRegistryPanel`).
   워크플로 상태 편집기(`StatusEditor`)는 이름을 바꾸지 않고 **기존 상태 추가 / 새 상태 만들기(레지스트리
   즉시 등록) / 순서 / 빼기**만 한다. 새 상태는 모달을 취소해도 레지스트리에 남는다(상태 페이지에서 삭제).
 - 구버전 localStorage는 `normalize`가 스킴/커스텀에 적힌 상태로 레지스트리를 채운다(무마이그레이션).
+
+## 상태 아이콘 (2026-09-05)
+
+`StatusDef.icon` — lucide 키(`typeIcons.tsx`의 `TYPE_ICONS`)를 저장한다. 서버는 V20
+`status_def.icon VARCHAR(40) NOT NULL DEFAULT ''`이고, REST 어댑터는 매핑 없이 통과시킨다.
+**기본 3상태 시드는 서버·목업이 같다**: `todo → circle` · `inprogress → loader-circle` ·
+`done → circle-check`. 미지정(`""`)은 카테고리 의미(kind)의 기본으로 폴백한다 —
+`new → circle` · `active → refresh-cw` · `complete → circle-check`.
+
+**두 엔드포인트의 `icon` 의미가 다르다(2026-09-05 백엔드와 확정).** 이걸 섞으면 편집기가
+"미지정"을 못 보여 준다.
+
+| 출처 | `icon` 값 | 쓰는 곳 |
+|------|-----------|---------|
+| `GET/POST /settings/statuses`, `PUT /settings/statuses/{id}` (`listStatusDefs` 등) | **저장 원본** — `""`가 그대로 온다 | 레지스트리 편집기(“카테고리 기본” 표시) |
+| 워크플로 본문 `body.statuses[].icon` (`resolveSettings`·`listProjectStatuses`·`listSchemes`) | **해석된 값** — 서버·목업이 kind 기본으로 채워 `""`가 오지 않는다 | 모든 화면 |
+
+- 폴백 표는 세 곳에 같은 값으로 있다: 서버, 목업 `jiraMock.ts`의 `KIND_STATUS_ICON`
+  (`enrichStatuses`가 본문을 해석할 때), 화면 `labels.ts`의 `KIND_DEFAULT_STATUS_ICON`
+  (`statusIcon()`). 화면 폴백은 죽은 코드가 아니다 — **레지스트리에서 만든 목록**
+  (`StatusRegistryPanel`의 미리보기, `StatusEditor`의 `toEntry`)은 저장 원본을 쓰므로 `""`가 온다.
+- **쓰기 계약**: `PUT /settings/statuses/{id}`에서 `icon`을 **생략하면 유지**, `""`를 보내면
+  미지정으로 되돌린다. 그래서 아이콘 Select의 "카테고리 기본"은 반드시 `""`를 **명시적으로** 보낸다
+  (`undefined`/`null` 아님). 키가 40자를 넘으면 서버가 400 `아이콘 키가 너무 깁니다`를 준다.
+- 화면은 **`components/StatusGlyph.tsx`만** 쓴다 — `<StatusGlyph status={id} statuses={list} size={14|16} />`.
+  모양은 `labels.ts`의 `statusIcon()`, 색은 `statusAppearance()`(카테고리 색)에서 오고 아이콘 자체는 색을
+  모른다. **색만으로 구분하지 않는다** — 모양이 다르고, 옆에 늘 이름(Lozenge·머리글)이 있으며
+  `role="img"` + `aria-label="상태: 진행 중"`을 갖는다. 색은 `--chanho-color-text-*` 토큰뿐(하드코딩 금지).
+- 적용 위치: 보드 컬럼 머리글(옛 색 점 `.board-column-dot`을 대체·삭제), 이슈 목록·검색 표의 상태 셀,
+  백로그/스프린트 행, 홈 행, 요약 최근 업데이트, 이슈 상세의 상태 Select 트리거 왼쪽과 하위 이슈·링크 행,
+  상태 레지스트리·워크플로 편집기 행, 스킴 미리보기 스트립.
+  **DS Select의 옵션 렌더는 문자열만 받는다** — 그래서 옵션이 아니라 트리거 왼쪽에 세운다
+  (`.issue-status-field`).
+- `WorkflowStatus.icon`은 `kind`/`color`처럼 **읽을 때만 채워지는 파생**이다(목업 `enrichStatuses`,
+  서버 `SchemeQueries.enrich`). 저장 본문에는 넣지 않는다.
+- 편집 UI는 `StatusRegistryPanel`의 아이콘 Select(`STATUS_ICON_OPTIONS`). Radix 제약으로 "카테고리 기본"은
+  빈 문자열이 아니라 센티널(`__category__`)이다.
+- 같은 규칙으로 우선순위 아이콘은 `components/PriorityGlyph.tsx`가 그린다. `variant="icon"`은 호출부가
+  이름을 따로 그리는 자리용이고(중복 낭독 방지), 기본 `auto`는 아이콘을 못 그릴 때 이름이 보이는
+  Lozenge로 폴백한다.
 
 ## 전역 이슈 타입 레지스트리 (2026-08-30)
 

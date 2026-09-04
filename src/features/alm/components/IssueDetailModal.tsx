@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
-import { Avatar, Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
+import { Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
 import type {
   Activity,
   Comment,
@@ -46,12 +46,14 @@ import {
 } from "../store/jiraStore";
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { StatusGlyph } from "./StatusGlyph";
 import { useIssueTypes } from "./useIssueTypes";
 import { Plus } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
 import { WatchButton } from "./WatchButton";
+import { UserAvatar } from "./UserAvatar";
 import { RichTextEditor } from "./editor/RichTextEditor";
 import { RichTextView } from "./editor/RichTextView";
 import {
@@ -216,7 +218,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     // issueKey가 바뀔 때만 재조회 (toast/onClose는 재조회 트리거가 아니다)
   }, [issueKey]);
 
-  const userName = (id: string) => users.find((u) => u.id === id)?.name ?? "알 수 없음";
+  const userOf = (id: string) => users.find((u) => u.id === id);
+  const userName = (id: string) => userOf(id)?.name ?? "알 수 없음";
 
   const applyPatch = async (
     patch: Partial<
@@ -646,9 +649,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                       <IssueTypeGlyph type={child.type} />
                       <span className="issue-key-cell">{child.key}</span>
                       <span className="issue-relation-title">{child.title}</span>
-                      <Lozenge appearance={statusAppearance(statuses, child.status)}>
-                        {statusName(statuses, child.status)}
-                      </Lozenge>
+                      <span className="status-cell">
+                        <StatusGlyph status={child.status} statuses={statuses} />
+                        <Lozenge appearance={statusAppearance(statuses, child.status)}>
+                          {statusName(statuses, child.status)}
+                        </Lozenge>
+                      </span>
                     </button>
                     {grandChildrenOf(child.id).length > 0 ? (
                       <ul className="issue-relation-list issue-relation-nested" aria-label={`${child.key}의 하위 이슈`}>
@@ -662,9 +668,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                               <IssueTypeGlyph type={grand.type} />
                               <span className="issue-key-cell">{grand.key}</span>
                               <span className="issue-relation-title">{grand.title}</span>
-                              <Lozenge appearance={statusAppearance(statuses, grand.status)}>
-                                {statusName(statuses, grand.status)}
-                              </Lozenge>
+                              <span className="status-cell">
+                                <StatusGlyph status={grand.status} statuses={statuses} />
+                                <Lozenge appearance={statusAppearance(statuses, grand.status)}>
+                                  {statusName(statuses, grand.status)}
+                                </Lozenge>
+                              </span>
                             </button>
                           </li>
                         ))}
@@ -743,9 +752,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                           <IssueTypeGlyph type={other.type} />
                           <span className="issue-key-cell">{other.key}</span>
                           <span className="issue-relation-title">{other.title}</span>
-                          <Lozenge appearance={statusAppearance(statuses, other.status)}>
-                            {statusName(statuses, other.status)}
-                          </Lozenge>
+                          <span className="status-cell">
+                            <StatusGlyph status={other.status} statuses={statuses} />
+                            <Lozenge appearance={statusAppearance(statuses, other.status)}>
+                              {statusName(statuses, other.status)}
+                            </Lozenge>
+                          </span>
                         </button>
                         <Button
                           variant="ghost"
@@ -819,12 +831,16 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               .map((t) => ({ value: t.id, label: t.name }))}
             onValueChange={(v) => void applyPatch({ type: v }, "타입을 변경했습니다")}
           />
-          <Select
-            label="상태"
-            value={issue.status}
-            options={statuses.map((s) => ({ value: s.id, label: s.name }))}
-            onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
-          />
+          {/* DS Select의 옵션 렌더는 문자열만 받는다 — 글리프는 트리거 왼쪽에 둔다 */}
+          <div className="issue-status-field">
+            <StatusGlyph status={issue.status} statuses={statuses} size={16} />
+            <Select
+              label="상태"
+              value={issue.status}
+              options={statuses.map((s) => ({ value: s.id, label: s.name }))}
+              onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
+            />
+          </div>
           {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}
           {fields.resolution.visible && statusKind(statuses, issue.status) === "complete" ? (
             <Select
@@ -1054,7 +1070,13 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                     <CommentBlock
                       key={comment.id}
                       author={userName(comment.authorId)}
-                      avatar={<Avatar name={userName(comment.authorId)} size="small" />}
+                      avatar={
+                        <UserAvatar
+                          user={userOf(comment.authorId)}
+                          name={userName(comment.authorId)}
+                          size="small"
+                        />
+                      }
                       time={
                         comment.updatedAt
                           ? `${formatDateTime(comment.createdAt)} (수정됨)`
@@ -1158,7 +1180,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   <ul className="issue-worklog-list">
                     {worklogs.map((worklog) => (
                       <li key={worklog.id} className="issue-worklog-row">
-                        <Avatar name={userName(worklog.authorId)} size="small" />
+                        <UserAvatar
+                          user={userOf(worklog.authorId)}
+                          name={userName(worklog.authorId)}
+                          size="small"
+                        />
                         <span className="issue-worklog-author">{userName(worklog.authorId)}</span>
                         <span className="issue-worklog-date">{worklog.workedOn}</span>
                         <strong className="issue-worklog-hours">{worklog.hours}h</strong>

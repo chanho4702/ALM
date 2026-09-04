@@ -3,6 +3,7 @@ import { Button, Lozenge, Select, TextField, useToast } from "@chanho/react";
 import type { StatusCategory, StatusDef, StatusKind, WorkflowStatus } from "../store/types";
 import { createStatusDef, listStatusCategories, listStatusDefs } from "../store/jiraStore";
 import { KIND_LABELS } from "./labels";
+import { StatusGlyph } from "./StatusGlyph";
 
 const NONE = "none"; // Select는 빈 문자열 value를 쓰지 않는다
 
@@ -62,6 +63,7 @@ export function StatusEditor({ value, onChange }: StatusEditorProps) {
       order: value.length + 1,
       kind: category?.kind,
       color: category?.color,
+      icon: def.icon,
     };
   };
 
@@ -106,9 +108,12 @@ export function StatusEditor({ value, onChange }: StatusEditorProps) {
           const category = categoryOf(status.category);
           return (
             <li key={status.id} className="status-editor-row">
-              <Lozenge appearance={status.color ?? category?.color ?? "neutral"}>
-                {category?.name ?? status.category}
-              </Lozenge>
+              <span className="status-cell">
+                <StatusGlyph status={status.id} statuses={[status]} size={16} />
+                <Lozenge appearance={status.color ?? category?.color ?? "neutral"}>
+                  {category?.name ?? status.category}
+                </Lozenge>
+              </span>
               <span className="status-editor-name">{status.name}</span>
               <div className="status-editor-row-actions">
                 <Button

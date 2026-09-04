@@ -18,6 +18,7 @@ import {
   updateScheme,
 } from "../store/jiraStore";
 import { StatusEditor } from "../components/StatusEditor";
+import { StatusGlyph } from "../components/StatusGlyph";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { FieldConfigEditor } from "../components/FieldConfigEditor";
 import { normalizeFields, sameFields } from "../components/fieldConfig";
@@ -297,9 +298,10 @@ export function GlobalSettingsPage() {
                         {[...scheme.body.statuses]
                           .sort((a, b) => a.order - b.order)
                           .map((status) => (
-                            <Lozenge key={status.id} appearance={status.color ?? "neutral"}>
-                              {status.name}
-                            </Lozenge>
+                            <span key={status.id} className="status-cell">
+                              <StatusGlyph status={status.id} statuses={scheme.body.statuses} />
+                              <Lozenge appearance={status.color ?? "neutral"}>{status.name}</Lozenge>
+                            </span>
                           ))}
                       </div>
                       <div className="admin-scheme-actions">

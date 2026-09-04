@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { Avatar, Badge, Button, TopBar } from "@chanho/react";
+import { Badge, Button, TopBar } from "@chanho/react";
 import type { Issue, Notification, Project, User } from "../store/types";
 import {
+  AVATAR_CHANGED_EVENT,
   getCurrentUser,
   getIssueByKey,
   listNotifications,
@@ -18,6 +19,7 @@ import { NotificationsModal } from "./NotificationsModal";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { AnnouncementBanner } from "./AnnouncementBanner";
+import { UserAvatar } from "./UserAvatar";
 import { SettingsMenu } from "./SettingsMenu";
 import { useAuth } from "../../../auth/AuthGate";
 
@@ -45,8 +47,12 @@ export function AppShell({ projects }: AppShellProps) {
   const reloadNotifications = () => void listNotifications().then(setNotifications);
 
   useEffect(() => {
-    void getCurrentUser().then(setMe);
+    // 개인 설정에서 프로필 사진을 바꾸면 상단바 아바타도 바로 따라간다(새로고침 없이)
+    const loadMe = () => void getCurrentUser().then(setMe);
+    loadMe();
     reloadNotifications();
+    window.addEventListener(AVATAR_CHANGED_EVENT, loadMe);
+    return () => window.removeEventListener(AVATAR_CHANGED_EVENT, loadMe);
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -123,7 +129,7 @@ export function AppShell({ projects }: AppShellProps) {
                 </Button>
               </>
             ) : null}
-            {me ? <Avatar name={me.name} size="small" /> : null}
+            {me ? <UserAvatar user={me} size="small" /> : null}
           </>
         }
       />

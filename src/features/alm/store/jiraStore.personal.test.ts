@@ -85,6 +85,7 @@ describe("개인 설정(알림·자동 관찰·시작 화면)", () => {
       startPage: "home",
       emailEnabled: false,
       mailConfigured: false,
+      avatarUrl: null,
     });
   });
 

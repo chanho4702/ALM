@@ -11,6 +11,7 @@ import {
 import { listRecentProjectIds, listStarredProjectIds } from "../store/uiStore";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { StatusGlyph } from "../components/StatusGlyph";
 import {
   statusAppearance,
   statusKind,
@@ -195,9 +196,12 @@ export function HomePage() {
             </span>
           </span>
           {reason ? <Lozenge appearance={reason.appearance}>{reason.reason}</Lozenge> : null}
-          <Lozenge appearance={statusAppearance(statusList, issue.status)}>
-            {statusName(statusList, issue.status)}
-          </Lozenge>
+          <span className="status-cell">
+            <StatusGlyph status={issue.status} statuses={statusList} />
+            <Lozenge appearance={statusAppearance(statusList, issue.status)}>
+              {statusName(statusList, issue.status)}
+            </Lozenge>
+          </span>
         </button>
       </li>
     );

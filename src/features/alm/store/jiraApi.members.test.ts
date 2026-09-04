@@ -37,11 +37,11 @@ function fetchSpy(handler: (path: string, init?: RequestInit) => Response) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("jiraApi 사용자 디렉터리·멤버 (org-service)", () => {
-  it("사용자 목록은 ACTIVE 멤버만 보여준다", async () => {
-    fetchSpy(() => response(200, MEMBERS));
+  it("사용자 목록은 ACTIVE 멤버만 보여준다 (아바타 목록이 없으면 avatarUrl은 null)", async () => {
+    fetchSpy((path) => (path === "/api/org/members" ? response(200, MEMBERS) : response(404)));
     expect(await listUsers()).toEqual([
-      { id: "1", name: "Alice" },
-      { id: "2", name: "Bob" },
+      { id: "1", name: "Alice", avatarUrl: null },
+      { id: "2", name: "Bob", avatarUrl: null },
     ]);
   });
 
@@ -50,8 +50,8 @@ describe("jiraApi 사용자 디렉터리·멤버 (org-service)", () => {
     const members = await listProjectMembers("3");
     expect(spy).toHaveBeenCalledWith("/api/org/grants?resourceType=PROJECT&resourceId=3");
     expect(members).toEqual([
-      { user: { id: "1", name: "Alice" }, role: "admin" },
-      { user: { id: "2", name: "Bob" }, role: "editor" },
+      { user: { id: "1", name: "Alice", avatarUrl: null }, role: "admin" },
+      { user: { id: "2", name: "Bob", avatarUrl: null }, role: "editor" },
     ]);
   });
 
