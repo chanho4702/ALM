@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -11,9 +11,15 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
+const realLocationDescriptor = Object.getOwnPropertyDescriptor(window, "location")!;
+
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
+});
+
+afterEach(() => {
+  Object.defineProperty(window, "location", realLocationDescriptor);
 });
 
 describe("⚙ 설정 메뉴 (지라 설정 드롭다운 구조)", () => {
@@ -44,5 +50,33 @@ describe("⚙ 설정 메뉴 (지라 설정 드롭다운 구조)", () => {
     const nav = screen.getByRole("navigation", { name: "설정 메뉴" });
     expect(within(nav).getByText("이슈 항목")).toBeInTheDocument();
     expect(within(nav).getByRole("button", { name: "알림 설정" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("개인 설정 그룹의 'API 토큰'은 계정 포털로 전체 페이지 이동한다", async () => {
+    const assign = vi.fn();
+    // 토큰 화면은 다른 SPA(myFront /app)라 라우터가 아니라 window.location으로 나간다.
+    // jsdom의 실제 assign은 "Not implemented"를 던지므로 스텁으로 바꿔 호출만 확인한다.
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign },
+    });
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/projects"]}>
+          <App />
+          <LocationProbe />
+        </MemoryRouter>
+      </ToastProvider>,
+    );
+    await screen.findByRole("table", { name: "프로젝트 목록" });
+    await user.click(screen.getByRole("button", { name: "설정" }));
+    const menu = await screen.findByRole("menu");
+    const tokens = within(menu).getByRole("menuitem", { name: /API 토큰/ });
+    expect(tokens).toHaveTextContent("개인 토큰");
+    await user.click(tokens);
+    expect(assign).toHaveBeenCalledWith("/app/tokens");
+    // 라우터는 그대로 — 전체 이동이라 SPA 경로는 바뀌지 않는다
+    expect(screen.getByTestId("location")).toHaveTextContent("/projects");
   });
 });

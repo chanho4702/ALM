@@ -1,4 +1,4 @@
-import { Bell, FolderKanban, ListChecks, Settings, Server, SlidersHorizontal } from "lucide-react";
+import { Bell, FolderKanban, KeyRound, ListChecks, Settings, Server, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button, Dropdown } from "@chanho/react";
 
@@ -37,6 +37,14 @@ export function SettingsMenu() {
           description: "어떤 일이 있을 때 앱 내 알림을 받을지 정합니다",
           icon: <Bell size={16} />,
           onSelect: () => navigate("/settings/notifications"),
+        },
+        {
+          // 토큰 관리 화면은 계정 포털(myFront `/app`)에 있다 — 같은 오리진이지만 다른 SPA라
+          // 라우터가 아니라 전체 페이지 이동이다.
+          label: "API 토큰",
+          description: "스크립트·CI에서 쓰는 개인 토큰을 발급하고 폐기합니다",
+          icon: <KeyRound size={16} />,
+          onSelect: () => window.location.assign("/app/tokens"),
         },
         { separator: true },
         { heading: "ALM 관리자 설정" },
