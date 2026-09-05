@@ -26,6 +26,8 @@ import {
 import type {
   Attachment,
   ChangeField,
+  OrgMemberStatus,
+  OrgProfile,
   Issue,
   IssueChange,
   IssuePriority,
@@ -1465,7 +1467,7 @@ const avatarUrls = new Map<string, { path: string; url: string }>();
  * 안 보인다. 대신 진행 중인 요청만 합쳐(in-flight dedup) 한 번의 화면 로드에서 여러 번 부르지
  * 않게 한다. 비싼 쪽은 바이트이고 그건 아래 `avatarUrls`가 경로 단위로 막는다.
  */
-let myProfileInFlight: Promise<OrgMeDto | null> | null = null;
+let myProfileInFlight: Promise<OrgMeDto> | null = null;
 
 /** 이전 object URL을 브라우저에 돌려준다 — 사진 교체·삭제 때 쌓이지 않게 */
 function releaseAvatar(userId: string): void {
@@ -1503,6 +1505,11 @@ interface OrgMeDto extends OrgAvatarFields {
   id: number | string;
   displayName?: string | null;
   email?: string | null;
+  status?: string | null;
+  kind?: string | null;
+  globalRoles?: string[] | null;
+  teams?: { id: number | string; name: string; role: string }[] | null;
+  joinedVia?: string | null;
 }
 
 /** `PUT /api/org/me/avatar` 응답 */
@@ -1518,19 +1525,53 @@ function avatarPathOf(memberId: string, row: OrgAvatarFields): string | null {
   return `/api/org/members/${encodeURIComponent(memberId)}/avatar?v=${encodeURIComponent(updatedAt)}`;
 }
 
-function myProfile(): Promise<OrgMeDto | null> {
+/**
+ * `GET /api/org/me` 원본 — **실패하면 던진다**. 계정 상태 게이트는 조회 실패를 알아야 한다
+ * (삼키면 정지된 계정이 정상으로 보인다). 아바타 쪽은 아래 `myProfile()`이 따로 삼킨다.
+ */
+function fetchMyProfile(): Promise<OrgMeDto> {
   if (myProfileInFlight) return myProfileInFlight;
   myProfileInFlight = (async () => {
     try {
       return await json<OrgMeDto>(await sharedApiFetch("/api/org/me"));
-    } catch {
-      // 아바타는 부가 정보다 — 프로필 조회가 실패해도 화면은 이니셜로 그린다
-      return null;
     } finally {
       myProfileInFlight = null;
     }
   })();
   return myProfileInFlight;
+}
+
+function myProfile(): Promise<OrgMeDto | null> {
+  // 아바타는 부가 정보다 — 프로필 조회가 실패해도 화면은 이니셜로 그린다
+  return fetchMyProfile().catch(() => null);
+}
+
+const ORG_STATUSES: OrgMemberStatus[] = ["PENDING", "ACTIVE", "SUSPENDED", "DEACTIVATED"];
+
+/**
+ * 계정 상태·전역 역할의 단일 진실 소스(설계 §3.3). 예전의 `/api/org/me/permissions` GLOBAL ADMIN
+ * 조회를 대신한다 — 위키와 같은 응답을 보므로 두 앱의 관리자 판정이 갈라지지 않는다.
+ *
+ * 서버가 아직 필드를 안 주면(구버전) 상태는 ACTIVE로, 역할은 빈 배열로 읽는다. 상태를 모른 채
+ * PENDING으로 가정하면 멀쩡한 사용자가 승인 대기 화면에 갇힌다.
+ */
+export async function getMyOrgProfile(): Promise<OrgProfile> {
+  const dto = await fetchMyProfile();
+  const status = ORG_STATUSES.find((value) => value === dto.status) ?? "ACTIVE";
+  return {
+    id: String(dto.id),
+    displayName: dto.displayName ?? "",
+    email: dto.email ?? null,
+    status,
+    kind: dto.kind === "AGENT" ? "AGENT" : "HUMAN",
+    globalRoles: Array.isArray(dto.globalRoles) ? dto.globalRoles : [],
+    teams: (dto.teams ?? []).map((team) => ({
+      id: String(team.id),
+      name: team.name,
+      role: team.role === "LEAD" ? "LEAD" : "MEMBER",
+    })),
+    joinedVia: dto.joinedVia ?? null,
+  };
 }
 
 async function avatarObjectUrl(userId: string, path: string): Promise<string | null> {
@@ -1933,8 +1974,11 @@ const ROLE_RANK: Record<ProjectRole, number> = { viewer: 1, editor: 2, admin: 3 
  * ACTIVE 멤버만 — 비활성 계정은 담당자·멤버 선택 UI에 나오면 안 된다.
  * 아바타 경로는 org-service가 목록 행에 함께 준다(별도 병합 호출 없음).
  */
-export async function listUsers(): Promise<User[]> {
-  const rows = await json<OrgMemberDto[]>(await sharedApiFetch("/api/org/members"));
+export async function listUsers(query?: { q?: string }): Promise<User[]> {
+  // 서버가 이름·이메일 부분일치로 걸러 준다 — 목록 전체를 받아 화면에서 자르지 않는다.
+  const q = query?.q?.trim() ?? "";
+  const search = q === "" ? "" : `?q=${encodeURIComponent(q)}`;
+  const rows = await json<OrgMemberDto[]>(await sharedApiFetch(`/api/org/members${search}`));
   return Promise.all(
     rows
       .filter((m) => m.status === "ACTIVE")
@@ -2002,14 +2046,22 @@ function assertNotLastAdmin(grants: OrgGrantDto[], userId: string): void {
   if (!otherAdmin) throw new Error("프로젝트에는 관리자가 최소 한 명 필요합니다");
 }
 
-/** org-service grant는 역할 수정이 없다 — 기존 grant를 지우고 새 역할로 다시 만든다 */
+/**
+ * 역할 변경은 `PATCH /api/org/grants/{id}` 제자리 갱신이다(설계 §3.2). 예전의 "삭제 후 재생성"은
+ * 두 요청 사이에서 실패하면 멤버가 통째로 사라졌고, `grant_audit`에도 회수+부여로 남았다.
+ */
 export async function updateProjectMemberRole(projectId: string, userId: string, role: ProjectRole): Promise<void> {
   const grants = await projectGrants(projectId);
   const current = requireGrant(grants, userId);
   if (ROLE_FROM_ORG[current.role] === role) return;
   if (current.role === "ADMIN" && role !== "admin") assertNotLastAdmin(grants, userId);
-  await json(await sharedApiFetch(`/api/org/grants/${current.id}`, { method: "DELETE" }));
-  await createProjectGrant(projectId, userId, role);
+  await json(
+    await sharedApiFetch(`/api/org/grants/${current.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: ROLE_TO_ORG[role] }),
+    }),
+  );
 }
 
 export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
@@ -2019,11 +2071,32 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   await json(await sharedApiFetch(`/api/org/grants/${current.id}`, { method: "DELETE" }));
 }
 
+interface MyPermissionDto {
+  resourceType: string;
+  resourceId: string | null;
+  role: OrgGrantDto["role"];
+}
+
+/** 내 grant 전부 — 프로젝트 역할과 "어디든 관리자인가" 판정이 같은 응답을 읽는다 */
+async function myPermissions(): Promise<MyPermissionDto[]> {
+  return json<MyPermissionDto[]>(await sharedApiFetch("/api/org/me/permissions"));
+}
+
+/**
+ * 어느 프로젝트든 관리자인가 — 설계 §3.2의 "리소스 ADMIN도 초대할 수 있다"를 화면이 판정하는 값.
+ * 전역 관리자는 당연히 참이다. 허용 범위(자기 리소스로 제한)는 서버가 강제하므로 화면은
+ * 진입만 열고 거절 문구는 서버 것을 그대로 띄운다.
+ */
+export async function hasAnyProjectAdmin(): Promise<boolean> {
+  const rows = await myPermissions();
+  return rows.some(
+    (g) => g.role === "ADMIN" && (g.resourceType === "PROJECT" || g.resourceType === "GLOBAL"),
+  );
+}
+
 /** 내 역할 — PROJECT grant, 없으면 GLOBAL ADMIN, 그것도 없으면 null(멤버 아님) */
 export async function getMyProjectRole(projectId: string): Promise<ProjectRole | null> {
-  const rows = await json<{ resourceType: string; resourceId: string | null; role: OrgGrantDto["role"] }[]>(
-    await sharedApiFetch("/api/org/me/permissions"),
-  );
+  const rows = await myPermissions();
   const resourceId = String(toBackendId(projectId));
   const mine = rows.filter((g) => g.resourceType === "PROJECT" && g.resourceId === resourceId);
   if (mine.length > 0) {

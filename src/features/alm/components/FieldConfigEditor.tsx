@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Switch, Tabs } from "@chanho/react";
+import { Badge, Switch, Tabs } from "@chanho/react";
 import type { IssueFieldConfig, IssueTypeDef } from "../store/types";
 import {
   FIELD_IDS,
@@ -201,12 +201,23 @@ export function FieldConfigEditor({
               />
             ),
           },
-          ...tabTypes.map((type) => ({
-            value: type.id,
-            // 덮어쓴 타입은 말로 구분한다 — 기호(●)는 접근성 이름에 섞이고 읽히는 방식도 제각각이다
-            label: isFieldOverride(overrides[type.id]) ? `${type.name} (덮어씀)` : type.name,
-            content: typeTab(type),
-          })),
+          ...tabTypes.map((type) => {
+            const overridden = isFieldOverride(overrides[type.id]);
+            return {
+              value: type.id,
+              // 덮어쓴 타입은 배지로 눈에 띄게 하되, 읽히는 이름은 `ariaLabel`로 고정한다 —
+              // 노드 라벨은 스크린리더가 안쪽 텍스트를 이어붙이므로 이름이 흔들린다(react 0.9.0).
+              label: overridden ? (
+                <>
+                  {type.name} <Badge appearance="brand">덮어씀</Badge>
+                </>
+              ) : (
+                type.name
+              ),
+              ariaLabel: overridden ? `${type.name} (덮어씀)` : type.name,
+              content: typeTab(type),
+            };
+          }),
         ]}
       />
       <p className="field-config-legend">

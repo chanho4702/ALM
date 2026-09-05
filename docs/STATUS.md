@@ -129,14 +129,14 @@
 
 ## 디자인시스템 버전
 
-`@chanho/react` **0.8.0** · `@chanho/tokens` **0.4.0** (react 0.8.0/tokens 0.4.0: 모달 안 Select·Dropdown이 블랭킷에 가려 클릭 불가하던 버그 — z `popover` 층 추가; react 0.7.0: Dropdown 설명·그룹 제목·align, Table 열 너비 조절·순서 변경; wiki-front는 0.5.0 — 같은 버그가 있으니 올려야 한다).
+`@chanho/react` **0.9.0** · `@chanho/tokens` **0.4.0** · `@chanho/org-admin` **0.1.2**(플랫폼 공용 조직 관리 화면 — 위키와 같은 것을 `/settings/org/*`에 마운트한다) (react 0.8.0/tokens 0.4.0: 모달 안 Select·Dropdown이 블랭킷에 가려 클릭 불가하던 버그 — z `popover` 층 추가; react 0.7.0: Dropdown 설명·그룹 제목·align, Table 열 너비 조절·순서 변경; wiki-front는 0.5.0 — 같은 버그가 있으니 올려야 한다).
 S-03(2026-09-04)부터 GitHub Packages(`npm:@chanho4702/*` 별칭)로 받는다. 버전 고정은 `package.json`과 `pnpm-workspace.yaml` overrides **두 곳**에 있다 — 하나만 올리면 무시된다.
 CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만들므로, 고정 버전이 뒤처지면
 파일이 없어 설치 단계에서 끊긴다(8-20~8-29 실패 원인).
 
 ## 품질 상태
 
-- 테스트 **602 케이스 / 76 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **631 케이스 / 79 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 

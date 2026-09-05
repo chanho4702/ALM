@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
 import {
+  __resetForTest,
   addProjectMember,
+  getMyOrgProfile,
   getMyProjectRole,
+  hasAnyProjectAdmin,
   listProjectMembers,
   listUsers,
   removeProjectMember,
@@ -34,7 +37,10 @@ function fetchSpy(handler: (path: string, init?: RequestInit) => Response) {
     .mockImplementation((path: string, init?: RequestInit) => Promise.resolve(handler(path, init)));
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  __resetForTest();
+});
 
 describe("jiraApi 사용자 디렉터리·멤버 (org-service)", () => {
   it("사용자 목록은 ACTIVE 멤버만 보여준다 (행에 아바타가 없으면 avatarUrl은 null)", async () => {
@@ -43,6 +49,52 @@ describe("jiraApi 사용자 디렉터리·멤버 (org-service)", () => {
       { id: "1", name: "Alice", avatarUrl: null },
       { id: "2", name: "Bob", avatarUrl: null },
     ]);
+  });
+
+  it("내 조직 프로필은 /api/org/me 하나로 읽는다 — 상태·전역 역할·팀", async () => {
+    const spy = fetchSpy(() =>
+      response(200, {
+        id: 5,
+        displayName: "Alice",
+        email: "a@x",
+        status: "SUSPENDED",
+        kind: "HUMAN",
+        globalRoles: ["ADMIN"],
+        teams: [{ id: 2, name: "플랫폼", role: "LEAD" }],
+        joinedVia: "INVITE",
+      }),
+    );
+    expect(await getMyOrgProfile()).toEqual({
+      id: "5",
+      displayName: "Alice",
+      email: "a@x",
+      status: "SUSPENDED",
+      kind: "HUMAN",
+      globalRoles: ["ADMIN"],
+      teams: [{ id: "2", name: "플랫폼", role: "LEAD" }],
+      joinedVia: "INVITE",
+    });
+    expect(spy).toHaveBeenCalledWith("/api/org/me");
+  });
+
+  it("상태를 안 주는 서버(구버전)는 ACTIVE로 읽는다 — PENDING으로 가정하면 멀쩡한 사용자가 갇힌다", async () => {
+    fetchSpy(() => response(200, { id: 5, displayName: "Alice" }));
+    const profile = await getMyOrgProfile();
+    expect(profile.status).toBe("ACTIVE");
+    expect(profile.globalRoles).toEqual([]);
+  });
+
+  it("조회가 실패하면 던진다 — 게이트가 상태를 모른 채 앱을 열면 안 된다", async () => {
+    fetchSpy(() => response(503, { error: "권한 서비스에 연결할 수 없습니다" }));
+    await expect(getMyOrgProfile()).rejects.toThrow("권한 서비스에 연결할 수 없습니다");
+  });
+
+  it("사용자 검색은 서버에 q를 넘긴다 — 전체를 받아 화면에서 자르지 않는다", async () => {
+    const spy = fetchSpy(() => response(200, MEMBERS));
+    await listUsers({ q: " 앨 리스 " });
+    expect(spy).toHaveBeenCalledWith("/api/org/members?q=%EC%95%A8%20%EB%A6%AC%EC%8A%A4");
+    await listUsers({ q: "   " });
+    expect(spy).toHaveBeenLastCalledWith("/api/org/members");
   });
 
   it("프로젝트 멤버는 USER grant를 이름과 합쳐 역할 높은 순으로 보여준다", async () => {
@@ -67,20 +119,46 @@ describe("jiraApi 사용자 디렉터리·멤버 (org-service)", () => {
     );
   });
 
-  it("역할 변경은 기존 grant를 지우고 새로 만들며, 마지막 관리자는 강등할 수 없다", async () => {
+  it("역할 변경은 grant를 제자리에서 PATCH하고, 마지막 관리자는 강등할 수 없다", async () => {
     const spy = fetchSpy((path, init) => {
-      if (init?.method === "DELETE") return response(204);
-      if (init?.method === "POST") return response(201, GRANTS[0]);
+      if (init?.method === "PATCH") return response(200, { ...GRANTS[0], role: "ADMIN" });
       return path.startsWith("/api/org/grants") ? response(200, GRANTS) : response(200, MEMBERS);
     });
     await updateProjectMemberRole("3", "2", "admin");
     const methods = spy.mock.calls.map(([path, init]) => `${init?.method ?? "GET"} ${path}`);
-    expect(methods).toContain("DELETE /api/org/grants/10");
-    expect(methods).toContain("POST /api/org/grants");
+    expect(methods).toContain("PATCH /api/org/grants/10");
+    // 삭제 후 재생성으로 되돌아가면 두 요청 사이의 실패가 멤버를 통째로 날린다
+    expect(methods.some((m) => m.startsWith("DELETE") || m.startsWith("POST"))).toBe(false);
+    expect(spy).toHaveBeenCalledWith(
+      "/api/org/grants/10",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ role: "ADMIN" }) }),
+    );
 
     await expect(updateProjectMemberRole("3", "1", "viewer")).rejects.toThrow("프로젝트에는 관리자가 최소 한 명 필요합니다");
     await expect(removeProjectMember("3", "1")).rejects.toThrow("프로젝트에는 관리자가 최소 한 명 필요합니다");
     await expect(removeProjectMember("3", "9")).rejects.toThrow("프로젝트 멤버가 아닙니다");
+  });
+
+  it("초대 경로 판정은 PROJECT·GLOBAL ADMIN grant 하나면 열린다", async () => {
+    const spy = fetchSpy(() =>
+      response(200, [{ resourceType: "PROJECT", resourceId: "3", role: "ADMIN" }]),
+    );
+    expect(await hasAnyProjectAdmin()).toBe(true);
+    expect(spy).toHaveBeenCalledWith("/api/org/me/permissions");
+
+    vi.restoreAllMocks();
+    fetchSpy(() => response(200, [{ resourceType: "GLOBAL", resourceId: null, role: "ADMIN" }]));
+    expect(await hasAnyProjectAdmin()).toBe(true);
+
+    // 편집자는 초대할 수 없고, 스페이스 관리자는 ALM 프로젝트 초대의 근거가 아니다
+    vi.restoreAllMocks();
+    fetchSpy(() =>
+      response(200, [
+        { resourceType: "PROJECT", resourceId: "3", role: "EDITOR" },
+        { resourceType: "SPACE", resourceId: "DEV", role: "ADMIN" },
+      ]),
+    );
+    expect(await hasAnyProjectAdmin()).toBe(false);
   });
 
   it("내 역할은 me/permissions의 PROJECT grant(또는 GLOBAL ADMIN)에서 읽고, 없으면 null", async () => {

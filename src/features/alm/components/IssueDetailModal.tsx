@@ -49,7 +49,7 @@ import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { StatusGlyph } from "./StatusGlyph";
 import { useIssueTypes } from "./useIssueTypes";
-import { Plus } from "lucide-react";
+import { Plus, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
@@ -583,7 +583,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <span className="issue-ancestor-current">{issue.key}</span>
         </nav>
         <div className="issue-detail-toolbar">
-          <WatchButton issueId={issue.id} userNames={Object.fromEntries(users.map((u) => [u.id, u.name]))} />
+          <WatchButton issueId={issue.id} users={users} />
         </div>
       </div>
       <div className="issue-detail-body">
@@ -867,17 +867,33 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             />
           ) : null}
           {fields.assignee.visible ? (
-          <Select
-            label="담당자"
-            value={issue.assigneeId ?? UNASSIGNED}
-            options={[
-              { value: UNASSIGNED, label: "미지정" },
-              ...users.map((u) => ({ value: u.id, label: u.name })),
-            ]}
-            onValueChange={(v) =>
-              void applyPatch({ assigneeId: v === UNASSIGNED ? null : v }, "담당자를 변경했습니다")
-            }
-          />
+          /* 담당자는 이름만으로는 누군지 잘 안 붙는다 — 지라처럼 얼굴을 트리거 왼쪽에 세운다
+             (DS Select 옵션은 문자열만 받으므로 상태 필드와 같은 방식) */
+          <div className="issue-assignee-field">
+            {issue.assigneeId ? (
+              <UserAvatar
+                className="issue-assignee-face"
+                user={userOf(issue.assigneeId)}
+                name={userName(issue.assigneeId)}
+                size="small"
+              />
+            ) : (
+              <span className="issue-assignee-face issue-assignee-empty" aria-hidden="true">
+                <UserRound size={14} />
+              </span>
+            )}
+            <Select
+              label="담당자"
+              value={issue.assigneeId ?? UNASSIGNED}
+              options={[
+                { value: UNASSIGNED, label: "미지정" },
+                ...users.map((u) => ({ value: u.id, label: u.name })),
+              ]}
+              onValueChange={(v) =>
+                void applyPatch({ assigneeId: v === UNASSIGNED ? null : v }, "담당자를 변경했습니다")
+              }
+            />
+          </div>
           ) : null}
           {fields.priority.visible ? (
           <Select

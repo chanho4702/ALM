@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import {
+  Checkbox,
   EmptyState,
   Lozenge,
   Spinner,
@@ -195,7 +196,7 @@ export function IssueListPage() {
     issue.dueDate < today &&
     statusKind(statuses, issue.status) !== "complete";
 
-  // 표 위 툴바의 "모두 선택" — 현재 페이지 전체가 선택되어 있는가
+  // 표 머리글의 "모두 선택" — 현재 페이지 전체가 선택되어 있는가
   const allSelected = sortedIssues.length > 0 && sortedIssues.every((i) => selected.has(i.id));
 
   const toggleSelected = (id: string, checked: boolean) =>
@@ -253,10 +254,28 @@ export function IssueListPage() {
     {
       key: "select",
       adjustable: false,
-      header: "",
+      // "모두 선택"은 표 머리글 자리가 제자리다(지라·깃허브와 같다). 툴바에 놔두면 어느 열을
+      // 고르는지 눈으로 이어지지 않는다. 라벨은 시각만 숨기고 접근 이름은 남긴다(react 0.9.0).
+      header: (
+        <span className="issue-select">
+          <Checkbox
+            label="모두 선택"
+            labelHidden
+            checked={allSelected ? true : selected.size > 0 ? "indeterminate" : false}
+            onCheckedChange={(checked) =>
+              setSelected(checked === true ? new Set(sortedIssues.map((i) => i.id)) : new Set())
+            }
+          />
+        </span>
+      ),
+      // 헤더가 노드라 정렬 버튼·너비 조절 핸들이 쓸 이름을 따로 준다
+      ariaLabel: "선택",
       width: "44px",
       render: (issue) => (
-        // 행 클릭(상세 열기)과 분리 — 체크박스 클릭은 행으로 올라가지 않는다
+        // 행 클릭(상세 열기)과 분리 — 체크박스 클릭은 행으로 올라가지 않는다.
+        // 행은 DS Checkbox로 바꾸지 않았다: `labelHidden`도 라벨 텍스트("ALM-2 선택")를 DOM에
+        // 남겨, 이슈 행을 `/ALM-\d+/`로 찾는 질의가 전부 두 개를 물게 된다(정렬 테스트에서 실증).
+        // 텍스트를 남기지 않는 체크박스가 DS에 생기면 그때 함께 옮긴다.
         <span className="issue-select" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -482,20 +501,6 @@ export function IssueListPage() {
         ) : (
           <>
             <div className="issue-toolbar" role="toolbar" aria-label="이슈 목록 도구">
-              <span className="issue-toolbar-check">
-                <input
-                  type="checkbox"
-                  aria-label="모두 선택"
-                  checked={allSelected}
-                  ref={(el) => {
-                    // 일부만 고른 상태는 중간(indeterminate)으로 — DOM 속성이라 ref로만 세운다
-                    if (el) el.indeterminate = selected.size > 0 && !allSelected;
-                  }}
-                  onChange={(e) =>
-                    setSelected(e.target.checked ? new Set(sortedIssues.map((i) => i.id)) : new Set())
-                  }
-                />
-              </span>
               <span className="issue-toolbar-range">
                 {`${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} / ${total}건`}
               </span>

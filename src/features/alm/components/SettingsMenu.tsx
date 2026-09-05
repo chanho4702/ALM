@@ -1,13 +1,59 @@
-import { Bell, FolderKanban, KeyRound, ListChecks, Settings, Server, SlidersHorizontal } from "lucide-react";
+import {
+  Bell,
+  FolderKanban,
+  KeyRound,
+  ListChecks,
+  Server,
+  Settings,
+  SlidersHorizontal,
+  Users,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button, Dropdown } from "@chanho/react";
+import type { DropdownItem } from "@chanho/react";
+import { useOrgProfile } from "./OrgAccountGate";
+import { ORG_ADMIN_BASE } from "./SettingsSideNav";
 
 /**
  * 상단바 ⚙ 메뉴 — 지라의 설정 드롭다운과 같은 구조: 그룹 제목 아래 "아이콘 · 이름 · 설명" 항목.
- * 개인 설정(일반·알림) / ALM 관리자 설정(시스템·프로젝트·이슈 항목).
+ * 개인 설정(일반·알림) / ALM 관리자 설정(사용자·팀·시스템·프로젝트·이슈 항목).
+ *
+ * 관리자 그룹은 **전역 관리자에게만** 보인다. 판정은 `/api/org/me.globalRoles`(위키와 같은 응답)
+ * 하나이며, 예전처럼 관리자 엔드포인트를 찔러 403을 화면에 띄우지 않는다.
  */
 export function SettingsMenu() {
   const navigate = useNavigate();
+  const { isGlobalAdmin } = useOrgProfile();
+  const adminItems: DropdownItem[] = isGlobalAdmin
+    ? [
+        { separator: true },
+        { heading: "ALM 관리자 설정" },
+        {
+          label: "사용자·팀",
+          description: "사용자 초대, 팀과 전역 역할, 승인 대기 계정을 관리합니다",
+          icon: <Users size={16} />,
+          onSelect: () => navigate(ORG_ADMIN_BASE),
+        },
+        {
+          label: "시스템",
+          description: "공지 배너, 감사 로그, 시스템 현황을 관리합니다",
+          icon: <Server size={16} />,
+          onSelect: () => navigate("/settings/system"),
+        },
+        {
+          label: "프로젝트",
+          description: "프로젝트 세부, 사용자·권한, 바로 가기를 관리합니다",
+          icon: <FolderKanban size={16} />,
+          onSelect: () => navigate("/projects"),
+        },
+        {
+          label: "이슈 항목",
+          description: "이슈 타입, 상태 카테고리, 워크플로 스킴을 구성합니다",
+          icon: <ListChecks size={16} />,
+          onSelect: () => navigate("/settings/issue-types"),
+        },
+      ]
+    : [];
   return (
     <Dropdown
       align="end"
@@ -46,26 +92,7 @@ export function SettingsMenu() {
           icon: <KeyRound size={16} />,
           onSelect: () => window.location.assign("/app/tokens"),
         },
-        { separator: true },
-        { heading: "ALM 관리자 설정" },
-        {
-          label: "시스템",
-          description: "공지 배너, 감사 로그, 시스템 현황을 관리합니다",
-          icon: <Server size={16} />,
-          onSelect: () => navigate("/settings/system"),
-        },
-        {
-          label: "프로젝트",
-          description: "프로젝트 세부, 사용자·권한, 바로 가기를 관리합니다",
-          icon: <FolderKanban size={16} />,
-          onSelect: () => navigate("/projects"),
-        },
-        {
-          label: "이슈 항목",
-          description: "이슈 타입, 상태 카테고리, 워크플로 스킴을 구성합니다",
-          icon: <ListChecks size={16} />,
-          onSelect: () => navigate("/settings/issue-types"),
-        },
+        ...adminItems,
       ]}
     />
   );

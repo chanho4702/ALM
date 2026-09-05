@@ -10,6 +10,7 @@
 |---|---|---|
 | `/home` | HomePage | For you 홈: 인사말 → 이어서 하기 카드 → 추천 작업/나에게 배정됨/최근 업데이트/별표 탭 |
 | `/search` | SearchPage | 이슈 검색: 기본(필터 드롭다운)/스마트 2모드 → search.md |
+| `/settings/org/*` | OrgAdminPage(lazy) | **조직 관리** — 공용 패키지 `@chanho/org-admin`을 통째로 마운트한다(사용자·초대·팀·전역 역할·승인 대기). 위키(`/admin/org/*`)와 **같은 화면**이라 이 리포에 복제하지 않는다. `basePath="/settings/org"`, 인증 fetch는 `store/orgApi.ts`, 프로젝트 이름은 `resolveResource`로 호스트가 준다. **초대 화면만은 프로젝트 관리자도 진입**(설계 §3.2 — 리소스 ADMIN도 초대 가능, `hasAnyProjectAdmin()`으로 판정)하고 나머지 네 화면은 전역 관리자 전용이다. 목업 모드에서는 권한 통과 뒤 "REST 모드에서만" 안내. 프로젝트 권한 화면의 "초대하기"는 `?scope=PROJECT&resourceId=&role=EDITOR` 프리셋을 달아 보낸다(패키지가 읽고 쿼리를 즉시 지운다) |
 | `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `categories`(상태 카테고리)·`statuses`(상태 레지스트리)·`issue-types`(이슈 타입 레지스트리)·`fields`(필드 구성 — 스킴별 표시/필수)·`types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
 | `/projects` | ProjectListPage | 디렉터리: 테이블 기본(★/이름/키/이슈/생성일/⋯) + 카드 토글 + 검색 |
 | `/projects/new` | ProjectCreatePage | 템플릿(빈/스크럼/칸반/버그 트래킹/**데모 프로젝트**) 미리보기 생성. "데모 프로젝트"는 `store/sampleData.ts` 공용 시더가 이슈 46·스프린트 3·릴리스 3·컴포넌트 4·코멘트 15·워크로그 12를 채운다 — 목업·REST 같은 코드, 관리자 롤 불필요, 여러 번 만들면 키만 다른 데모가 하나씩 더 생긴다 |
@@ -28,6 +29,18 @@
 `IssueDetailModal`) — 어느 화면에서든 URL 공유 가능.
 
 ## 셸 관례
+
+- **계정 상태 게이트**: `AuthGate`(로그인) 뒤, 셸보다 바깥에 `OrgAccountGate`(`components/OrgAccountGate.tsx`)가
+  있다. `/api/org/me`를 **앱 전체에서 한 번** 읽어 PENDING(승인 대기, 공용 패키지 화면)·SUSPENDED·
+  DEACTIVATED면 셸 대신 안내를 그리고, 조회가 실패하면 앱을 열지 않는다(fail-closed). 통과한 값은
+  `useOrgProfile()`로 내려간다 — **전역 관리자 판정의 유일한 기준은 `globalRoles`에 `"ADMIN"`이
+  있는가**다(예전의 `/api/org/me/permissions` 찔러보기 없음). 프로바이더 밖에서는 관리자가 아니다.
+
+- 관리자 전용 구획(개인 설정 두 개를 뺀 `GLOBAL_SETTINGS_SECTIONS` 전부 + `사용자·팀`)은 사이드바와
+  ⚙ 메뉴에서 감춰지고, URL을 직접 쳐도 GlobalSettingsPage가 안내로 막는다(`isAdminOnlyGlobalSection`).
+  **예외는 `/settings/org/invitations` 하나**다 — 프로젝트 관리자도 사람을 초대할 수 있어야 하므로
+  라우트만 열어 둔다(메뉴에는 여전히 안 보이고, 링크는 프로젝트 설정의 "초대하기"뿐이다).
+  패키지 내비게이션에는 다섯 탭이 다 보이므로 다른 탭으로 넘어가면 그때 안내로 막힌다.
 
 - **설정 라우트(`/settings/*`, `/projects/:id/settings/*`)에서는 전역 사이드바 자리를 설정 사이드바
   (`SettingsSideNav`)가 차지한다** — 돌아가기 → 머리(무엇의 설정인가) → 구획 메뉴. 구획은 URL이

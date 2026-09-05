@@ -30,7 +30,9 @@
 
 - 해소: 사용자별 알림 저장(V9 `notification`) + 코멘트/상태/배정/멘션 알림, 개인 설정으로 끄기
 - 해소(2026-09-04): **이메일 알림** — 서버 V19 `EmailNotifier`(`ALM_MAIL_HOST`가 비면 발송 없이 알림함만),
-  개인 설정 "이메일로도 받기"(`emailEnabled`) + 서버 구성 여부(`mailConfigured`) 안내. 주소는 JWT email 스냅샷.
+  개인 설정 "이메일로도 받기"(`emailEnabled`) + 서버 구성 여부(`mailConfigured`) 안내. 주소는 발송 시점에
+  org-service 디렉터리(`GetMembers`)에서 읽고(2026-09-05), 못 읽으면 JWT email 스냅샷으로 폴백한다 —
+  둘 다 없으면 생략. 비활성(DEACTIVATED) 계정에는 보내지 않는다. 프론트 계약(`emailEnabled`·`mailConfigured`)은 그대로다.
 - 남음: 실시간 푸시(WebSocket/Web Push), 하루 요약(digest) 모드
 
 ## 4. 사용자/권한 (Role) — ✅ 해소(2026-08-30 org-service 연동)

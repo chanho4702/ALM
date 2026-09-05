@@ -9,10 +9,15 @@ import { App } from "../../../app/App";
 import "./ProjectSettingsPage";
 import { __resetForTest } from "../store/jiraStore";
 
-/** 현재 pathname을 노출하는 테스트 프로브 */
+/** 현재 pathname을 노출하는 테스트 프로브 (초대 링크는 쿼리 프리셋까지 본다) */
 function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="location">{location.pathname}</div>;
+  return (
+    <>
+      <div data-testid="location">{location.pathname}</div>
+      <div data-testid="search">{location.search}</div>
+    </>
+  );
 }
 
 function renderSettings() {
@@ -137,6 +142,55 @@ describe("프로젝트 사용자·권한", () => {
     await waitFor(() => {
       expect(within(members).getByText("최다인")).toBeInTheDocument();
     });
+  });
+
+  it("검색으로 후보를 좁히고, 좁혀서 사라진 선택은 비운다", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.click(
+      within(await screen.findByRole("navigation", { name: "설정 메뉴" })).getByRole("button", {
+        name: "사용자·권한",
+      }),
+    );
+    const members = await screen.findByRole("table", { name: "프로젝트 멤버" });
+    await user.click(within(members).getByRole("button", { name: "최다인 내보내기" }));
+    await waitFor(() => expect(within(members).queryByText("최다인")).not.toBeInTheDocument());
+
+    // 후보를 고른 뒤 검색으로 다른 사람만 남기면 선택이 풀린다
+    await user.click(screen.getByRole("combobox", { name: "추가할 사용자" }));
+    await user.click(await screen.findByRole("option", { name: "최다인" }));
+    await user.type(screen.getByRole("textbox", { name: "사용자 검색" }), "박준");
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "추가할 사용자" })).toHaveTextContent(
+        "사용자 선택",
+      ),
+    );
+
+    // 검색 결과에 없는 사람은 후보에서도 빠진다
+    await user.click(screen.getByRole("combobox", { name: "추가할 사용자" }));
+    expect(screen.queryByRole("option", { name: "최다인" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+  });
+
+  it("프로젝트 관리자에게 초대 화면으로 가는 프리셋 링크가 있다", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.click(
+      within(await screen.findByRole("navigation", { name: "설정 메뉴" })).getByRole("button", {
+        name: "사용자·권한",
+      }),
+    );
+    await screen.findByRole("table", { name: "프로젝트 멤버" });
+    await user.click(screen.getByRole("button", { name: "초대하기" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent("/settings/org/invitations"),
+    );
+    // 패키지(0.1.2)가 읽는 프리셋 — 초대 폼이 이 프로젝트 권한을 담은 채 열린다
+    expect(screen.getByTestId("search")).toHaveTextContent(
+      "?scope=PROJECT&resourceId=p1&role=EDITOR",
+    );
   });
 });
 

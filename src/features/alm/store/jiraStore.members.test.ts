@@ -10,7 +10,10 @@ import {
   deleteProject,
   purgeProject,
   getCurrentUser,
+  getMyOrgProfile,
+  hasAnyProjectAdmin,
   listProjectMembers,
+  listProjects,
   listUsers,
   removeProjectMember,
   updateProjectMemberRole,
@@ -131,6 +134,31 @@ describe("역할이 쓰기를 제한한다", () => {
     await expect(addProjectMember(project.id, "u3", "viewer")).rejects.toThrow(
       "프로젝트 관리자만 할 수 있습니다",
     );
+  });
+
+  it("목업 조직 프로필은 활성 전역 관리자다 — 목업 개발자는 모든 화면을 봐야 한다", async () => {
+    const profile = await getMyOrgProfile();
+    expect(profile.status).toBe("ACTIVE");
+    expect(profile.globalRoles).toContain("ADMIN");
+    expect(profile.id).toBe((await getCurrentUser()).id);
+  });
+
+  it("사용자 검색은 이름 부분일치이고, 공백만 넣으면 전체를 준다", async () => {
+    expect((await listUsers({ q: "서연" })).map((u) => u.name)).toEqual(["이서연"]);
+    expect(await listUsers({ q: "  " })).toHaveLength((await listUsers()).length);
+    expect(await listUsers({ q: "없는사람" })).toEqual([]);
+  });
+
+  it("어느 프로젝트든 관리자면 초대 경로가 열린다 — 관리자 자리를 잃으면 닫힌다", async () => {
+    expect(await hasAnyProjectAdmin()).toBe(true); // 시드: u1은 ALM 플랫폼 관리자
+
+    // 내가 관리하는 모든 프로젝트에서 관리자 자리를 넘긴다 (마지막 관리자 보호를 지키며)
+    for (const project of await listProjects()) {
+      await updateProjectMemberRole(project.id, "u2", "admin");
+      await updateProjectMemberRole(project.id, "u1", "viewer");
+    }
+
+    expect(await hasAnyProjectAdmin()).toBe(false);
   });
 
   it("멤버가 아니면 읽기도 쓰기도 막힌다 (쓰기 기준)", async () => {

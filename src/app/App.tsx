@@ -20,6 +20,8 @@ import { DashboardPage } from "../features/alm/pages/DashboardPage";
 import { HomePage } from "../features/alm/pages/HomePage";
 import { SearchPage } from "../features/alm/pages/SearchPage";
 import { GlobalSettingsPage } from "../features/alm/pages/GlobalSettingsPage";
+import { OrgAccountGate } from "../features/alm/components/OrgAccountGate";
+import { ORG_ADMIN_BASE } from "../features/alm/components/SettingsSideNav";
 
 /**
  * 리포트만 차트 라이브러리(recharts)를 쓴다 — 첫 화면 번들에 넣지 않고 라우트 단위로 쪼갠다.
@@ -44,7 +46,25 @@ const ReportsPage = lazy(() =>
   import("../features/alm/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })),
 );
 
+/** 조직 관리는 공용 패키지(@chanho/org-admin) 전체를 끌어온다 — 여는 사람만 내려받는다 */
+const OrgAdminPage = lazy(() =>
+  import("../features/alm/pages/OrgAdminPage").then((module) => ({ default: module.OrgAdminPage })),
+);
+
+/**
+ * 로그인(AuthGate) 뒤 계정 상태 게이트 — 승인 대기·정지 계정은 셸 대신 안내를 본다.
+ * 프로젝트 조회보다 **먼저** 놓는다: 그 계정은 org-service가 ALM 호출까지 403으로 막으므로
+ * 뒤에 두면 빈 스피너에 갇힌다. 전역 역할도 여기서 한 번 읽어 아래 화면들이 같은 판정을 쓴다.
+ */
 export function App() {
+  return (
+    <OrgAccountGate>
+      <AppRoutes />
+    </OrgAccountGate>
+  );
+}
+
+function AppRoutes() {
   const [projects, setProjects] = useState<Project[] | null>(null);
 
   const reload = useCallback(async () => {
@@ -75,6 +95,26 @@ export function App() {
         <Route path="/dashboards/:dashboardId" element={<DashboardViewPage />} />
         {/* 전역 관리 — 구획은 URL 세그먼트, 메뉴는 설정 사이드바(SettingsSideNav) */}
         <Route path="/settings" element={<Navigate to="/settings/types" replace />} />
+        {/*
+          조직 관리는 공용 패키지(@chanho/org-admin)가 자기 하위 경로를 정의하는 스플랫이다.
+          `/settings/org`(구획 없음)는 `/settings/:section`이 먼저 잡아 "없는 구획"으로 튕기므로
+          정적 경로로 한 줄 더 두고 목록으로 보낸다.
+        */}
+        <Route path={ORG_ADMIN_BASE} element={<Navigate to={`${ORG_ADMIN_BASE}/users`} replace />} />
+        <Route
+          path={`${ORG_ADMIN_BASE}/*`}
+          element={
+            <Suspense
+              fallback={
+                <div className="board-loading">
+                  <Spinner size="large" label="조직 관리 불러오는 중" />
+                </div>
+              }
+            >
+              <OrgAdminPage projects={projects} />
+            </Suspense>
+          }
+        />
         <Route path="/settings/:section" element={<GlobalSettingsPage />} />
         <Route
           path="/projects"

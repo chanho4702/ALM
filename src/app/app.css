@@ -1899,6 +1899,35 @@ body {
   padding-bottom: var(--chanho-space-100);
 }
 
+/* 담당자 필드 — 상태 필드와 같은 배치(트리거 왼쪽에 얼굴). 24px 아바타를 36px 트리거 가운데에 맞춘다 */
+.issue-assignee-field {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--chanho-space-75);
+}
+
+.issue-assignee-field > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.issue-assignee-face {
+  flex: none;
+  margin-bottom: var(--chanho-space-75);
+}
+
+/* 미지정 — 이니셜이 없으니 사람 실루엣만 흐리게 */
+.issue-assignee-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px dashed var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-full);
+  color: var(--chanho-color-text-subtle);
+}
+
 /* 속성 패널 필드 라벨 — 값이 주인공이라 라벨은 작고 흐리게 */
 .issue-props label {
   font-size: var(--chanho-font-size-75);
@@ -2378,18 +2407,6 @@ body {
   padding-inline: var(--chanho-space-50);
 }
 
-.issue-toolbar-check {
-  display: inline-flex;
-  align-items: center;
-}
-
-.issue-toolbar-check input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--chanho-color-background-brand);
-  cursor: pointer;
-}
 
 .issue-toolbar-range {
   font-size: var(--chanho-font-size-75);
@@ -3793,7 +3810,8 @@ th:last-child > [role="separator"] {
   align-items: center;
 }
 
-.issue-select input {
+/* 행의 날 체크박스 — 머리글은 DS Checkbox라 자식 선택자로 행만 겨냥한다 */
+.issue-select > input {
   width: 16px;
   height: 16px;
   margin: 0;
@@ -3855,6 +3873,53 @@ th:last-child > [role="separator"] {
 
 .watch-button-count {
   margin-left: var(--chanho-space-50);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 워처 얼굴 스택 + 토글 버튼 한 줄 */
+.watch-control {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+/* 지라식 겹친 아바타 — 누르면 전원 이름이 드롭다운으로 열린다 */
+.watcher-stack {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--chanho-radius-full);
+  background: none;
+  cursor: pointer;
+}
+
+.watcher-stack:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: 2px;
+}
+
+.watcher-stack > * + * {
+  margin-left: -6px;
+}
+
+/* 겹칠 때 서로 구분되도록 모달 배경색으로 테두리를 두른다 */
+.watcher-stack-face {
+  box-shadow: 0 0 0 2px var(--chanho-color-background-surface-overlay);
+}
+
+.watcher-stack-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--chanho-space-50);
+  border-radius: var(--chanho-radius-full);
+  box-shadow: 0 0 0 2px var(--chanho-color-background-surface-overlay);
+  background: var(--chanho-color-background-neutral-hovered);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
   font-variant-numeric: tabular-nums;
 }
 
@@ -4536,5 +4601,36 @@ th:last-child > [role="separator"] {
 .profile-card-actions {
   display: flex;
   align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+/* 계정 상태 게이트(승인 대기·정지·비활성) — 셸 없이 한 화면만 그린다 */
+.org-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--chanho-space-200);
+  min-height: 100vh;
+  padding: var(--chanho-space-400);
+  text-align: center;
+  color: var(--chanho-color-text);
+}
+
+.org-gate-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-300);
+  font-weight: 600;
+}
+
+.org-gate-body {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--chanho-color-text-subtle);
+  line-height: 1.6;
+}
+
+.org-gate-actions {
+  display: flex;
   gap: var(--chanho-space-100);
 }

@@ -10,6 +10,10 @@
   `render(<App/>)` 풀 마운트라는 점(아래 개선 후보).
 - pool 기본값(forks) + isolate=true라 파일마다 독립 jsdom — **`isolate: false`로 바꾸면
   26개 파일이 localStorage를 공유해 대량 파손된다. 바꾸지 말 것.**
+- `resolve.dedupe`에 `react-router`, `test.server.deps.inline`에 **`@chanho4702/org-admin`** —
+  `@chanho/org-admin`을 외부화하면 라우터가 두 벌 로드돼 `useLocation() may be used only in the
+  context of a <Router>`가 난다. inline 목록은 pnpm alias 이름(`@chanho/*`)이 아니라 **발행
+  스코프**(`@chanho4702/*`)로 적어야 매칭된다 — alias로 적으면 증상이 그대로 남는다.
 
 ## 관례
 

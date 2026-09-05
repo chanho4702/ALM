@@ -1,5 +1,6 @@
 import "@chanho/tokens/css";
 import "@chanho/react/styles.css";
+import "@chanho/org-admin/styles.css";
 import "./app.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

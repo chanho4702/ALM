@@ -287,3 +287,29 @@ project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 �
   구독해 새로고침 없이 따라온다. 새 아바타 소비처가 오래 살아 있다면 같은 이벤트를 구독할 것.
 - 위키·보드도 `/api/org/members`의 `avatarUrl`을 그대로 쓰면 같은 사진이 보인다(각 프론트의 표시
   적용은 별건). 목업(`jiraMock.ts`)은 이관과 무관하게 그대로다 — `data.avatars`에 dataURL을 넣는다.
+
+## 조직 프로필 · 사용자 검색 (2026-09-05)
+
+`getMyOrgProfile()`이 `GET /api/org/me`를 **계정 상태·전역 역할의 단일 진실 소스**로 읽는다
+(설계 §3.3: `{id, displayName, email, status, kind, globalRoles[], teams[], joinedVia}`). ALM이
+예전에 쓰던 `/api/org/me/permissions`의 `GLOBAL/ADMIN` grant 조회는 관리자 판정에서 빠졌다 —
+위키와 같은 응답을 봐야 두 앱이 같은 사람을 같게 본다. `getMyProjectRole`은 프로젝트 역할을
+읽는 것이므로 그대로 `me/permissions`를 쓴다.
+
+- 목업은 **항상 `{status: "ACTIVE", globalRoles: ["ADMIN"]}`**이다 — 목업 개발자가 승인 대기
+  화면에 갇히거나 관리자 화면을 못 보면 안 된다. 상태별 화면은 유닛 테스트가 프로필을 주입한다.
+- REST는 **실패하면 던진다**. 아바타가 쓰는 `myProfile()`만 따로 삼킨다(사진은 부가 정보).
+  진행 중 요청은 하나로 합치고(in-flight dedup) 캐시는 하지 않는다.
+- 서버가 `status`를 안 주면 `ACTIVE`로 읽는다. 모른다고 PENDING으로 가정하면 멀쩡한 사용자가
+  승인 대기 화면에 갇힌다.
+- `listUsers({ q })`가 사용자 검색이다. REST는 `GET /api/org/members?q=`(서버가 이름·이메일
+  부분일치), 목업은 이름 부분일치다. 빈 문자열·공백만이면 필터 없이 전체.
+- 프로젝트 역할 변경은 **`PATCH /api/org/grants/{id}`** 제자리 갱신이다(설계 §3.2). 삭제 후
+  재생성으로 되돌리지 말 것 — 두 요청 사이에서 실패하면 멤버가 통째로 사라진다.
+- `hasAnyProjectAdmin()`은 "어느 프로젝트든 관리자인가"다. 초대 화면 진입만 이 값으로 연다
+  (설계 §3.2). REST는 `getMyProjectRole`과 같은 `GET /api/org/me/permissions`를 읽고, 조회가
+  실패하면 화면이 닫는다. **허용 범위(자기 리소스로 제한)는 서버가 강제한다** — 화면은 진입만
+  열고 거절 문구는 서버 `{error}`를 그대로 띄운다.
+- `store/orgApi.ts`의 `orgApiFetch`가 `@chanho/org-admin`에 넘기는 인증 fetch다. REST 모드는
+  `sharedApiFetch` 그대로, 목업 모드는 `/api/org/me`만 목업 프로필로 답하고 나머지는 501
+  `{"error"}`로 거절한다(개발 서버가 index.html을 200으로 돌려주는 최악의 실패를 막는다).

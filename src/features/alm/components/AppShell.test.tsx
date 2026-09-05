@@ -156,7 +156,7 @@ describe("전역 만들기 타입 선택지", () => {
     await user.click(within(dialog).getByRole("combobox", { name: "상위 항목 *" }));
     await user.click(await screen.findByRole("option", { name: /ALM-1/ }));
     expect(within(dialog).getByRole("button", { name: "만들기" })).toBeEnabled();
-  });
+  }, 30_000); // 만들기 모달 + 타입 전환 + 상위 항목 선택 — 부하에서 15s를 넘긴다
 });
 
 describe("사이드바 프로젝트 메뉴", () => {

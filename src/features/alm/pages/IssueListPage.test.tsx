@@ -258,6 +258,12 @@ describe("IssueListPage 표 위 툴바", () => {
     renderIssues();
     await screen.findByText("ALM-1");
 
+    // "모두 선택"은 표 머리글 셀에 있다 — 툴바가 아니다
+    expect(screen.getByRole("checkbox", { name: "모두 선택" }).closest("th")).not.toBeNull();
+    expect(
+      within(screen.getByRole("toolbar", { name: "이슈 목록 도구" })).queryByRole("checkbox"),
+    ).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("checkbox", { name: "모두 선택" }));
     expect(await screen.findByRole("toolbar", { name: "대량 작업" })).toHaveTextContent("8개 선택");
 

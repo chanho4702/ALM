@@ -52,3 +52,23 @@ GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름�
   (`.reports-units.reports-units`).
 - **아이콘은 lucide-react.** 글자 기호(⋯ ☾ ⚙ 🔔)를 버튼 본문에 넣지 않는다 — 크기·정렬·다크모드가
   제각각이 된다.
+
+## 0.9.0에서 메운 갭 (2026-09-05)
+
+`@chanho/react` 0.9.0이 노드 라벨과 숨은 라벨을 받으면서 ALM의 임시방편 두 개가 없어졌다.
+
+- **표 머리글의 "모두 선택"**: `TableColumn.header`가 `ReactNode`라 이슈 목록 select 열 머리글에
+  `<Checkbox label="모두 선택" labelHidden>`을 넣는다. 헤더가 노드면 정렬 버튼·너비 조절 핸들이
+  쓸 이름이 없어지므로 **`column.ariaLabel`을 함께 준다**(여기서는 `"선택"`). 툴바에 있던 날
+  `<input type="checkbox">`와 `.issue-toolbar-check` CSS는 지웠다. 중간 상태는 DOM `indeterminate`
+  속성이 아니라 `checked="indeterminate"`로 준다 — 다만 **DS Checkbox에는 중간 상태 그림이 없어**
+  일부 선택이 미선택과 같아 보인다(`aria-checked="mixed"`는 맞다). 날 input이 그리던 대시가
+  사라진 것이라 `@chanho/react`에 표시를 추가하는 것이 남은 갭이다.
+  **행 체크박스는 날 `<input>` 그대로 둔다.** `labelHidden`은 시각만 숨기고 라벨 텍스트를 DOM에
+  남기므로, 행마다 "ALM-2 선택"이 생겨 이슈 행을 `/ALM-\d+/`로 찾는 질의가 두 개를 문다(마감일
+  정렬 테스트에서 실증). 텍스트를 남기지 않는 체크박스가 DS에 생기면 그때 옮긴다. 그래서 CSS는
+  `.issue-select > input`으로 **행만** 겨냥한다 — 머리글의 DS Checkbox에 닿으면 안 된다.
+- **탭 라벨의 배지**: `TabItem.label`도 `ReactNode`다. 필드 구성 편집기는 덮어쓴 이슈 타입을
+  `<>버그 <Badge appearance="brand">덮어씀</Badge></>`로 그리고 **`ariaLabel: "버그 (덮어씀)"`**로
+  읽히는 이름을 고정한다 — 노드 라벨은 스크린리더가 안쪽 텍스트를 이어붙여 이름이 흔들린다.
+  기존 테스트 셀렉터(`"버그 (덮어씀)"`)가 그대로 사는 이유가 이 `ariaLabel`이다.

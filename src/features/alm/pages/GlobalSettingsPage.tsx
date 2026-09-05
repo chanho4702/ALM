@@ -30,7 +30,12 @@ import {
 import {
   typeName,
 } from "../components/labels";
-import { GLOBAL_SETTINGS_SECTIONS, isGlobalSettingsSection } from "../components/SettingsSideNav";
+import {
+  GLOBAL_SETTINGS_SECTIONS,
+  isAdminOnlyGlobalSection,
+  isGlobalSettingsSection,
+} from "../components/SettingsSideNav";
+import { useOrgProfile } from "../components/OrgAccountGate";
 import { StatusCategoriesPanel } from "../components/StatusCategoriesPanel";
 import { StatusRegistryPanel } from "../components/StatusRegistryPanel";
 import { IssueTypesPanel } from "../components/IssueTypesPanel";
@@ -53,6 +58,7 @@ type Aspect = "workflow" | "types" | "fields";
 export function GlobalSettingsPage() {
   const toast = useToast();
   const { section = "types" } = useParams();
+  const { isGlobalAdmin } = useOrgProfile();
   const issueTypes = useIssueTypes();
   const aspect: Aspect =
     section === "workflows" ? "workflow" : section === "fields" ? "fields" : "types";
@@ -164,6 +170,21 @@ export function GlobalSettingsPage() {
   };
 
   if (!isGlobalSettingsSection(section)) return <Navigate to="/settings/types" replace />;
+
+  // 관리 구획은 사이드바·⚙ 메뉴에서 이미 감춰지지만, URL을 직접 친 경우가 남는다. 서버 403을
+  // 화면에 흘리는 대신 여기서 막는다 — 관리자 여부의 판정은 `/api/org/me` 하나다.
+  if (isAdminOnlyGlobalSection(section) && !isGlobalAdmin) {
+    return (
+      <main className="project-list-content settings-page">
+        <PageHeader title="ALM 관리" />
+        <Card padding="lg" title="전역 관리자만 볼 수 있습니다">
+          <p className="dash-empty">
+            이 설정은 전역 관리자 권한이 필요합니다. 접근이 필요하면 관리자에게 요청하세요.
+          </p>
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <main className="project-list-content settings-page">

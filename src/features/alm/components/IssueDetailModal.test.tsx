@@ -541,3 +541,41 @@ describe("IssueDetailModal 관심 등록", () => {
     expect(await within(dialog).findByRole("button", { name: /관심 등록/ })).toHaveTextContent("0");
   });
 });
+
+describe("IssueDetailModal 담당자·워처 아바타", () => {
+  it("담당자 필드에 얼굴이 붙고, 미지정으로 바꾸면 사라진다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/issues?issue=ALM-4"); // 시드: ALM-4 담당자 = 박준영
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByRole("combobox", { name: "담당자" })).toHaveTextContent("박준영");
+    expect(within(dialog).getByRole("img", { name: "박준영" })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("combobox", { name: "담당자" }));
+    await user.click(await screen.findByRole("option", { name: "미지정" }));
+
+    await waitFor(() => {
+      expect(within(dialog).queryByRole("img", { name: "박준영" })).not.toBeInTheDocument();
+    });
+    expect(within(dialog).getByRole("combobox", { name: "담당자" })).toHaveTextContent("미지정");
+  });
+
+  it("워처가 생기면 얼굴 스택이 붙고, 눌러 이름 목록을 볼 수 있다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/issues?issue=ALM-3");
+    const dialog = await screen.findByRole("dialog");
+
+    // 워처가 없으면 스택도 없다
+    await within(dialog).findByRole("button", { name: /관심 등록/ });
+    expect(within(dialog).queryByRole("button", { name: /관찰자/ })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: /관심 등록/ }));
+
+    const stack = await within(dialog).findByRole("button", { name: "관찰자 1명: 김찬호" });
+    await user.click(stack);
+
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByText("관찰자 1명")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "김찬호" })).toBeInTheDocument();
+  });
+});

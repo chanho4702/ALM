@@ -1,7 +1,15 @@
 import { ArrowLeft, Settings } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import type { Project } from "../store/types";
+import { useOrgProfile } from "./OrgAccountGate";
 import { ProjectAvatar } from "./ProjectAvatar";
+
+/**
+ * 조직 관리(공용 패키지 `@chanho/org-admin`)가 마운트된 경로.
+ * 라우트 상수는 여기 모아 둔다 — 페이지 모듈에 두면 상수 하나 때문에 그 무거운 화면이
+ * 첫 번들에 딸려 들어온다(App은 이 화면을 지연 로드한다).
+ */
+export const ORG_ADMIN_BASE = "/settings/org";
 
 /** 프로젝트 설정 구획 — URL 세그먼트(`/projects/:id/settings/:section`)와 메뉴 라벨 */
 export const PROJECT_SETTINGS_SECTIONS = [
@@ -14,7 +22,13 @@ export const PROJECT_SETTINGS_SECTIONS = [
   { id: "import", label: "가져오기" },
 ] as const;
 
-/** 전역 관리 구획 — `/settings/:section` */
+/**
+ * 전역 관리 구획 — `/settings/:section`.
+ *
+ * 개인 설정 둘을 뺀 나머지는 **전역 관리자(`/api/org/me.globalRoles`에 ADMIN)에게만** 보인다
+ * (`isAdminOnlyGlobalSection`). 예전에는 누구에게나 메뉴를 보여주고 서버 403을 화면에 띄웠는데,
+ * 그건 "권한이 있나"를 오류로 알려주는 UI였다. 판정을 org-service 한 곳으로 모은 뒤로는 감춘다.
+ */
 export const GLOBAL_SETTINGS_SECTIONS = [
   { id: "personal", label: "일반 설정", group: "개인 설정" },
   { id: "notifications", label: "알림 설정", group: "개인 설정" },
@@ -29,10 +43,19 @@ export const GLOBAL_SETTINGS_SECTIONS = [
   { id: "audit", label: "감사 로그", group: "시스템" },
   { id: "system", label: "시스템 현황", group: "시스템" },
   { id: "banner", label: "공지 배너", group: "시스템" },
+  // 조직 관리는 구획 하나가 아니라 공용 패키지(@chanho/org-admin)가 통째로 마운트되는
+  // 하위 트리(`/settings/org/*`)다 — 메뉴에서는 한 항목으로 보인다.
+  { id: "org", label: "사용자·팀", group: "시스템" },
 ] as const;
 
 export type ProjectSettingsSection = (typeof PROJECT_SETTINGS_SECTIONS)[number]["id"];
 export type GlobalSettingsSection = (typeof GLOBAL_SETTINGS_SECTIONS)[number]["id"];
+
+/** 전역 관리자에게만 여는 구획 — 개인 설정 두 개를 뺀 전부 */
+const PERSONAL_SECTIONS: readonly string[] = ["personal", "notifications"];
+
+export const isAdminOnlyGlobalSection = (value: string): boolean =>
+  isGlobalSettingsSection(value) && !PERSONAL_SECTIONS.includes(value);
 
 export const isProjectSettingsSection = (value: string): value is ProjectSettingsSection =>
   PROJECT_SETTINGS_SECTIONS.some((section) => section.id === value);
@@ -47,6 +70,9 @@ export interface SettingsSideNavProps {
   projects: Project[];
 }
 
+/** `/settings/org/users` 처럼 하위 경로가 있는 구획도 한 항목으로 활성 표시한다 */
+const sectionOf = (segment: string | undefined) => segment ?? "types";
+
 /**
  * 설정 전용 사이드바 — 설정에 들어오면 전역 사이드바 자리를 이것이 차지한다(지라의 프로젝트 설정
  * 사이드바). 돌아가기 → 머리(무엇의 설정인가) → 구획 메뉴. 구획은 URL이 진실이라 새로고침·공유가 된다.
@@ -54,6 +80,7 @@ export interface SettingsSideNavProps {
 export function SettingsSideNav({ projects }: SettingsSideNavProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { isGlobalAdmin } = useOrgProfile();
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/settings(?:\/([^/?]+))?/);
   const project = projectMatch ? projects.find((p) => p.id === projectMatch[1]) : undefined;
@@ -61,8 +88,10 @@ export function SettingsSideNav({ projects }: SettingsSideNavProps) {
 
   const items: ReadonlyArray<{ id: string; label: string; group?: string }> = project
     ? PROJECT_SETTINGS_SECTIONS
-    : GLOBAL_SETTINGS_SECTIONS;
-  const active = project ? (projectMatch?.[2] ?? "general") : (globalMatch?.[1] ?? "types");
+    : GLOBAL_SETTINGS_SECTIONS.filter(
+        (section) => isGlobalAdmin || !isAdminOnlyGlobalSection(section.id),
+      );
+  const active = project ? (projectMatch?.[2] ?? "general") : sectionOf(globalMatch?.[1]);
   const base = project ? `/projects/${project.id}/settings` : "/settings";
 
   const itemClass = (isActive: boolean) =>
