@@ -4430,6 +4430,43 @@ th:last-child > [role="separator"] {
   color: var(--chanho-color-text-subtle);
 }
 
+/* 기본 구성 + 이슈 타입별 덮어쓰기 탭 */
+.field-config-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.field-config-type {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+/* "기본 구성 따름" 줄 — 보이는 글자 옆에 스위치를 세운다(스위치 라벨은 접근성 이름용으로 숨김) */
+.field-config-follow {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-default);
+}
+
+.field-config-follow-state {
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-default);
+}
+
+/* 탭의 ● 뜻풀이 — 기호만으로 알리지 않는다 */
+.field-config-legend {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
 /* "완료 상태에서만 입력" 같은 행 도움말 — 색만으로 알리지 않고 문장으로 말한다 */
 .field-config-hint {
   display: block;

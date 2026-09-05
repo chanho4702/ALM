@@ -110,6 +110,7 @@ export function IssueListPage() {
     setLabelOptions([...new Set(all.flatMap((i) => i.labels))].sort());
     setStatuses(await listProjectStatuses(projectId));
     setComponentOptions(await listComponents(projectId));
+    // 대량 변경은 여러 타입이 섞이므로 타입별 덮어쓰기가 아니라 **기본 구성**으로 해석한다
     setFields(resolveFields((await resolveSettings(projectId)).body));
   }, [projectId, text, status, priority, assigneeId, label, componentId, type, page]);
 

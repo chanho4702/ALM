@@ -75,6 +75,15 @@ describe("필드 구성 — 검증", () => {
     );
   });
 
+  it("빈 id는 이름이 사라지는 문구 대신 따로 말한다", async () => {
+    await expect(
+      saveSchemeFields([{ id: "" as IssueFieldConfig["id"], visible: true, required: false }]),
+    ).rejects.toThrow("필드 id가 비어 있습니다");
+    await expect(
+      saveSchemeFields([{ visible: true, required: false } as IssueFieldConfig]),
+    ).rejects.toThrow("필드 id가 비어 있습니다");
+  });
+
   it("같은 필드를 두 번 넣을 수 없다", async () => {
     await expect(
       saveSchemeFields([
@@ -195,5 +204,138 @@ describe("필드 구성 — 만들기 필수 검사", () => {
     await expect(createIssue({ projectId: PROJECT, title: "마감일 없이 통과" })).resolves.toMatchObject(
       { title: "마감일 없이 통과" },
     );
+  });
+});
+
+/** 스킴 본문에 타입별 덮어쓰기를 저장한다 */
+async function saveSchemeFieldsByType(
+  byType: Record<string, IssueFieldConfig[]>,
+): Promise<void> {
+  const [scheme] = await listSchemes();
+  await updateScheme(scheme.id, { body: { ...scheme.body, fieldsByType: byType } });
+}
+
+describe("필드 구성 — 이슈 타입별 구성", () => {
+  it("덮어쓰기가 있는 타입만 키로 남고, 각 목록은 13종으로 채워진다", async () => {
+    await saveSchemeFieldsByType({ bug: fieldsWith("dueDate", { visible: false }) });
+
+    const resolved = await resolveSettings(PROJECT);
+    expect(Object.keys(resolved.body.fieldsByType ?? {})).toEqual(["bug"]);
+    expect(resolved.body.fieldsByType?.bug).toHaveLength(13);
+    expect(resolved.body.fieldsByType?.bug.find((f) => f.id === "dueDate")?.visible).toBe(false);
+    // 기본 구성은 그대로다 — 덮어쓰기는 그 타입에만 산다
+    expect(resolved.body.fields?.find((f) => f.id === "dueDate")?.visible).toBe(true);
+  });
+
+  it("덮어쓰기에 없는 필드는 기본 구성을 따른다", async () => {
+    await saveSchemeFields(fieldsWith("labels", { visible: false }));
+    // 마감일 하나만 담은 부분 덮어쓰기 — 나머지는 기본 구성 그대로여야 한다
+    await saveSchemeFieldsByType({ bug: [{ id: "dueDate", visible: false, required: false }] });
+
+    const resolved = await resolveSettings(PROJECT);
+    const bug = resolved.body.fieldsByType?.bug ?? [];
+    expect(bug.find((f) => f.id === "dueDate")?.visible).toBe(false);
+    expect(bug.find((f) => f.id === "labels")?.visible).toBe(false); // 기본 구성에서 물려받음
+    expect(bug.find((f) => f.id === "assignee")?.visible).toBe(true);
+  });
+
+  it("없는 이슈 타입을 키로 쓰면 거부한다", async () => {
+    await expect(saveSchemeFieldsByType({ ghost: fieldsWith("dueDate", { visible: false }) })).rejects.toThrow(
+      "없는 이슈 타입입니다: ghost",
+    );
+  });
+
+  it("타입별 목록도 기본 구성과 같은 규칙을 탄다", async () => {
+    await expect(
+      saveSchemeFieldsByType({ bug: fieldsWith("assignee", { visible: false, required: true }) }),
+    ).rejects.toThrow("숨긴 필드는 필수로 지정할 수 없습니다: 담당자");
+    await expect(
+      saveSchemeFieldsByType({ subtask: fieldsWith("parent", { required: true }) }),
+    ).rejects.toThrow("상위 항목은 최상위 이슈가 있어야 하므로 필수로 지정할 수 없습니다");
+    await expect(
+      saveSchemeFieldsByType({ bug: [{ id: "reporter" as IssueFieldConfig["id"], visible: true, required: false }] }),
+    ).rejects.toThrow("없는 필드입니다: reporter");
+  });
+
+  it("만들기 필수 검사는 요청의 타입으로 해석한다", async () => {
+    await saveSchemeFieldsByType({ bug: fieldsWith("dueDate", { required: true }) });
+
+    await expect(
+      createIssue({ projectId: PROJECT, title: "버그, 마감일 없음", type: "bug" }),
+    ).rejects.toThrow("마감일은 필수입니다");
+    // 덮어쓰기가 없는 타입은 기본 구성(비필수)을 따른다
+    await expect(
+      createIssue({ projectId: PROJECT, title: "작업은 통과", type: "task" }),
+    ).resolves.toMatchObject({ type: "task" });
+    await expect(
+      createIssue({ projectId: PROJECT, title: "버그, 마감일 있음", type: "bug", dueDate: "2026-09-30" }),
+    ).resolves.toMatchObject({ dueDate: "2026-09-30" });
+  });
+
+  it("타입별 덮어쓰기가 기본 구성의 필수를 풀 수도 있다", async () => {
+    await saveSchemeFields(fieldsWith("assignee", { required: true }));
+    await saveSchemeFieldsByType({ bug: fieldsWith("assignee", { required: false }) });
+
+    await expect(createIssue({ projectId: PROJECT, title: "작업", type: "task" })).rejects.toThrow(
+      "담당자는 필수입니다",
+    );
+    await expect(
+      createIssue({ projectId: PROJECT, title: "버그", type: "bug" }),
+    ).resolves.toMatchObject({ type: "bug" });
+  });
+
+  it("이슈 타입을 지우면 그 타입의 덮어쓰기도 사라진다", async () => {
+    const { createIssueType, deleteIssueType, listSchemes: schemes } = await import("./jiraStore");
+    const custom = await createIssueType({ name: "결함", level: "standard", icon: "bug", color: "danger" });
+    const [scheme] = await schemes();
+    await updateScheme(scheme.id, {
+      body: {
+        ...scheme.body,
+        enabledTypes: [...scheme.body.enabledTypes, custom.id],
+        fieldsByType: { [custom.id]: fieldsWith("dueDate", { visible: false }) },
+      },
+    });
+    expect((await resolveSettings(PROJECT)).body.fieldsByType?.[custom.id]).toHaveLength(13);
+
+    await deleteIssueType(custom.id);
+
+    const resolved = await resolveSettings(PROJECT);
+    expect(resolved.body.fieldsByType?.[custom.id]).toBeUndefined();
+    // 덮어쓰기가 하나도 없어도 맵 자체는 실린다(서버 응답 shape과 같게 — 키 생략 아님)
+    expect(resolved.body.fieldsByType).toEqual({});
+  });
+
+  it("프로젝트 커스텀도 타입별 덮어쓰기를 갖는다", async () => {
+    await setProjectCustom(PROJECT, true);
+    const resolved = await resolveSettings(PROJECT);
+    await updateProjectCustomSettings(PROJECT, {
+      ...resolved.body,
+      fieldsByType: { story: fieldsWith("estimate", { required: true }) },
+    });
+
+    await expect(
+      createIssue({ projectId: PROJECT, title: "스토리", type: "story" }),
+    ).rejects.toThrow("예상 시간은 필수입니다");
+    await expect(
+      createIssue({ projectId: PROJECT, title: "작업", type: "task" }),
+    ).resolves.toMatchObject({ type: "task" });
+  });
+
+  it("덮어쓰기가 없어도 fieldsByType는 빈 맵으로 실린다", async () => {
+    const [scheme] = await listSchemes();
+    expect(scheme.body.fieldsByType).toEqual({});
+    expect((await resolveSettings(PROJECT)).body.fieldsByType).toEqual({});
+  });
+
+  it("빈 목록은 오류가 아니라 '기본 구성 따름'이라 키째 사라진다", async () => {
+    await saveSchemeFieldsByType({ bug: [] });
+
+    const resolved = await resolveSettings(PROJECT);
+    expect(resolved.body.fieldsByType).toEqual({});
+    // 저장한 뒤에도 그 타입은 기본 구성으로 만들어진다
+    await saveSchemeFields(fieldsWith("dueDate", { required: true }));
+    await expect(
+      createIssue({ projectId: PROJECT, title: "버그", type: "bug" }),
+    ).rejects.toThrow("마감일은 필수입니다");
   });
 });

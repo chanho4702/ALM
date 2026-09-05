@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
 import { Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
@@ -11,6 +11,7 @@ import type {
   IssueResolution,
   IssueType,
   ProjectVersion,
+  SettingsBody,
   Sprint,
   User,
   WorkflowStatus,
@@ -111,8 +112,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const PRIORITIES = priorities.map((d) => d.id);
   const levelOf = (typeId: string) => typeLevel(issueTypes, typeId);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
-  /** 프로젝트 설정의 필드 구성 — 숨긴 필드는 속성 패널·첨부·링크·하위 이슈에서 뺀다 */
-  const [fields, setFields] = useState(() => resolveFields(null));
+  /** 프로젝트 설정 본문 — 필드 구성은 **이 이슈의 타입**으로 해석한다(타입별 덮어쓰기가 이긴다) */
+  const [settingsBody, setSettingsBody] = useState<SettingsBody | null>(null);
+  /** 숨긴 필드는 속성 패널·첨부·링크·하위 이슈에서 뺀다 */
+  const fields = useMemo(() => resolveFields(settingsBody, issue?.type), [settingsBody, issue?.type]);
   const [worklogHours, setWorklogHours] = useState("");
   const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [worklogComment, setWorklogComment] = useState("");
@@ -208,7 +211,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       if (!cancelled) {
         setEnabledTypes(settings.body.enabledTypes);
         setStatuses([...settings.body.statuses].sort((a, b) => a.order - b.order));
-        setFields(resolveFields(settings.body));
+        setSettingsBody(settings.body);
       }
       await refreshRelations(found.id, found.projectId);
     })();

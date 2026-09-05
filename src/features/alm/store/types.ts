@@ -427,10 +427,15 @@ export interface SettingsBody {
   /** 우선순위 없이 만든 이슈에 붙는 값 — enabledPriorities 안에 있어야 한다 */
   defaultPriority: IssuePriority;
   /**
-   * 이슈 필드 구성 — 없거나 비면 13종 전부 `visible:true, required:false`.
+   * 이슈 필드 구성의 **기본 구성**(모든 타입) — 없거나 비면 13종 전부 `visible:true, required:false`.
    * 모르는 id는 거부하고, 빠진 id는 읽을 때 기본값으로 채운다(구버전 호환).
    */
   fields?: IssueFieldConfig[];
+  /**
+   * 이슈 타입별 덮어쓰기 — 키는 이슈 타입 레지스트리 id다. 키가 없는 타입은 기본 구성을 따른다.
+   * 읽을 때는 덮어쓰기가 있는 타입만 키로 남고 각 목록은 13종 전부로 채워진다.
+   */
+  fieldsByType?: Record<IssueType, IssueFieldConfig[]>;
 }
 
 /** 지라식 설정 스킴 — 전역 관리가 정의하고 프로젝트에 배정한다 */

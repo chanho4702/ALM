@@ -74,6 +74,9 @@
 - **데모 프로젝트 템플릿**: 만들기 위저드 "데모 프로젝트" — `store/sampleData.ts` 시더가 파사드 함수만 호출해 목업·REST 공용
   (이슈 46·스프린트 3·릴리스 3·컴포넌트 4·코멘트 15·워크로그 12·링크 5·대시보드 1). 실제 스택에 더미를 넣을 때도 이 템플릿.
   목업 dev 기본 시드는 `rich`(프로젝트 2·이슈 25) — 테스트는 종전 8건 유지.
+- **타입별 필드 구성**(사용자 결정 2026-09-05): `SettingsBody.fieldsByType` — 기본 구성 위에 이슈 타입별 덮어쓰기(필드 단위, 저장 시 13개 스냅샷).
+  편집기는 `기본` + 활성 타입 탭, 타입 탭의 "기본 구성 따름" 스위치(켜면 키 제거). 만들기 모달은 선택 타입으로 재해석, 상세는 `issue.type`, 대량 변경은 기본.
+  `parent`·`resolution` 필수 금지는 타입 탭에도 동일. 비활성 타입의 덮어쓰기는 보존, 레지스트리 삭제 때만 정리(서버 343b4c6).
 - **경계면 버그**: REST `completeSprint`/`releaseVersion`이 `(id, doneStatuses, options)`라 화면 호출 `(id, options)`와 어긋나
   REST 모드에서 스프린트 완료·릴리스가 깨졌었다 → 서버가 워크플로 의미로 완료를 판정하고 어댑터를 목업과 같은 시그니처로 통일.
 
@@ -133,7 +136,7 @@ CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만
 
 ## 품질 상태
 
-- 테스트 **584 케이스 / 76 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **600 케이스 / 76 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 

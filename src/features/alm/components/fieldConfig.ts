@@ -35,27 +35,64 @@ export const DEFAULT_FIELDS: IssueFieldConfig[] = FIELD_IDS.map((id) => ({
 
 export const defaultFields = (): IssueFieldConfig[] => DEFAULT_FIELDS.map((f) => ({ ...f }));
 
+/** 필드 구성이 실린 본문 조각 — 기본 구성 + 이슈 타입별 덮어쓰기 */
+export type FieldConfigSource = Pick<SettingsBody, "fields" | "fieldsByType">;
+
 /**
  * 본문의 필드 구성을 id → 설정 맵으로 해석한다. 없는 id는 기본값(표시·비필수)으로 채우므로
  * 화면은 언제나 13종 전부를 조회할 수 있다.
+ *
+ * `typeId`를 주면 그 타입의 덮어쓰기(`fieldsByType[typeId]`)를 **필드 단위로** 기본 구성 위에
+ * 얹는다 — 덮어쓰기에 없는 id는 기본 구성을 그대로 따른다(서버·목업과 같은 규칙).
  */
 export function resolveFields(
-  body?: Pick<SettingsBody, "fields"> | null,
+  body?: FieldConfigSource | null,
+  typeId?: string | null,
 ): Record<IssueFieldId, IssueFieldConfig> {
-  const byId = new Map((body?.fields ?? []).map((f) => [f.id, f]));
+  const base = new Map((body?.fields ?? []).map((f) => [f.id, f]));
+  const override = new Map(
+    ((typeId && body?.fieldsByType?.[typeId]) || []).map((f) => [f.id, f]),
+  );
   return Object.fromEntries(
     FIELD_IDS.map((id) => {
-      const found = byId.get(id);
+      const found = override.get(id) ?? base.get(id);
       return [id, { id, visible: found?.visible ?? true, required: found?.required ?? false }];
     }),
   ) as Record<IssueFieldId, IssueFieldConfig>;
 }
 
 /** 본문의 필드 구성을 13종 전부·고정 순서의 배열로 — 편집기 초안의 원천 */
-export const normalizeFields = (body?: Pick<SettingsBody, "fields"> | null): IssueFieldConfig[] => {
-  const map = resolveFields(body);
+export const normalizeFields = (
+  body?: FieldConfigSource | null,
+  typeId?: string | null,
+): IssueFieldConfig[] => {
+  const map = resolveFields(body, typeId);
   return FIELD_IDS.map((id) => ({ ...map[id] }));
 };
+
+/**
+ * 이 목록이 덮어쓰기인가 — **빈 목록은 "기본 구성 따름"** 이다(서버도 빈 목록 키를 버린다).
+ * `Boolean([])`가 참이라 길이로 판정해야 한다.
+ */
+export const isFieldOverride = (fields?: IssueFieldConfig[] | null) => (fields?.length ?? 0) > 0;
+
+/** 이 타입이 기본 구성을 덮어쓰고 있는가 — 탭의 ● 표시와 "기본 구성 따름" 스위치의 원천 */
+export const hasTypeOverride = (body: FieldConfigSource | null | undefined, typeId: string) =>
+  isFieldOverride(body?.fieldsByType?.[typeId]);
+
+/**
+ * 본문의 타입별 덮어쓰기를 편집기 초안 형태로 — 덮어쓰기가 있는 타입만 키로 남기고
+ * 각 목록을 13종·고정 순서로 채운다. 빠진 id는 **기본 구성**을 따른다(해석과 같은 규칙).
+ * 빈 목록 키는 "기본 구성 따름"이므로 버린다(서버 정규화와 같다).
+ */
+export const normalizeFieldsByType = (
+  body?: FieldConfigSource | null,
+): Record<string, IssueFieldConfig[]> =>
+  Object.fromEntries(
+    Object.keys(body?.fieldsByType ?? {})
+      .filter((typeId) => hasTypeOverride(body, typeId))
+      .map((typeId) => [typeId, normalizeFields(body, typeId)]),
+  );
 
 /** 두 구성이 같은가 — 저장 버튼 dirty 판정 */
 export const sameFields = (a: IssueFieldConfig[], b: IssueFieldConfig[]) =>
@@ -65,6 +102,20 @@ export const sameFields = (a: IssueFieldConfig[], b: IssueFieldConfig[]) =>
     return (left?.visible ?? true) === (right?.visible ?? true) &&
       (left?.required ?? false) === (right?.required ?? false);
   });
+
+/** 타입별 덮어쓰기 맵이 같은가 — 키 집합과 각 구성을 함께 본다(저장 버튼 dirty 판정) */
+export const sameFieldsByType = (
+  a?: Record<string, IssueFieldConfig[]> | null,
+  b?: Record<string, IssueFieldConfig[]> | null,
+) => {
+  const left = a ?? {};
+  const right = b ?? {};
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  return [...keys].every(
+    (key) => isFieldOverride(left[key]) === isFieldOverride(right[key]) &&
+      (!isFieldOverride(left[key]) || sameFields(left[key], right[key])),
+  );
+};
 
 /** 필수 표시 — 라벨 뒤에 `*`를 붙인다(요약·프로젝트와 같은 표기) */
 export const withRequiredMark = (label: string, required: boolean) =>

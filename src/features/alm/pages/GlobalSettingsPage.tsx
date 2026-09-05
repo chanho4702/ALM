@@ -21,7 +21,12 @@ import { StatusEditor } from "../components/StatusEditor";
 import { StatusGlyph } from "../components/StatusGlyph";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { FieldConfigEditor } from "../components/FieldConfigEditor";
-import { normalizeFields, sameFields } from "../components/fieldConfig";
+import {
+  normalizeFields,
+  normalizeFieldsByType,
+  sameFields,
+  sameFieldsByType,
+} from "../components/fieldConfig";
 import {
   typeName,
 } from "../components/labels";
@@ -55,6 +60,10 @@ export function GlobalSettingsPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   /** 스킴 id → 필드 구성 초안 (필드 구성 구획은 카드 안에서 바로 편집한다) */
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, IssueFieldConfig[]>>({});
+  /** 스킴 id → 이슈 타입별 덮어쓰기 초안 (키가 없는 타입은 기본 구성을 따른다) */
+  const [fieldTypeDrafts, setFieldTypeDrafts] = useState<
+    Record<string, Record<string, IssueFieldConfig[]>>
+  >({});
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<SettingsScheme | null>(null);
   const [editTypes, setEditTypes] = useState<IssueType[]>([]);
@@ -70,6 +79,9 @@ export function GlobalSettingsPage() {
     const list = await listSchemes();
     setSchemes(list);
     setFieldDrafts(Object.fromEntries(list.map((s) => [s.id, normalizeFields(s.body)])));
+    setFieldTypeDrafts(
+      Object.fromEntries(list.map((s) => [s.id, normalizeFieldsByType(s.body)])),
+    );
     const { countSchemeProjects } = await import("../store/jiraStore");
     const entries = await Promise.all(
       list.map(async (s) => [s.id, await countSchemeProjects(s.id)] as const),
@@ -94,6 +106,10 @@ export function GlobalSettingsPage() {
     }
     await reload();
   };
+
+  /** 필드 구성 탭에 세울 이슈 타입 — 스킴의 활성 타입을 레지스트리 순서로(하위 작업 포함) */
+  const tabTypesOf = (scheme: SettingsScheme) =>
+    issueTypes.filter((type) => scheme.body.enabledTypes.includes(type.id));
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -205,6 +221,7 @@ export function GlobalSettingsPage() {
               끈 필드는 이슈 만들기·상세 속성 패널·대량 변경에서 사라집니다(데이터는 남습니다).
               필수 필드는 만들기에서 값이 없으면 저장되지 않습니다. 해결과 상위 항목은 필수로 지정할 수
               없고, 첨부·링크는 만든 뒤에 붙는 값이라 필수로 켜도 만들기를 막지 않습니다.
+              이슈 타입 탭에서 그 타입만 다르게 구성할 수 있습니다 — 대량 변경은 언제나 기본 구성을 씁니다.
             </p>
           ) : null}
 
@@ -262,10 +279,14 @@ export function GlobalSettingsPage() {
                         event.preventDefault();
                         void run("저장 실패", async () => {
                           await updateScheme(scheme.id, {
-                            // 빈 배열은 서버가 "기본값으로 되돌리기"로 읽는다 — 항상 13개를 보낸다
+                            // 빈 배열은 서버가 "기본값으로 되돌리기"로 읽는다 — 항상 13개를 보낸다.
+                            // 타입별 덮어쓰기는 "기본 구성 따름"인 타입의 키를 아예 빼서 보낸다
                             body: {
                               ...scheme.body,
                               fields: fieldDrafts[scheme.id] ?? normalizeFields(scheme.body),
+                              fieldsByType:
+                                fieldTypeDrafts[scheme.id] ??
+                                normalizeFieldsByType(scheme.body),
                             },
                           });
                           toast({ title: "필드 구성을 저장했습니다", appearance: "success" });
@@ -278,15 +299,30 @@ export function GlobalSettingsPage() {
                         onChange={(next) =>
                           setFieldDrafts((prev) => ({ ...prev, [scheme.id]: next }))
                         }
+                        byType={
+                          fieldTypeDrafts[scheme.id] ??
+                          normalizeFieldsByType(scheme.body)
+                        }
+                        onByTypeChange={(next) =>
+                          setFieldTypeDrafts((prev) => ({ ...prev, [scheme.id]: next }))
+                        }
+                        types={tabTypesOf(scheme)}
                       />
                       <div className="admin-scheme-actions">
                         <Button
                           type="submit"
                           size="small"
-                          disabled={sameFields(
-                            fieldDrafts[scheme.id] ?? normalizeFields(scheme.body),
-                            normalizeFields(scheme.body),
-                          )}
+                          disabled={
+                            sameFields(
+                              fieldDrafts[scheme.id] ?? normalizeFields(scheme.body),
+                              normalizeFields(scheme.body),
+                            ) &&
+                            sameFieldsByType(
+                              fieldTypeDrafts[scheme.id] ??
+                                normalizeFieldsByType(scheme.body),
+                              normalizeFieldsByType(scheme.body),
+                            )
+                          }
                         >
                           저장
                         </Button>

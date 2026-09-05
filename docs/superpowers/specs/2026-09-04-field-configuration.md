@@ -73,3 +73,20 @@ export interface IssueFieldConfig {
 
 ## 4. 문서
 - `docs/areas/settings-workflow.md`에 "필드 구성" 절 추가, `docs/areas/screens.md` 라우트 표 갱신(`/settings/fields`, `/projects/:id/settings/fields`).
+
+## 5. 이슈 타입별 구성 (2026-09-05 사용자 결정 — 지라 필드 구성 스킴처럼 타입별)
+
+프로젝트 단위 `fields`를 **기본 구성**으로 두고, 이슈 타입별 **덮어쓰기**를 얹는다. 스킴/커스텀 본문에 같이 산다(마이그레이션 없음).
+
+```ts
+// SettingsBody
+fields?: IssueFieldConfig[];                              // 기본(모든 타입)
+fieldsByType?: Record<IssueType /* 레지스트리 id */, IssueFieldConfig[]>; // 타입별 덮어쓰기 — 키가 없으면 기본을 따른다
+```
+
+- 해석: `resolveFields(body, typeId)` = 기본 13개 위에 `fieldsByType[typeId]`(있으면 13개 전부, 없는 id는 기본값)를 **필드 단위로** 덮는다. 서버·목업 동일. 응답은 정규화(기본 13개 + 덮어쓰기 있는 타입만 13개 전부).
+- 규칙(서버 400, 목업 동일 문구): `fieldsByType` 키는 레지스트리에 있는 타입 id여야 함(`없는 이슈 타입입니다: {id}`), 각 목록은 §1 규칙 그대로(모르는/빈/중복 id, 숨김+필수, `resolution`·`parent` 필수 금지 — 하위 작업 타입은 계층 규칙이 이미 상위를 요구하므로 `parent` 필수를 따로 허용하지 않는다). 타입 레지스트리에서 타입을 지우면(`withoutType`) 그 덮어쓰기도 제거.
+- 생성 시 필수 검사는 **요청의 타입으로 해석한 구성**을 쓴다(서버 `assertRequiredFields`, 목업 `createIssue`). 타입을 바꾸는 수정(PUT)은 검사하지 않는다.
+- 화면 `FieldConfigEditor`: 상단에 탭 `기본` + 활성 이슈 타입들(스킴 `enabledTypes`, 하위 작업 포함). 타입 탭에는 맨 위에 Switch **"기본 구성 따름"**(켜짐 = 덮어쓰기 없음, 표는 기본값을 읽기 전용으로 보여줌; 끄면 기본을 복사해 편집 시작). 저장 시 따름이면 `fieldsByType`에서 그 키를 제거. 덮어쓰기가 있는 타입 탭에는 점 표시(●)로 구분.
+- 소비: 만들기 모달은 선택한 이슈 타입으로 재해석(타입 바꾸면 표시/필수 갱신, 숨겨진 필드 값은 보내지 않음), 상세 모달은 `issue.type`, 대량 변경은 **기본 구성**(여러 타입이 섞이므로).
+- 테스트: 스토어(해석 우선순위·규칙 위반·타입 삭제 시 정리·타입별 required 생성 거부), 화면(타입 탭에서 마감일 숨김 → 만들기 모달에서 그 타입만 마감일 없음, 다른 타입은 보임), REST 계약(fieldsByType 왕복).

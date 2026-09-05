@@ -46,7 +46,12 @@ import { StatusEditor } from "../components/StatusEditor";
 import { StatusGlyph } from "../components/StatusGlyph";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { FieldConfigEditor } from "../components/FieldConfigEditor";
-import { normalizeFields, sameFields } from "../components/fieldConfig";
+import {
+  normalizeFields,
+  normalizeFieldsByType,
+  sameFields,
+  sameFieldsByType,
+} from "../components/fieldConfig";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
 import { ProjectShortcutsPanel } from "../components/ProjectShortcutsPanel";
@@ -115,6 +120,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const [transitionsDraft, setTransitionsDraft] = useState<WorkflowTransition[]>([]);
   const [layoutDraft, setLayoutDraft] = useState<WorkflowLayout>({});
   const [fieldsDraft, setFieldsDraft] = useState<IssueFieldConfig[]>(() => normalizeFields(null));
+  /** 이슈 타입별 덮어쓰기 초안 — 키가 없는 타입은 기본 구성을 따른다 */
+  const [fieldsByTypeDraft, setFieldsByTypeDraft] = useState<Record<string, IssueFieldConfig[]>>({});
 
   const currentProjectId = project?.id;
 
@@ -133,6 +140,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     setTransitionsDraft(resolvedSettings.body.transitions ?? []);
     setLayoutDraft(resolvedSettings.body.layout ?? {});
     setFieldsDraft(normalizeFields(resolvedSettings.body));
+    setFieldsByTypeDraft(normalizeFieldsByType(resolvedSettings.body));
   }, [currentProjectId]);
 
   useEffect(() => {
@@ -505,6 +513,11 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     </div>
   ) : null;
 
+  /** 필드 구성 탭에 세울 이슈 타입 — 이 프로젝트의 활성 타입을 레지스트리 순서로(하위 작업 포함) */
+  const fieldTabTypes = issueTypes.filter((type) =>
+    (resolved?.body.enabledTypes ?? []).includes(type.id),
+  );
+
   const fields = resolved ? (
     <div className="project-settings">
       <Card padding="lg" title="필드">
@@ -513,7 +526,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
           끈 필드는 이 프로젝트의 이슈 만들기·상세 속성 패널·대량 변경에서 사라집니다(데이터는
           남습니다). 첨부·링크는 만든 뒤에 붙는 값이라 필수로 켜도 만들기를 막지 않습니다.
           커스텀으로 전환하면 필드만이 아니라 워크플로·이슈 타입까지 포함한 설정 본문
-          전체가 이 프로젝트만의 것이 됩니다.
+          전체가 이 프로젝트만의 것이 됩니다. 이슈 타입 탭에서 그 타입만 다르게 구성할 수 있습니다.
         </p>
         {resolved.source === "custom" ? (
           <form
@@ -524,23 +537,39 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
                 await updateProjectCustomSettings(project.id, {
                   ...resolved.body,
                   fields: fieldsDraft,
+                  fieldsByType: fieldsByTypeDraft,
                 });
                 toast({ title: "필드 구성을 저장했습니다", appearance: "success" });
               });
             }}
           >
-            <FieldConfigEditor value={fieldsDraft} onChange={setFieldsDraft} />
+            <FieldConfigEditor
+              value={fieldsDraft}
+              onChange={setFieldsDraft}
+              byType={fieldsByTypeDraft}
+              onByTypeChange={setFieldsByTypeDraft}
+              types={fieldTabTypes}
+            />
             <Button
               type="submit"
               size="small"
-              disabled={sameFields(fieldsDraft, normalizeFields(resolved.body))}
+              disabled={
+                sameFields(fieldsDraft, normalizeFields(resolved.body)) &&
+                sameFieldsByType(fieldsByTypeDraft, normalizeFieldsByType(resolved.body))
+              }
             >
               저장
             </Button>
           </form>
         ) : (
           <div data-testid="fields-readonly">
-            <FieldConfigEditor value={normalizeFields(resolved.body)} onChange={() => {}} readOnly />
+            <FieldConfigEditor
+              value={normalizeFields(resolved.body)}
+              onChange={() => {}}
+              byType={normalizeFieldsByType(resolved.body)}
+              types={fieldTabTypes}
+              readOnly
+            />
             <p className="admin-scheme-note">
               스킴 자체 편집은 전역 관리(⚙), 이 프로젝트만 바꾸려면 커스텀으로 전환하세요.
             </p>

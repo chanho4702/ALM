@@ -121,4 +121,32 @@ describe("jiraApi 필드 구성 계약", () => {
     const resolved = await resolveSettings("7");
     expect(resolved.body.fields).toEqual(FIELDS);
   });
+
+  it("타입별 덮어쓰기(fieldsByType)도 그대로 왕복한다", async () => {
+    const byType = { bug: [{ id: "dueDate", visible: false, required: false }] } as const;
+    const body: SettingsBody = { ...BODY, fieldsByType: byType as unknown as SettingsBody["fieldsByType"] };
+    const spy = vi
+      .spyOn(client, "sharedApiFetch")
+      .mockResolvedValue(response(200, { id: "s1", name: "기본 스킴", isDefault: true, body }));
+
+    const saved = await updateScheme("s1", { body });
+
+    const sent = JSON.parse(String((spy.mock.calls[0][1] as RequestInit).body));
+    expect(sent.body.fieldsByType).toEqual(byType);
+    expect(saved.body.fieldsByType).toEqual(byType);
+  });
+
+  it("서버가 늘 보내는 빈 맵도 그대로 읽는다 — 어댑터가 키를 떨어뜨리면 타입 탭이 빈다", async () => {
+    const empty: SettingsBody = { ...BODY, fieldsByType: {} };
+    vi.spyOn(client, "sharedApiFetch").mockResolvedValue(
+      response(200, {
+        body: empty,
+        source: "scheme",
+        scheme: { id: "s1", name: "기본 스킴", isDefault: true, body: empty },
+      }),
+    );
+
+    const resolved = await resolveSettings("7");
+    expect(resolved.body.fieldsByType).toEqual({});
+  });
 });

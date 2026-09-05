@@ -42,5 +42,5 @@ describe("전역 관리 > 우선순위 (지라 우선 순위 + 구성표)", () =
     await user.click(within(dialog).getByRole("combobox", { name: "우선순위" }));
     expect(await screen.findByRole("option", { name: "긴급" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "최하" })).toBeInTheDocument();
-  });
+  }, 30_000); // 전역 관리 → 만들기 모달까지 왕복 — 병렬 워커 부하에서 기본 15s를 넘긴다
 });

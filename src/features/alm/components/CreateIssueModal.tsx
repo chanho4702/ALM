@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Checkbox, Modal, Select, TextField, useToast } from "@chanho/react";
 import { RichTextEditor } from "./editor/RichTextEditor";
@@ -10,6 +10,7 @@ import type {
   IssueType,
   Project,
   ProjectVersion,
+  SettingsBody,
   Sprint,
   User,
 } from "../store/types";
@@ -95,8 +96,8 @@ export function CreateIssueModal({
   const [linkDrafts, setLinkDrafts] = useState<LinkDraft[]>([]);
   const [createAnother, setCreateAnother] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  /** 프로젝트 설정의 필드 구성 — 숨긴 필드는 그리지도 보내지도 않는다 */
-  const [fields, setFields] = useState(() => resolveFields(null));
+  /** 프로젝트 설정 본문 — 필드 구성은 아래에서 **선택한 이슈 타입으로** 해석한다 */
+  const [settingsBody, setSettingsBody] = useState<SettingsBody | null>(null);
 
   useEffect(() => {
     void listUsers().then(setUsers);
@@ -167,13 +168,18 @@ export function CreateIssueModal({
       ];
       setEnabledTypes(creatable);
       setType((prev) => (creatable.includes(prev) ? prev : creatable[0]));
-      setFields(resolveFields(body));
+      setSettingsBody(body);
     });
     return () => {
       cancelled = true;
     };
   }, [open, projectId, issueTypes]);
 
+  /**
+   * 숨긴 필드는 그리지도 보내지도 않는다. 타입별 덮어쓰기가 있으면 그쪽이 이기므로
+   * **타입을 바꾸면 표시·필수가 즉시 갱신**된다(스토어·서버도 요청의 타입으로 검사한다).
+   */
+  const fields = useMemo(() => resolveFields(settingsBody, type), [settingsBody, type]);
   const parentRequired = typeLevel(issueTypes, type) === "subtask";
   const show = (id: IssueFieldId) => fields[id].visible;
   const required = (id: IssueFieldId) => fields[id].visible && fields[id].required;

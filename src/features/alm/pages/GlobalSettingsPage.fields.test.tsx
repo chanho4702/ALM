@@ -213,3 +213,90 @@ describe("프로젝트 설정 > 필드", () => {
     expect(within(dialog).queryByLabelText("마감일")).not.toBeInTheDocument();
   });
 });
+
+describe("전역 관리 > 필드 구성 — 이슈 타입별 구성", () => {
+  it("버그 탭에서만 마감일을 숨기면 만들기 모달도 버그일 때만 마감일이 사라진다", async () => {
+    const user = userEvent.setup();
+    const view = renderAt("/settings/fields");
+
+    await screen.findByRole("table", { name: "기본 스킴 필드 구성" });
+    await user.click(screen.getByRole("tab", { name: "버그" }));
+    // 덮어쓰기 전에는 기본 구성을 읽기 전용으로 보여 준다
+    const following = await screen.findByRole("table", { name: "기본 스킴 버그 필드 구성" });
+    expect(within(following).queryByRole("switch")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: "기본 스킴 버그 기본 구성 따름" }));
+    await user.click(await screen.findByRole("switch", { name: "기본 스킴 버그 마감일 표시" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("필드 구성을 저장했습니다")).toBeInTheDocument();
+    // 덮어쓴 타입 탭은 이름 뒤 "(덮어씀)"으로 구분된다 — 기호가 아니라 말로 읽힌다
+    expect(await screen.findByRole("tab", { name: "버그 (덮어씀)" })).toBeInTheDocument();
+
+    const resolved = await resolveSettings("p1");
+    expect(resolved.body.fieldsByType?.bug.find((f) => f.id === "dueDate")?.visible).toBe(false);
+    expect(resolved.body.fields?.find((f) => f.id === "dueDate")?.visible).toBe(true);
+
+    view.unmount();
+    renderAt("/projects/p1/board");
+    await user.click(await screen.findByRole("button", { name: "만들기" }));
+    const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
+    // 기본 타입(작업)에는 그대로 있고
+    expect(within(dialog).getByLabelText("마감일")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("combobox", { name: "이슈 타입 *" }));
+    await user.click(await screen.findByRole("option", { name: "버그" }));
+    // 타입을 바꾸면 그 자리에서 사라진다
+    expect(within(dialog).queryByLabelText("마감일")).not.toBeInTheDocument();
+  });
+
+  it("타입 탭의 필수는 그 타입으로 만들 때만 막는다", async () => {
+    const user = userEvent.setup();
+    const view = renderAt("/settings/fields");
+
+    await screen.findByRole("table", { name: "기본 스킴 필드 구성" });
+    await user.click(screen.getByRole("tab", { name: "버그" }));
+    await user.click(await screen.findByRole("switch", { name: "기본 스킴 버그 기본 구성 따름" }));
+    await user.click(await screen.findByRole("switch", { name: "기본 스킴 버그 예상 시간 필수" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("필드 구성을 저장했습니다")).toBeInTheDocument();
+
+    view.unmount();
+    renderAt("/projects/p1/board");
+    await user.click(await screen.findByRole("button", { name: "만들기" }));
+    const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
+    await user.type(within(dialog).getByLabelText("요약 *"), "타입별 필수");
+    // 작업에는 필수가 아니라 바로 만들 수 있다
+    expect(within(dialog).getByRole("button", { name: "만들기" })).toBeEnabled();
+
+    await user.click(within(dialog).getByRole("combobox", { name: "이슈 타입 *" }));
+    await user.click(await screen.findByRole("option", { name: "버그" }));
+    expect(within(dialog).getByRole("button", { name: "만들기" })).toBeDisabled();
+    expect(within(dialog).getByText(/필수 항목 미입력: 예상 시간/)).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText("예상 시간 (h) *"), "2");
+    await user.click(within(dialog).getByRole("button", { name: "만들기" }));
+    expect(await screen.findByText(/를 만들었습니다/)).toBeInTheDocument();
+    const created = (await listIssues("p1")).find((i) => i.title === "타입별 필수");
+    expect(created).toMatchObject({ type: "bug", estimateHours: 2 });
+  });
+
+  it("'기본 구성 따름'을 다시 켜면 덮어쓰기가 사라진다", async () => {
+    const user = userEvent.setup();
+    renderAt("/settings/fields");
+
+    await screen.findByRole("table", { name: "기본 스킴 필드 구성" });
+    await user.click(screen.getByRole("tab", { name: "버그" }));
+    await user.click(await screen.findByRole("switch", { name: "기본 스킴 버그 기본 구성 따름" }));
+    await user.click(await screen.findByRole("switch", { name: "기본 스킴 버그 마감일 표시" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("필드 구성을 저장했습니다")).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("tab", { name: "버그 (덮어씀)" }));
+    await user.click(await screen.findByRole("switch", { name: "기본 스킴 버그 기본 구성 따름" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findAllByText("필드 구성을 저장했습니다")).not.toHaveLength(0);
+
+    const resolved = await resolveSettings("p1");
+    expect(resolved.body.fieldsByType).toEqual({});
+  });
+});

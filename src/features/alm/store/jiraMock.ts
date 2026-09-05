@@ -79,13 +79,14 @@ function defaultFieldConfigs(): IssueFieldConfig[] {
 
 /**
  * 이슈 생성 시 필수 필드 검사 — 값을 준 필드만 본다(우선순위는 기본값이 늘 있으므로 대상이 아니고,
- * 해결·첨부·링크는 만들기 경로에 값 자체가 없다).
+ * 해결·첨부·링크는 만들기 경로에 값 자체가 없다). 구성은 **요청의 타입으로 해석**한다.
  */
 function assertRequiredFields(
   body: SettingsBody,
+  typeId: string | null,
   values: Partial<Record<IssueFieldId, unknown>>,
 ): void {
-  for (const field of normalizeFieldConfigs(body.fields)) {
+  for (const field of fieldConfigsFor(body, typeId)) {
     if (!field.required) continue;
     if (!(field.id in values)) continue;
     const value = values[field.id];
@@ -113,6 +114,39 @@ function normalizeFieldConfigs(fields?: IssueFieldConfig[] | null): IssueFieldCo
   return ISSUE_FIELD_IDS.map((id) => {
     const found = byId.get(id);
     return { id, visible: found?.visible ?? true, required: found?.required ?? false };
+  });
+}
+
+/**
+ * 타입별 덮어쓰기 정규화 — 덮어쓰기가 있는 타입만 키로 남기고 각 목록을 13종으로 채운다.
+ * 빠진 id는 **기본 구성**으로 채운다(해석과 같은 규칙이라 정규화가 뜻을 바꾸지 않는다).
+ *
+ * 서버와 같은 두 가지 규칙(2026-09-05 백엔드와 확정):
+ * - 빈 목록(`"bug": []`)은 오류가 아니라 **"기본 구성 따름"** 이라 키째 버린다.
+ * - 덮어쓰기가 하나도 없어도 맵 자체는 남는다 — 응답에는 `{}`가 실린다(키 생략 아님).
+ */
+function normalizeFieldsByType(body: FieldConfigBody): Record<string, IssueFieldConfig[]> {
+  const entries = Object.entries(body.fieldsByType ?? {})
+    .filter(([, fields]) => (fields?.length ?? 0) > 0)
+    .map(([typeId]) => [typeId, fieldConfigsFor(body, typeId)] as const);
+  return Object.fromEntries(entries);
+}
+
+/** 필드 구성이 실린 본문 조각 — 기본 구성 + 타입별 덮어쓰기 */
+type FieldConfigBody = Pick<SettingsBody, "fields" | "fieldsByType">;
+
+/**
+ * 한 이슈 타입의 최종 필드 구성 — 기본 구성(`fields`) 위에 `fieldsByType[typeId]`를
+ * **필드 단위로** 얹는다. 덮어쓰기에 없는 id는 기본 구성을 그대로 따른다(화면 `resolveFields`와 같은 규칙).
+ */
+function fieldConfigsFor(body: FieldConfigBody, typeId?: string | null): IssueFieldConfig[] {
+  const base = normalizeFieldConfigs(body.fields);
+  const override = typeId ? body.fieldsByType?.[typeId] : undefined;
+  if (!override) return base;
+  const byId = new Map(override.map((f) => [f.id, f]));
+  return base.map((field) => {
+    const found = byId.get(field.id);
+    return found ? { id: field.id, visible: found.visible, required: found.required } : field;
   });
 }
 
@@ -197,10 +231,12 @@ function enrichStatuses(data: JiraData, statuses: WorkflowStatus[]): WorkflowSta
 
 function enrichBody(data: JiraData, body: SettingsBody): SettingsBody {
   // 필드 구성은 읽을 때 13종을 다 채운다 — 화면이 없는 id를 만나지 않게(구버전 호환)
+  // 덮어쓰기가 없어도 `{}`를 싣는다 — 서버 응답 shape과 같게(키 생략 아님)
   return {
     ...body,
     statuses: enrichStatuses(data, body.statuses),
     fields: normalizeFieldConfigs(body.fields),
+    fieldsByType: normalizeFieldsByType(body),
   };
 }
 
@@ -249,6 +285,7 @@ function cloneBody(body: SettingsBody): SettingsBody {
     enabledPriorities: [...(body.enabledPriorities ?? defaultSettingsBody().enabledPriorities)],
     defaultPriority: body.defaultPriority ?? "medium",
     fields: normalizeFieldConfigs(body.fields),
+    fieldsByType: normalizeFieldsByType(body),
     ...(body.transitions
       ? { transitions: body.transitions.map((t) => ({ ...t, from: [...t.from] })) }
       : {}),
@@ -384,6 +421,14 @@ function normalize(data: JiraData): JiraData {
   data.issueTypes ??= BUILTIN_ISSUE_TYPES.map((t) => ({ ...t }));
   for (const builtin of BUILTIN_ISSUE_TYPES) {
     if (!data.issueTypes.some((t) => t.id === builtin.id)) data.issueTypes.push({ ...builtin });
+  }
+  // 타입별 필드 덮어쓰기 — 레지스트리에 없는 타입의 키는 버린다(타입 레지스트리 초기화 뒤에 해야 한다)
+  for (const body of allBodies(data)) {
+    if (!body.fieldsByType) continue;
+    for (const typeId of Object.keys(body.fieldsByType)) {
+      if (!typeDefOf(data, typeId)) delete body.fieldsByType[typeId];
+    }
+    body.fieldsByType = normalizeFieldsByType(body);
   }
   for (const body of allBodies(data)) {
     for (const status of body.statuses) {
@@ -1746,8 +1791,9 @@ export async function createIssue(input: {
   if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
   const componentIdsForCreate = validateComponentIds(data, project.id, input.componentIds);
   if (input.fixVersionId) assertVersionAssignable(data, input.fixVersionId, project.id);
-  // 필드 구성의 필수 검사 — 만들기에서만 한다(수정은 기존 이슈를 갑자기 막지 않으려고 검사하지 않는다)
-  assertRequiredFields(bodyForCreate, {
+  // 필드 구성의 필수 검사 — 만들기에서만 한다(수정은 기존 이슈를 갑자기 막지 않으려고 검사하지 않는다).
+  // 구성은 만들려는 타입으로 해석한다 — 타입별 덮어쓰기가 있으면 그쪽이 이긴다.
+  assertRequiredFields(bodyForCreate, resolvedType, {
     description: input.description === undefined ? "" : htmlToText(input.description),
     assignee: input.assigneeId,
     labels: input.labels,
@@ -2515,6 +2561,11 @@ function validateSettingsBody(data: JiraData, body: SettingsBody): void {
     throw new Error("기본 우선순위는 활성화된 우선순위 중에서 골라야 합니다");
   }
   validateFieldConfigs(body.fields);
+  // 타입별 덮어쓰기 — 키는 레지스트리에 있는 타입이어야 하고, 각 목록은 기본 구성과 같은 규칙을 탄다
+  for (const [typeId, fields] of Object.entries(body.fieldsByType ?? {})) {
+    if (!typeDefOf(data, typeId)) throw new Error(`없는 이슈 타입입니다: ${typeId}`);
+    validateFieldConfigs(fields);
+  }
 }
 
 /** 필드 구성 규칙 — 서버(SettingsBody 검증)와 같은 문구를 쓴다 */
@@ -2522,6 +2573,8 @@ function validateFieldConfigs(fields?: IssueFieldConfig[] | null): void {
   if (!fields) return;
   const seen = new Set<string>();
   for (const field of fields) {
+    // 빈 문자열·누락은 "없는 필드입니다: " 처럼 이름이 사라지는 문구가 되므로 따로 말한다
+    if (!field.id || !String(field.id).trim()) throw new Error("필드 id가 비어 있습니다");
     if (!(ISSUE_FIELD_IDS as readonly string[]).includes(field.id)) {
       throw new Error(`없는 필드입니다: ${field.id}`);
     }
@@ -3036,6 +3089,9 @@ export async function deleteIssueType(id: string): Promise<void> {
     });
   for (const body of allBodies(data)) {
     body.enabledTypes = body.enabledTypes.filter((t) => t !== id);
+    // 그 타입의 필드 덮어쓰기도 함께 사라진다 — 남으면 저장할 때마다 "없는 이슈 타입" 400이 된다.
+    // 비활성화만 한 타입의 덮어쓰기는 건드리지 않는다(다시 켜면 살아난다 — 서버와 같다)
+    if (body.fieldsByType) delete body.fieldsByType[id];
   }
   persist();
   notifyIssueTypesChanged();

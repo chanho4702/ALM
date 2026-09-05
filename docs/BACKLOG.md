@@ -65,7 +65,8 @@
 - [x] 휴지통 자동 비우기 — `ALM_TRASH_RETENTION_DAYS`(60) 지난 프로젝트를 매일 03:00 영구 삭제, 휴지통 화면에 "n일 후 영구 삭제"
 
 ### 플랫폼/운영 잔여 (타 리포)
-- [ ] ALM 통합 검색 — platform-backend `feat/wave-d-alm-search` 브랜치 main 미머지 (제품 기능 아님)
+- [ ] ALM 통합 검색 — **후속 후보로 보류(2026-09-05 결정)**: ALM 자체 검색은 DB 검색으로 동작. 위키+ALM 통합 검색이 필요해지면
+      platform-backend `f92ff71`의 search-service ALM 색인기만 새 main 위에 재이식(브랜치는 8/15 기반이라 그대로 머지 불가)
 - [ ] S-03 잔여 — alm-front가 design-system을 아직 tgz로 소비(GitHub Packages 전환 미완),
       board-service 이미지 푸시는 리포 시크릿 `GH_PACKAGES_TOKEN` 대기
 - [ ] Keycloak ADMIN 롤 부여 — 사용자 직접 작업 (관리자 설정 화면 접근에 필요)
