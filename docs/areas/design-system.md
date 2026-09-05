@@ -10,8 +10,9 @@ GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름�
 2. **Select는 빈 문자열 value 금지**(Radix 제약) — "전체"/"미지정"/"선택" 등은 센티널
    문자열(`all`/`unassigned`/`none`/`pick`)로. `onValueChange` 사용(onChange 아님).
 3. **DatePicker 없음** — `TextField type="date"` 사용.
-4. **TextField의 `className`은 wrapper가 아니라 input에 붙는다** — 레이아웃 제어가 필요하면
-   div로 감싸라. `label`은 필수 prop(시각 숨김 옵션 없음). ref는 input으로 전달됨.
+4. **TextField/Select의 `className`은 필드 래퍼 div에 붙는다**(0.9.0 실측 — 예전 메모의 "input에
+   붙는다"는 틀렸다). 그래서 `.visually-hidden-label`을 컨트롤에 바로 걸 수 있다. `label`은 필수
+   prop이고 **문자열만** 받는다(시각 숨김 옵션·노드 라벨 없음). ref는 input으로 전달됨.
 5. **Dropdown은 항목 선택 시 닫히는 단일선택 메뉴** — 멀티선택 필터가 필요하면
    `components/FilterDropdown.tsx`(커스텀, 체크박스+바깥클릭/Esc 닫기)를 재사용.
 6. **Tag 제거 버튼의 접근성 이름은 `"{label} 태그 제거"`** — 테스트 셀렉터에서 사용.
@@ -34,6 +35,22 @@ GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름�
 상태 Lozenge/이름/정렬은 반드시 `components/labels.ts`의
 `statusCategory/statusName/statusAppearance/CATEGORY_ORDER`를 경유한다(기본 3상태 폴백 내장).
 `STATUS_LABELS`/`STATUS_APPEARANCE` 직접 인덱싱은 카테고리 값에만 허용(예: 대시보드 타일 라벨).
+
+## 필드 라벨에 아이콘 (2026-09-06)
+
+DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 없다. 그래서 이슈 모달 3종
+(상세 속성 패널·만들기·대량 변경)은 **컨트롤에 `.visually-hidden-label`을 걸어 접근 이름만 남기고**,
+보이는 라벨은 `components/FieldLabel.tsx`가 아이콘 + 텍스트로 그린다.
+
+- 아이콘 원천은 `components/fieldConfig.ts`의 `FIELD_ICONS`(lucide) — 13종 구성 필드에 더해
+  `type`/`status`/`project`/`summary`까지 키를 가진다. 새 필드를 만들면 여기에도 한 줄 추가한다.
+- 라벨 + 컨트롤 세로 스택은 `.alm-field`(DS 필드와 같은 `space-50` 간격).
+- **접근 이름은 DS `label` 문자열이 원천이다.** `getByRole("combobox", { name: "담당자" })`,
+  `getByLabelText("예상 시간 (h) *")` 같은 셀렉터가 그대로 살아 있는 이유가 이것이다.
+  `FieldLabel`은 기본이 `aria-hidden`이라 같은 말이 두 번 읽히지 않는다 — `legend`처럼 그 라벨
+  자체가 이름을 만드는 자리에서만 `ariaHidden={false}`.
+- 필수 `*`는 **텍스트 노드 안에** 넣는다(`withRequiredMark`). 아이콘과 글자를 갈라 놓으면
+  `getByText("연결 이슈 *")`가 무너진다.
 
 ## 2026-09-04 추가 함정
 

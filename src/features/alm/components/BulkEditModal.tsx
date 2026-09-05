@@ -6,6 +6,7 @@ import { bulkUpdateIssues } from "../store/jiraStore";
 import type { BulkIssuePatch } from "../store/jiraStore";
 import { priorityName } from "./labels";
 import { resolveFields } from "./fieldConfig";
+import { FieldLabel } from "./FieldLabel";
 import { usePriorities } from "./usePriorities";
 
 const KEEP = "__keep__"; // "변경 안 함" 센티널 — Select는 빈 문자열 value를 쓰지 않는다
@@ -117,66 +118,91 @@ export function BulkEditModal({
     >
       <form className="create-issue-form" onSubmit={(e) => void handleSubmit(e)}>
         <div className="create-issue-grid">
-          <Select
-            label="상태"
-            value={status}
-            onValueChange={setStatus}
-            options={[
-              { value: KEEP, label: "변경 안 함" },
-              ...statuses.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-          />
+          {/* 시각 라벨은 아이콘 + 텍스트(FieldLabel) — 상세·만들기 모달과 같은 표기 */}
+          <div className="alm-field">
+            <FieldLabel field="status">상태</FieldLabel>
+            <Select
+              label="상태"
+              className="visually-hidden-label"
+              value={status}
+              onValueChange={setStatus}
+              options={[
+                { value: KEEP, label: "변경 안 함" },
+                ...statuses.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+          </div>
           {show("priority") ? (
-          <Select
-            label="우선순위"
-            value={priority}
-            onValueChange={setPriority}
-            options={[
-              { value: KEEP, label: "변경 안 함" },
-              ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
-            ]}
-          />
+          <div className="alm-field">
+            <FieldLabel field="priority">우선순위</FieldLabel>
+            <Select
+              label="우선순위"
+              className="visually-hidden-label"
+              value={priority}
+              onValueChange={setPriority}
+              options={[
+                { value: KEEP, label: "변경 안 함" },
+                ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
+              ]}
+            />
+          </div>
           ) : null}
           {show("assignee") ? (
-          <Select
-            label="담당자"
-            value={assignee}
-            onValueChange={setAssignee}
-            options={[
-              { value: KEEP, label: "변경 안 함" },
-              { value: NONE, label: "미지정" },
-              ...users.map((u) => ({ value: u.id, label: u.name })),
-            ]}
-          />
+          <div className="alm-field">
+            <FieldLabel field="assignee">담당자</FieldLabel>
+            <Select
+              label="담당자"
+              className="visually-hidden-label"
+              value={assignee}
+              onValueChange={setAssignee}
+              options={[
+                { value: KEEP, label: "변경 안 함" },
+                { value: NONE, label: "미지정" },
+                ...users.map((u) => ({ value: u.id, label: u.name })),
+              ]}
+            />
+          </div>
           ) : null}
           {show("sprint") ? (
-          <Select
-            label="스프린트"
-            value={sprint}
-            onValueChange={setSprint}
-            options={[
-              { value: KEEP, label: "변경 안 함" },
-              { value: NONE, label: "백로그" },
-              ...sprints
-                .filter((s) => s.state !== "done")
-                .map((s) => ({ value: s.id, label: s.name })),
-            ]}
-          />
+          <div className="alm-field">
+            <FieldLabel field="sprint">스프린트</FieldLabel>
+            <Select
+              label="스프린트"
+              className="visually-hidden-label"
+              value={sprint}
+              onValueChange={setSprint}
+              options={[
+                { value: KEEP, label: "변경 안 함" },
+                { value: NONE, label: "백로그" },
+                ...sprints
+                  .filter((s) => s.state !== "done")
+                  .map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+          </div>
           ) : null}
           {show("labels") ? (
           <>
-          <TextField
-            label="라벨 추가"
-            placeholder="콤마로 구분"
-            value={addLabels}
-            onChange={(e) => setAddLabels(e.target.value)}
-          />
-          <TextField
-            label="라벨 제거"
-            placeholder="콤마로 구분"
-            value={removeLabels}
-            onChange={(e) => setRemoveLabels(e.target.value)}
-          />
+          <div className="alm-field">
+            <FieldLabel field="labels">라벨 추가</FieldLabel>
+            <TextField
+              label="라벨 추가"
+              className="visually-hidden-label"
+              placeholder="콤마로 구분"
+              value={addLabels}
+              onChange={(e) => setAddLabels(e.target.value)}
+            />
+          </div>
+          <div className="alm-field">
+            <FieldLabel field="labels">라벨 제거</FieldLabel>
+            <TextField
+              label="라벨 제거"
+              className="visually-hidden-label"
+              placeholder="콤마로 구분"
+              value={removeLabels}
+              onChange={(e) => setRemoveLabels(e.target.value)}
+            />
+          </div>
           </>
           ) : null}
         </div>

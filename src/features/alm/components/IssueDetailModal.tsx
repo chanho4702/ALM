@@ -70,6 +70,7 @@ import {
 } from "./labels";
 import { usePriorities } from "./usePriorities";
 import { resolveFields } from "./fieldConfig";
+import { FieldLabel } from "./FieldLabel";
 import { formatDateTime } from "./time";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -825,51 +826,70 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               차단됨
             </Lozenge>
           ) : null}
-          <Select
-            label="타입"
-            value={issue.type}
-            // 프로젝트 설정의 활성 타입만 — 현재 값이 비활성이어도 표시를 위해 포함
-            options={issueTypes
-              .filter((t) => enabledTypes.includes(t.id) || t.id === issue.type)
-              .map((t) => ({ value: t.id, label: t.name }))}
-            onValueChange={(v) => void applyPatch({ type: v }, "타입을 변경했습니다")}
-          />
-          {/* DS Select의 옵션 렌더는 문자열만 받는다 — 글리프는 트리거 왼쪽에 둔다 */}
-          <div className="issue-status-field">
-            <StatusGlyph status={issue.status} statuses={statuses} size={16} />
+          {/* 속성 패널의 시각 라벨은 아이콘 + 텍스트다 — DS 라벨은 접근 이름으로만 남긴다 */}
+          <div className="alm-field">
+            <FieldLabel field="type">타입</FieldLabel>
             <Select
-              label="상태"
-              value={issue.status}
-              options={statuses.map((s) => ({ value: s.id, label: s.name }))}
-              onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
+              label="타입"
+              className="visually-hidden-label"
+              value={issue.type}
+              // 프로젝트 설정의 활성 타입만 — 현재 값이 비활성이어도 표시를 위해 포함
+              options={issueTypes
+                .filter((t) => enabledTypes.includes(t.id) || t.id === issue.type)
+                .map((t) => ({ value: t.id, label: t.name }))}
+              onValueChange={(v) => void applyPatch({ type: v }, "타입을 변경했습니다")}
             />
+          </div>
+          {/* DS Select의 옵션 렌더는 문자열만 받는다 — 글리프는 트리거 왼쪽에 둔다 */}
+          <div className="alm-field">
+            <FieldLabel field="status">상태</FieldLabel>
+            <div className="issue-status-field">
+              <StatusGlyph status={issue.status} statuses={statuses} size={16} />
+              <Select
+                label="상태"
+                className="visually-hidden-label"
+                value={issue.status}
+                options={statuses.map((s) => ({ value: s.id, label: s.name }))}
+                onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
+              />
+            </div>
           </div>
           {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}
           {fields.resolution.visible && statusKind(statuses, issue.status) === "complete" ? (
-            <Select
-              label="해결"
-              value={issue.resolution ?? "done"}
-              options={RESOLUTIONS.map((r) => ({ value: r, label: RESOLUTION_LABELS[r] }))}
-              onValueChange={(v) =>
-                void applyPatch({ resolution: v as IssueResolution }, "해결을 변경했습니다")
-              }
-            />
+            <div className="alm-field">
+              <FieldLabel field="resolution">해결</FieldLabel>
+              <Select
+                label="해결"
+                className="visually-hidden-label"
+                value={issue.resolution ?? "done"}
+                options={RESOLUTIONS.map((r) => ({ value: r, label: RESOLUTION_LABELS[r] }))}
+                onValueChange={(v) =>
+                  void applyPatch({ resolution: v as IssueResolution }, "해결을 변경했습니다")
+                }
+              />
+            </div>
           ) : null}
           {issue && fields.parent.visible ? (
-            <Select
-              label="상위 항목"
-              value={issue.parentId ?? NO_PARENT}
-              options={[
-                { value: NO_PARENT, label: "없음" },
-                ...parentCandidates.map((p) => ({ value: p.id, label: `${p.key} ${p.title}` })),
-              ]}
-              onValueChange={(v) => void handleParentChange(v)}
-            />
+            <div className="alm-field">
+              <FieldLabel field="parent">상위 항목</FieldLabel>
+              <Select
+                label="상위 항목"
+                className="visually-hidden-label"
+                value={issue.parentId ?? NO_PARENT}
+                options={[
+                  { value: NO_PARENT, label: "없음" },
+                  ...parentCandidates.map((p) => ({ value: p.id, label: `${p.key} ${p.title}` })),
+                ]}
+                onValueChange={(v) => void handleParentChange(v)}
+              />
+            </div>
           ) : null}
           {fields.assignee.visible ? (
           /* 담당자는 이름만으로는 누군지 잘 안 붙는다 — 지라처럼 얼굴을 트리거 왼쪽에 세운다
              (DS Select 옵션은 문자열만 받으므로 상태 필드와 같은 방식) */
-          <div className="issue-assignee-field">
+          <div className="alm-field">
+            <FieldLabel field="assignee">담당자</FieldLabel>
+            <div className="issue-assignee-field">
             {issue.assigneeId ? (
               <UserAvatar
                 className="issue-assignee-face"
@@ -884,6 +904,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             )}
             <Select
               label="담당자"
+              className="visually-hidden-label"
               value={issue.assigneeId ?? UNASSIGNED}
               options={[
                 { value: UNASSIGNED, label: "미지정" },
@@ -893,62 +914,81 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                 void applyPatch({ assigneeId: v === UNASSIGNED ? null : v }, "담당자를 변경했습니다")
               }
             />
+            </div>
           </div>
           ) : null}
           {fields.priority.visible ? (
-          <Select
-            label="우선순위"
-            value={issue.priority}
-            options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
-            onValueChange={(v) =>
-              void applyPatch({ priority: v as IssuePriority }, "우선순위를 변경했습니다")
-            }
-          />
+          <div className="alm-field">
+            <FieldLabel field="priority">우선순위</FieldLabel>
+            <Select
+              label="우선순위"
+              className="visually-hidden-label"
+              value={issue.priority}
+              options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
+              onValueChange={(v) =>
+                void applyPatch({ priority: v as IssuePriority }, "우선순위를 변경했습니다")
+              }
+            />
+          </div>
           ) : null}
           {fields.sprint.visible ? (
-          <Select
-            label="스프린트"
-            value={issue.sprintId ?? BACKLOG}
-            options={[
-              { value: BACKLOG, label: "백로그" },
-              // 완료된 스프린트는 선택지에서 제외하되, 현재 값이면 표시를 위해 포함
-              ...sprints
-                .filter((s) => s.state !== "done" || s.id === issue.sprintId)
-                .map((s) => ({ value: s.id, label: s.name })),
-            ]}
-            onValueChange={(v) =>
-              void applyPatch({ sprintId: v === BACKLOG ? null : v }, "스프린트를 변경했습니다")
-            }
-          />
+          <div className="alm-field">
+            <FieldLabel field="sprint">스프린트</FieldLabel>
+            <Select
+              label="스프린트"
+              className="visually-hidden-label"
+              value={issue.sprintId ?? BACKLOG}
+              options={[
+                { value: BACKLOG, label: "백로그" },
+                // 완료된 스프린트는 선택지에서 제외하되, 현재 값이면 표시를 위해 포함
+                ...sprints
+                  .filter((s) => s.state !== "done" || s.id === issue.sprintId)
+                  .map((s) => ({ value: s.id, label: s.name })),
+              ]}
+              onValueChange={(v) =>
+                void applyPatch({ sprintId: v === BACKLOG ? null : v }, "스프린트를 변경했습니다")
+              }
+            />
+          </div>
           ) : null}
           {fields.fixVersion.visible ? (
-          <Select
-            label="수정 버전"
-            value={issue.fixVersionId ?? NO_VERSION}
-            options={[
-              { value: NO_VERSION, label: "없음" },
-              // 보관된 버전은 선택지에서 제외하되, 현재 값이면 표시를 위해 포함
-              ...versions
-                .filter((v) => v.status !== "archived" || v.id === issue.fixVersionId)
-                .map((v) => ({ value: v.id, label: v.name })),
-            ]}
-            onValueChange={(v) =>
-              void applyPatch({ fixVersionId: v === NO_VERSION ? null : v }, "수정 버전을 변경했습니다")
-            }
-          />
+          <div className="alm-field">
+            <FieldLabel field="fixVersion">수정 버전</FieldLabel>
+            <Select
+              label="수정 버전"
+              className="visually-hidden-label"
+              value={issue.fixVersionId ?? NO_VERSION}
+              options={[
+                { value: NO_VERSION, label: "없음" },
+                // 보관된 버전은 선택지에서 제외하되, 현재 값이면 표시를 위해 포함
+                ...versions
+                  .filter((v) => v.status !== "archived" || v.id === issue.fixVersionId)
+                  .map((v) => ({ value: v.id, label: v.name })),
+              ]}
+              onValueChange={(v) =>
+                void applyPatch({ fixVersionId: v === NO_VERSION ? null : v }, "수정 버전을 변경했습니다")
+              }
+            />
+          </div>
           ) : null}
           {fields.dueDate.visible ? (
-          <TextField
-            label="마감일"
-            type="date"
-            value={issue.dueDate ?? ""}
-            onChange={(e) =>
-              void applyPatch({ dueDate: e.target.value || null }, "마감일을 저장했습니다")
-            }
-          />
+          <div className="alm-field">
+            <FieldLabel field="dueDate">마감일</FieldLabel>
+            <TextField
+              label="마감일"
+              className="visually-hidden-label"
+              type="date"
+              value={issue.dueDate ?? ""}
+              onChange={(e) =>
+                void applyPatch({ dueDate: e.target.value || null }, "마감일을 저장했습니다")
+              }
+            />
+          </div>
           ) : null}
           {fields.components.visible && componentOptions.length > 0 ? (
-            <div className="board-settings-checks issue-components-field" role="group" aria-label="컴포넌트">
+            <div className="alm-field">
+              <FieldLabel field="components">컴포넌트</FieldLabel>
+              <div className="board-settings-checks issue-components-field" role="group" aria-label="컴포넌트">
               {componentOptions.map((c) => {
                 const current = issue.componentIds ?? [];
                 const checked = current.includes(c.id);
@@ -966,12 +1006,15 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   />
                 );
               })}
+              </div>
             </div>
           ) : null}
           {fields.labels.visible ? (
-          <div className="issue-labels-field">
+          <div className="alm-field issue-labels-field">
+            <FieldLabel field="labels">라벨 추가</FieldLabel>
             <TextField
               label="라벨 추가"
+              className="visually-hidden-label"
               placeholder="입력 후 Enter"
               value={labelDraft}
               onChange={(e) => setLabelDraft(e.target.value)}
@@ -987,16 +1030,20 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           </div>
           ) : null}
           {fields.estimate.visible ? (
-          <TextField
-            label="예상 시간 (h)"
-            type="number"
-            min={0.5}
-            step={0.5}
-            placeholder="미지정"
-            value={estimateDraft}
-            onChange={(e) => setEstimateDraft(e.target.value)}
-            onBlur={() => void handleEstimateBlur()}
-          />
+          <div className="alm-field">
+            <FieldLabel field="estimate">예상 시간 (h)</FieldLabel>
+            <TextField
+              label="예상 시간 (h)"
+              className="visually-hidden-label"
+              type="number"
+              min={0.5}
+              step={0.5}
+              placeholder="미지정"
+              value={estimateDraft}
+              onChange={(e) => setEstimateDraft(e.target.value)}
+              onBlur={() => void handleEstimateBlur()}
+            />
+          </div>
           ) : null}
           {fields.estimate.visible && (loggedHours > 0 || issue.estimateHours !== null) ? (
             <div className="issue-time-tracking" data-testid="issue-time-tracking">

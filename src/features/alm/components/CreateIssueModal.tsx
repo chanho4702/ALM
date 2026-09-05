@@ -27,6 +27,7 @@ import {
 } from "../store/jiraStore";
 import { priorityName, ISSUE_TYPES, typeLevel, typeName } from "./labels";
 import { FIELD_LABELS, resolveFields, withRequiredMark } from "./fieldConfig";
+import { FieldLabel } from "./FieldLabel";
 import { isEmptyHtml } from "../store/richText";
 import { usePriorities } from "./usePriorities";
 import { useIssueTypes } from "./useIssueTypes";
@@ -325,32 +326,45 @@ export function CreateIssueModal({
     >
       <form className="create-issue-form" onSubmit={handleSubmit}>
         <div className="create-issue-grid">
-          <Select
-            label="프로젝트 *"
-            value={projectId}
-            options={projects.map((p) => ({ value: p.id, label: `${p.name} (${p.key})` }))}
-            onValueChange={setProjectId}
-          />
-          <Select
-            label="이슈 타입 *"
-            value={type}
-            options={enabledTypes.map((t) => ({ value: t, label: typeName(issueTypes, t) }))}
-            onValueChange={setType}
-          />
+          {/* 시각 라벨은 아이콘 + 텍스트(FieldLabel), DS 라벨은 접근 이름으로만 남긴다 */}
+          <div className="alm-field">
+            <FieldLabel field="project" required>프로젝트</FieldLabel>
+            <Select
+              label="프로젝트 *"
+              className="visually-hidden-label"
+              value={projectId}
+              options={projects.map((p) => ({ value: p.id, label: `${p.name} (${p.key})` }))}
+              onValueChange={setProjectId}
+            />
+          </div>
+          <div className="alm-field">
+            <FieldLabel field="type" required>이슈 타입</FieldLabel>
+            <Select
+              label="이슈 타입 *"
+              className="visually-hidden-label"
+              value={type}
+              options={enabledTypes.map((t) => ({ value: t, label: typeName(issueTypes, t) }))}
+              onValueChange={setType}
+            />
+          </div>
         </div>
         <hr className="create-issue-divider" />
-        <TextField
-          label="요약 *"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="무엇을 해야 하나요?"
-        />
+        <div className="alm-field">
+          <FieldLabel field="summary" required>요약</FieldLabel>
+          <TextField
+            label="요약 *"
+            className="visually-hidden-label"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="무엇을 해야 하나요?"
+          />
+        </div>
         {show("description") ? (
-        <div className="create-issue-editor-field">
+        <div className="alm-field create-issue-editor-field">
           {/* 시각 라벨은 다른 필드와 같은 자리. 접근 이름·테스트 레지스트리 키는 "설명"으로 고정한다 */}
-          <span className="create-issue-field-label" aria-hidden="true">
-            {fieldLabel("description", "설명")}
-          </span>
+          <FieldLabel field="description" required={required("description")}>
+            설명
+          </FieldLabel>
         <RichTextEditor
           label="설명"
           value={description}
@@ -363,15 +377,19 @@ export function CreateIssueModal({
         ) : null}
         {show("assignee") ? (
         <div className="create-issue-assignee">
-          <Select
-            label={fieldLabel("assignee", "담당자")}
-            value={assigneeId}
-            options={[
-              { value: UNASSIGNED, label: "미지정" },
-              ...users.map((u) => ({ value: u.id, label: u.name })),
-            ]}
-            onValueChange={setAssigneeId}
-          />
+          <div className="alm-field">
+            <FieldLabel field="assignee" required={required("assignee")}>담당자</FieldLabel>
+            <Select
+              label={fieldLabel("assignee", "담당자")}
+              className="visually-hidden-label"
+              value={assigneeId}
+              options={[
+                { value: UNASSIGNED, label: "미지정" },
+                ...users.map((u) => ({ value: u.id, label: u.name })),
+              ]}
+              onValueChange={setAssigneeId}
+            />
+          </div>
           {me ? (
             <Button
               type="button"
@@ -387,36 +405,46 @@ export function CreateIssueModal({
         ) : null}
         <div className="create-issue-grid">
           {show("priority") ? (
-          <Select
-            label={fieldLabel("priority", "우선순위")}
-            value={priority}
-            options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
-            onValueChange={(v) => setPriority(v as IssuePriority)}
-          />
+          <div className="alm-field">
+            <FieldLabel field="priority" required={required("priority")}>우선순위</FieldLabel>
+            <Select
+              label={fieldLabel("priority", "우선순위")}
+              className="visually-hidden-label"
+              value={priority}
+              options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
+              onValueChange={(v) => setPriority(v as IssuePriority)}
+            />
+          </div>
           ) : null}
           {show("labels") ? (
-          <TextField
-            label={fieldLabel("labels", "라벨")}
-            value={labelsText}
-            onChange={(e) => setLabelsText(e.target.value)}
-            placeholder="콤마로 구분 (예: backend, api)"
-          />
+          <div className="alm-field">
+            <FieldLabel field="labels" required={required("labels")}>라벨</FieldLabel>
+            <TextField
+              label={fieldLabel("labels", "라벨")}
+              className="visually-hidden-label"
+              value={labelsText}
+              onChange={(e) => setLabelsText(e.target.value)}
+              placeholder="콤마로 구분 (예: backend, api)"
+            />
+          </div>
           ) : null}
         </div>
         {show("components") && components.length === 0 && required("components") ? (
-          <div className="create-issue-empty-field" role="group" aria-label="컴포넌트 *">
-            <span className="create-issue-field-label" aria-hidden="true">컴포넌트 *</span>
+          <div className="alm-field create-issue-empty-field" role="group" aria-label="컴포넌트 *">
+            <FieldLabel field="components" required>컴포넌트</FieldLabel>
             <p className="create-issue-empty-note">
               이 프로젝트에 컴포넌트가 없습니다 — 프로젝트 설정 &gt; 컴포넌트에서 먼저 만드세요.
             </p>
           </div>
         ) : null}
         {show("components") && components.length > 0 ? (
-          <div
-            className="board-settings-checks"
-            role="group"
-            aria-label={fieldLabel("components", "컴포넌트")}
-          >
+          <div className="alm-field">
+            <FieldLabel field="components" required={required("components")}>컴포넌트</FieldLabel>
+            <div
+              className="board-settings-checks"
+              role="group"
+              aria-label={fieldLabel("components", "컴포넌트")}
+            >
             {components.map((c) => (
               <Checkbox
                 key={c.id}
@@ -427,63 +455,90 @@ export function CreateIssueModal({
                 }
               />
             ))}
+            </div>
           </div>
         ) : null}
         {showParent ? (
-        <Select
-          label={parentRequired ? "상위 항목 *" : fieldLabel("parent", "상위 항목")}
-          value={parentId}
-          options={[{ value: NO_PARENT, label: "없음" }, ...projectIssues.map(issueOption)]}
-          onValueChange={setParentId}
-        />
+        <div className="alm-field">
+          <FieldLabel field="parent" required={parentRequired || required("parent")}>
+            상위 항목
+          </FieldLabel>
+          <Select
+            label={parentRequired ? "상위 항목 *" : fieldLabel("parent", "상위 항목")}
+            className="visually-hidden-label"
+            value={parentId}
+            options={[{ value: NO_PARENT, label: "없음" }, ...projectIssues.map(issueOption)]}
+            onValueChange={setParentId}
+          />
+        </div>
         ) : null}
         <div className="create-issue-grid">
           {show("sprint") ? (
-          <Select
-            label={fieldLabel("sprint", "스프린트")}
-            value={sprintId}
-            options={[
-              { value: BACKLOG, label: "백로그" },
-              ...sprints.map((s) => ({ value: s.id, label: s.state === "active" ? `${s.name} (진행 중)` : s.name })),
-            ]}
-            onValueChange={setSprintId}
-          />
+          <div className="alm-field">
+            <FieldLabel field="sprint" required={required("sprint")}>스프린트</FieldLabel>
+            <Select
+              label={fieldLabel("sprint", "스프린트")}
+              className="visually-hidden-label"
+              value={sprintId}
+              options={[
+                { value: BACKLOG, label: "백로그" },
+                ...sprints.map((s) => ({ value: s.id, label: s.state === "active" ? `${s.name} (진행 중)` : s.name })),
+              ]}
+              onValueChange={setSprintId}
+            />
+          </div>
           ) : null}
           {show("dueDate") ? (
-          <TextField
-            label={fieldLabel("dueDate", "마감일")}
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
+          <div className="alm-field">
+            <FieldLabel field="dueDate" required={required("dueDate")}>마감일</FieldLabel>
+            <TextField
+              label={fieldLabel("dueDate", "마감일")}
+              className="visually-hidden-label"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
           ) : null}
         </div>
         {show("fixVersion") ? (
-          <Select
-            label={fieldLabel("fixVersion", "수정 버전")}
-            value={fixVersionId}
-            options={[
-              { value: NO_VERSION, label: "없음" },
-              ...versions.map((v) => ({ value: v.id, label: v.name })),
-            ]}
-            onValueChange={setFixVersionId}
-          />
+          <div className="alm-field">
+            <FieldLabel field="fixVersion" required={required("fixVersion")}>수정 버전</FieldLabel>
+            <Select
+              label={fieldLabel("fixVersion", "수정 버전")}
+              className="visually-hidden-label"
+              value={fixVersionId}
+              options={[
+                { value: NO_VERSION, label: "없음" },
+                ...versions.map((v) => ({ value: v.id, label: v.name })),
+              ]}
+              onValueChange={setFixVersionId}
+            />
+          </div>
         ) : null}
         {show("estimate") ? (
-          <TextField
-            label={fieldLabel("estimate", "예상 시간 (h)")}
-            type="number"
-            min={0.5}
-            step={0.5}
-            placeholder="미지정"
-            value={estimateHours}
-            onChange={(e) => setEstimateHours(e.target.value)}
-          />
+          <div className="alm-field">
+            <FieldLabel field="estimate" required={required("estimate")}>예상 시간 (h)</FieldLabel>
+            <TextField
+              label={fieldLabel("estimate", "예상 시간 (h)")}
+              className="visually-hidden-label"
+              type="number"
+              min={0.5}
+              step={0.5}
+              placeholder="미지정"
+              value={estimateHours}
+              onChange={(e) => setEstimateHours(e.target.value)}
+            />
+          </div>
         ) : null}
         {show("links") ? (
         <fieldset className="create-issue-links">
           {/* 링크는 만든 뒤에 붙는 값이라 필수여도 제출을 막지 않는다 — 표시만 한다(서버도 강제하지 않음) */}
-          <legend>{fieldLabel("links", "연결 이슈")}</legend>
+          <legend>
+            <FieldLabel field="links" required={required("links")} ariaHidden={false}>
+              연결 이슈
+            </FieldLabel>
+          </legend>
           <div className="create-issue-link-row">
             <Select
               label="종류"

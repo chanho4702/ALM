@@ -1883,10 +1883,10 @@ body {
 }
 
 /* 상태 필드 — DS Select 옵션은 문자열만 받으므로 글리프를 트리거 왼쪽에 세운다.
-   라벨+트리거 스택의 아래쪽(=트리거)에 맞춘다 */
+   라벨은 FieldLabel이 위에 그리므로 여기 남는 건 트리거뿐 — 가운데에 맞춘다 */
 .issue-status-field {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--chanho-space-75);
 }
 
@@ -1896,13 +1896,13 @@ body {
 }
 
 .issue-status-field .status-glyph {
-  padding-bottom: var(--chanho-space-100);
+  flex: none;
 }
 
 /* 담당자 필드 — 상태 필드와 같은 배치(트리거 왼쪽에 얼굴). 24px 아바타를 36px 트리거 가운데에 맞춘다 */
 .issue-assignee-field {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--chanho-space-75);
 }
 
@@ -1913,7 +1913,6 @@ body {
 
 .issue-assignee-face {
   flex: none;
-  margin-bottom: var(--chanho-space-75);
 }
 
 /* 미지정 — 이니셜이 없으니 사람 실루엣만 흐리게 */
@@ -1928,8 +1927,9 @@ body {
   color: var(--chanho-color-text-subtle);
 }
 
-/* 속성 패널 필드 라벨 — 값이 주인공이라 라벨은 작고 흐리게 */
-.issue-props label {
+/* 속성 패널 필드 라벨 — 값이 주인공이라 라벨은 작고 흐리게 (FieldLabel도 같은 표기) */
+.issue-props label,
+.issue-props .field-label {
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }
@@ -1940,10 +1940,8 @@ body {
   color: var(--chanho-color-text-default);
 }
 
+/* 라벨 필드 — 세로 스택·간격은 .alm-field가 준다. 붙은 라벨 목록만 한 칸 띄운다 */
 .issue-labels-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--chanho-space-100);
   width: 100%;
 }
 
@@ -1951,6 +1949,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--chanho-space-50);
+  margin-top: var(--chanho-space-50);
 }
 
 /* 생성일/수정일 읽기 전용 표시 */
@@ -4432,6 +4431,32 @@ th:last-child > [role="separator"] {
 
 /* ── 공통 유틸 (2026-09-04 손질) ── */
 
+/* 필드 라벨 (아이콘 + 텍스트) — DS Select/TextField의 label은 문자열만 받아 아이콘을 넣을 수 없다.
+   컨트롤에는 .visually-hidden-label로 접근 이름만 남기고, 보이는 라벨은 FieldLabel이 그린다.
+   기본 타이포는 DS 필드 라벨과 같다(text-default · font-size-100 · medium). */
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+/* 아이콘은 라벨을 거드는 표시라 글자보다 흐리게 두고, 좁아져도 찌그러지지 않게 한다 */
+.field-label-icon {
+  flex: none;
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 라벨 + 컨트롤 세로 스택 — DS 필드(label+input)와 같은 간격을 그대로 쓴다 */
+.alm-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  min-width: 0;
+}
+
 /* 라벨 시각 숨김 — DS TextField/Select에 label 숨김 옵션이 없어 래퍼(또는 Select 루트)에 건다.
    접근성 이름은 label 요소로 그대로 남는다. */
 .visually-hidden-label label {
@@ -4541,15 +4566,6 @@ th:last-child > [role="separator"] {
 }
 
 /* ── 만들기 모달: 필드 구성이 만든 상태들 ── */
-
-/* 에디터·체크박스 그룹처럼 DS label이 없는 자리에 다른 필드와 같은 라벨을 세운다 */
-.create-issue-field-label {
-  display: block;
-  margin-bottom: var(--chanho-space-50);
-  color: var(--chanho-color-text-subtle);
-  font-size: var(--chanho-font-size-75);
-  font-weight: var(--chanho-font-weight-medium);
-}
 
 /* 필수인데 고를 후보가 없는 필드 — 빈 자리를 숨기지 않고 무엇을 해야 하는지 말한다 */
 .create-issue-empty-note {
