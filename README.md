@@ -10,6 +10,7 @@
 ![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)
 ![Chanho Design System](https://img.shields.io/badge/Chanho%20DS-0.3.0-1B66C9)
 ![Self-hosted](https://img.shields.io/badge/deployment-self--hosted-0b7285)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## 특징
 
