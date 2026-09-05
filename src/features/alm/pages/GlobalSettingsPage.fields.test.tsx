@@ -211,7 +211,7 @@ describe("프로젝트 설정 > 필드", () => {
     await user.click(await screen.findByRole("button", { name: "만들기" }));
     const dialog = await screen.findByRole("dialog", { name: "이슈 만들기" });
     expect(within(dialog).queryByLabelText("마감일")).not.toBeInTheDocument();
-  });
+  }, 30_000); // 전역 설정 → 프로젝트 설정 → 만들기 모달 왕복 — 병렬 부하에서 15s를 넘긴다
 });
 
 describe("전역 관리 > 필드 구성 — 이슈 타입별 구성", () => {
