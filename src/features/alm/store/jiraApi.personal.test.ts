@@ -29,6 +29,15 @@ function fetchSpy(handler: (path: string, init?: RequestInit) => Response) {
     .mockImplementation((path: string, init?: RequestInit) => Promise.resolve(handler(path, init)));
 }
 
+/**
+ * 마지막 PUT 요청 본문 — 개인 설정 읽기는 `/api/alm/me/preferences`와 `/api/org/me`(아바타)를
+ * 함께 부르므로 호출 순번으로 세지 않는다.
+ */
+function lastPutBody(spy: ReturnType<typeof fetchSpy>): Record<string, unknown> {
+  const puts = spy.mock.calls.filter(([, init]) => init?.method === "PUT");
+  return JSON.parse(puts[puts.length - 1][1]!.body as string);
+}
+
 afterEach(() => vi.restoreAllMocks());
 
 describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", () => {
@@ -68,7 +77,7 @@ describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", ()
       avatarUrl: null,
     });
     const saved = await saveMyPreferences({ startPage: "projects" });
-    const body = JSON.parse(spy.mock.calls[2][1]!.body as string);
+    const body = lastPutBody(spy);
     expect(body).toEqual({
       notifications: { assigned: false, statusChanged: true, commented: true, mentioned: true },
       autoWatch: { created: true, commented: true, edited: false },
@@ -86,7 +95,7 @@ describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", ()
     );
     expect(await getMyPreferences()).toMatchObject({ emailEnabled: false, mailConfigured: true });
     const saved = await saveMyPreferences({ emailEnabled: true });
-    const body = JSON.parse(spy.mock.calls[2][1]!.body as string);
+    const body = lastPutBody(spy);
     expect(body.emailEnabled).toBe(true);
     expect(body.mailConfigured).toBeUndefined();
     expect(saved).toMatchObject({ emailEnabled: true, mailConfigured: true });

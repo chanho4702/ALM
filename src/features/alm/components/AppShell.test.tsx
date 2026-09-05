@@ -50,7 +50,7 @@ describe("AppShell 전역 만들기", () => {
       expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/issues?issue=ALM-9");
     });
     expect(await screen.findByRole("dialog", { name: "ALM-9" })).toBeInTheDocument();
-  });
+  }, 30_000); // 디렉터리 → 만들기 모달 → 상세 이동 왕복 — 병렬 워커·다른 빌드 부하에서 기본 15s를 넘긴다
 
   it("프로젝트 내부에서는 현재 프로젝트가 기본값이다", async () => {
     const user = userEvent.setup();

@@ -9,22 +9,31 @@ import {
 } from "./jiraApi";
 
 /**
- * 서버 계약(alm-backend V20, 2026-09-05 확정):
- * - `PUT /api/alm/me/avatar` multipart `file` → 200 `{userId, avatarUrl, updatedAt}`
- * - `DELETE /api/alm/me/avatar` → 204
- * - `GET /api/alm/users/{id}/avatar` → 바이트, 없으면 404 `{"error":"아바타가 없습니다"}`
- * - `GET /api/alm/users/avatars` → `[{userId, avatarUrl, updatedAt}]` (userId는 JSON 숫자,
- *   updatedAt은 ISO-8601). **avatarUrl은 서버가 만든다 — 프론트가 조립하지 않는다.**
+ * 서버 계약(org-service V7 `member_profile`, 2026-09-05 확정 — 아바타는 ALM이 아니라 org가 가진다):
+ * - `PUT /api/org/me/avatar` multipart `file` → 200 `{memberId, avatarUrl, updatedAt}`
+ * - `DELETE /api/org/me/avatar` → 204
+ * - `GET /api/org/members/{id}/avatar` → 바이트, 없으면 404 `{"error":"아바타가 없습니다"}`
+ * - `GET /api/org/members` → 각 행에 `avatarUrl`(nullable)·`avatarUpdatedAt`(nullable)
+ * - `GET /api/org/me` → `{id, displayName, email, avatarUrl, avatarUpdatedAt}`
  *
- * 바이트는 Bearer 토큰이 필요해 `<img src>`로 직접 못 연다 → 어댑터가 받아 object URL을 만든다.
+ * **avatarUrl은 서버가 만든다 — 프론트가 조립하지 않는다.** ALM 전용 `/api/alm/users/avatars`
+ * 병합은 없어졌다. 바이트는 Bearer 토큰이 필요해 `<img src>`로 직접 못 연다 → 어댑터가 받아
+ * object URL을 만든다.
  */
 
-const MEMBERS = [
-  { id: 1, displayName: "김찬호", status: "ACTIVE" },
-  { id: 2, displayName: "이서연", status: "ACTIVE" },
-];
+const AVATAR_PATH_2 = "/api/org/members/2/avatar?v=1757000000000";
 
-const AVATAR_PATH_2 = "/api/alm/users/2/avatar?v=1757000000000";
+/** 2번만 사진이 있다 — 목록 행이 경로를 직접 들고 온다 */
+const MEMBERS = [
+  { id: 1, displayName: "김찬호", status: "ACTIVE", avatarUrl: null, avatarUpdatedAt: null },
+  {
+    id: 2,
+    displayName: "이서연",
+    status: "ACTIVE",
+    avatarUrl: AVATAR_PATH_2,
+    avatarUpdatedAt: "2026-09-05T02:18:03.123456Z",
+  },
+];
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -55,33 +64,24 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-describe("jiraApi 프로필 사진", () => {
-  it("서버가 준 avatarUrl 경로로 바이트를 받는다 — 프론트가 URL을 조립하지 않는다", async () => {
-    const spy = fetchSpy((path) => {
-      if (path === "/api/org/members") return json(200, MEMBERS);
-      if (path === "/api/alm/users/avatars") {
-        return json(200, [
-          { userId: 2, avatarUrl: AVATAR_PATH_2, updatedAt: "2026-09-05T02:18:03.123456Z" },
-        ]);
-      }
-      return bytes();
-    });
+describe("jiraApi 프로필 사진 (org-service)", () => {
+  it("멤버 목록이 준 avatarUrl 경로로 바이트를 받는다 — 병합 호출도 URL 조립도 없다", async () => {
+    const spy = fetchSpy((path) => (path === "/api/org/members" ? json(200, MEMBERS) : bytes()));
 
     const users = await listUsers();
     expect(users.find((u) => u.id === "1")?.avatarUrl).toBeNull();
     expect(users.find((u) => u.id === "2")?.avatarUrl).toBe("blob:avatar-1");
     // 사진 없는 사용자에게는 바이트를 요청하지 않고, 요청 경로는 서버가 준 문자열 그대로다
-    const byteCalls = spy.mock.calls.filter(([path]) => path.includes("/avatar?"));
-    expect(byteCalls.map(([path]) => path)).toEqual([AVATAR_PATH_2]);
+    expect(spy.mock.calls.map(([path]) => path)).toEqual(["/api/org/members", AVATAR_PATH_2]);
+    // ALM 전용 아바타 목록은 더 이상 부르지 않는다
+    expect(spy.mock.calls.some(([path]) => path.startsWith("/api/alm/"))).toBe(false);
   });
 
   it("같은 버전은 다시 받지 않고, 사진이 바뀌면 이전 object URL을 revoke한다", async () => {
     let version = AVATAR_PATH_2;
-    const spy = fetchSpy((path) => {
-      if (path === "/api/org/members") return json(200, MEMBERS);
-      if (path === "/api/alm/users/avatars") return json(200, [{ userId: 2, avatarUrl: version }]);
-      return bytes();
-    });
+    const spy = fetchSpy((path) =>
+      path === "/api/org/members" ? json(200, [MEMBERS[0], { ...MEMBERS[1], avatarUrl: version }]) : bytes(),
+    );
 
     expect((await listUsers()).find((u) => u.id === "2")?.avatarUrl).toBe("blob:avatar-1");
     // 목록을 다시 불러도 같은 경로면 바이트를 재요청하지 않는다
@@ -90,41 +90,46 @@ describe("jiraApi 프로필 사진", () => {
     expect(spy.mock.calls.filter(([p]) => p.includes("/avatar?")).length).toBe(before);
 
     // 사진 교체 → 경로가 바뀌고 이전 URL은 놓아준다
-    version = "/api/alm/users/2/avatar?v=1757999999999";
+    version = "/api/org/members/2/avatar?v=1757999999999";
     expect((await listUsers()).find((u) => u.id === "2")?.avatarUrl).toBe("blob:avatar-2");
     expect(revoked).toEqual(["blob:avatar-1"]);
   });
 
-  it("아바타 목록 조회가 실패해도 사용자 목록은 이니셜로 살아 있다", async () => {
-    fetchSpy((path) =>
-      path === "/api/org/members" ? json(200, MEMBERS) : json(503, { error: "저장소 장애" }),
+  it("서버가 경로를 안 주면 avatarUpdatedAt으로 org 경로를 조립한다(폴백)", async () => {
+    const spy = fetchSpy((path) =>
+      path === "/api/org/members"
+        ? json(200, [{ id: 2, displayName: "이서연", status: "ACTIVE", avatarUpdatedAt: "2026-09-05T02:18:03Z" }])
+        : bytes(),
     );
-    const users = await listUsers();
-    expect(users.map((u) => u.name)).toEqual(["김찬호", "이서연"]);
-    expect(users.every((u) => u.avatarUrl === null)).toBe(true);
+    expect((await listUsers())[0].avatarUrl).toBe("blob:avatar-1");
+    expect(spy.mock.calls[1][0]).toBe(
+      `/api/org/members/2/avatar?v=${encodeURIComponent("2026-09-05T02:18:03Z")}`,
+    );
+  });
+
+  it("멤버 목록 조회가 실패하면 던진다 — 사용자 목록은 부가 정보가 아니다", async () => {
+    fetchSpy(() => json(503, { error: "저장소 장애" }));
+    await expect(listUsers()).rejects.toThrow("저장소 장애");
   });
 
   it("목록에 있던 사용자가 404면 조용히 이니셜로 떨어진다(삭제 경합)", async () => {
-    fetchSpy((path) => {
-      if (path === "/api/org/members") return json(200, MEMBERS);
-      if (path === "/api/alm/users/avatars") return json(200, [{ userId: 2, avatarUrl: AVATAR_PATH_2 }]);
-      return json(404, { error: "아바타가 없습니다" });
-    });
+    fetchSpy((path) =>
+      path === "/api/org/members" ? json(200, MEMBERS) : json(404, { error: "아바타가 없습니다" }),
+    );
     // 던지지 않는다 — 목록 전체가 실패하면 안 된다
     expect((await listUsers()).find((u) => u.id === "2")?.avatarUrl).toBeNull();
   });
 
-  it("업로드는 multipart PUT이고, 응답의 avatarUrl로 캐시를 채워 바이트를 다시 받지 않는다", async () => {
+  it("업로드는 org 경로 multipart PUT이고, 응답의 avatarUrl로 캐시를 채워 바이트를 다시 받지 않는다", async () => {
     const spy = fetchSpy((path) => {
-      if (path === "/api/alm/me/avatar") {
+      if (path === "/api/org/me/avatar") {
         return json(200, {
-          userId: 2,
+          memberId: 2,
           avatarUrl: AVATAR_PATH_2,
           updatedAt: "2026-09-05T02:18:03.123456Z",
         });
       }
       if (path === "/api/org/members") return json(200, MEMBERS);
-      if (path === "/api/alm/users/avatars") return json(200, [{ userId: 2, avatarUrl: AVATAR_PATH_2 }]);
       return bytes();
     });
 
@@ -132,7 +137,7 @@ describe("jiraApi 프로필 사진", () => {
     expect(await uploadMyAvatar(file)).toBe("blob:avatar-1");
 
     const [path, init] = spy.mock.calls[0];
-    expect(path).toBe("/api/alm/me/avatar");
+    expect(path).toBe("/api/org/me/avatar");
     expect(init?.method).toBe("PUT");
     expect(init?.body).toBeInstanceOf(FormData);
     const sent = (init?.body as FormData).get("file") as File;
@@ -166,14 +171,13 @@ describe("jiraApi 프로필 사진", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("제거는 DELETE 204이고, 그 뒤 목록은 이니셜로 돌아가며 object URL을 놓아준다", async () => {
+  it("제거는 org 경로 DELETE 204이고, 그 뒤 목록은 이니셜로 돌아가며 object URL을 놓아준다", async () => {
     let hasAvatar = true;
     const spy = fetchSpy((path) => {
-      if (path === "/api/org/members") return json(200, MEMBERS);
-      if (path === "/api/alm/users/avatars") {
-        return json(200, hasAvatar ? [{ userId: 2, avatarUrl: AVATAR_PATH_2 }] : []);
+      if (path === "/api/org/members") {
+        return json(200, hasAvatar ? MEMBERS : [MEMBERS[0], { ...MEMBERS[1], avatarUrl: null, avatarUpdatedAt: null }]);
       }
-      if (path === "/api/alm/me/avatar") return new Response(null, { status: 204 });
+      if (path === "/api/org/me/avatar") return new Response(null, { status: 204 });
       return bytes();
     });
 
@@ -181,32 +185,38 @@ describe("jiraApi 프로필 사진", () => {
     hasAvatar = false;
     await removeMyAvatar();
     expect(spy).toHaveBeenCalledWith(
-      "/api/alm/me/avatar",
+      "/api/org/me/avatar",
       expect.objectContaining({ method: "DELETE" }),
     );
     expect((await listUsers()).find((u) => u.id === "2")?.avatarUrl).toBeNull();
     expect(revoked).toEqual(["blob:avatar-1"]);
   });
 
-  it("개인 설정의 avatarUrl은 항상 있고 값이 null일 수 있다 — 유무만 보고 표시 URL로 바꾼다", async () => {
+  it("개인 설정의 avatarUrl은 /api/org/me에서 온다 — 사진이 없으면 null이고 바이트도 안 받는다", async () => {
     let stored: string | null = null;
-    fetchSpy((path) => {
-      if (path === "/api/alm/me/preferences") return json(200, { startPage: "home", avatarUrl: stored });
-      if (path === "/api/alm/users/avatars") {
-        return json(200, stored ? [{ userId: 1, avatarUrl: stored }] : []);
+    const spy = fetchSpy((path) => {
+      if (path === "/api/alm/me/preferences") return json(200, { startPage: "home" });
+      if (path === "/api/org/me") {
+        return json(200, { id: 1, displayName: "김찬호", email: "me@example.com", avatarUrl: stored });
       }
       return bytes();
     });
-    vi.spyOn(client.sharedAuthClient, "fetchMe").mockResolvedValue({
-      sub: "1",
-      name: "김찬호",
-      email: "me@example.com",
-    } as Awaited<ReturnType<typeof client.sharedAuthClient.fetchMe>>);
 
     expect((await getMyPreferences()).avatarUrl).toBeNull();
+    expect(spy.mock.calls.some(([p]) => p.includes("/avatar"))).toBe(false);
 
-    stored = "/api/alm/users/1/avatar?v=1757000000000";
+    stored = "/api/org/members/1/avatar?v=1757000000000";
     __resetForTest();
     expect((await getMyPreferences()).avatarUrl).toBe("blob:avatar-1");
+    expect(spy.mock.calls.map(([p]) => p)).toContain(stored);
+  });
+
+  it("내 프로필 조회가 실패해도 개인 설정은 이니셜로 살아 있다", async () => {
+    fetchSpy((path) =>
+      path === "/api/alm/me/preferences" ? json(200, { startPage: "projects" }) : json(503, { error: "org 장애" }),
+    );
+    const prefs = await getMyPreferences();
+    expect(prefs.startPage).toBe("projects");
+    expect(prefs.avatarUrl).toBeNull();
   });
 });

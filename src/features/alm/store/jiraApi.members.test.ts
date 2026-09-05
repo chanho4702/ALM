@@ -37,7 +37,7 @@ function fetchSpy(handler: (path: string, init?: RequestInit) => Response) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("jiraApi 사용자 디렉터리·멤버 (org-service)", () => {
-  it("사용자 목록은 ACTIVE 멤버만 보여준다 (아바타 목록이 없으면 avatarUrl은 null)", async () => {
+  it("사용자 목록은 ACTIVE 멤버만 보여준다 (행에 아바타가 없으면 avatarUrl은 null)", async () => {
     fetchSpy((path) => (path === "/api/org/members" ? response(200, MEMBERS) : response(404)));
     expect(await listUsers()).toEqual([
       { id: "1", name: "Alice", avatarUrl: null },

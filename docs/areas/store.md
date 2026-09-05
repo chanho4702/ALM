@@ -253,18 +253,25 @@ project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 �
   하드코딩하지 말 것. 타입·크기 검증은 `assertAvatarFile`(목업 정본)을 REST도 함께 쓴다.
 - 목업은 `data.avatars[userId] = dataURL`로 localStorage에 넣는다(첨부 바이트와 달리 새로고침해도
   남아야 하기 때문). base64가 약 1.37배로 부풀고 localStorage가 5MB라 상한이 서버보다 훨씬 작다.
-- **REST는 `<img src="/api/alm/users/{id}/avatar">`를 쓸 수 없다.** 인증이 메모리 Bearer 토큰이고
+- **저장소는 org-service다**(`member_profile`, V7) — ALM이 아니다. 그래서 같은 사진을 위키·보드도
+  볼 수 있다. ALM 전용 엔드포인트(`/api/alm/me/avatar`, `/api/alm/users/avatars`,
+  `/api/alm/users/{id}/avatar`)와 `user_preference.avatar_key`는 없어졌다(alm-backend V21).
+  경로는 `PUT`/`DELETE /api/org/me/avatar`(multipart `file`, PUT 응답 `{memberId, avatarUrl, updatedAt}`),
+  바이트는 `GET /api/org/members/{id}/avatar`.
+- **REST는 `<img src="/api/org/members/{id}/avatar">`를 쓸 수 없다.** 인증이 메모리 Bearer 토큰이고
   (`auth/client.ts`) 쿠키는 refresh 전용이라 브라우저가 `<img>` 요청에 Authorization 헤더를 붙이지
-  않는다(첨부 내려받기와 같은 제약). 어댑터가 `GET /api/alm/users/avatars`로
-  `[{userId, avatarUrl, updatedAt}]`를 받고, 사진이 있는 사용자만 `sharedApiFetch`로 바이트를 받아
-  object URL로 바꾼다. 조회가 실패하면 **avatarUrl을 null로 두고 목록 자체는 살린다**(부가 정보).
+  않는다(첨부 내려받기와 같은 제약). 그래서 `sharedApiFetch`로 바이트를 받아 object URL로 바꾼다.
+- **경로는 목록이 함께 준다 — 병합 호출이 없다.** `GET /api/org/members`의 각 행에
+  `avatarUrl`(nullable)·`avatarUpdatedAt`이 실려 오고, `listUsers`는 사진이 있는 사용자만 바이트를
+  받는다. 멤버 목록 조회 자체가 실패하면 **던진다**(사용자 목록은 부가 정보가 아니다).
 - **바이트 경로는 서버가 준 `avatarUrl`을 그대로 쓴다 — 프론트가 조립하지 않는다.** 그 문자열에
-  버전이 들어 있어 사진이 바뀌면 경로가 달라진다. object URL은 userId별로 `{경로, url}`을 들고
+  버전이 들어 있어 사진이 바뀌면 경로가 달라진다. object URL은 memberId별로 `{경로, url}`을 들고
   있다가 경로가 바뀌면 이전 것을 `revokeObjectURL`로 놓아준다(바이트 응답에
-  `Cache-Control: private, max-age=300`이 붙어 브라우저 HTTP 캐시와 겹친다).
-- **경로 목록은 결과를 캐시하지 않는다** — 캐시하면 남이 바꾼 사진이 영원히 안 보인다. 진행 중인
-  요청만 합친다(in-flight dedup). 비싼 쪽은 바이트이고 그건 경로 단위 캐시가 막는다.
-- 업로드 응답 `{userId, avatarUrl, updatedAt}`으로 **방금 올린 로컬 바이트를 새 경로에 등록**한다 —
+  `Cache-Control: private, max-age=300`이 붙어 브라우저 HTTP 캐시와 겹친다). 서버가 경로를 안 주고
+  `avatarUpdatedAt`만 주면 그때만 `/api/org/members/{id}/avatar?v=…`로 조립한다(폴백).
+- **`/api/org/me` 응답은 캐시하지 않는다** — 캐시하면 내가 다른 탭에서 바꾼 사진이 영원히 안 보인다.
+  진행 중인 요청만 합친다(in-flight dedup). 비싼 쪽은 바이트이고 그건 경로 단위 캐시가 막는다.
+- 업로드 응답 `{memberId, avatarUrl, updatedAt}`으로 **방금 올린 로컬 바이트를 새 경로에 등록**한다 —
   올린 직후 목록을 다시 불러도 바이트를 두 번 받지 않는다.
 - **선검증은 서버를 대신하지 않는다.** 서버는 확장자·MIME이 아니라 **매직 바이트**로 판별하므로
   이름만 `.png`인 GIF·SVG는 통과 후 400이 난다. 화면은 서버 `{error}`를 항상 그대로 띄운다.
@@ -272,9 +279,11 @@ project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 �
   `아바타는 PNG·JPG·WebP 이미지만 올릴 수 있습니다`, `아바타는 2MB 이하 이미지여야 합니다`.
 - 목록에 있던 사용자의 바이트가 404(`아바타가 없습니다`)면 그 사이 지워진 경합이다 — 에러를 띄우지
   말고 조용히 이니셜로 떨어진다.
-- `getMyPreferences().avatarUrl`은 읽기 전용이다. REST의 개인 설정 응답 `avatarUrl`은 위 이유로
-  값 자체를 못 쓰므로 **있다/없다만** 보고 표시 URL은 `getCurrentUser()`가 만든 것을 쓴다.
-  `saveMyPreferences`는 avatarUrl을 보내지 않는다(저장소가 다르다).
+- `getMyPreferences().avatarUrl`은 읽기 전용이고 **`GET /api/org/me`**(`{id, displayName, email,
+  avatarUrl, avatarUpdatedAt}`)에서 온다 — ALM 개인 설정 응답에는 더 이상 아바타가 없다. 사진이
+  없으면 바이트 요청 없이 null이고, `saveMyPreferences`는 avatarUrl을 보내지 않는다(저장소가 다르다).
+  `/api/org/me` 조회가 실패해도 개인 설정은 이니셜로 살아 있다(부가 정보).
 - 사진을 바꾸면 `AVATAR_CHANGED_EVENT`를 window에 발행한다 — 이미 그려진 상단바 아바타(`AppShell`)가
   구독해 새로고침 없이 따라온다. 새 아바타 소비처가 오래 살아 있다면 같은 이벤트를 구독할 것.
-- 한계: 아바타는 ALM 서비스 저장이라 **위키·보드에는 아직 안 보인다**. org-service 이관은 후속.
+- 위키·보드도 `/api/org/members`의 `avatarUrl`을 그대로 쓰면 같은 사진이 보인다(각 프론트의 표시
+  적용은 별건). 목업(`jiraMock.ts`)은 이관과 무관하게 그대로다 — `data.avatars`에 dataURL을 넣는다.

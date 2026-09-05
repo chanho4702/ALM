@@ -4,7 +4,7 @@ export interface User {
   /**
    * 프로필 사진 — 화면이 `<Avatar src>`에 그대로 넣을 수 있는 URL.
    * 목업은 base64 dataURL, REST는 인증 헤더가 필요해 바이트를 받아 만든 object URL이다
-   * (`/api/alm/users/{id}/avatar`는 Bearer 토큰을 요구하므로 `<img src>`로 직접 못 연다).
+   * (`/api/org/members/{id}/avatar`는 Bearer 토큰을 요구하므로 `<img src>`로 직접 못 연다).
    * 없으면 이니셜 아바타.
    */
   avatarUrl?: string | null;
