@@ -2572,9 +2572,11 @@ function validateSettingsBody(data: JiraData, body: SettingsBody): void {
 function validateFieldConfigs(fields?: IssueFieldConfig[] | null): void {
   if (!fields) return;
   const seen = new Set<string>();
+  // 규칙마다 목록을 훑지 않고 **요소 하나마다** 여섯 검사를 다 돌린다(서버 validateFieldList와 같은 순회) —
+  // 위반이 여러 종류 섞이면 "앞선 요소의 위반"이 먼저 나가야 문구가 서버와 갈리지 않는다
   for (const field of fields) {
-    // 빈 문자열·누락은 "없는 필드입니다: " 처럼 이름이 사라지는 문구가 되므로 따로 말한다
-    if (!field.id || !String(field.id).trim()) throw new Error("필드 id가 비어 있습니다");
+    // 빈 문자열·누락·요소 자체가 null인 경우는 "없는 필드입니다: " 처럼 이름이 사라지므로 따로 말한다
+    if (!field?.id || !String(field.id).trim()) throw new Error("필드 id가 비어 있습니다");
     if (!(ISSUE_FIELD_IDS as readonly string[]).includes(field.id)) {
       throw new Error(`없는 필드입니다: ${field.id}`);
     }

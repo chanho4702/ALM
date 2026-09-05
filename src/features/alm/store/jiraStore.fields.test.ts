@@ -84,6 +84,20 @@ describe("필드 구성 — 검증", () => {
     ).rejects.toThrow("필드 id가 비어 있습니다");
   });
 
+  it("규칙별 패스가 아니라 요소 단위로 검사한다 — 앞선 요소의 위반이 먼저 나간다", async () => {
+    // 패스 방식이면 빈 id 패스가 먼저라 "필드 id가 비어 있습니다"가 나온다(서버와 갈린다)
+    await expect(
+      saveSchemeFields([
+        { id: "severity" as IssueFieldConfig["id"], visible: true, required: false },
+        { visible: true, required: false } as IssueFieldConfig,
+      ]),
+    ).rejects.toThrow("없는 필드입니다: severity");
+    // 요소 자체가 null이어도 같은 문구다 — 이름이 사라진 문구로 새지 않는다
+    await expect(
+      saveSchemeFields([null as unknown as IssueFieldConfig]),
+    ).rejects.toThrow("필드 id가 비어 있습니다");
+  });
+
   it("같은 필드를 두 번 넣을 수 없다", async () => {
     await expect(
       saveSchemeFields([
@@ -237,6 +251,20 @@ describe("필드 구성 — 이슈 타입별 구성", () => {
     expect(bug.find((f) => f.id === "dueDate")?.visible).toBe(false);
     expect(bug.find((f) => f.id === "labels")?.visible).toBe(false); // 기본 구성에서 물려받음
     expect(bug.find((f) => f.id === "assignee")?.visible).toBe(true);
+  });
+
+  it("타입별 목록도 같은 검증 함수를 타므로 문구·순회가 같다", async () => {
+    await expect(saveSchemeFieldsByType({ bug: [{ id: "" as IssueFieldConfig["id"], visible: true, required: false }] })).rejects.toThrow(
+      "필드 id가 비어 있습니다",
+    );
+    await expect(
+      saveSchemeFieldsByType({
+        bug: [
+          { id: "severity" as IssueFieldConfig["id"], visible: true, required: false },
+          { visible: true, required: false } as IssueFieldConfig,
+        ],
+      }),
+    ).rejects.toThrow("없는 필드입니다: severity");
   });
 
   it("없는 이슈 타입을 키로 쓰면 거부한다", async () => {
