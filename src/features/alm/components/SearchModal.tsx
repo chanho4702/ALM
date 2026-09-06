@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, EmptyState, Lozenge, Modal, TextField } from "@chanho/react";
 import type { Issue, Project, WorkflowStatus } from "../store/types";
 import { searchIssues, statusMetaByProject } from "../store/jiraStore";
+import { looksLikeAql } from "../store/aql/complete";
 import { statusAppearance, statusName } from "./labels";
 
 export interface SearchModalProps {
@@ -14,6 +15,8 @@ export interface SearchModalProps {
   onNavigate: (issue: Issue) => void;
   /** "고급 검색으로" — 셸이 /search?q= 로 이동시킨다 */
   onAdvanced: (query: string) => void;
+  /** "AQL로 검색" — 입력이 AQL 문법으로 보일 때만 뜬다. 셸이 /search?aql= 로 보낸다 */
+  onAql: (aql: string) => void;
 }
 
 /** 지라의 전역 검색 — 전 프로젝트 이슈를 키/제목/설명으로 찾는다 */
@@ -24,6 +27,7 @@ export function SearchModal({
   onOpenChange,
   onNavigate,
   onAdvanced,
+  onAql,
 }: SearchModalProps) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<Issue[]>([]);
@@ -105,6 +109,11 @@ export function SearchModal({
           </ul>
         )}
         <div className="search-modal-footer">
+          {looksLikeAql(query) ? (
+            <Button variant="ghost" size="small" onClick={() => onAql(query)}>
+              AQL로 검색 — 이 문장을 질의어로 실행
+            </Button>
+          ) : null}
           <Button variant="ghost" size="small" onClick={() => onAdvanced(query)}>
             고급 검색으로 — 상태·담당·타입 조건까지
           </Button>

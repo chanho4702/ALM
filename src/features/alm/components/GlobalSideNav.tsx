@@ -280,7 +280,11 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
                   type="button"
                   className="global-nav-item"
                   title={filter.query}
-                  onClick={() => navigate(`/search?q=${encodeURIComponent(filter.query)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/search?${filter.kind === "aql" ? "aql" : "q"}=${encodeURIComponent(filter.query)}`,
+                    )
+                  }
                 >
                   <span className="global-nav-glyph" aria-hidden>
                     <Filter />

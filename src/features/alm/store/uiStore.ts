@@ -13,11 +13,13 @@ export const SIDENAV_DEFAULT_WIDTH = 240;
 /** uiStore가 바뀔 때마다 window에 발행 — 사이드바 등 구독자가 다시 읽는다 */
 export const UI_CHANGED_EVENT = "alm:ui-changed";
 
-/** 저장 필터 — query는 스마트 검색 문자열 그대로 (URL·사이드바에서 재사용) */
+/** 저장 필터 — query는 스마트 검색 문자열 또는 AQL 문자열 (URL·사이드바에서 재사용) */
 export interface SavedFilter {
   id: string;
   name: string;
   query: string;
+  /** 없으면 스마트(`?q=`). AQL 필터는 `?aql=`로 연다 — 옛 저장분은 kind가 없어 자동으로 스마트가 된다 */
+  kind?: "smart" | "aql";
 }
 
 /** 테이블별 열 순서·너비 — DS Table의 columnOrder/columnWidths와 같은 모양 */
@@ -132,17 +134,22 @@ export async function listSavedFilters(): Promise<SavedFilter[]> {
 }
 
 /** 저장 필터 추가 — 같은 이름이 있으면 쿼리를 덮어쓴다 */
-export async function saveFilter(name: string, query: string): Promise<SavedFilter> {
+export async function saveFilter(
+  name: string,
+  query: string,
+  kind: "smart" | "aql" = "smart",
+): Promise<SavedFilter> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("필터 이름을 입력하세요");
   const state = load();
   const existing = state.savedFilters.find((f) => f.name === trimmed);
   if (existing) {
     existing.query = query;
+    existing.kind = kind;
     persist(state);
     return existing;
   }
-  const filter: SavedFilter = { id: crypto.randomUUID(), name: trimmed, query };
+  const filter: SavedFilter = { id: crypto.randomUUID(), name: trimmed, query, kind };
   persist({ ...state, savedFilters: [...state.savedFilters, filter] });
   return filter;
 }

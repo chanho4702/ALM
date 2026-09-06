@@ -163,6 +163,10 @@ export function AppShell({ projects }: AppShellProps) {
           setSearchOpen(false);
           navigate(`/search?q=${encodeURIComponent(query)}`);
         }}
+        onAql={(aql) => {
+          setSearchOpen(false);
+          navigate(`/search?aql=${encodeURIComponent(aql)}`);
+        }}
       />
       <NotificationsModal
         notifications={notifications}

@@ -21,6 +21,13 @@ GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름�
 9. Card에 flex/grid를 덮어쓰면 내부 레이아웃과 충돌해 겹침이 난다 — 카드형 커스텀 UI는
    자체 타일 마크업(`.project-card`, `.home-resume-card` 패턴) 권장.
 
+## 미정의 토큰 (2026-09-06 리뷰에서 발견, 미수정)
+
+`--chanho-color-text` · `--chanho-color-text-muted` · `--chanho-color-text-subtlest` ·
+`--chanho-shadow-raised` 넷은 **토큰에 없다**(`.org-gate` 등 기존 코드가 쓰고 있다). 없는 토큰을 쓰면
+그 선언 하나가 조용히 무효화될 뿐 에러가 안 나므로, 새 코드에서 따라 쓰지 말 것.
+`text`→`text-default`, `text-muted`/`text-subtlest`→`text-subtle`, `shadow-raised`→`shadow-overlay`가 대응이다.
+
 ## 토큰 사용 규칙
 
 - 존재하는 토큰만 쓸 것. **`var(--chanho-color-border)`는 존재하지 않는다**(bare) —

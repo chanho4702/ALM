@@ -915,9 +915,141 @@ body {
   min-width: 260px;
 }
 
-/* 지라의 우측 "JQL로 전환" 자리 */
+/* 지라의 우측 "JQL로 전환" 자리 — 기본·스마트·AQL 3분할 세그먼트 */
 .search-mode-toggle {
+  display: inline-flex;
+  gap: var(--chanho-space-25);
+  align-items: center;
   margin-left: auto;
+  padding: var(--chanho-space-25);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-subtle);
+}
+
+/* ── AQL 모드 (지라 JQL 자리) ─────────────────────────── */
+
+.search-aql-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-100);
+  align-items: flex-start;
+}
+
+.aql-editor {
+  display: flex;
+  flex: 1;
+  min-width: 320px;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+/* 입력과 밑줄 오버레이가 정확히 겹쳐야 한다 — 타이포·여백을 양쪽에 같은 값으로 못박는다 */
+.aql-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.aql-input {
+  display: block;
+  width: 100%;
+}
+
+.aql-input input,
+.aql-underlay {
+  box-sizing: border-box;
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-100);
+  line-height: 20px;
+  padding: var(--chanho-space-100);
+  border-width: 1px;
+  border-style: solid;
+}
+
+.aql-input input {
+  width: 100%;
+}
+
+.aql-underlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  border-color: transparent;
+  color: transparent;
+}
+
+/* 입력이 가로로 스크롤되면 밑줄 층도 같이 민다 — 겹침이 어긋나면 엉뚱한 글자에 줄이 그어진다 */
+.aql-underlay-scroll {
+  width: max-content;
+  min-width: 100%;
+  white-space: pre;
+}
+
+.aql-underline {
+  text-decoration: underline wavy var(--chanho-color-text-danger);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+
+.aql-error {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-danger);
+}
+
+.aql-hint {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.aql-hint code {
+  font-family: var(--chanho-font-family-mono);
+}
+
+/* 자동완성 팝업 — DS Dropdown은 고르면 닫히는 단일선택 메뉴라 커스텀 listbox를 쓴다 */
+.aql-suggestions {
+  position: absolute;
+  z-index: var(--chanho-z-dropdown);
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--chanho-space-50);
+  list-style: none;
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface-raised);
+  box-shadow: var(--chanho-shadow-overlay);
+}
+
+.aql-suggestion {
+  display: flex;
+  align-items: baseline;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border-radius: var(--chanho-radius-small);
+  cursor: pointer;
+}
+
+.aql-suggestion.is-active {
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-selected);
+}
+
+.aql-suggestion-label {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-100);
+}
+
+.aql-suggestion-detail {
+  margin-left: auto;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
 }
 
 /* 필터 드롭다운 (지라 Basic 필터 버튼) */
@@ -994,6 +1126,22 @@ body {
   background: var(--chanho-color-background-brand-subtle);
   color: var(--chanho-color-text-brand);
   font-weight: var(--chanho-font-weight-medium);
+}
+
+/* 결과 머리글 한 줄 — 범위 표시 + 페이지 이동(AQL은 서버가 자른 한 페이지만 그린다) */
+.search-result-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+}
+
+/* 페이지 범위(시작–끝 / 총건) — 이슈 목록 툴바와 같은 표기 */
+.search-range {
+  margin-left: var(--chanho-space-100);
+  margin-right: auto;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
 }
 
 .search-count {

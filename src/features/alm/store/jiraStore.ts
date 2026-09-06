@@ -181,3 +181,7 @@ export const createDashboard = impl.createDashboard;
 export const updateDashboard = impl.updateDashboard;
 export const deleteDashboard = impl.deleteDashboard;
 export const listProjectWorklogs = impl.listProjectWorklogs;
+/** AQL — 목업은 `store/aql/evaluate.ts`로 메모리 이슈에, REST는 `POST /api/alm/issues/query`로 실행한다 */
+export const queryIssuesAql = impl.queryIssuesAql;
+export const validateAql = impl.validateAql;
+export const aqlFields = impl.aqlFields;

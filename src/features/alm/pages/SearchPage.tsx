@@ -30,8 +30,14 @@ import {
   queryIssues,
   statusMetaByProject,
 } from "../store/jiraStore";
+import { aqlFields, listStatusCategories, queryIssuesAql } from "../store/jiraStore";
 import type { IssueQuery } from "../store/searchQuery";
 import { EMPTY_QUERY, parseSmartQuery, queryTokens, serializeQuery } from "../store/searchQuery";
+import { parseAql } from "../store/aql/parser";
+import { AqlError } from "../store/aql/types";
+import { fromAql, toAql } from "../store/aql/toAql";
+import { EMPTY_FIELDS_INFO, type AqlFieldsInfo } from "../store/aql/fields";
+import { AqlEditor, type AqlEditorError } from "../components/AqlEditor";
 import { saveFilter } from "../store/uiStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
@@ -47,6 +53,21 @@ import {
 import { usePriorities } from "../components/usePriorities";
 import { formatDate } from "../components/time";
 import { UserAvatar } from "../components/UserAvatar";
+
+type SearchMode = "basic" | "smart" | "aql";
+
+/** AQL 결과 한 페이지 크기 — 이슈 목록과 같은 값을 쓴다 */
+const AQL_PAGE_SIZE = 50;
+
+/**
+ * 모드 전환 버튼 — 보이는 글자는 짧게, 접근 이름은 하던 말 그대로 둔다.
+ * 보이는 글자가 접근 이름의 앞부분이라 WCAG 2.5.3(Label in Name)을 지키고, 기존 테스트 셀렉터도 산다.
+ */
+const MODE_OPTIONS: { value: SearchMode; label: string; action: string }[] = [
+  { value: "basic", label: "기본", action: "기본 검색으로 전환" },
+  { value: "smart", label: "스마트", action: "스마트 구문으로 전환" },
+  { value: "aql", label: "AQL", action: "AQL로 전환" },
+];
 
 const CATEGORY_IDS = new Set(["todo", "inprogress", "done"]);
 
@@ -69,12 +90,20 @@ export function SearchPage() {
   const PRIORITIES = priorities.map((d) => d.id);
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") ?? "";
-  const [mode, setMode] = useState<"basic" | "smart">("basic");
+  /** AQL 모드의 진실은 URL의 `aql` 파라미터다 — 있으면 AQL 모드, 없으면 기본/스마트 중 하나 */
+  const aql = searchParams.get("aql");
+  const [textMode, setTextMode] = useState<"basic" | "smart">("basic");
+  const mode: SearchMode = aql !== null ? "aql" : textMode;
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
+  const [total, setTotal] = useState<number | null>(null); // AQL은 서버/실행기가 준 총건수
+  const [page, setPage] = useState(0);
   const [allStatuses, setAllStatuses] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; kind: string }[]>([]);
   const [statusMeta, setStatusMeta] = useState<Record<string, Record<string, WorkflowStatus>>>({});
+  const [fieldsInfo, setFieldsInfo] = useState<AqlFieldsInfo>(EMPTY_FIELDS_INFO);
+  const [aqlError, setAqlError] = useState<AqlEditorError | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const toast = useToast();
@@ -83,18 +112,65 @@ export function SearchPage() {
     void listUsers().then(setUsers);
     void listProjects().then(setProjects);
     void listAllStatuses().then(setAllStatuses); // 상태:이름 토큰이 커스텀 상태도 알아듣게
+    void listStatusCategories().then(setCategories); // 기본 필터 ↔ statusCategory 번역용
     void statusMetaByProject().then(setStatusMeta);
   }, []);
 
+  // 자동완성 카탈로그는 AQL 모드에 들어올 때만 받는다(값 후보가 레지스트리 전체를 훑는다)
+  useEffect(() => {
+    if (mode !== "aql" || fieldsInfo.fields.length > 0) return;
+    void aqlFields().then(setFieldsInfo);
+  }, [mode, fieldsInfo.fields.length]);
+
+  /**
+   * 스마트 구문 파싱/직렬화의 문맥 — **기본·스마트 모드가 매 렌더 쓰는 값**이라 좁게 유지한다.
+   * 여기에 늦게 도착하는 값을 더하면 그때마다 q가 다시 파싱되고 결과를 다시 불러, 필터 칩·트리거
+   * 요약이 한 박자 늦게 갱신된다(기본 모드 테스트가 그 레이스를 잡는다).
+   */
   const ctx = useMemo(
     () => ({ users, projects, statuses: allStatuses, priorities }),
     [users, projects, allStatuses, priorities],
   );
+  /** AQL 번역 전용 문맥 — 모드 전환 때만 쓰이므로 타입·카테고리를 더 얹어도 기본 모드에 영향이 없다 */
+  const aqlCtx = useMemo(
+    () => ({ ...ctx, types: issueTypes, categories }),
+    [ctx, issueTypes, categories],
+  );
   const query = useMemo(() => parseSmartQuery(q, ctx), [q, ctx]);
 
   const reload = useCallback(async () => {
+    if (aql !== null) {
+      try {
+        const result = await queryIssuesAql(aql, { page, size: AQL_PAGE_SIZE });
+        setIssues(result.items);
+        setTotal(result.total);
+        setAqlError(null);
+      } catch (error) {
+        // 문법 오류는 밑줄로, 그 밖(로드 실패)은 토스트로 — 결과는 비운다
+        setIssues([]);
+        setTotal(0);
+        if (error instanceof AqlError) {
+          setAqlError({ message: error.message, position: error.position });
+        } else {
+          setAqlError(null);
+          toast({
+            title: "검색을 실행하지 못했습니다",
+            description: error instanceof Error ? error.message : String(error),
+            appearance: "danger",
+          });
+        }
+      }
+      return;
+    }
+    setTotal(null);
+    setAqlError(null);
     setIssues(await queryIssues(query));
-  }, [query]);
+  }, [aql, page, query, toast]);
+
+  // 질의가 바뀌면 첫 페이지로 — 3쪽을 보다 조건을 바꾸면 빈 화면이 나오면 안 된다
+  useEffect(() => {
+    setPage(0);
+  }, [aql]);
 
   useEffect(() => {
     void reload();
@@ -113,6 +189,59 @@ export function SearchPage() {
       },
       { replace: true },
     );
+  };
+
+  /** AQL 실행 — `?aql=`만 남긴다(스마트 `q`는 지운다) */
+  const setAqlParam = (next: string) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("q");
+        params.set("aql", next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  /** AQL 모드로 — 지금 필터를 AQL로 채워 넣는다(지라 Basic→JQL과 같다) */
+  const switchToAql = () => setAqlParam(toAql(query, aqlCtx));
+
+  /** AQL 모드에서 나가기 — 단순 조건만 역변환된다. 아니면 AQL을 그대로 둔다 */
+  const switchFromAql = (next: "basic" | "smart") => {
+    let restored: IssueQuery | null = null;
+    try {
+      restored = fromAql(parseAql(aql ?? ""), aqlCtx);
+    } catch {
+      restored = null;
+    }
+    if (!restored) {
+      toast({
+        title: "이 AQL은 기본 검색으로 옮길 수 없습니다",
+        description: "AND로 이은 = · IN 조건만 되돌릴 수 있습니다. AQL을 그대로 유지합니다.",
+        appearance: "info",
+      });
+      return;
+    }
+    const smart = serializeQuery(restored, aqlCtx);
+    setTextMode(next);
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("aql");
+        if (smart.trim()) params.set("q", smart);
+        else params.delete("q");
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  const switchMode = (next: SearchMode) => {
+    if (next === mode) return;
+    if (next === "aql") switchToAql();
+    else if (mode === "aql") switchFromAql(next);
+    else setTextMode(next);
   };
 
   /** 기본 모드 필터 조작 — 쿼리 객체를 고쳐 스마트 문자열로 되쓴다 */
@@ -173,7 +302,7 @@ export function SearchPage() {
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await saveFilter(saveName, q);
+      await saveFilter(saveName, mode === "aql" ? (aql ?? "") : q, mode === "aql" ? "aql" : "smart");
       toast({ title: `필터 "${saveName.trim()}"를 저장했습니다`, appearance: "success" });
       setSaveName("");
       setSaveOpen(false);
@@ -185,6 +314,23 @@ export function SearchPage() {
       });
     }
   };
+
+  const modeSwitch = (
+    <span className="search-mode-toggle" role="group" aria-label="검색 모드">
+      {MODE_OPTIONS.map((option) => (
+        <Button
+          key={option.value}
+          variant={mode === option.value ? "primary" : "ghost"}
+          size="small"
+          aria-pressed={mode === option.value}
+          aria-label={option.action}
+          onClick={() => switchMode(option.value)}
+        >
+          {option.label}
+        </Button>
+      ))}
+    </span>
+  );
 
   const columns: TableColumn<Issue>[] = [
     {
@@ -263,7 +409,7 @@ export function SearchPage() {
       <PageHeader
         title="검색"
         actions={
-          q.trim() ? (
+          q.trim() || (aql ?? "").trim() ? (
             <Button variant="secondary" onClick={() => setSaveOpen(true)}>
               필터로 저장
             </Button>
@@ -342,13 +488,9 @@ export function SearchPage() {
               필터 초기화
             </Button>
           ) : null}
-          <span className="search-mode-toggle">
-            <Button variant="ghost" size="small" onClick={() => setMode("smart")}>
-              스마트 구문으로 전환
-            </Button>
-          </span>
+          {modeSwitch}
         </div>
-      ) : (
+      ) : mode === "smart" ? (
         // 지라 JQL 모드 대응 — 한국어 스마트 문자열 직접 편집 (ALM 특색)
         <div className="search-smart-bar">
           <div className="search-smart-input">
@@ -359,11 +501,18 @@ export function SearchPage() {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <span className="search-mode-toggle">
-            <Button variant="ghost" size="small" onClick={() => setMode("basic")}>
-              기본 검색으로 전환
-            </Button>
-          </span>
+          {modeSwitch}
+        </div>
+      ) : (
+        // AQL 모드 — 지라 JQL 자리. 한 줄 에디터 + 자동완성 + 실시간 검증
+        <div className="search-aql-bar" data-testid="search-aql-bar">
+          <AqlEditor
+            value={aql ?? ""}
+            fields={fieldsInfo}
+            runError={aqlError}
+            onRun={setAqlParam}
+          />
+          {modeSwitch}
         </div>
       )}
 
@@ -382,9 +531,38 @@ export function SearchPage() {
         />
       ) : (
         <>
-          <p className="search-count" data-testid="search-count">
-            {issues.length}개 이슈
-          </p>
+          <div className="search-result-bar">
+            {/* 건수 문구는 세 모드가 같다 — 페이징은 범위 표시와 페이저를 옆에 덧붙일 뿐이다 */}
+            <p className="search-count" data-testid="search-count">
+              {mode === "aql" && total !== null ? total : issues.length}개 이슈
+            </p>
+            {/* 범위·페이저는 AQL 모드에서만 — 전환 직후 stale total이 남아도 그리지 않는다 */}
+            {mode === "aql" && total !== null && total > 0 ? (
+              <span className="search-range" data-testid="search-range">
+                {`${page * AQL_PAGE_SIZE + 1}–${Math.min((page + 1) * AQL_PAGE_SIZE, total)} / ${total}건`}
+              </span>
+            ) : null}
+            {mode === "aql" && total !== null && total > AQL_PAGE_SIZE ? (
+              <div className="issue-pager" role="navigation" aria-label="페이지">
+                <Button
+                  size="small"
+                  variant="ghost"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  이전
+                </Button>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  disabled={(page + 1) * AQL_PAGE_SIZE >= total}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  다음
+                </Button>
+              </div>
+            ) : null}
+          </div>
           <Table
             aria-label="검색 결과"
             columns={columns}
