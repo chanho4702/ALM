@@ -7,7 +7,13 @@ import { App } from "../../../app/App";
 // 이 화면은 App에서 lazy()로 쪼개져 있다. 전체 스위트를 병렬로 돌릴 때 첫 findBy가 청크 로딩까지
 // 기다리다 한도(5s)를 넘기므로, 수집 시점에 미리 올려 lazy 해석이 즉시 끝나게 한다.
 import "./ReportsPage";
-import { __resetForTest, createSprint, listSprints } from "../store/jiraStore";
+import {
+  __resetForTest,
+  createSprint,
+  getIssueByKey,
+  listSprints,
+  updateIssue,
+} from "../store/jiraStore";
 
 /** 이력 기능 도입 전 데이터를 흉내 — localStorage의 changes만 비운다 */
 async function dropChangeHistory() {
@@ -91,6 +97,18 @@ describe("ReportsPage", () => {
     expect(within(report).getByText("완료 1건")).toBeInTheDocument();
     expect(within(report).getByText("미완료 4건")).toBeInTheDocument();
     expect(within(report).getByText("ALM-1")).toBeInTheDocument();
+  });
+
+  it("완료됨이 아닌 해결은 아이콘 + 이름으로 드러난다", async () => {
+    const alm1 = await getIssueByKey("ALM-1");
+    await updateIssue(alm1!.id, { resolution: "duplicate" });
+    renderReports();
+
+    const report = await screen.findByRole("region", { name: "스프린트 리포트" });
+    const done = within(report).getByRole("button", { name: /ALM-1/ });
+    expect(within(done).getByTestId("resolution-glyph-duplicate")).toBeInTheDocument();
+    // 아이콘만 두지 않는다 — 이름은 메타 텍스트가 갖는다
+    expect(done).toHaveTextContent("중복");
   });
 
   it("리포트의 이슈를 누르면 상세 모달이 열린다", async () => {

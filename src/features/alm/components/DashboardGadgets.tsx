@@ -14,6 +14,9 @@ import {
 } from "../store/jiraStore";
 import { parseSmartQuery } from "../store/searchQuery";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { PriorityGlyph } from "./PriorityGlyph";
+import { StatusGlyph } from "./StatusGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 import { priorityAppearance, priorityName, statusAppearance, statusKind } from "./labels";
 import { usePriorities } from "./usePriorities";
 import { burnupSeries } from "../pages/reportMetricsExt";
@@ -112,7 +115,11 @@ export function StatusDistributionGadget({ gadget }: GadgetProps) {
       .sort((a, b) => a.order - b.order)
       .map((s) => ({
         key: s.id,
-        label: <Lozenge appearance={statusAppearance(data.statuses, s.id)}>{s.name}</Lozenge>,
+        label: (
+          <ValueWithIcon icon={<StatusGlyph status={s.id} statuses={data.statuses} variant="icon" />}>
+            <Lozenge appearance={statusAppearance(data.statuses, s.id)}>{s.name}</Lozenge>
+          </ValueWithIcon>
+        ),
         count: data.issues.filter((i) => i.status === s.id).length,
       }));
   }, [data]);
@@ -170,7 +177,15 @@ export function PriorityDistributionGadget({ gadget }: GadgetProps) {
     return ids
       .map((id) => ({
         key: id,
-        label: <Lozenge appearance={priorityAppearance(priorities, id)}>{priorityName(priorities, id)}</Lozenge>,
+        label: (
+          <ValueWithIcon
+            icon={<PriorityGlyph defs={priorities} priority={id} size={14} variant="icon" />}
+          >
+            <Lozenge appearance={priorityAppearance(priorities, id)}>
+              {priorityName(priorities, id)}
+            </Lozenge>
+          </ValueWithIcon>
+        ),
         count: open.filter((i) => i.priority === id).length,
       }))
       .filter((r) => r.count > 0 || priorities.length > 0);

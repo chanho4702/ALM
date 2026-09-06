@@ -66,6 +66,8 @@ describe("ReleasesPage", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("미완료 이슈 1건");
+    // 미해결 1건의 상태를 아이콘 + 이름으로 그린다 — 텍스트만 두지 않는다
+    expect(within(dialog).getAllByTestId(/^status-glyph-/)).toHaveLength(1);
     await user.click(within(dialog).getByRole("radio", { name: "1.1" }));
     await user.click(within(dialog).getByRole("button", { name: "릴리스" }));
 

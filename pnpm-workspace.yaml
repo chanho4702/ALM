@@ -11,4 +11,4 @@ minimumReleaseAgeExclude:
 overrides:
   "@chanho/tokens": "npm:@chanho4702/tokens@0.4.0"
   # org-admin이 선언한 react peer(별칭)도 우리 것과 하나로 — 두 벌이면 컨텍스트가 갈린다
-  "@chanho/react": "npm:@chanho4702/react@0.9.1"
+  "@chanho/react": "npm:@chanho4702/react@0.11.0"

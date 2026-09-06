@@ -65,7 +65,7 @@ describe("전역 관리 > 필드 구성 (지라 필드 구성 스킴)", () => {
     await user.click(within(dialog).getByRole("combobox", { name: "담당자 *" }));
     await user.click(await screen.findByRole("option", { name: "김찬호" }));
     expect(within(dialog).getByRole("button", { name: "만들기" })).toBeEnabled();
-  });
+  }, 30_000); // 전역 설정 → 만들기 모달 + Select 왕복 — 병렬 워커 부하에서 기본 15s를 넘긴다
 
   it("해결·상위 항목의 필수 스위치는 사유와 함께 잠겨 있다", async () => {
     renderAt("/settings/fields");
@@ -220,7 +220,10 @@ describe("전역 관리 > 필드 구성 — 이슈 타입별 구성", () => {
     const view = renderAt("/settings/fields");
 
     await screen.findByRole("table", { name: "기본 스킴 필드 구성" });
-    await user.click(screen.getByRole("tab", { name: "버그" }));
+    // 타입 탭 라벨도 값이라 글리프를 함께 세운다 — 읽히는 이름은 ariaLabel이 고정한다
+    const bugTab = screen.getByRole("tab", { name: "버그" });
+    expect(within(bugTab).getByTestId("type-glyph-bug")).toBeInTheDocument();
+    await user.click(bugTab);
     // 덮어쓰기 전에는 기본 구성을 읽기 전용으로 보여 준다
     const following = await screen.findByRole("table", { name: "기본 스킴 버그 필드 구성" });
     expect(within(following).queryByRole("switch")).not.toBeInTheDocument();

@@ -44,6 +44,9 @@ describe("전역 관리 (/settings)", () => {
     expect(within(list).getByText("기본 스킴")).toBeInTheDocument();
     expect(within(list).getByText("디폴트")).toBeInTheDocument();
     expect(within(list).getByText("배정 1개 프로젝트")).toBeInTheDocument();
+    // 스킴 미리보기의 타입도 아이콘 + 텍스트다 — 텍스트만 두지 않는다
+    expect(within(list).getByTestId("type-glyph-bug")).toBeInTheDocument();
+    expect(within(list).getByText("버그")).toBeInTheDocument();
   });
 
   it("새 스킴 생성 → 목록 추가, 이슈 타입 편집으로 버그를 끄면 반영된다", async () => {
@@ -59,7 +62,10 @@ describe("전역 관리 (/settings)", () => {
     // 기본 스킴의 이슈 타입 편집 — 버그 비활성
     await user.click(within(list).getAllByRole("button", { name: "이슈 타입 편집" })[0]);
     const dialog = await screen.findByRole("dialog", { name: /이슈 타입 — 기본 스킴/ });
-    await user.click(within(dialog).getByRole("checkbox", { name: "버그" }));
+    // 활성 체크박스 라벨도 글리프 + 이름이다(react 0.11.0 노드 라벨) — 접근 이름은 이름만 남는다
+    const bugCheck = within(dialog).getByRole("checkbox", { name: "버그" });
+    expect(within(bugCheck.closest("label") ?? dialog).getByTestId("type-glyph-bug")).toBeInTheDocument();
+    await user.click(bugCheck);
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
 
     await waitFor(() => {
@@ -130,6 +136,10 @@ describe("스킴 워크플로 전이", () => {
     await user.click(screen.getByRole("button", { name: "기본 스킴 워크플로 편집" }));
     const reopened = await screen.findByRole("list", { name: "전이 목록" });
     expect(within(reopened).queryByText(/전이를 정하지 않으면/)).not.toBeInTheDocument();
+    // 전이 목록의 상태도 값이라 아이콘 + 이름으로 그린다 — 출발 1 + 도착 1
+    expect(within(reopened).getAllByTestId(/^status-glyph-/)).toHaveLength(2);
+    expect(within(reopened).getByTestId("status-glyph-todo")).toBeInTheDocument();
+    expect(within(reopened).getByTestId("status-glyph-inprogress")).toBeInTheDocument();
   });
 });
 
@@ -158,6 +168,9 @@ describe("프로젝트 설정 — 스킴/커스텀", () => {
     );
     const readonly = await screen.findByTestId("types-readonly");
     expect(within(readonly).getByText("에픽")).toBeInTheDocument();
+    // 읽기 전용 미리보기의 타입·우선순위도 값 글리프 + 이름이다
+    expect(within(readonly).getByTestId("type-glyph-epic")).toBeInTheDocument();
+    expect(within(readonly).getByTestId("priority-glyph-highest")).toBeInTheDocument();
   });
 
   it("워크플로 탭: 스킴은 읽기 전용, 커스텀 전환하면 상태 편집기로 추가/저장", async () => {
@@ -202,6 +215,14 @@ describe("상태 카테고리·상태 레지스트리", () => {
     expect(await screen.findByText("카테고리를 추가했습니다")).toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "검토 삭제" })).toBeEnabled();
     expect(within(list).getByRole("combobox", { name: "검토 의미" })).toBeEnabled();
+
+    // 카테고리도 값이라 이름만 두지 않는다 — 의미(kind)의 기본 아이콘을 이름 왼쪽에 세운다
+    const doneRow = within(list).getByRole("button", { name: "완료 삭제" }).closest("li")!;
+    const glyph = within(doneRow).getByTestId("status-glyph-done");
+    expect(glyph).toHaveClass("status-glyph", "is-success");
+    expect(glyph.querySelector("svg")).toBeTruthy();
+    // 이름은 글리프 바로 옆 Lozenge가 갖는다 — 아이콘만 남기지 않는다
+    expect(glyph.parentElement).toHaveTextContent("완료");
   });
 
   it("상태를 만들고 이름을 바꾸면 워크플로 스킴 미리보기에 반영된다", async () => {

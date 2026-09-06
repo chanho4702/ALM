@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Lozenge, Select, TextField, useToast } from "@chanho/react";
 import type { StatusCategory, StatusDef, StatusKind, WorkflowStatus } from "../store/types";
 import { createStatusDef, listStatusCategories, listStatusDefs } from "../store/jiraStore";
-import { KIND_LABELS } from "./labels";
+import { categoryAsStatus, KIND_LABELS, statusDefAsStatus } from "./labels";
 import { StatusGlyph } from "./StatusGlyph";
 
 const NONE = "none"; // Select는 빈 문자열 value를 쓰지 않는다
@@ -99,6 +99,7 @@ export function StatusEditor({ value, onChange }: StatusEditorProps) {
   const categoryOptions = categories.map((c) => ({
     value: c.id,
     label: `${c.name} (${KIND_LABELS[c.kind]})`,
+    icon: <StatusGlyph status={c.id} statuses={[categoryAsStatus(c)]} variant="icon" />,
   }));
 
   return (
@@ -109,7 +110,7 @@ export function StatusEditor({ value, onChange }: StatusEditorProps) {
           return (
             <li key={status.id} className="status-editor-row">
               <span className="status-cell">
-                <StatusGlyph status={status.id} statuses={[status]} size={16} />
+                <StatusGlyph status={status.id} statuses={[status]} size={16} variant="icon" />
                 <Lozenge appearance={status.color ?? category?.color ?? "neutral"}>
                   {category?.name ?? status.category}
                 </Lozenge>
@@ -162,6 +163,13 @@ export function StatusEditor({ value, onChange }: StatusEditorProps) {
               ...available.map((d) => ({
                 value: d.id,
                 label: `${d.name} · ${categoryOf(d.categoryId)?.name ?? d.categoryId}`,
+                icon: (
+                  <StatusGlyph
+                    status={d.id}
+                    statuses={[statusDefAsStatus(d, categoryOf(d.categoryId))]}
+                    variant="icon"
+                  />
+                ),
               })),
             ]}
             onValueChange={setPickId}

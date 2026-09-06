@@ -29,6 +29,18 @@ beforeEach(() => {
 });
 
 describe("BacklogPage", () => {
+  it("스프린트 행의 타입·상태·우선순위를 모두 아이콘 + 이름으로 그린다", async () => {
+    renderBacklog();
+
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    const row = within(panel).getByText("ALM-1").closest(".backlog-row") as HTMLElement;
+    // 우선순위 글리프는 레지스트리(usePriorities)가 비동기로 온 뒤에 그려진다 — 기다린다
+    expect(await within(row).findAllByTestId(/^priority-glyph-/)).toHaveLength(1);
+    // 세 값 모두 글리프가 있고, 이름 텍스트도 그대로 남는다(색만으로 구분하지 않는다)
+    expect(within(row).getAllByTestId(/^type-glyph-/)).toHaveLength(1);
+    expect(within(row).getAllByTestId(/^status-glyph-/)).toHaveLength(1);
+  });
+
   it("계획 저장이 거부되면 모달이 열린 채 입력이 남는다", async () => {
     renderBacklog();
     const user = userEvent.setup();
@@ -179,6 +191,8 @@ describe("BacklogPage", () => {
     // 모달이 미완료 4건을 먼저 보여준다 (침묵 처리 금지)
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("미완료 이슈 4건");
+    // 미완료 4건 모두 상태를 아이콘 + 이름으로 그린다 — 텍스트만 두지 않는다
+    expect(within(dialog).getAllByTestId(/^status-glyph-/)).toHaveLength(4);
     await user.click(within(dialog).getByRole("button", { name: "완료 처리" }));
 
     // done 스프린트 패널은 렌더하지 않는다

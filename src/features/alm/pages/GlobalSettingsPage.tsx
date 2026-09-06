@@ -19,6 +19,9 @@ import {
 } from "../store/jiraStore";
 import { StatusEditor } from "../components/StatusEditor";
 import { StatusGlyph } from "../components/StatusGlyph";
+import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { PriorityGlyph } from "../components/PriorityGlyph";
+import { ValueWithIcon } from "../components/ValueWithIcon";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { FieldConfigEditor } from "../components/FieldConfigEditor";
 import {
@@ -261,9 +264,12 @@ export function GlobalSettingsPage() {
                     <>
                       <div className="admin-scheme-preview">
                         {scheme.body.enabledTypes.map((type) => (
-                          <Lozenge key={type} appearance="neutral">
-                            {typeName(issueTypes, type)}
-                          </Lozenge>
+                          <ValueWithIcon
+                            key={type}
+                            icon={<IssueTypeGlyph type={type} types={issueTypes} variant="icon" />}
+                          >
+                            <Lozenge appearance="neutral">{typeName(issueTypes, type)}</Lozenge>
+                          </ValueWithIcon>
                         ))}
                       </div>
                       <div className="admin-scheme-actions">
@@ -356,7 +362,7 @@ export function GlobalSettingsPage() {
                           .sort((a, b) => a.order - b.order)
                           .map((status) => (
                             <span key={status.id} className="status-cell">
-                              <StatusGlyph status={status.id} statuses={scheme.body.statuses} />
+                              <StatusGlyph status={status.id} statuses={scheme.body.statuses} variant="icon" />
                               <Lozenge appearance={status.color ?? "neutral"}>{status.name}</Lozenge>
                             </span>
                           ))}
@@ -417,7 +423,14 @@ export function GlobalSettingsPage() {
               {issueTypes.map(({ id: type, name }) => (
                 <Checkbox
                   key={type}
-                  label={name}
+                  // 노드 라벨(react 0.11.0) — 글리프는 장식이라 접근 이름은 이름 텍스트가 갖는다
+                  label={
+                    <ValueWithIcon
+                      icon={<IssueTypeGlyph type={type} types={issueTypes} variant="icon" />}
+                    >
+                      {name}
+                    </ValueWithIcon>
+                  }
                   checked={editTypes.includes(type)}
                   disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
                   onCheckedChange={() =>
@@ -432,7 +445,13 @@ export function GlobalSettingsPage() {
               {priorities.map(({ id, name }) => (
                 <Checkbox
                   key={id}
-                  label={name}
+                  label={
+                    <ValueWithIcon
+                      icon={<PriorityGlyph defs={priorities} priority={id} size={14} variant="icon" />}
+                    >
+                      {name}
+                    </ValueWithIcon>
+                  }
                   checked={editPriorities.includes(id)}
                   onCheckedChange={() =>
                     setEditPriorities((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
@@ -443,7 +462,11 @@ export function GlobalSettingsPage() {
             <Select
               label="기본 우선순위"
               value={editDefaultPriority}
-              options={editPriorities.map((id) => ({ value: id, label: priorityName(priorities, id) }))}
+              options={editPriorities.map((id) => ({
+                value: id,
+                label: priorityName(priorities, id),
+                icon: <PriorityGlyph defs={priorities} priority={id} size={14} variant="icon" />,
+              }))}
               onValueChange={setEditDefaultPriority}
             />
             <Button type="submit">저장</Button>

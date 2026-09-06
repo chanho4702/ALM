@@ -37,7 +37,7 @@ describe("이슈 보관함 (지라 보관된 업무 항목)", () => {
     expect(await screen.findByText("ALM-2을(를) 복원했습니다")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "보관된 이슈가 없습니다" })).toBeInTheDocument();
     expect((await listIssues("p1")).some((i) => i.key === "ALM-2")).toBe(true);
-  });
+  }, 30_000); // App 전체 마운트 + 보관→보관함→복원 왕복 — 병렬 워커 부하에서 기본 15s를 넘긴다
 });
 
 describe("프로젝트 보관·휴지통", () => {

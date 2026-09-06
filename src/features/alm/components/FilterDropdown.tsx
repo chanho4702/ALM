@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Checkbox } from "@chanho/react";
+import { ValueWithIcon } from "./ValueWithIcon";
 
 export interface FilterOption {
   value: string;
   label: string;
+  /**
+   * 값 왼쪽에 세울 글리프(`IssueTypeGlyph`/`StatusGlyph`/`PriorityGlyph`). 라벨 텍스트는 그대로
+   * 남으므로 색·모양만으로 구분되지 않는다 — 넘기는 글리프는 `variant="icon"`으로 숨겨
+   * 같은 이름이 두 번 읽히지 않게 한다.
+   *
+   * 단일·멀티 선택 두 모드 모두에서 그려진다 — `Checkbox.label`이 노드를 받는다(react 0.11.0).
+   */
+  icon?: ReactNode;
 }
 
 export interface FilterDropdownProps {
@@ -80,7 +90,19 @@ export function FilterDropdown({
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
       >
-        {summary ? `${label}: ${summary}` : label}
+        {summary ? (
+          <>
+            {/* 콜론 뒤 공백은 접근 이름의 일부다 — 지우면 "담당자:김찬호"가 되어
+                이름으로 트리거를 찾는 검색 화면 테스트가 깨진다. 눈에 보이는 간격은
+                flex gap이 주지만, 낭독되는 이름은 이 텍스트 노드가 갖는다. */}
+            {`${label}: `}
+            {/* 고른 값이 하나일 때만 글리프를 세운다 — "외 N"에는 대표 아이콘이 없다 */}
+            {active.length === 1 ? first?.icon : null}
+            {summary}
+          </>
+        ) : (
+          label
+        )}
         <span className="filter-dropdown-caret" aria-hidden>
           ▾
         </span>
@@ -95,7 +117,14 @@ export function FilterDropdown({
             multiple ? (
               <Checkbox
                 key={option.value}
-                label={option.label}
+                // 노드 라벨(react 0.11.0) — 아이콘은 장식, 접근 이름은 라벨 텍스트가 갖는다
+                label={
+                  option.icon ? (
+                    <ValueWithIcon icon={option.icon}>{option.label}</ValueWithIcon>
+                  ) : (
+                    option.label
+                  )
+                }
                 checked={selected.includes(option.value)}
                 onCheckedChange={() => choose(option.value)}
               />
@@ -112,7 +141,11 @@ export function FilterDropdown({
                 }
                 onClick={() => choose(option.value)}
               >
-                {option.label}
+                {option.icon ? (
+                  <ValueWithIcon icon={option.icon}>{option.label}</ValueWithIcon>
+                ) : (
+                  option.label
+                )}
               </button>
             ),
           )}

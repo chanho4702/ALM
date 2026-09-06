@@ -35,6 +35,8 @@ import { useIssueModal } from "../components/useIssueModal";
 import { useTokenColors } from "../components/useTokenColors";
 import { IssueMiniList, type IssueMiniRow } from "../components/DashboardCards";
 import { estimateSummary, formatPlannedRange, RESOLUTION_LABELS } from "../components/labels";
+import { ResolutionGlyph } from "../components/ResolutionGlyph";
+import { ValueWithIcon } from "../components/ValueWithIcon";
 import { todayKey } from "./dashboardMetrics";
 import { burndownSeries, sprintReport, type BurndownUnit } from "./reportMetrics";
 import { burnupSeries, controlChart, cumulativeFlow, velocitySeries } from "./reportMetricsExt";
@@ -442,7 +444,13 @@ export function ReportsPage() {
                   issue,
                   // "왜 끝났는가"가 회고의 재료다 — 완료됨이 아닌 해결은 눈에 띄게
                   meta: issue.resolution && issue.resolution !== "done"
-                    ? `${userNames[issue.assigneeId ?? ""] ?? "미지정"} · ${RESOLUTION_LABELS[issue.resolution]}`
+                    ? (
+                        <ValueWithIcon
+                          icon={<ResolutionGlyph resolution={issue.resolution} variant="icon" />}
+                        >
+                          {`${userNames[issue.assigneeId ?? ""] ?? "미지정"} · ${RESOLUTION_LABELS[issue.resolution]}`}
+                        </ValueWithIcon>
+                      )
                     : (issue.assigneeId ? userNames[issue.assigneeId] : "미지정"),
                 }))}
                 statuses={statuses}

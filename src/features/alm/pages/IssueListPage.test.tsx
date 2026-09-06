@@ -175,6 +175,24 @@ describe("IssueListPage 타입", () => {
     });
     const row = screen.getByText("ALM-8").closest("tr")!;
     expect(within(row).getByRole("img", { name: "버그" })).toBeInTheDocument();
+    // 필터 칩 트리거도 값을 아이콘 + 텍스트로 보여준다(이름은 텍스트가 갖는다)
+    const trigger = filterBar().getByRole("button", { name: "타입: 버그" });
+    expect(within(trigger).getByTestId("type-glyph-bug")).toBeInTheDocument();
+  });
+
+  it("상태·우선순위 필터 항목도 값 글리프를 함께 그린다", async () => {
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+
+    await user.click(filterBar().getByRole("button", { name: "상태" }));
+    const todo = await filterBar().findByRole("radio", { name: "할 일" });
+    expect(within(todo).getByTestId("status-glyph-todo")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(filterBar().getByRole("button", { name: "우선순위" }));
+    const high = await filterBar().findByRole("radio", { name: "높음" });
+    expect(within(high).getByTestId("priority-glyph-high")).toBeInTheDocument();
   });
 });
 

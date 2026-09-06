@@ -78,6 +78,11 @@ describe("AppShell 전역 검색", () => {
     expect(within(results).getByText("ALM-2")).toBeInTheDocument();
     expect(within(results).getByText("칸반 보드 UI 구현")).toBeInTheDocument();
     expect(within(results).getByText("ALM 플랫폼")).toBeInTheDocument(); // 프로젝트명 표시
+    // 후보 행도 값을 아이콘 + 텍스트로 그린다 — 타입 글리프가 앞, 상태는 글리프 + 이름
+    const row = within(results).getByText("ALM-2").closest("button") as HTMLElement;
+    expect(await within(row).findByTestId("type-glyph-story")).toBeInTheDocument();
+    expect(within(row).getByTestId("status-glyph-inprogress")).toBeInTheDocument();
+    expect(row).toHaveTextContent("진행 중");
 
     await user.click(within(results).getByText("칸반 보드 UI 구현"));
     await waitFor(() => {

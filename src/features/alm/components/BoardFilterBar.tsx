@@ -1,5 +1,6 @@
 import { Button, Select, TextField } from "@chanho/react";
 import type { Issue, IssueType, User } from "../store/types";
+import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { useIssueTypes } from "./useIssueTypes";
 import { UserAvatar } from "./UserAvatar";
 
@@ -119,7 +120,11 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
         options={[
           // 라벨을 시각적으로 숨겼으므로 기본 선택지가 무슨 필터인지 알려준다
           { value: ALL, label: "모든 타입" },
-          ...issueTypes.map((t) => ({ value: t.id, label: t.name })),
+          ...issueTypes.map((t) => ({
+            value: t.id,
+            label: t.name,
+            icon: <IssueTypeGlyph type={t.id} types={issueTypes} variant="icon" />,
+          })),
         ]}
         onValueChange={(v) => onChange({ ...quick, type: v === ALL ? null : v })}
       />

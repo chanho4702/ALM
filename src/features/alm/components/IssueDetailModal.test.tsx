@@ -29,6 +29,35 @@ beforeEach(() => {
   __resetForTest();
 });
 
+describe("IssueDetailModal 값 아이콘", () => {
+  it("타입·상태·우선순위 Select는 옵션과 트리거 양쪽에 값 글리프를 그린다 (react 0.11.0)", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-4"); // 시드: ALM-4 = 에픽, 할 일, 보통
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+
+    // 트리거 — 고른 값의 글리프가 선택값 옆에 선다(DS가 옵션 icon을 트리거에도 그린다)
+    const statusTrigger = within(dialog).getByRole("combobox", { name: "상태" });
+    expect(await within(statusTrigger).findByTestId("status-glyph-todo")).toBeInTheDocument();
+    expect(statusTrigger).toHaveTextContent("할 일");
+
+    // 목록 — 열면 항목마다 글리프 + 이름. 접근 이름은 label 문자열만 남는다(아이콘은 장식)
+    await user.click(statusTrigger);
+    const doneOption = await screen.findByRole("option", { name: "완료" });
+    expect(within(doneOption).getByTestId("status-glyph-done")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    const typeTrigger = within(dialog).getByRole("combobox", { name: "타입" });
+    expect(await within(typeTrigger).findByTestId("type-glyph-epic")).toBeInTheDocument();
+    await user.click(typeTrigger);
+    const bugOption = await screen.findByRole("option", { name: "버그" });
+    expect(within(bugOption).getByTestId("type-glyph-bug")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    const priorityTrigger = within(dialog).getByRole("combobox", { name: "우선순위" });
+    expect(await within(priorityTrigger).findByTestId("priority-glyph-medium")).toBeInTheDocument();
+  });
+});
+
 describe("IssueDetailModal", () => {
   it("?issue= 쿼리로 모달이 열리고, 상태 변경이 Lozenge와 보드 카드에 반영된다", async () => {
     const user = userEvent.setup();
@@ -56,7 +85,7 @@ describe("IssueDetailModal", () => {
     expect(
       within(screen.getByTestId("board-column-todo")).queryByText("ALM-4"),
     ).not.toBeInTheDocument();
-  });
+  }, 30_000); // 모달 열기 + 상태 전환 + 보드 카드 반영 확인 — 병렬 워커 부하에서 기본 15s를 넘긴다
 
   it("제목 인라인 편집(InlineEdit): 클릭 → 입력 → Enter로 저장하고 보드 카드에도 반영된다", async () => {
     const user = userEvent.setup();

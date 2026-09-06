@@ -191,7 +191,7 @@ describe("프로젝트 사용자·권한", () => {
     expect(screen.getByTestId("search")).toHaveTextContent(
       "?scope=PROJECT&resourceId=p1&role=EDITOR",
     );
-  });
+  }, 30_000); // 프로젝트 설정 → 멤버 탭 → 초대 프리셋 이동 — 병렬 워커 부하에서 기본 15s를 넘긴다
 });
 
 describe("워크플로 전이 편집", () => {

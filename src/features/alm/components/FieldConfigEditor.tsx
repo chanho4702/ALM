@@ -10,6 +10,8 @@ import {
   normalizeFields,
   resolveFields,
 } from "./fieldConfig";
+import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 
 /** 기본 구성 탭의 값 — 이슈 타입 id와 섞이지 않게 밑줄 두 개를 쓴다 */
 const BASE_TAB = "__base__";
@@ -207,12 +209,15 @@ export function FieldConfigEditor({
               value: type.id,
               // 덮어쓴 타입은 배지로 눈에 띄게 하되, 읽히는 이름은 `ariaLabel`로 고정한다 —
               // 노드 라벨은 스크린리더가 안쪽 텍스트를 이어붙이므로 이름이 흔들린다(react 0.9.0).
-              label: overridden ? (
-                <>
-                  {type.name} <Badge appearance="brand">덮어씀</Badge>
-                </>
-              ) : (
-                type.name
+              // 탭 라벨도 값(이슈 타입)이라 아이콘 + 텍스트로 그린다 — 글리프는 이름을 옆에
+              // 두고 있으니 `variant="icon"`으로 숨겨 `ariaLabel`이 정한 이름만 읽히게 한다
+              label: (
+                <ValueWithIcon
+                  icon={<IssueTypeGlyph type={type.id} types={tabTypes} variant="icon" />}
+                >
+                  {type.name}
+                  {overridden ? <Badge appearance="brand">덮어씀</Badge> : null}
+                </ValueWithIcon>
               ),
               ariaLabel: overridden ? `${type.name} (덮어씀)` : type.name,
               content: typeTab(type),

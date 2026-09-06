@@ -10,7 +10,9 @@ import {
   moveStatusCategory,
   updateStatusCategory,
 } from "../store/jiraStore";
-import { COLOR_LABELS, KIND_LABELS, STATUS_COLORS, STATUS_KINDS } from "./labels";
+import { categoryAsStatus, COLOR_LABELS, KIND_LABELS, STATUS_COLORS, STATUS_KINDS } from "./labels";
+import { StatusGlyph } from "./StatusGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 
 const KIND_OPTIONS = STATUS_KINDS.map((kind) => ({ value: kind, label: KIND_LABELS[kind] }));
 const COLOR_OPTIONS = STATUS_COLORS.map((color) => ({ value: color, label: COLOR_LABELS[color] }));
@@ -105,7 +107,18 @@ export function StatusCategoriesPanel() {
           const used = usageOf(category.id);
           return (
             <li key={category.id} className="status-editor-row status-editor-row--category">
-              <Lozenge appearance={category.color}>{category.name}</Lozenge>
+              <ValueWithIcon
+                icon={
+                  <StatusGlyph
+                    status={category.id}
+                    statuses={[categoryAsStatus(category)]}
+                    size={16}
+                    variant="icon"
+                  />
+                }
+              >
+                <Lozenge appearance={category.color}>{category.name}</Lozenge>
+              </ValueWithIcon>
               <TextField
                 label={`${category.name} 이름`}
                 value={drafts[category.id] ?? category.name}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Card, Lozenge, Select, TextField, useToast } from "@chanho/react";
-import type { StatusCategory, StatusDef, WorkflowStatus } from "../store/types";
+import type { StatusCategory, StatusDef } from "../store/types";
 import {
   createStatusDef,
   deleteStatusDef,
@@ -10,26 +10,13 @@ import {
   statusDefUsage,
   updateStatusDef,
 } from "../store/jiraStore";
-import { KIND_LABELS } from "./labels";
+import { categoryAsStatus, KIND_LABELS, statusDefAsStatus } from "./labels";
 import { StatusGlyph } from "./StatusGlyph";
 import { STATUS_ICON_OPTIONS } from "./typeIcons";
 
 /** Select는 빈 문자열 value를 못 쓴다 — "카테고리 기본 아이콘"(icon === "")의 센티널 */
 const ICON_DEFAULT = "__category__";
 const ICON_OPTIONS = [{ value: ICON_DEFAULT, label: "카테고리 기본" }, ...STATUS_ICON_OPTIONS];
-
-/** 레지스트리 항목 + 카테고리 → 글리프가 읽는 해석된 상태 (미리보기 전용, 저장되지 않는다) */
-function toWorkflowStatus(def: StatusDef, category: StatusCategory | undefined): WorkflowStatus {
-  return {
-    id: def.id,
-    name: def.name,
-    category: def.categoryId,
-    order: 0,
-    kind: category?.kind,
-    color: category?.color,
-    icon: def.icon,
-  };
-}
 
 /**
  * 전역 관리 → 상태. 워크플로가 골라 쓰는 **상태 레지스트리** — 이름·카테고리를 여기서 바꾸면
@@ -91,6 +78,7 @@ export function StatusRegistryPanel() {
   const categoryOptions = categories.map((c) => ({
     value: c.id,
     label: `${c.name} (${KIND_LABELS[c.kind]})`,
+    icon: <StatusGlyph status={c.id} statuses={[categoryAsStatus(c)]} variant="icon" />,
   }));
 
   const commitName = (def: StatusDef) => {
@@ -137,7 +125,7 @@ export function StatusRegistryPanel() {
           return (
             <li key={def.id} className="status-editor-row status-editor-row--registry">
               <span className="status-cell">
-                <StatusGlyph status={def.id} statuses={[toWorkflowStatus(def, category)]} size={16} />
+                <StatusGlyph status={def.id} statuses={[statusDefAsStatus(def, category)]} size={16} />
                 <Lozenge appearance={category?.color ?? "neutral"}>
                   {category?.name ?? def.categoryId}
                 </Lozenge>

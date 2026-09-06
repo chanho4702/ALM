@@ -47,6 +47,8 @@ import {
 } from "../store/jiraStore";
 import type { IssueLinkView } from "../store/jiraStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { PriorityGlyph } from "./PriorityGlyph";
+import { ResolutionGlyph } from "./ResolutionGlyph";
 import { StatusGlyph } from "./StatusGlyph";
 import { useIssueTypes } from "./useIssueTypes";
 import { Plus, UserRound } from "lucide-react";
@@ -654,7 +656,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                       <span className="issue-key-cell">{child.key}</span>
                       <span className="issue-relation-title">{child.title}</span>
                       <span className="status-cell">
-                        <StatusGlyph status={child.status} statuses={statuses} />
+                        <StatusGlyph status={child.status} statuses={statuses} variant="icon" />
                         <Lozenge appearance={statusAppearance(statuses, child.status)}>
                           {statusName(statuses, child.status)}
                         </Lozenge>
@@ -673,7 +675,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                               <span className="issue-key-cell">{grand.key}</span>
                               <span className="issue-relation-title">{grand.title}</span>
                               <span className="status-cell">
-                                <StatusGlyph status={grand.status} statuses={statuses} />
+                                <StatusGlyph status={grand.status} statuses={statuses} variant="icon" />
                                 <Lozenge appearance={statusAppearance(statuses, grand.status)}>
                                   {statusName(statuses, grand.status)}
                                 </Lozenge>
@@ -757,7 +759,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                           <span className="issue-key-cell">{other.key}</span>
                           <span className="issue-relation-title">{other.title}</span>
                           <span className="status-cell">
-                            <StatusGlyph status={other.status} statuses={statuses} />
+                            <StatusGlyph status={other.status} statuses={statuses} variant="icon" />
                             <Lozenge appearance={statusAppearance(statuses, other.status)}>
                               {statusName(statuses, other.status)}
                             </Lozenge>
@@ -836,23 +838,29 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               // 프로젝트 설정의 활성 타입만 — 현재 값이 비활성이어도 표시를 위해 포함
               options={issueTypes
                 .filter((t) => enabledTypes.includes(t.id) || t.id === issue.type)
-                .map((t) => ({ value: t.id, label: t.name }))}
+                .map((t) => ({
+                  value: t.id,
+                  label: t.name,
+                  icon: <IssueTypeGlyph type={t.id} types={issueTypes} variant="icon" />,
+                }))}
               onValueChange={(v) => void applyPatch({ type: v }, "타입을 변경했습니다")}
             />
           </div>
-          {/* DS Select의 옵션 렌더는 문자열만 받는다 — 글리프는 트리거 왼쪽에 둔다 */}
+          {/* 글리프는 DS Select의 옵션 icon 슬롯이 목록·트리거 양쪽에 그린다(react 0.11.0) —
+              전엔 트리거 왼쪽에 손으로 세웠다(.issue-status-field) */}
           <div className="alm-field">
             <FieldLabel field="status">상태</FieldLabel>
-            <div className="issue-status-field">
-              <StatusGlyph status={issue.status} statuses={statuses} size={16} />
-              <Select
-                label="상태"
-                className="visually-hidden-label"
-                value={issue.status}
-                options={statuses.map((s) => ({ value: s.id, label: s.name }))}
-                onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
-              />
-            </div>
+            <Select
+              label="상태"
+              className="visually-hidden-label"
+              value={issue.status}
+              options={statuses.map((s) => ({
+                value: s.id,
+                label: s.name,
+                icon: <StatusGlyph status={s.id} statuses={statuses} variant="icon" />,
+              }))}
+              onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
+            />
           </div>
           {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}
           {fields.resolution.visible && statusKind(statuses, issue.status) === "complete" ? (
@@ -862,7 +870,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                 label="해결"
                 className="visually-hidden-label"
                 value={issue.resolution ?? "done"}
-                options={RESOLUTIONS.map((r) => ({ value: r, label: RESOLUTION_LABELS[r] }))}
+                options={RESOLUTIONS.map((r) => ({
+                  value: r,
+                  label: RESOLUTION_LABELS[r],
+                  icon: <ResolutionGlyph resolution={r} variant="icon" />,
+                }))}
                 onValueChange={(v) =>
                   void applyPatch({ resolution: v as IssueResolution }, "해결을 변경했습니다")
                 }
@@ -924,7 +936,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               label="우선순위"
               className="visually-hidden-label"
               value={issue.priority}
-              options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
+              options={PRIORITIES.map((p) => ({
+                value: p,
+                label: priorityName(priorities, p),
+                icon: <PriorityGlyph defs={priorities} priority={p} size={14} variant="icon" />,
+              }))}
               onValueChange={(v) =>
                 void applyPatch({ priority: v as IssuePriority }, "우선순위를 변경했습니다")
               }

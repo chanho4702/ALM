@@ -83,6 +83,9 @@ export function BoardColumn({
       <header className="board-column-header">
         {/* 지라식 플레인 텍스트 머리글 — 아이콘은 카테고리 색으로 거들고 이름이 진짜 식별자다.
             색만으로 구분하지 않도록 상태마다 모양이 다르다(레지스트리 `StatusDef.icon`) */}
+        {/* 여기만 `auto`를 유지한다 — 머리글은 <header>라 접근 이름을 조립하지 않으므로 이름이
+            늘어나지 않고, "컬럼 머리글이 상태 이름을 읽어 주는 아이콘을 갖는다(색 단독 구분 금지)"가
+            BoardPage 테스트로 고정된 계약이다. */}
         <StatusGlyph
           status={status}
           statuses={glyphStatus ? [glyphStatus] : undefined}

@@ -1,4 +1,4 @@
-# 디자인 시스템 (@chanho/react 0.7.0 / @chanho/tokens 0.3.0)
+# 디자인 시스템 (@chanho/react 0.11.0 / @chanho/tokens 0.4.0)
 
 GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름을 유지한다(S-03, 2026-09-04 — 전엔 `file:../design-system/artifacts/*.tgz`). 새 버전은 design-system에 `v*` 태그를 밀어 발행한 뒤 `package.json`과 `pnpm-workspace.yaml`의 `overrides` **두 곳**의 버전을 함께 올린다. Radix 기반. **다른 UI 라이브러리 금지**,
 커스텀 마크업은 토큰(`--chanho-*`)만.
@@ -76,6 +76,28 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
   (`.reports-units.reports-units`).
 - **아이콘은 lucide-react.** 글자 기호(⋯ ☾ ⚙ 🔔)를 버튼 본문에 넣지 않는다 — 크기·정렬·다크모드가
   제각각이 된다.
+
+## 0.11.0에서 메운 갭 — 값 아이콘 (2026-09-06)
+
+이슈 타입·상태·우선순위·해결 같은 **값**은 이제 어디서든 아이콘 + 텍스트로 그린다. 두 갭이 메워졌다.
+
+- **`SelectOption.icon?: ReactNode`** — 목록 항목과 트리거의 선택값 양쪽에 같은 아이콘이 나온다.
+  DS가 `aria-hidden`으로 감싸고 접근 이름은 `label` 문자열이 그대로 갖는다. 크기는 소비자 몫이라
+  ALM은 전부 14px로 넘긴다. 이것 덕에 이슈 상세 상태 필드의 **손으로 세운 트리거 왼쪽 글리프가
+  없어졌다**(`.issue-status-field`는 이제 쓰는 곳이 없다 — app.css에서 지울 수 있다).
+- **`Checkbox`/`Switch`/`Radio`의 `label: ReactNode`** — `aria-labelledby`가 자동 배선되므로
+  `<><Glyph variant="icon" /> 이름</>` 형태로 넣어도 접근 이름은 이름 텍스트만 남는다.
+  타입·우선순위 활성 체크박스 목록(전역/프로젝트 설정)과 `FilterDropdown` 멀티선택이 이걸 쓴다.
+
+**글리프에 `variant="icon"`을 반드시 준다.** `IssueTypeGlyph`/`StatusGlyph`/`PriorityGlyph`/
+`ResolutionGlyph`는 기본(`auto`)이 `role="img"` + 이름을 가지므로, 이름 텍스트가 접근 이름을
+만드는 자리(Select 옵션·체크박스 라벨·라디오 항목·탭)에 그대로 넣으면 `"상태: 할 일 할 일"`처럼
+이름이 두 번 붙는다. 값 표기의 공통 껍데기는 `components/ValueWithIcon.tsx`(= `.status-cell`)다.
+
+- **`IssueTypeGlyph`의 `auto` 접근 이름만 접두어가 없다**(`"버그"`). `StatusGlyph`는 `"상태: 진행 중"`,
+  `PriorityGlyph`는 `"우선순위: 높음"`, `ResolutionGlyph`는 `"해결: 중복"`으로 값 종류를 붙인다.
+  타입은 이름이 홀로 서도 뜻이 통하고 기존 셀렉터(`getByRole("img", { name: "버그" })`)가 이미
+  그 계약에 걸려 있다 — 기존 계약이므로 유지한다.
 
 ## 0.9.0에서 메운 갭 (2026-09-05)
 

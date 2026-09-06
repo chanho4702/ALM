@@ -4,6 +4,9 @@ import type { Issue, Project, WorkflowStatus } from "../store/types";
 import { searchIssues, statusMetaByProject } from "../store/jiraStore";
 import { looksLikeAql } from "../store/aql/complete";
 import { statusAppearance, statusName } from "./labels";
+import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { StatusGlyph } from "./StatusGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 
 export interface SearchModalProps {
   projects: Project[];
@@ -96,12 +99,19 @@ export function SearchModal({
                     className="search-result-row"
                     onClick={() => onNavigate(issue)}
                   >
+                    {/* 다른 이슈 행(홈·보관함·상세 관계)과 같은 표기 — 타입 글리프가 앞에 서고
+                        상태는 글리프 + Lozenge 이름이다. 값을 텍스트만으로 두지 않는다 */}
+                    <IssueTypeGlyph type={issue.type} />
                     <span className="issue-key-cell">{issue.key}</span>
                     <span className="search-result-title">{issue.title}</span>
                     <span className="search-result-project">{projectName(issue.projectId)}</span>
-                    <Lozenge appearance={statusAppearance(statusList, issue.status)}>
-                      {statusName(statusList, issue.status)}
-                    </Lozenge>
+                    <ValueWithIcon
+                      icon={<StatusGlyph status={issue.status} statuses={statusList} variant="icon" />}
+                    >
+                      <Lozenge appearance={statusAppearance(statusList, issue.status)}>
+                        {statusName(statusList, issue.status)}
+                      </Lozenge>
+                    </ValueWithIcon>
                   </button>
                 </li>
               );

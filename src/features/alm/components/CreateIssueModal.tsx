@@ -28,6 +28,8 @@ import {
 import { priorityName, ISSUE_TYPES, typeLevel, typeName } from "./labels";
 import { FIELD_LABELS, resolveFields, withRequiredMark } from "./fieldConfig";
 import { FieldLabel } from "./FieldLabel";
+import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { PriorityGlyph } from "./PriorityGlyph";
 import { isEmptyHtml } from "../store/richText";
 import { usePriorities } from "./usePriorities";
 import { useIssueTypes } from "./useIssueTypes";
@@ -343,7 +345,11 @@ export function CreateIssueModal({
               label="이슈 타입 *"
               className="visually-hidden-label"
               value={type}
-              options={enabledTypes.map((t) => ({ value: t, label: typeName(issueTypes, t) }))}
+              options={enabledTypes.map((t) => ({
+                value: t,
+                label: typeName(issueTypes, t),
+                icon: <IssueTypeGlyph type={t} types={issueTypes} variant="icon" />,
+              }))}
               onValueChange={setType}
             />
           </div>
@@ -411,7 +417,11 @@ export function CreateIssueModal({
               label={fieldLabel("priority", "우선순위")}
               className="visually-hidden-label"
               value={priority}
-              options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
+              options={PRIORITIES.map((p) => ({
+                value: p,
+                label: priorityName(priorities, p),
+                icon: <PriorityGlyph defs={priorities} priority={p} size={14} variant="icon" />,
+              }))}
               onValueChange={(v) => setPriority(v as IssuePriority)}
             />
           </div>

@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@chanho/org-admin": "npm:@chanho4702/org-admin@0.1.2",
-    "@chanho/react": "npm:@chanho4702/react@0.9.1",
+    "@chanho/react": "npm:@chanho4702/react@0.11.0",
     "@chanho/tokens": "npm:@chanho4702/tokens@0.4.0",
     "@dagrejs/dagre": "^3.1.1",
     "@dnd-kit/core": "^6.3.1",

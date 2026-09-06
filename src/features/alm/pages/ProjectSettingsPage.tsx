@@ -44,6 +44,9 @@ import {
 import { pruneProject } from "../store/uiStore";
 import { StatusEditor } from "../components/StatusEditor";
 import { StatusGlyph } from "../components/StatusGlyph";
+import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { PriorityGlyph } from "../components/PriorityGlyph";
+import { ValueWithIcon } from "../components/ValueWithIcon";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { FieldConfigEditor } from "../components/FieldConfigEditor";
 import {
@@ -416,7 +419,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
                 .sort((a, b) => a.order - b.order)
                 .map((status) => (
                   <span key={status.id} className="status-cell">
-                    <StatusGlyph status={status.id} statuses={resolved.body.statuses} />
+                    <StatusGlyph status={status.id} statuses={resolved.body.statuses} variant="icon" />
                     <Lozenge appearance={status.color ?? "neutral"}>{status.name}</Lozenge>
                   </span>
                 ))}
@@ -460,7 +463,14 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
               {issueTypes.map(({ id: type, name }) => (
                 <Checkbox
                   key={type}
-                  label={name}
+                  // 노드 라벨(react 0.11.0) — 글리프는 장식이라 접근 이름은 이름 텍스트가 갖는다
+                  label={
+                    <ValueWithIcon
+                      icon={<IssueTypeGlyph type={type} types={issueTypes} variant="icon" />}
+                    >
+                      {name}
+                    </ValueWithIcon>
+                  }
                   checked={typesDraft.includes(type)}
                   disabled={type === "subtask"} // 계층 기능 의존 — 항상 활성
                   onCheckedChange={() =>
@@ -475,7 +485,13 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
               {priorities.map(({ id, name }) => (
                 <Checkbox
                   key={id}
-                  label={name}
+                  label={
+                    <ValueWithIcon
+                      icon={<PriorityGlyph defs={priorities} priority={id} size={14} variant="icon" />}
+                    >
+                      {name}
+                    </ValueWithIcon>
+                  }
                   checked={prioritiesDraft.includes(id)}
                   onCheckedChange={() =>
                     setPrioritiesDraft((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
@@ -486,7 +502,11 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             <Select
               label="기본 우선순위"
               value={defaultPriorityDraft}
-              options={prioritiesDraft.map((id) => ({ value: id, label: priorityName(priorities, id) }))}
+              options={prioritiesDraft.map((id) => ({
+                value: id,
+                label: priorityName(priorities, id),
+                icon: <PriorityGlyph defs={priorities} priority={id} size={14} variant="icon" />,
+              }))}
               onValueChange={setDefaultPriorityDraft}
             />
             <Button type="submit" size="small">
@@ -496,16 +516,26 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         ) : (
           <div className="admin-scheme-preview" data-testid="types-readonly">
             {resolved.body.enabledTypes.map((type) => (
-              <Lozenge key={type} appearance={typeAppearance(issueTypes, type)}>
-                {typeName(issueTypes, type)}
-              </Lozenge>
+              <ValueWithIcon
+                key={type}
+                icon={<IssueTypeGlyph type={type} types={issueTypes} variant="icon" />}
+              >
+                <Lozenge appearance={typeAppearance(issueTypes, type)}>
+                  {typeName(issueTypes, type)}
+                </Lozenge>
+              </ValueWithIcon>
             ))}
             <span className="admin-scheme-sep" aria-hidden>·</span>
             {resolved.body.enabledPriorities.map((id) => (
-              <Lozenge key={id} appearance={priorityAppearance(priorities, id)}>
-                {priorityName(priorities, id)}
-                {id === resolved.body.defaultPriority ? " (기본)" : ""}
-              </Lozenge>
+              <ValueWithIcon
+                key={id}
+                icon={<PriorityGlyph defs={priorities} priority={id} size={14} variant="icon" />}
+              >
+                <Lozenge appearance={priorityAppearance(priorities, id)}>
+                  {priorityName(priorities, id)}
+                  {id === resolved.body.defaultPriority ? " (기본)" : ""}
+                </Lozenge>
+              </ValueWithIcon>
             ))}
           </div>
         )}

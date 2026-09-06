@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Button, Lozenge, Modal, Radio, RadioGroup } from "@chanho/react";
 import type { Issue, Sprint, WorkflowStatus } from "../store/types";
 import { statusAppearance, statusName } from "./labels";
+import { StatusGlyph } from "./StatusGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 
 /** 백로그를 뜻하는 라디오 값 — Select 센티널과 같은 이유로 빈 문자열을 쓰지 않는다 */
 const BACKLOG = "backlog";
@@ -55,9 +57,11 @@ export function SprintCompleteModal({
               <li key={issue.id}>
                 <span className="dash-issue-key">{issue.key}</span>
                 <span className="dash-issue-title">{issue.title}</span>
-                <Lozenge appearance={statusAppearance(statuses, issue.status)}>
-                  {statusName(statuses, issue.status)}
-                </Lozenge>
+                <ValueWithIcon icon={<StatusGlyph status={issue.status} statuses={statuses} variant="icon" />}>
+                  <Lozenge appearance={statusAppearance(statuses, issue.status)}>
+                    {statusName(statuses, issue.status)}
+                  </Lozenge>
+                </ValueWithIcon>
               </li>
             ))}
             {unfinished.length > 5 ? (

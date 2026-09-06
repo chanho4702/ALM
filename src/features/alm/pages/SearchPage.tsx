@@ -131,6 +131,18 @@ export function SearchPage() {
     () => ({ users, projects, statuses: allStatuses, priorities }),
     [users, projects, allStatuses, priorities],
   );
+  /**
+   * 상태 id → 해석된 상태. `allStatuses`는 이름만 있어 글리프가 색·아이콘을 못 고른다 —
+   * 프로젝트별 메타에서 같은 id를 찾아 쓴다(먼저 만난 프로젝트 것을 취한다: 상태 레지스트리가
+   * 하나라 프로젝트가 달라도 색·아이콘은 같다).
+   */
+  const statusById = useMemo(() => {
+    const out: Record<string, WorkflowStatus> = {};
+    for (const byStatus of Object.values(statusMeta)) {
+      for (const [id, ws] of Object.entries(byStatus)) out[id] ??= ws;
+    }
+    return out;
+  }, [statusMeta]);
   /** AQL 번역 전용 문맥 — 모드 전환 때만 쓰이므로 타입·카테고리를 더 얹어도 기본 모드에 영향이 없다 */
   const aqlCtx = useMemo(
     () => ({ ...ctx, types: issueTypes, categories }),
@@ -361,7 +373,7 @@ export function SearchPage() {
         const statusList = ws ? [ws] : undefined;
         return (
           <span className="status-cell">
-            <StatusGlyph status={issue.status} statuses={statusList} />
+            <StatusGlyph status={issue.status} statuses={statusList} variant="icon" />
             <Lozenge appearance={statusAppearance(statusList, issue.status)}>
               {statusName(statusList, issue.status)}
             </Lozenge>
@@ -440,7 +452,18 @@ export function SearchPage() {
           />
           <FilterDropdown
             label="상태"
-            options={allStatuses.map((s) => ({ value: s.id, label: s.name }))}
+            // 멀티 선택 항목은 DS Checkbox — 라벨 텍스트가 접근 이름을 만드니 글리프는 숨긴다
+            options={allStatuses.map((s) => ({
+              value: s.id,
+              label: s.name,
+              icon: (
+                <StatusGlyph
+                  status={s.id}
+                  statuses={statusById[s.id] ? [statusById[s.id]] : undefined}
+                  variant="icon"
+                />
+              ),
+            }))}
             selected={selectedStatusIds}
             onToggle={toggleStatus}
           />
@@ -455,7 +478,11 @@ export function SearchPage() {
           />
           <FilterDropdown
             label="타입"
-            options={issueTypes.map((t) => ({ value: t.id, label: t.name }))}
+            options={issueTypes.map((t) => ({
+              value: t.id,
+              label: t.name,
+              icon: <IssueTypeGlyph type={t.id} types={issueTypes} variant="icon" />,
+            }))}
             selected={query.types}
             onToggle={(v) =>
               setQuery({ ...query, types: toggled(query.types, v) as IssueType[] })
@@ -463,7 +490,11 @@ export function SearchPage() {
           />
           <FilterDropdown
             label="우선순위"
-            options={PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) }))}
+            options={PRIORITIES.map((p) => ({
+              value: p,
+              label: priorityName(priorities, p),
+              icon: <PriorityGlyph defs={priorities} priority={p} size={14} variant="icon" />,
+            }))}
             selected={query.priorities}
             onToggle={(v) =>
               setQuery({ ...query, priorities: toggled(query.priorities, v) as IssuePriority[] })

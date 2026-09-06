@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Button, Lozenge, Modal, Radio, RadioGroup } from "@chanho/react";
 import type { Issue, ProjectVersion, WorkflowStatus } from "../store/types";
 import { statusAppearance, statusName } from "./labels";
+import { StatusGlyph } from "./StatusGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 
 /** "그대로 두기" 센티널 — Select·Radio는 빈 문자열 value를 쓰지 않는다 */
 const KEEP = "keep";
@@ -54,9 +56,11 @@ export function VersionReleaseModal({
               <li key={issue.id}>
                 <span className="dash-issue-key">{issue.key}</span>
                 <span className="dash-issue-title">{issue.title}</span>
-                <Lozenge appearance={statusAppearance(statuses, issue.status)}>
-                  {statusName(statuses, issue.status)}
-                </Lozenge>
+                <ValueWithIcon icon={<StatusGlyph status={issue.status} statuses={statuses} variant="icon" />}>
+                  <Lozenge appearance={statusAppearance(statuses, issue.status)}>
+                    {statusName(statuses, issue.status)}
+                  </Lozenge>
+                </ValueWithIcon>
               </li>
             ))}
             {unresolved.length > 5 ? (

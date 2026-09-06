@@ -11,7 +11,9 @@ import {
   updatePriority,
 } from "../store/jiraStore";
 import { COLOR_LABELS, STATUS_COLORS } from "./labels";
-import { TYPE_ICONS, TYPE_ICON_OPTIONS } from "./typeIcons";
+import { PriorityGlyph } from "./PriorityGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
+import { TYPE_ICON_OPTIONS } from "./typeIcons";
 
 const COLOR_OPTIONS = STATUS_COLORS.map((color) => ({ value: color, label: COLOR_LABELS[color] }));
 
@@ -96,14 +98,15 @@ export function PrioritiesPanel() {
       <ul className="status-editor-list" aria-label="우선순위 목록">
         {priorities.map((def, index) => {
           const used = usage[def.id] ?? 0;
-          const Icon = TYPE_ICONS[def.icon];
           return (
             <li key={def.id} className="status-editor-row status-editor-row--type">
-              <span className="status-editor-glyph">
-                <Lozenge appearance={def.color}>
-                  {Icon ? <Icon size={12} aria-hidden /> : null} {def.name}
-                </Lozenge>
-              </span>
+              {/* 다른 화면의 우선순위 표기와 같은 글리프 + 이름 — 아이콘 색은 레지스트리 색을 따른다 */}
+              <ValueWithIcon
+                className="status-editor-glyph"
+                icon={<PriorityGlyph defs={priorities} priority={def.id} size={14} variant="icon" />}
+              >
+                <Lozenge appearance={def.color}>{def.name}</Lozenge>
+              </ValueWithIcon>
               <TextField
                 label={`${def.name} 이름`}
                 value={drafts[def.id] ?? def.name}

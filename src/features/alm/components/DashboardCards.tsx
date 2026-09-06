@@ -98,7 +98,7 @@ export function IssueMiniList({
             <span className="dash-issue-key">{issue.key}</span>
             <span className="dash-issue-title">{issue.title}</span>
             <span className="status-cell">
-              <StatusGlyph status={issue.status} statuses={statuses} />
+              <StatusGlyph status={issue.status} statuses={statuses} variant="icon" />
               <Lozenge appearance={statusAppearance(statuses, issue.status)}>
                 {statusName(statuses, issue.status)}
               </Lozenge>

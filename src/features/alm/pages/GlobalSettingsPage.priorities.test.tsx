@@ -30,6 +30,10 @@ describe("전역 관리 > 우선순위 (지라 우선 순위 + 구성표)", () =
     expect(rows).toHaveLength(5);
     expect(within(rows[0]).getByLabelText("최상 이름")).toHaveValue("최상");
     expect(within(rows[0]).getByRole("button", { name: "최상 삭제" })).toBeDisabled();
+    // 값 표기는 아이콘 + 텍스트 — 아이콘 색은 레지스트리 색을 따르고 이름은 옆에 남는다
+    const topGlyph = within(rows[0]).getByTestId("priority-glyph-highest");
+    expect(topGlyph).toHaveClass("issue-priority-mark", "is-danger");
+    expect(topGlyph.querySelector("svg")).toBeTruthy();
 
     await user.type(screen.getByLabelText("새 우선순위 이름"), "긴급");
     await user.click(screen.getByRole("button", { name: "우선순위 추가" }));

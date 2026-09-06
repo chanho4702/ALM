@@ -5,6 +5,8 @@ import { analyzeCsv, csvToIssueInputs, parseCsv } from "../store/csv";
 import type { ImportResult } from "../store/jiraStore";
 import { importIssues } from "../store/jiraStore";
 import { KIND_LABELS } from "./labels";
+import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { StatusGlyph } from "./StatusGlyph";
 
 const UNASSIGNED = "__unassigned__";
 const SKIP = "__skip__";
@@ -84,9 +86,20 @@ export function JiraImportPanel({ projectId, ctx, onImported }: JiraImportPanelP
 
   const statusOptions = [
     { value: SKIP, label: "건너뛰기" },
-    ...ctx.statuses.map((s) => ({ value: s.id, label: `${s.name} (${KIND_LABELS[s.kind ?? "new"]})` })),
+    ...ctx.statuses.map((s) => ({
+      value: s.id,
+      label: `${s.name} (${KIND_LABELS[s.kind ?? "new"]})`,
+      icon: <StatusGlyph status={s.id} statuses={ctx.statuses} variant="icon" />,
+    })),
   ];
-  const typeOptions = [{ value: SKIP, label: "건너뛰기" }, ...ctx.types.map((t) => ({ value: t.id, label: t.name }))];
+  const typeOptions = [
+    { value: SKIP, label: "건너뛰기" },
+    ...ctx.types.map((t) => ({
+      value: t.id,
+      label: t.name,
+      icon: <IssueTypeGlyph type={t.id} types={ctx.types} variant="icon" />,
+    })),
+  ];
   const assigneeOptions = [
     { value: UNASSIGNED, label: "미지정으로" },
     ...ctx.users.map((u) => ({ value: u.id, label: u.name })),

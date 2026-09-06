@@ -54,7 +54,7 @@ UI는 전부 디자인 시스템 컴포넌트로만 구성한다(타 UI 라이�
 ```bash
 GH_PACKAGES_TOKEN=$(gh auth token) pnpm install   # 최초 1회 ~/.npmrc에 `//npm.pkg.github.com/:_authToken=${GH_PACKAGES_TOKEN}` 추가
 pnpm dev --port 5175 --strictPort  # http://localhost:5175/alm/
-pnpm test                          # vitest run (245 test cases)
+pnpm test                          # vitest run (763 test cases)
 pnpm typecheck                     # tsc --noEmit
 pnpm build                         # vite build (→ dist/)
 ```

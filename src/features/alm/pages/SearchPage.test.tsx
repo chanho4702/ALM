@@ -52,6 +52,30 @@ describe("SearchPage 기본 검색 (지라 Basic)", () => {
     expect(screen.queryByText("ALM-4")).not.toBeInTheDocument();
   });
 
+  it("상태·타입·우선순위 필터 항목은 값 글리프를 함께 그린다", async () => {
+    const user = userEvent.setup();
+    renderSearch();
+    await screen.findByTestId("search-count");
+
+    // 결과 표에도 같은 글리프가 있으므로 열린 필터 패널로 범위를 좁힌다
+    await user.click(screen.getByRole("button", { name: "상태" }));
+    const statusPanel = await screen.findByRole("group", { name: "상태 필터" });
+    expect(within(statusPanel).getByRole("checkbox", { name: "할 일" })).toBeInTheDocument();
+    expect(within(statusPanel).getByTestId("status-glyph-todo")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: "타입" }));
+    const typePanel = await screen.findByRole("group", { name: "타입 필터" });
+    expect(within(typePanel).getByRole("checkbox", { name: "버그" })).toBeInTheDocument();
+    expect(within(typePanel).getByTestId("type-glyph-bug")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: "우선순위" }));
+    const priorityPanel = await screen.findByRole("group", { name: "우선순위 필터" });
+    expect(within(priorityPanel).getByRole("checkbox", { name: "높음" })).toBeInTheDocument();
+    expect(within(priorityPanel).getByTestId("priority-glyph-high")).toBeInTheDocument();
+  });
+
   it("검색어+필터 조합 후 필터 초기화로 복원한다 (검색어는 유지)", async () => {
     const user = userEvent.setup();
     renderSearch();

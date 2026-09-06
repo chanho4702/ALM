@@ -319,7 +319,7 @@ export function IssueListPage() {
       width: "112px",
       render: (issue) => (
         <span className="status-cell">
-          <StatusGlyph status={issue.status} statuses={statuses} />
+          <StatusGlyph status={issue.status} statuses={statuses} variant="icon" />
           <Lozenge appearance={statusAppearance(statuses, issue.status)}>
             {statusName(statuses, issue.status)}
           </Lozenge>
@@ -406,7 +406,13 @@ export function IssueListPage() {
             clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
-              ...statuses.map((s) => ({ value: s.id, label: s.name })),
+              ...statuses.map((s) => ({
+                value: s.id,
+                label: s.name,
+                // 라디오 항목의 접근 이름은 자손 텍스트로 조립된다 — 글리프가 이름을 가지면
+                // "상태: 할 일 할 일"이 된다. 이름은 옆 라벨이 갖고 글리프는 숨긴다.
+                icon: <StatusGlyph status={s.id} statuses={statuses} variant="icon" />,
+              })),
             ]}
             selected={[status]}
             onToggle={setStatus}
@@ -417,7 +423,11 @@ export function IssueListPage() {
             clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
-              ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
+              ...PRIORITIES.map((p) => ({
+                value: p,
+                label: priorityName(priorities, p),
+                icon: <PriorityGlyph defs={priorities} priority={p} size={14} variant="icon" />,
+              })),
             ]}
             selected={[priority]}
             onToggle={setPriority}
@@ -463,7 +473,11 @@ export function IssueListPage() {
             clearValue={ALL}
             options={[
               { value: ALL, label: "전체" },
-              ...issueTypes.map((t) => ({ value: t.id, label: t.name })),
+              ...issueTypes.map((t) => ({
+                value: t.id,
+                label: t.name,
+                icon: <IssueTypeGlyph type={t.id} types={issueTypes} variant="icon" />,
+              })),
             ]}
             selected={[type]}
             onToggle={setType}

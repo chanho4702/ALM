@@ -7,6 +7,8 @@ import type { BulkIssuePatch } from "../store/jiraStore";
 import { priorityName } from "./labels";
 import { resolveFields } from "./fieldConfig";
 import { FieldLabel } from "./FieldLabel";
+import { PriorityGlyph } from "./PriorityGlyph";
+import { StatusGlyph } from "./StatusGlyph";
 import { usePriorities } from "./usePriorities";
 
 const KEEP = "__keep__"; // "변경 안 함" 센티널 — Select는 빈 문자열 value를 쓰지 않는다
@@ -128,7 +130,11 @@ export function BulkEditModal({
               onValueChange={setStatus}
               options={[
                 { value: KEEP, label: "변경 안 함" },
-                ...statuses.map((s) => ({ value: s.id, label: s.name })),
+                ...statuses.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                  icon: <StatusGlyph status={s.id} statuses={statuses} variant="icon" />,
+                })),
               ]}
             />
           </div>
@@ -142,7 +148,11 @@ export function BulkEditModal({
               onValueChange={setPriority}
               options={[
                 { value: KEEP, label: "변경 안 함" },
-                ...PRIORITIES.map((p) => ({ value: p, label: priorityName(priorities, p) })),
+                ...PRIORITIES.map((p) => ({
+                  value: p,
+                  label: priorityName(priorities, p),
+                  icon: <PriorityGlyph defs={priorities} priority={p} size={14} variant="icon" />,
+                })),
               ]}
             />
           </div>

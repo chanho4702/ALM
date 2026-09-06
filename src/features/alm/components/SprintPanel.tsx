@@ -6,7 +6,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge, Button, Dropdown, Lozenge } from "@chanho/react";
 import type { Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
+import { PriorityGlyph } from "./PriorityGlyph";
 import { StatusGlyph } from "./StatusGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 import {
   priorityAppearance,
   priorityName,
@@ -65,14 +67,19 @@ export function BacklogIssueRow({
       <span className="backlog-row-key">{issue.key}</span>
       <span className="backlog-row-title">{issue.title}</span>
       <span className="status-cell">
-        <StatusGlyph status={issue.status} statuses={statuses} />
+        <StatusGlyph status={issue.status} statuses={statuses} variant="icon" />
         <Lozenge appearance={statusAppearance(statuses, issue.status)}>
           {statusName(statuses, issue.status)}
         </Lozenge>
       </span>
-      <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
-        {priorityName(priorities, issue.priority)}
-      </Lozenge>
+      {/* 이름은 Lozenge가 갖는다 — 아이콘은 색·모양만 거든다(중복 낭독 방지) */}
+      <ValueWithIcon
+        icon={<PriorityGlyph defs={priorities} priority={issue.priority} size={14} variant="icon" />}
+      >
+        <Lozenge appearance={priorityAppearance(priorities, issue.priority)}>
+          {priorityName(priorities, issue.priority)}
+        </Lozenge>
+      </ValueWithIcon>
       {assignee ? <UserAvatar user={assignee} size="small" /> : null}
       {/*
         Dropdown 전체를 stopPropagation 래퍼로 감싼다.

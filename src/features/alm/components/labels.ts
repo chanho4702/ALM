@@ -4,7 +4,9 @@ import type {
   IssuePriority,
   IssueResolution,
   IssueStatus,
+  StatusCategory,
   StatusColor,
+  StatusDef,
   StatusKind,
   WorkflowStatus,
   BuiltinIssueType,
@@ -154,6 +156,40 @@ export function statusIcon(statuses: WorkflowStatus[] | undefined, statusId: str
   const icon = found?.icon?.trim();
   if (icon) return icon;
   return KIND_DEFAULT_STATUS_ICON[statusKind(statuses, statusId)] ?? DEFAULT_STATUS_ICON;
+}
+
+/**
+ * 카테고리를 글리프가 읽을 수 있는 상태로 본다 — 카테고리 전용 아이콘은 없고
+ * `KIND_DEFAULT_STATUS_ICON`(의미별 기본 아이콘)이 그림이 된다. 표시 전용이라 저장되지 않는다.
+ */
+export function categoryAsStatus(category: StatusCategory): WorkflowStatus {
+  return {
+    id: category.id,
+    name: category.name,
+    category: category.id,
+    order: category.order,
+    kind: category.kind,
+    color: category.color,
+  };
+}
+
+/**
+ * 상태 레지스트리 항목 + 그 카테고리 → 글리프가 읽는 해석된 상태. 모양은 항목의 아이콘,
+ * 색·의미는 카테고리에서 온다. 표시 전용이라 저장되지 않는다.
+ */
+export function statusDefAsStatus(
+  def: StatusDef,
+  category: StatusCategory | undefined,
+): WorkflowStatus {
+  return {
+    id: def.id,
+    name: def.name,
+    category: def.categoryId,
+    order: 0,
+    kind: category?.kind,
+    color: category?.color,
+    icon: def.icon,
+  };
 }
 
 /** 정렬용 카테고리 위계 (할 일 → 진행 중 → 완료) */

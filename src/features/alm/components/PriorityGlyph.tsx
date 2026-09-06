@@ -38,7 +38,11 @@ export function PriorityGlyph({ defs, priority, size = 16, variant = "auto" }: P
       ? { "aria-hidden": true as const, title: name }
       : { role: "img", "aria-label": `우선순위: ${name}`, title: `우선순위: ${name}` };
   return (
-    <span className={`issue-priority-mark is-${def!.color}`} {...labelProps}>
+    <span
+      className={`issue-priority-mark is-${def!.color}`}
+      data-testid={`priority-glyph-${priority}`}
+      {...labelProps}
+    >
       <Icon size={size} strokeWidth={2.5} aria-hidden />
     </span>
   );

@@ -197,7 +197,7 @@ export function HomePage() {
           </span>
           {reason ? <Lozenge appearance={reason.appearance}>{reason.reason}</Lozenge> : null}
           <span className="status-cell">
-            <StatusGlyph status={issue.status} statuses={statusList} />
+            <StatusGlyph status={issue.status} statuses={statusList} variant="icon" />
             <Lozenge appearance={statusAppearance(statusList, issue.status)}>
               {statusName(statusList, issue.status)}
             </Lozenge>

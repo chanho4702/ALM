@@ -68,6 +68,25 @@ describe("대시보드 (지라 Dashboards)", () => {
     expect(gadget).toHaveTextContent(/총 \d+(\.\d+)?h/);
     expect(gadget).toHaveTextContent("최근 7일");
   });
+
+  it("상태·우선순위 분포 가젯의 값도 아이콘 + 이름으로 그린다", async () => {
+    const board = await createDashboard({
+      name: "분포",
+      gadgets: [
+        { id: "g1", type: "status-distribution", column: 0, config: { projectId: "p1" } },
+        { id: "g2", type: "priority-distribution", column: 1, config: { projectId: "p1" } },
+      ],
+    });
+    renderAt(`/dashboards/${board.id}`);
+
+    const statusGadget = await screen.findByRole("region", { name: "상태 분포" });
+    await waitFor(() => expect(statusGadget).toHaveTextContent("할 일"));
+    expect(within(statusGadget).getByTestId("status-glyph-todo")).toBeInTheDocument();
+
+    const priorityGadget = await screen.findByRole("region", { name: "우선순위 분포" });
+    await waitFor(() => expect(priorityGadget).toHaveTextContent("보통"));
+    expect(within(priorityGadget).getByTestId("priority-glyph-medium")).toBeInTheDocument();
+  });
 });
 
 describe("워크로그 리포트", () => {

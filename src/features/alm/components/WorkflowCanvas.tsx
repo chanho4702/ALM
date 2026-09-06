@@ -15,6 +15,8 @@ import { Button, Lozenge, Select } from "@chanho/react";
 import type { WorkflowLayout, WorkflowStatus, WorkflowTransition } from "../store/types";
 import { WORKFLOW_ANY_NODE } from "../store/types";
 import { statusAppearance } from "./labels";
+import { StatusGlyph } from "./StatusGlyph";
+import { ValueWithIcon } from "./ValueWithIcon";
 import { computeAutoLayout } from "./workflowLayout";
 
 const ANY = "any"; // "모든 상태" 센티널 — Select는 빈 문자열 value를 쓰지 않는다
@@ -253,16 +255,18 @@ function WorkflowCanvasInner({
                 <Lozenge appearance="info">모든 상태</Lozenge>
               ) : (
                 transition.from.map((id) => (
-                  <Lozenge key={id} appearance={statusAppearance(sorted, id)}>
-                    {nameOf(id)}
-                  </Lozenge>
+                  <ValueWithIcon key={id} icon={<StatusGlyph status={id} statuses={sorted} variant="icon" />}>
+                    <Lozenge appearance={statusAppearance(sorted, id)}>{nameOf(id)}</Lozenge>
+                  </ValueWithIcon>
                 ))
               )}
             </span>
             <span aria-hidden>→</span>
-            <Lozenge appearance={statusAppearance(sorted, transition.to)}>
-              {nameOf(transition.to)}
-            </Lozenge>
+            <ValueWithIcon icon={<StatusGlyph status={transition.to} statuses={sorted} variant="icon" />}>
+              <Lozenge appearance={statusAppearance(sorted, transition.to)}>
+                {nameOf(transition.to)}
+              </Lozenge>
+            </ValueWithIcon>
             {readOnly ? null : (
               <Button
                 variant="subtle"

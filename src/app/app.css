@@ -2030,23 +2030,6 @@ body {
   width: 100%; /* Select 필드(div 래퍼)는 패널 폭에 맞춘다 (Lozenge는 span이라 영향 없음) */
 }
 
-/* 상태 필드 — DS Select 옵션은 문자열만 받으므로 글리프를 트리거 왼쪽에 세운다.
-   라벨은 FieldLabel이 위에 그리므로 여기 남는 건 트리거뿐 — 가운데에 맞춘다 */
-.issue-status-field {
-  display: flex;
-  align-items: center;
-  gap: var(--chanho-space-75);
-}
-
-.issue-status-field > div {
-  flex: 1;
-  min-width: 0;
-}
-
-.issue-status-field .status-glyph {
-  flex: none;
-}
-
 /* 담당자 필드 — 상태 필드와 같은 배치(트리거 왼쪽에 얼굴). 24px 아바타를 36px 트리거 가운데에 맞춘다 */
 .issue-assignee-field {
   display: flex;
