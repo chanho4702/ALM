@@ -275,14 +275,58 @@ function estimateAt(index: number): number | null {
 }
 
 /**
+ * 시더 진행 알림 — `(done, total, label)`. `total`은 `DEMO_SEED_STEPS`로 고정이라
+ * 화면이 첫 호출 전에도 진행률 축을 그릴 수 있다. 라벨은 방금 끝낸 단계의 이름이다.
+ */
+export type SeedProgress = (done: number, total: number, label: string) => void;
+
+export interface SeedDemoOptions {
+  onProgress?: SeedProgress;
+}
+
+/** 진행 표시의 단계 이름 — 순서가 곧 진행 순서다(화면과 테스트가 같은 목록을 본다) */
+export const DEMO_SEED_STEP_LABELS = [
+  "컴포넌트",
+  "릴리스",
+  "스프린트",
+  "에픽",
+  "이슈",
+  "하위 작업",
+  "스프린트 진행",
+  "릴리스 배포",
+  "이슈 링크",
+  "코멘트",
+  "워크로그",
+  "보관·대시보드",
+] as const;
+
+export const DEMO_SEED_STEPS = DEMO_SEED_STEP_LABELS.length;
+
+/**
  * 데모 데이터를 만든다. 프로젝트·기본 보드는 이미 만들어진 상태로 들어온다.
  * 이슈 46건(에픽 4 · 표준 36 · 하위 작업 6) 중 2건은 보관 처리해 목록에는 44건이 남는다.
+ *
+ * `onProgress`는 각 단계가 **끝날 때마다** 불린다 — 12단계라 진행률이 한 번에 뛰지 않는다.
  */
 export async function seedDemoProject(
   project: { id: string; key: string },
   api: SampleDataApi,
+  options: SeedDemoOptions = {},
 ): Promise<void> {
   const projectId = project.id;
+  let done = 0;
+  /**
+   * 한 단계 끝. 듣는 사람이 있으면 **매크로태스크 한 박자를 쉰다** — 목업 어댑터는 전부
+   * 마이크로태스크라 쉬지 않으면 시더가 끝날 때까지 브라우저가 한 프레임도 그리지 못하고,
+   * 진행바가 있으나 마나가 된다. REST 모드는 왕복마다 이미 쉬므로 이 대기는 사실상 공짜다.
+   */
+  const step = async () => {
+    const label = DEMO_SEED_STEP_LABELS[done];
+    done += 1;
+    if (!options.onProgress) return;
+    options.onProgress(done, DEMO_SEED_STEPS, label);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
   const users = await api.listUsers();
 
   // 1. 컴포넌트 · 버전 ──────────────────────────────────────────
@@ -295,6 +339,7 @@ export async function seedDemoProject(
     });
     componentIds.push(component.id);
   }
+  await step(); // 컴포넌트
 
   const v10 = await api.createVersion(projectId, {
     name: "1.0.0",
@@ -314,6 +359,7 @@ export async function seedDemoProject(
     startDate: dayKey(9),
     releaseDate: dayKey(60),
   });
+  await step(); // 릴리스
   const versionOf: Record<Bucket, string | null> = {
     s1: v10.id,
     s2: v11.id,
@@ -340,6 +386,7 @@ export async function seedDemoProject(
     plannedStart: dayKey(9),
     plannedEnd: dayKey(23),
   });
+  await step(); // 스프린트
   const sprintOf: Record<Bucket, string | null> = {
     s1: sprint1.id,
     s2: sprint2.id,
@@ -364,6 +411,7 @@ export async function seedDemoProject(
     });
     epicIds.push(created.id);
   }
+  await step(); // 에픽
 
   // 4. 표준 이슈 36 ─────────────────────────────────────────────
   const issueIds: string[] = [];
@@ -385,6 +433,7 @@ export async function seedDemoProject(
     });
     issueIds.push(created.id);
   }
+  await step(); // 이슈
 
   // 5. 하위 작업 6 ──────────────────────────────────────────────
   for (const [index, subtask] of SUBTASKS.entries()) {
@@ -401,13 +450,17 @@ export async function seedDemoProject(
     });
   }
 
+  await step(); // 하위 작업
+
   // 6. 스프린트 수명주기 — 완료된 스프린트 하나, 활성 하나, 계획 하나
   await api.startSprint(sprint1.id);
   await api.completeSprint(sprint1.id);
   await api.startSprint(sprint2.id);
+  await step(); // 스프린트 진행
 
   // 7. 1.0 릴리스 ──────────────────────────────────────────────
   await api.releaseVersion(v10.id);
+  await step(); // 릴리스 배포
 
   // 8. 이슈 링크 5 ─────────────────────────────────────────────
   for (const link of LINKS) {
@@ -418,12 +471,16 @@ export async function seedDemoProject(
     });
   }
 
+  await step(); // 이슈 링크
+
   // 9. 코멘트 15 (멘션 2) ──────────────────────────────────────
   for (const comment of COMMENTS) {
     const target = users[comment.mention ?? 0];
     const prefix = comment.mention !== undefined && target ? `${mentionHtml(target)} ` : "";
     await api.addComment(issueIds[comment.issue], `<p>${prefix}${comment.body}</p>`);
   }
+
+  await step(); // 코멘트
 
   // 10. 워크로그 12 ────────────────────────────────────────────
   for (const worklog of WORKLOGS) {
@@ -434,6 +491,8 @@ export async function seedDemoProject(
     });
   }
 
+  await step(); // 워크로그
+
   // 11. 보관 2 · 대시보드 1 ────────────────────────────────────
   await api.archiveIssue(issueIds[ISSUES.length - 1]);
   await api.archiveIssue(issueIds[ISSUES.length - 2]);
@@ -442,6 +501,7 @@ export async function seedDemoProject(
     shared: true,
     gadgets: GADGETS(projectId),
   });
+  await step(); // 보관·대시보드
 }
 
 /**

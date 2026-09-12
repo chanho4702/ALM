@@ -463,6 +463,21 @@ describe("IssueDetailModal 해결", () => {
 
     expect(await within(dialog).findByRole("combobox", { name: "해결" })).toHaveTextContent("완료됨");
   });
+
+  it("해결일은 해결된 이슈에만 읽기 전용으로 선다", async () => {
+    const user = userEvent.setup();
+    renderBoard("/projects/p1/board?issue=ALM-5"); // 시드: 할 일 — 아직 해결 없음
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-5" });
+    expect(within(dialog).queryByText("해결일")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
+    await user.click(await screen.findByRole("option", { name: "완료" }));
+
+    expect(await within(dialog).findByText("해결일")).toBeInTheDocument();
+    // 편집 컨트롤이 아니라 값만 — 해결 시각은 서버가 찍는다
+    expect(within(dialog).queryByRole("combobox", { name: "해결일" })).not.toBeInTheDocument();
+  });
 });
 
 describe("IssueDetailModal 수정 버전", () => {

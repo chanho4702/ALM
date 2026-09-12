@@ -69,21 +69,42 @@ describe("uiStore 사이드바 너비", () => {
   });
 });
 
-describe("uiStore 저장 필터", () => {
-  it("저장·나열·삭제, 같은 이름은 덮어쓴다, 빈 이름 거부", async () => {
-    const { deleteSavedFilter, listSavedFilters, saveFilter } = await import("./uiStore");
-    const first = await saveFilter("내 버그", "타입:버그 담당:김찬호");
-    await saveFilter("이번 주", "정렬:마감");
+describe("uiStore 저장 필터 (목업 절반 — 화면은 jiraStore 파사드로 만난다)", () => {
+  it("만들기·나열·수정·삭제, 이름 중복·빈 이름 거부", async () => {
+    const { createSavedFilter, deleteSavedFilter, listSavedFilters, updateSavedFilter } =
+      await import("./uiStore");
+    const first = await createSavedFilter({ name: "내 버그", query: "타입:버그 담당:김찬호" });
+    await createSavedFilter({ name: "이번 주", query: "정렬:마감" });
+    // 이름 순 — 서버 `GET /api/alm/me/filters`와 같은 정렬이다
     expect((await listSavedFilters()).map((f) => f.name)).toEqual(["내 버그", "이번 주"]);
 
-    await saveFilter("내 버그", "타입:버그"); // 덮어쓰기
+    await updateSavedFilter(first.id, { query: "타입:버그" });
     const filters = await listSavedFilters();
     expect(filters).toHaveLength(2);
     expect(filters.find((f) => f.id === first.id)?.query).toBe("타입:버그");
 
+    await expect(createSavedFilter({ name: "이번 주", query: "x" })).rejects.toThrow(
+      "같은 이름의 필터가 있습니다",
+    );
+    await expect(updateSavedFilter(first.id, { name: "이번 주" })).rejects.toThrow(
+      "같은 이름의 필터가 있습니다",
+    );
+
     await deleteSavedFilter(first.id);
     expect((await listSavedFilters()).map((f) => f.name)).toEqual(["이번 주"]);
 
-    await expect(saveFilter("  ", "x")).rejects.toThrow("필터 이름을 입력하세요");
+    await expect(createSavedFilter({ name: "  ", query: "x" })).rejects.toThrow(
+      "필터 이름을 입력하세요",
+    );
+  });
+
+  it("REST 이관용 읽기·비우기는 저장 순서를 그대로 준다", async () => {
+    const { clearLocalSavedFilters, createSavedFilter, localSavedFilters } =
+      await import("./uiStore");
+    await createSavedFilter({ name: "나중", query: "a" });
+    await createSavedFilter({ name: "가장먼저", query: "status = done", kind: "aql" });
+    expect(localSavedFilters().map((f) => f.name)).toEqual(["나중", "가장먼저"]);
+    clearLocalSavedFilters();
+    expect(localSavedFilters()).toEqual([]);
   });
 });

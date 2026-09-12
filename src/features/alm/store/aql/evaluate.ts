@@ -393,6 +393,8 @@ function present(issue: Issue, field: string): boolean {
       return Boolean(issue.parentId);
     case "due":
       return Boolean(issue.dueDate);
+    case "resolved":
+      return instantOf(issue, "resolved") !== null;
     case "estimate":
       return issue.estimateHours !== null && issue.estimateHours !== undefined;
     case "labels":
@@ -405,7 +407,8 @@ function present(issue: Issue, field: string): boolean {
 }
 
 function instantOf(issue: Issue, field: string): number | null {
-  const raw = field === "created" ? issue.createdAt : issue.updatedAt;
+  const raw =
+    field === "created" ? issue.createdAt : field === "resolved" ? issue.resolvedAt : issue.updatedAt;
   const parsed = raw ? Date.parse(raw) : NaN;
   return Number.isNaN(parsed) ? null : parsed;
 }
@@ -500,7 +503,8 @@ function matches(
       return values.some((v) => mine === numberOf(v));
     }
     case "created":
-    case "updated": {
+    case "updated":
+    case "resolved": {
       const mine = instantOf(issue, def.name);
       if (mine === null) return false;
       return values.some((v) => {
@@ -593,7 +597,7 @@ function ordered(
         return rank > target;
     }
   }
-  if (def.name === "created" || def.name === "updated") {
+  if (def.name === "created" || def.name === "updated" || def.name === "resolved") {
     const mine = instantOf(issue, def.name);
     if (mine === null) return false;
     const at = moment(ctx, value);
@@ -712,6 +716,8 @@ function sortKey(issue: Issue, field: string, ctx: AqlEvalContext): (number | st
       return [instantOf(issue, "created")];
     case "updated":
       return [instantOf(issue, "updated")];
+    case "resolved":
+      return [instantOf(issue, "resolved")];
     case "due":
       return [dueOf(issue)];
     case "priority":

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Filter, FolderKanban, Home, LayoutDashboard, MoreHorizontal, Search } from "lucide-react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { Dropdown } from "@chanho/react";
+import { Button, Dropdown, useToast } from "@chanho/react";
 import type { Board, Project } from "../store/types";
-import { listBoards } from "../store/jiraStore";
+import { deleteSavedFilter, listBoards, listSavedFilters } from "../store/jiraStore";
+import type { SavedFilter } from "../store/jiraStore";
 import { BoardCreateModal } from "./BoardCreateModal";
 import { ProjectAvatar } from "./ProjectAvatar";
 import {
@@ -12,16 +13,13 @@ import {
   SIDENAV_MAX_WIDTH,
   SIDENAV_MIN_WIDTH,
   UI_CHANGED_EVENT,
-  deleteSavedFilter,
   getSideNavWidth,
   isSideNavCollapsed,
   listRecentProjectIds,
-  listSavedFilters,
   listStarredProjectIds,
   setSideNavCollapsed,
   setSideNavWidth,
 } from "../store/uiStore";
-import type { SavedFilter } from "../store/uiStore";
 
 const clampWidth = (width: number) =>
   Math.min(SIDENAV_MAX_WIDTH, Math.max(SIDENAV_MIN_WIDTH, width));
@@ -46,25 +44,43 @@ export interface GlobalSideNavProps {
  */
 export function GlobalSideNav({ projects }: GlobalSideNavProps) {
   const navigate = useNavigate();
+  const toast = useToast();
   const { pathname } = useLocation();
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  /** 저장 필터를 못 읽은 이유 — null이 아니면 "필터가 없다"가 아니라 "못 읽었다"를 보여 준다 */
+  const [filtersError, setFiltersError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(SIDENAV_DEFAULT_WIDTH);
   /** 드래그 중 최신 너비 — pointerup에서 저장할 값 */
   const widthRef = useRef(SIDENAV_DEFAULT_WIDTH);
 
+  /** 저장 필터만 따로 — 실패를 삼키면 섹션이 사라져 "없음"과 구분되지 않는다(503이 조용히 빈 목록이 된다) */
+  const refreshFilters = useCallback(
+    () =>
+      listSavedFilters().then(
+        (filters) => {
+          setSavedFilters(filters);
+          setFiltersError(null);
+        },
+        (error: unknown) => {
+          setFiltersError(error instanceof Error ? error.message : String(error));
+        },
+      ),
+    [],
+  );
+
   const refresh = useCallback(() => {
     void listRecentProjectIds().then(setRecentIds);
     void listStarredProjectIds().then(setStarredIds);
-    void listSavedFilters().then(setSavedFilters);
+    void refreshFilters();
     void isSideNavCollapsed().then(setCollapsed);
     void getSideNavWidth().then((w) => {
       widthRef.current = w;
       setWidth(w);
     });
-  }, []);
+  }, [refreshFilters]);
 
   /** 핸들 드래그 — 움직이는 동안은 로컬 상태만, 놓을 때 저장 */
   const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -270,7 +286,18 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
       </ul>
 
       {/* 저장 필터 — ALM 특색: 저장 즉시 사이드바 상주, 원클릭 적용 */}
-      {!collapsed && savedFilters.length > 0 ? (
+      {!collapsed && filtersError !== null ? (
+        <>
+          <span className="global-nav-section">필터</span>
+          <div className="global-nav-filters-error" role="status" data-testid="nav-filters-error">
+            <p>저장 필터를 불러오지 못했습니다</p>
+            <Button variant="subtle" size="small" onClick={() => void refreshFilters()}>
+              다시 시도
+            </Button>
+          </div>
+        </>
+      ) : null}
+      {!collapsed && filtersError === null && savedFilters.length > 0 ? (
         <>
           <span className="global-nav-section">필터</span>
           <ul className="global-nav-list" data-testid="nav-filters">
@@ -295,7 +322,17 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
                   type="button"
                   className="global-nav-filter-delete"
                   aria-label={`필터 ${filter.name} 삭제`}
-                  onClick={() => void deleteSavedFilter(filter.id)}
+                  onClick={() =>
+                    void deleteSavedFilter(filter.id)
+                      .then(() => refreshFilters())
+                      .catch((error: unknown) =>
+                        toast({
+                          title: `필터 "${filter.name}"를 삭제하지 못했습니다`,
+                          description: error instanceof Error ? error.message : String(error),
+                          appearance: "danger",
+                        }),
+                      )
+                  }
                 >
                   ×
                 </button>

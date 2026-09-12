@@ -1,10 +1,28 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { Badge, Button, Card, Lozenge, PageHeader, TextArea, TextField, useToast } from "@chanho/react";
+import {
+  Badge,
+  Button,
+  Card,
+  Lozenge,
+  PageHeader,
+  ProgressBar,
+  TextArea,
+  TextField,
+  useToast,
+} from "@chanho/react";
 import { createProject } from "../store/jiraStore";
+import { DEMO_SEED_STEPS } from "../store/sampleData";
 import { PROJECT_TEMPLATES } from "../store/projectTemplates";
 import type { ProjectTemplateId } from "../store/projectTemplates";
+
+/** 데모 시더 진행 — 돌고 있는 동안만 값이 있다 */
+interface SeedState {
+  done: number;
+  total: number;
+  label: string;
+}
 
 export interface ProjectCreatePageProps {
   onProjectsChanged: () => void | Promise<void>;
@@ -38,6 +56,7 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
   const [description, setDescription] = useState("");
   const [templateId, setTemplateId] = useState<ProjectTemplateId>("blank");
   const [submitting, setSubmitting] = useState(false);
+  const [seed, setSeed] = useState<SeedState | null>(null);
   const template = PROJECT_TEMPLATES.find((t) => t.id === templateId) ?? PROJECT_TEMPLATES[0];
 
   const handleNameChange = (next: string) => {
@@ -49,9 +68,18 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
     event.preventDefault();
     if (submitting) return;
     setSubmitting(true);
+    // 데모 템플릿은 수십 번의 왕복이라 진행이 안 보이면 멈춘 것처럼 보인다 — 단계 표시를 먼저 세운다
+    if (template.richSeed) setSeed({ done: 0, total: DEMO_SEED_STEPS, label: "준비" });
     try {
-      const project = await createProject({ key, name, description, templateId });
-      toast({ title: `프로젝트 ${project.key}를 만들었습니다`, appearance: "success" });
+      const project = await createProject(
+        { key, name, description, templateId },
+        { onProgress: (done, total, label) => setSeed({ done, total, label }) },
+      );
+      toast({
+        title: `프로젝트 ${project.key}를 만들었습니다`,
+        description: template.richSeed ? "데모 데이터를 모두 채웠습니다" : undefined,
+        appearance: "success",
+      });
       await onProjectsChanged();
       navigate(`/projects/${project.id}/board`);
     } catch (error) {
@@ -62,6 +90,7 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
       });
     } finally {
       setSubmitting(false);
+      setSeed(null);
     }
   };
 
@@ -164,6 +193,15 @@ export function ProjectCreatePage({ onProjectsChanged }: ProjectCreatePageProps)
                   프로젝트 만들기
                 </Button>
               </div>
+              {seed ? (
+                <div className="pcreate-seed" data-testid="demo-seed-progress">
+                  <ProgressBar
+                    label="데모 데이터 생성 진행률"
+                    value={Math.round((seed.done / seed.total) * 100)}
+                  />
+                  <span className="pcreate-seed-step">{`${seed.done}/${seed.total} · ${seed.label}`}</span>
+                </div>
+              ) : null}
             </form>
           </Card>
           <aside className="pcreate-preview" aria-label="선택한 템플릿">

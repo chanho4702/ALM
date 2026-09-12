@@ -59,7 +59,7 @@ import type { IssueQuery } from "./searchQuery";
 import { getTemplate } from "./projectTemplates";
 import type { ProjectTemplateId } from "./projectTemplates";
 import { extractMentionIds, htmlToText, newMentionIds } from "./richText";
-import { seedDemoProject, type SampleDataApi } from "./sampleData";
+import { seedDemoProject, type SampleDataApi, type SeedDemoOptions } from "./sampleData";
 import { parseAndCheck, validate as validateAqlInput, type AqlValidation } from "./aql/validate";
 import { evaluateAql, type AqlEvalContext } from "./aql/evaluate";
 import {
@@ -357,6 +357,7 @@ function normalize(data: JiraData): JiraData {
     issue.parentId ??= null;
     issue.estimateHours ??= null;
     issue.resolution ??= null;
+    issue.resolvedAt ??= null;
     issue.fixVersionId ??= null;
   }
   data.notifications ??= [];
@@ -402,6 +403,10 @@ function normalize(data: JiraData): JiraData {
   data.statusDefs ??= [];
   // 전역 이슈 타입 레지스트리 — 기본 5종은 항상 있다
   data.archivedIssues ??= [];
+  // 보관 이슈도 AQL `resolved`를 탄다 — 해결 시각 도입 전 데이터는 마지막 수정 시각으로 본다
+  for (const issue of data.archivedIssues) {
+    issue.resolvedAt ??= issue.resolution ? issue.updatedAt : null;
+  }
   data.components ??= [];
   data.dashboards ??= [];
   data.trashedProjects ??= [];
@@ -469,6 +474,8 @@ function normalize(data: JiraData): JiraData {
     if (issue.resolution === null && statusKindOf(data, issue.projectId, issue.status) === "complete") {
       issue.resolution = "done";
     }
+    // 해결 시각 도입 전 데이터: 이미 해결된 이슈는 마지막 수정 시각을 해결 시각으로 본다(서버 V23 백필과 같다)
+    if (issue.resolution !== null && !issue.resolvedAt) issue.resolvedAt = issue.updatedAt;
   }
   return data;
 }
@@ -555,13 +562,17 @@ export async function listProjects(): Promise<Project[]> {
   return clone(load().projects);
 }
 
-export async function createProject(input: {
-  key: string;
-  name: string;
-  description?: string;
-  /** 생성 템플릿 — 기본 blank(현행 기본 보드만) */
-  templateId?: ProjectTemplateId;
-}): Promise<Project> {
+export async function createProject(
+  input: {
+    key: string;
+    name: string;
+    description?: string;
+    /** 생성 템플릿 — 기본 blank(현행 기본 보드만) */
+    templateId?: ProjectTemplateId;
+  },
+  /** 데모 템플릿 시더의 진행 알림 — 다른 템플릿에서는 불리지 않는다 */
+  options: SeedDemoOptions = {},
+): Promise<Project> {
   const data = load();
   const key = input.key.trim().toUpperCase();
   const name = input.name.trim();
@@ -622,7 +633,7 @@ export async function createProject(input: {
     });
   }
   // 데모 템플릿은 공용 시더(REST와 같은 코드)가 채운다
-  if (template.richSeed) await seedDemoProject(project, sampleDataApi());
+  if (template.richSeed) await seedDemoProject(project, sampleDataApi(), options);
   return clone(project);
 }
 
@@ -1000,14 +1011,26 @@ function applyResolutionRule(
     if (explicit !== undefined && explicit !== null) {
       throw new Error("완료된 이슈에만 해결을 설정할 수 있습니다");
     }
-    issue.resolution = null;
+    setResolution(issue, null);
     return;
   }
   if (explicit !== undefined) {
-    issue.resolution = explicit ?? "done";
+    setResolution(issue, explicit ?? "done");
   } else if (!wasDone || issue.resolution === null) {
-    issue.resolution = "done";
+    setResolution(issue, "done");
   }
+}
+
+/**
+ * 해결을 바꾸는 **유일한 자리** — 해결 시각(`resolvedAt`)이 규칙과 갈라지지 않게 한 곳에 묶는다.
+ * null→값이면 지금 시각을 찍고, 값→null이면 지운다. 값→다른 값은 처음 해결한 시각을 지킨다
+ * (서버 `Issue.applyResolution`과 같은 규칙).
+ */
+function setResolution(issue: Issue, next: IssueResolution | null): void {
+  const before = issue.resolution ?? null;
+  issue.resolution = next;
+  if (before === null && next !== null) issue.resolvedAt = new Date().toISOString();
+  else if (next === null) issue.resolvedAt = null;
 }
 
 function assertValidStatus(data: JiraData, projectId: string, statusId: string): void {
@@ -1877,6 +1900,7 @@ export async function createIssue(input: {
     dueDate: input.dueDate ?? null,
     estimateHours: input.estimateHours ?? null,
     resolution: null,
+    resolvedAt: null,
     fixVersionId: input.fixVersionId ?? null,
     labels: input.labels ?? [],
     componentIds: componentIdsForCreate,
@@ -3983,6 +4007,20 @@ export async function saveBanner(banner: AnnouncementBanner): Promise<Announceme
   persist();
   return clone(data.banner);
 }
+
+// ── 저장 필터 ────────────────────────────────────────────────
+
+/**
+ * 저장 필터의 목업 절반 — 구현은 `uiStore`(localStorage `alm.jira.ui.v1`)가 갖고 있고 여기서 내보내기만 한다.
+ * REST 어댑터는 같은 이름으로 `/api/alm/me/filters`를 부른다. 화면은 둘 다 `jiraStore` 파사드로만 만난다.
+ */
+export {
+  listSavedFilters,
+  createSavedFilter,
+  updateSavedFilter,
+  deleteSavedFilter,
+} from "./uiStore";
+export type { SavedFilter, SavedFilterInput } from "./uiStore";
 
 // ── AQL (ALM Query Language) ─────────────────────────────────
 

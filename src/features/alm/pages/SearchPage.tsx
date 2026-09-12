@@ -31,6 +31,7 @@ import {
   statusMetaByProject,
 } from "../store/jiraStore";
 import { aqlFields, listStatusCategories, queryIssuesAql } from "../store/jiraStore";
+import { createSavedFilter, listSavedFilters, updateSavedFilter } from "../store/jiraStore";
 import type { IssueQuery } from "../store/searchQuery";
 import { EMPTY_QUERY, parseSmartQuery, queryTokens, serializeQuery } from "../store/searchQuery";
 import { parseAql } from "../store/aql/parser";
@@ -38,7 +39,6 @@ import { AqlError } from "../store/aql/types";
 import { fromAql, toAql } from "../store/aql/toAql";
 import { EMPTY_FIELDS_INFO, type AqlFieldsInfo } from "../store/aql/fields";
 import { AqlEditor, type AqlEditorError } from "../components/AqlEditor";
-import { saveFilter } from "../store/uiStore";
 import { useIssueModal } from "../components/useIssueModal";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { PriorityGlyph } from "../components/PriorityGlyph";
@@ -314,11 +314,24 @@ export function SearchPage() {
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await saveFilter(saveName, mode === "aql" ? (aql ?? "") : q, mode === "aql" ? "aql" : "smart");
-      toast({ title: `필터 "${saveName.trim()}"를 저장했습니다`, appearance: "success" });
+      const name = saveName.trim();
+      const query = mode === "aql" ? (aql ?? "") : q;
+      const kind = mode === "aql" ? "aql" : "smart";
+      // 같은 이름이면 덮어쓴다(지라 "필터 저장"과 같은 동작) — 서버는 중복 이름을 409로 막는다
+      const existing = (await listSavedFilters()).find((f) => f.name === name);
+      if (existing) await updateSavedFilter(existing.id, { query, kind });
+      else await createSavedFilter({ name, query, kind });
+      toast({ title: `필터 "${name}"를 저장했습니다`, appearance: "success" });
       setSaveName("");
       setSaveOpen(false);
     } catch (error) {
+      // AQL 문법 오류는 저장 대화상자에 묻지 않는다 — 고쳐야 할 곳이 질의라, 대화상자를 닫고
+      // 에디터의 밑줄·문구 자리로 그대로 돌려보낸다(실행 400과 같은 경로).
+      if (error instanceof AqlError) {
+        setSaveOpen(false);
+        setAqlError({ message: error.message, position: error.position });
+        return;
+      }
       toast({
         title: "필터 저장 실패",
         description: error instanceof Error ? error.message : String(error),

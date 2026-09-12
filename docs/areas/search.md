@@ -116,13 +116,19 @@ op      := "=" | "!=" | "~" | "!~" | "<" | "<=" | ">" | ">="
 | `resolution` | 해결 | ENUM | `DONE`/`WONT_DO`/`DUPLICATE`/`CANNOT_REPRODUCE` 또는 완료·하지않음·중복·재현불가 |
 | `parent` | 상위, 상위항목 | ENUM | `ALM-3` 또는 id |
 | `created`·`updated`·`due` | 생성일·수정일·마감일 | DATE | `due`만 `IS EMPTY` 가능 |
-| `resolved` | 해결일 | — | **아직 없다.** 쓰면 `아직 지원하지 않는 필드입니다: resolved` |
+| `resolved` | 해결일 | DATE | 해결이 **처음** 설정된 순간. 아직 해결 전이면 `IS EMPTY` |
 | `estimate` | 예상시간 | NUMBER | 시간(h) |
 | `text` | 텍스트, 내용 | TEXT | **`~`·`!~`만** — 제목+설명. `%`·`_`는 글자 그대로다(와일드카드 아님) |
 | `summary` | 요약, 제목 | TEXT | `~` 포함, `=` 정확(대소문자 무시) |
 | `archived` | 보관 | BOOL | 기본 false. `archived = true`가 보관함 검색 |
 
-정렬 가능: `created` `updated` `due` `priority` `key` `status` `summary` `assignee` `estimate`.
+정렬 가능: `created` `updated` `due` `resolved` `priority` `key` `status` `summary` `assignee` `estimate`.
+
+`resolved`의 원천은 `Issue.resolvedAt`(ISO-8601 UTC 또는 null)이다 — 수정일로 어림잡지 않는다.
+해결이 null→값이 되는 순간 찍히고 값→null이면 지워지며, 사유만 바꾸는 것(완료됨 → 하지 않음)은
+**처음 해결한 시각을 지킨다**(서버 규칙과 같다).
+목업은 `jiraMock.setResolution()` 한 곳이 그 규칙을 들고 있고, 해결 시각 도입 전 데이터는
+마지막 수정 시각으로 백필된다(서버 V23 백필과 같다).
 
 ### 항상 걸리는 세 가지 (서버와 같은 의미)
 
@@ -171,6 +177,42 @@ op      := "=" | "!=" | "~" | "!~" | "<" | "<=" | ">" | ">="
   OR·NOT·비교·`currentUser()`가 섞이면 되돌리지 않고 "AQL 그대로 유지" 토스트를 띄운다.
 - 저장 필터는 `SavedFilter.kind`("smart" | "aql")로 어느 파라미터로 열지 정한다.
   kind가 없는 옛 저장분은 스마트(`?q=`)다.
+- **저장 필터의 읽기·쓰기는 `jiraStore`의 파사드 4함수**(`listSavedFilters`/`createSavedFilter`/
+  `updateSavedFilter`/`deleteSavedFilter`)다. 화면(`GlobalSideNav`·검색 "필터로 저장")은 `uiStore`를
+  직접 만지지 않는다. 목업은 종전 localStorage 키(`alm.jira.ui.v1`)를 그대로 쓰고, REST는
+  `/api/alm/me/filters`(본인 소유만)다.
+
+### 저장 필터 서버 계약 (정본)
+
+| 요청 | 응답 |
+|---|---|
+| `GET /api/alm/me/filters` | `[{id, name, kind, query, createdAt, updatedAt}]` **이름 순** |
+| `POST {name, kind, query}` | 201, 같은 shape |
+| `PUT /{id} {name?, kind?, query?}` | 200 — **부분 갱신**(안 주는 필드는 본문에서 뺀다) |
+| `DELETE /{id}` | 204 |
+
+**`id`는 서버에서 number, 프론트에서 string**이다 — 어댑터가 `String(id)`로 옮기고 `SavedFilter.id`는
+그대로 문자열이다. 남의 것은 404. 중복 이름은 409 `{"error":"같은 이름의 필터가 있습니다"}`.
+검증 400 문구는 `필터 이름을 입력하세요` / `필터 이름은 60자 이하여야 합니다` /
+`필터 질의를 입력하세요` / `필터 질의는 4000자 이하여야 합니다` — 목업도 같은 문구로 먼저 막아 왕복하지 않는다.
+없는 id·남의 것은 404이고, 목업도 `저장 필터를 찾을 수 없습니다: {id}`로 던진다(조용히 성공하지 않는다).
+
+`kind = "aql"`이면 서버가 저장 전에 문법을 보고 **`/query`와 같은 오류 계약**
+(400 `{error, position, expected}`)으로 답한다. 그래서 어댑터는 자리를 주는 400만 `AqlError`로 올리고,
+검색 화면은 "필터로 저장" 대화상자를 닫은 뒤 **에디터의 밑줄·문구 자리로** 돌려보낸다(실행 400과 같은 경로).
+자리가 없는 400(이름 길이 등)은 평범한 오류라 토스트다 — 0으로 채워 엉뚱한 첫 글자에 줄을 긋지 않는다.
+
+**REST 모드의 첫 목록 조회**가 로컬에 남은 옛 필터를 서버로 한 번 옮기고 로컬 키를 비운다.
+"한 번"을 보장하는 것은 플래그가 아니라 비워진 로컬 키다. 실패는 두 갈래다.
+
+- **4xx**: 그 필터가 서버 규칙에 안 맞는다(옛 `saveFilter`가 막지 않던 빈 질의, 61자 이름, 중복 이름).
+  다시 보내도 같은 답이라 **그 한 건만 버리고** 넘어간다 — 남겨 두면 나쁜 필터 하나가 목록 조회를 영원히 막는다.
+- **5xx·네트워크**: 로컬을 남겨 다음 조회에서 다시 시도한다.
+
+어느 쪽이든 **이관 실패가 `listSavedFilters`를 실패시키지 않는다** — 서버 목록은 그대로 돌려준다.
+변경 신호(`UI_CHANGED_EVENT`)는 이관 끝에 한 번만 나간다(POST마다 내면 사이드바가 다시 조회해 재진입한다).
+사이드바는 목록 조회가 실패하면 섹션을 지우지 않고 실패 문구 + "다시 시도"를 남긴다 —
+503이 조용히 "필터 없음"으로 보이면 안 된다.
 - 전역 검색 모달은 입력이 "필드 연산자"로 보이면(`looksLikeAql`) "AQL로 검색"을 띄운다.
 
 ### 자동완성 사전의 분담

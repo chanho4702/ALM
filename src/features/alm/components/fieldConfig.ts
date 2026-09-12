@@ -1,5 +1,6 @@
 import {
   AlignLeft,
+  CalendarCheck,
   CalendarDays,
   CircleCheck,
   CircleDot,
@@ -145,7 +146,14 @@ export const withRequiredMark = (label: string, required: boolean) =>
  * 필드 라벨 앞에 세우는 아이콘 키 — 구성 가능한 13종에 더해, 구성 대상은 아니지만
  * 같은 자리에 서는 필드(타입·상태·프로젝트·요약)까지 포함한다.
  */
-export type FieldIconId = IssueFieldId | "type" | "status" | "project" | "summary";
+export type FieldIconId =
+  | IssueFieldId
+  | "type"
+  | "status"
+  | "project"
+  | "summary"
+  /** 읽기 전용 해결일 — 구성 대상은 아니지만 해결 바로 아래 같은 자리에 선다 */
+  | "resolved";
 
 /**
  * 필드를 상징하는 lucide 아이콘 — 지라 이슈 상세의 속성 아이콘을 따른다.
@@ -169,4 +177,5 @@ export const FIELD_ICONS: Record<FieldIconId, LucideIcon> = {
   links: Link,
   project: FolderKanban,
   summary: Type,
+  resolved: CalendarCheck,
 };

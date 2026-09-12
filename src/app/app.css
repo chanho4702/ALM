@@ -178,6 +178,21 @@ body {
 }
 
 .global-nav.is-collapsed .global-nav-label,
+/* 저장 필터를 못 읽었을 때 — 섹션을 지우지 않고 이유와 재시도를 남긴다 */
+.global-nav-filters-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--chanho-space-50);
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+}
+
+.global-nav-filters-error p {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
 .global-nav.is-collapsed .global-nav-section {
   display: none;
 }
@@ -2804,7 +2819,7 @@ body {
 
 .stat-tile-sub {
   font-size: var(--chanho-font-size-75);
-  color: var(--chanho-color-text-subtlest, var(--chanho-color-text-subtle));
+  color: var(--chanho-color-text-subtle);
 }
 
 /* ── 워크플로 전이 편집기(@xyflow/react) ────────────────── */
@@ -2845,7 +2860,7 @@ body {
   color: var(--chanho-color-text-default);
   font-size: var(--chanho-font-size-75);
   font-weight: var(--chanho-font-weight-medium);
-  box-shadow: var(--chanho-shadow-raised, 0 1px 2px rgba(0, 0, 0, 0.06));
+  box-shadow: var(--chanho-shadow-100);
 }
 
 .workflow-flow .react-flow__node.workflow-node.selected,
@@ -4123,7 +4138,7 @@ th:last-child > [role="separator"] {
 }
 .settings-help {
   margin: 0 0 var(--chanho-space-150);
-  color: var(--chanho-color-text-muted);
+  color: var(--chanho-color-text-subtle);
   font-size: var(--chanho-font-size-75);
 }
 /* 메일 서버 미구성 안내 — 스위치를 켜도 아무것도 오지 않는 것이 최악이라 먼저 알린다 */
@@ -4133,7 +4148,7 @@ th:last-child > [role="separator"] {
 }
 .settings-empty {
   margin: 0 0 var(--chanho-space-150);
-  color: var(--chanho-color-text-muted);
+  color: var(--chanho-color-text-subtle);
   font-size: var(--chanho-font-size-75);
 }
 .settings-toggle-list {
@@ -4172,7 +4187,7 @@ th:last-child > [role="separator"] {
   text-decoration: underline;
 }
 .shortcut-url {
-  color: var(--chanho-color-text-muted);
+  color: var(--chanho-color-text-subtle);
   font-size: var(--chanho-font-size-50);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4388,7 +4403,7 @@ th:last-child > [role="separator"] {
   float: left;
   height: 0;
   pointer-events: none;
-  color: var(--chanho-color-text-muted);
+  color: var(--chanho-color-text-subtle);
 }
 
 .rich-text-view .rich-text-readonly {
@@ -4397,7 +4412,7 @@ th:last-child > [role="separator"] {
 
 .rich-text-empty {
   margin: 0;
-  color: var(--chanho-color-text-muted);
+  color: var(--chanho-color-text-subtle);
   font-size: var(--chanho-font-size-75);
 }
 
@@ -4532,7 +4547,7 @@ th:last-child > [role="separator"] {
   font-size: var(--chanho-font-size-50);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--chanho-color-text-muted);
+  color: var(--chanho-color-text-subtle);
   margin-top: var(--chanho-space-100);
 }
 
@@ -4547,13 +4562,26 @@ th:last-child > [role="separator"] {
 }
 
 .pcreate-preview-muted {
-  color: var(--chanho-color-text-muted);
+  color: var(--chanho-color-text-subtle);
   font-size: var(--chanho-font-size-75);
 }
 
 .pcreate-lead {
   margin: calc(-1 * var(--chanho-space-200)) 0 0;
   color: var(--chanho-color-text-subtle);
+}
+
+/* 데모 시더 진행 — 만들기 버튼 아래에 진행바 + "n/total · 단계" 한 줄 */
+.pcreate-seed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.pcreate-seed-step {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  font-variant-numeric: tabular-nums;
 }
 
 .pcreate-page {
@@ -4586,6 +4614,13 @@ th:last-child > [role="separator"] {
   flex-direction: column;
   gap: var(--chanho-space-50);
   min-width: 0;
+}
+
+/* 읽기 전용 속성 값(해결일 등) — 컨트롤 없이 텍스트만 서는 자리 */
+.alm-field-readonly {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  font-variant-numeric: tabular-nums;
 }
 
 /* 라벨 시각 숨김 — DS TextField/Select에 label 숨김 옵션이 없어 래퍼(또는 Select 루트)에 건다.
@@ -4761,7 +4796,7 @@ th:last-child > [role="separator"] {
   min-height: 100vh;
   padding: var(--chanho-space-400);
   text-align: center;
-  color: var(--chanho-color-text);
+  color: var(--chanho-color-text-default);
 }
 
 .org-gate-title {

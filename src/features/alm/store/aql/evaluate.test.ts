@@ -25,6 +25,7 @@ const base = {
   dueDate: null as string | null,
   estimateHours: null as number | null,
   resolution: null as Issue["resolution"],
+  resolvedAt: null as string | null,
   fixVersionId: null as string | null,
   labels: [] as string[],
   componentIds: [] as string[],
@@ -35,7 +36,7 @@ const base = {
 
 /** 20건 — AND/OR/NOT/IN/~/날짜/EMPTY/ORDER를 한 벌로 확인할 수 있게 값을 흩뿌렸다 */
 const ISSUES: Issue[] = [
-  { ...base, id: "i1", key: "ALM-1", title: "프로젝트 스캐폴드", status: "done", resolution: "done", priority: "high", assigneeId: "u1", sprintId: "s1", labels: ["infra"], updatedAt: at(2026, 9, 5) },
+  { ...base, id: "i1", key: "ALM-1", title: "프로젝트 스캐폴드", status: "done", resolution: "done", resolvedAt: at(2026, 9, 5), priority: "high", assigneeId: "u1", sprintId: "s1", labels: ["infra"], updatedAt: at(2026, 9, 5) },
   { ...base, id: "i2", key: "ALM-2", title: "칸반 보드 UI", description: "<p>결제 화면과 함께 본다</p>", status: "inprogress", priority: "high", assigneeId: "u2", sprintId: "s1", labels: ["frontend", "design"], dueDate: "2026-09-08", type: "story", estimateHours: 8, updatedAt: at(2026, 9, 4) },
   { ...base, id: "i3", key: "ALM-3", title: "이슈 상세 모달", status: "inprogress", priority: "medium", assigneeId: "u1", sprintId: "s1", labels: ["frontend"], parentId: "i5", updatedAt: at(2026, 9, 3) },
   { ...base, id: "i4", key: "ALM-4", title: "백로그 화면", status: "review", priority: "medium", assigneeId: "u3", sprintId: "s1", dueDate: "2026-09-20", updatedAt: at(2026, 9, 2) },
@@ -44,15 +45,15 @@ const ISSUES: Issue[] = [
   { ...base, id: "i7", key: "ALM-7", title: "활동 로그", status: "todo", priority: "lowest", assigneeId: null, updatedAt: at(2026, 8, 29) },
   { ...base, id: "i8", key: "ALM-8", title: "다크 테마 점검", type: "bug", status: "todo", priority: "low", labels: ["design"], updatedAt: at(2026, 8, 28) },
   { ...base, id: "i9", key: "ALM-9", title: "로그인 버그", type: "bug", status: "inprogress", priority: "highest", assigneeId: "u1", sprintId: "s1", dueDate: "2026-09-07", updatedAt: at(2026, 8, 27) },
-  { ...base, id: "i10", key: "ALM-10", title: "검색 성능", status: "done", resolution: "wont_do", priority: "medium", assigneeId: "u3", componentIds: ["c1"], updatedAt: at(2026, 8, 26) },
+  { ...base, id: "i10", key: "ALM-10", title: "검색 성능", status: "done", resolution: "wont_do", resolvedAt: at(2026, 8, 26), priority: "medium", assigneeId: "u3", componentIds: ["c1"], updatedAt: at(2026, 8, 26) },
   { ...base, id: "i11", key: "ALM-11", title: "결제 연동", status: "todo", priority: "high", assigneeId: "u2", sprintId: "s2", fixVersionId: "v1", createdAt: at(2026, 9, 2), updatedAt: at(2026, 8, 25) },
   { ...base, id: "i12", key: "ALM-12", title: "알림 센터", status: "todo", priority: "medium", assigneeId: "u1", estimateHours: 12, updatedAt: at(2026, 8, 24) },
-  { ...base, id: "i13", key: "ALM-13", title: "보관된 옛 작업", status: "done", resolution: "done", priority: "low", archivedAt: at(2026, 8, 20), updatedAt: at(2026, 8, 20) },
+  { ...base, id: "i13", key: "ALM-13", title: "보관된 옛 작업", status: "done", resolution: "done", resolvedAt: at(2026, 8, 20), priority: "low", archivedAt: at(2026, 8, 20), updatedAt: at(2026, 8, 20) },
   { ...base, id: "i14", key: "ALM-14", title: "CSV 내보내기", type: "subtask", status: "todo", priority: "low", parentId: "i3", updatedAt: at(2026, 8, 19) },
   { ...base, id: "i15", key: "WIKI-1", title: "위키 트리", projectId: "p2", status: "inprogress", priority: "high", assigneeId: "u1", labels: ["frontend"], updatedAt: at(2026, 8, 18) },
   { ...base, id: "i16", key: "WIKI-2", title: "위키 첨부", projectId: "p2", status: "todo", priority: "medium", assigneeId: "u3", updatedAt: at(2026, 8, 17) },
   { ...base, id: "i17", key: "WIKI-3", title: "위키 검색", projectId: "p2", type: "story", status: "review", priority: "high", labels: ["backend", "api v2"], updatedAt: at(2026, 8, 16) },
-  { ...base, id: "i18", key: "WIKI-4", title: "권한 모델", projectId: "p2", status: "done", resolution: "done", priority: "highest", assigneeId: "u2", updatedAt: at(2026, 8, 15) },
+  { ...base, id: "i18", key: "WIKI-4", title: "권한 모델", projectId: "p2", status: "done", resolution: "done", resolvedAt: at(2026, 8, 15), priority: "highest", assigneeId: "u2", updatedAt: at(2026, 8, 15) },
   { ...base, id: "i19", key: "WIKI-5", title: "결제 문서", projectId: "p2", status: "todo", priority: "lowest", dueDate: "2026-09-30", updatedAt: at(2026, 8, 14) },
   { ...base, id: "i20", key: "WIKI-6", title: "다국어", projectId: "p2", type: "bug", status: "todo", priority: "low", assigneeId: "u1", labels: ["design"], updatedAt: at(2026, 8, 13) },
 ];
@@ -178,6 +179,31 @@ describe("AQL 실행 — 필드·연산자", () => {
     ]);
     expect(keys("resolution IS NOT EMPTY")).toEqual(["ALM-1", "ALM-10", "WIKI-4"]);
     expect(keys("assignee IS EMPTY AND project = WIKI")).toEqual(["WIKI-3", "WIKI-5"]);
+  });
+
+  // 해결일(`resolvedAt`)은 근사치가 아니라 저장된 값이다 — 수정일과 갈라져도 그대로 답한다
+  it("해결일 비교는 해결된 이슈만 본다", () => {
+    // ALM-1 = 09-05 해결, ALM-10 = 08-26, WIKI-4 = 08-15 (ALM-13은 보관이라 기본 제외)
+    expect(keys("resolved >= -7d")).toEqual(["ALM-1"]);
+    expect(keys("resolved < 2026-08-20")).toEqual(["WIKI-4"]);
+  });
+
+  it("해결일 IS EMPTY는 아직 해결되지 않은 이슈다", () => {
+    expect(keys("resolved IS NOT EMPTY")).toEqual(["ALM-1", "ALM-10", "WIKI-4"]);
+    const open = keys("resolved IS EMPTY");
+    expect(open).toHaveLength(16);
+    expect(open).not.toContain("ALM-1");
+    // 보관 이슈(ALM-13)는 해결됐지만 기본 제외라 어느 쪽에도 없다
+    expect(keys("resolved IS NOT EMPTY AND archived = true")).toEqual(["ALM-13"]);
+  });
+
+  it("해결일로 정렬한다 — 최근 해결 순", () => {
+    expect(keys("resolved IS NOT EMPTY ORDER BY resolved DESC")).toEqual([
+      "ALM-1", "ALM-10", "WIKI-4",
+    ]);
+    expect(keys("resolved IS NOT EMPTY ORDER BY resolved ASC")).toEqual([
+      "WIKI-4", "ALM-10", "ALM-1",
+    ]);
   });
 
   it("우선순위 비교는 중요도 순 (>= high는 high 이상)", () => {

@@ -3,6 +3,8 @@ import * as rest from "./jiraApi";
 import * as mock from "./jiraMock";
 import {
   DEMO_SEED_COUNTS,
+  DEMO_SEED_STEPS,
+  DEMO_SEED_STEP_LABELS,
   SAMPLE_DATA_API_FUNCTIONS,
   type AllSampleDataApiFunctionsListed,
   type SampleDataApi,
@@ -33,6 +35,31 @@ async function createDemo() {
 }
 
 describe("데모 프로젝트 템플릿 시더", () => {
+  it("진행 알림이 12단계를 순서대로, 마지막에 12/12로 준다", async () => {
+    const seen: [number, number, string][] = [];
+    await createProject(
+      { key: "PROG", name: "진행 표시", templateId: "demo" },
+      { onProgress: (done, total, label) => seen.push([done, total, label]) },
+    );
+
+    expect(seen).toHaveLength(DEMO_SEED_STEPS);
+    expect(seen.map(([, , label]) => label)).toEqual([...DEMO_SEED_STEP_LABELS]);
+    // done은 1부터 total까지 한 칸씩 — 화면 진행바가 뒤로 가거나 건너뛰지 않는다
+    expect(seen.map(([done]) => done)).toEqual(
+      Array.from({ length: DEMO_SEED_STEPS }, (_, i) => i + 1),
+    );
+    expect(seen.every(([, total]) => total === DEMO_SEED_STEPS)).toBe(true);
+  });
+
+  it("데모가 아닌 템플릿에서는 진행 알림이 불리지 않는다", async () => {
+    const seen: string[] = [];
+    await createProject(
+      { key: "BLANK", name: "빈 프로젝트", templateId: "blank" },
+      { onProgress: (_done, _total, label) => seen.push(label) },
+    );
+    expect(seen).toEqual([]);
+  });
+
   it("이슈·스프린트·릴리스·컴포넌트·코멘트를 한 번에 채운다", async () => {
     const project = await createDemo();
     const issues = await listIssues(project.id);

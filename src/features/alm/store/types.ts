@@ -256,6 +256,11 @@ export interface Issue {
   estimateHours: number | null;
   /** 완료 카테고리일 때만 non-null. 완료로 들어가면 "done"이 기본값, 벗어나면 null */
   resolution: IssueResolution | null;
+  /**
+   * 해결 시각 — `resolution`이 null→non-null이 되는 순간 찍히고, 다시 null이 되면 지워진다.
+   * AQL `resolved`(해결일)가 읽는 값이다. 직접 대입하지 말고 해결을 바꾸는 한 경로만 쓴다.
+   */
+  resolvedAt: string | null;
   /** 수정 버전(fix version). null = 미지정 */
   fixVersionId: string | null;
   /** 보관 시각 — 보관함 목록에서만 값이 있다(활성 이슈는 null/없음) */

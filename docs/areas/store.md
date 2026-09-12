@@ -24,6 +24,11 @@ REST에 아직 없는 함수는 목업으로 떨어진다(혼합 모드). 코멘
 - `load()` → `normalize()`가 구버전 데이터에 새 필드를 `??=`로 승격한다. **새 필드를 추가하면
   반드시 normalize에도 기본값을 추가**할 것.
 - uiStore 변경은 `UI_CHANGED_EVENT`를 window에 발행 — 사이드바 등이 구독한다.
+  **저장 필터는 uiStore에 저장되지만 화면이 직접 부르지 않는다** — `jiraStore`의
+  `listSavedFilters`/`createSavedFilter`/`updateSavedFilter`/`deleteSavedFilter` 파사드를 거친다
+  (REST는 `/api/alm/me/filters`). REST 쪽 쓰기도 같은 이벤트를 직접 발행해 사이드바 동작이 두 모드에서 같다.
+- 해결 시각(`Issue.resolvedAt`)은 `setResolution()` **한 곳**에서만 바뀐다 — 해결을 대입하는 새 경로를
+  만들지 말고 그 함수를 부를 것(AQL `resolved`가 이 값을 읽는다).
 - 이슈 키(`ALM-7`)는 `issueCounters`로 발번하며 삭제 시 감소시키지 않는다(지라식 키 불변).
 
 ## 연쇄 규칙 (삭제/변경 시 같이 정리해야 하는 것)

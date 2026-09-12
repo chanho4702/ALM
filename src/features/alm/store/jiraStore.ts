@@ -11,6 +11,7 @@
 import * as mock from "./jiraMock";
 import * as rest from "./jiraApi";
 
+export type { SavedFilter, SavedFilterInput } from "./uiStore";
 export type { ProjectPatch,
   ProjectMemberView,
   VersionInput,
@@ -182,6 +183,14 @@ export const createDashboard = impl.createDashboard;
 export const updateDashboard = impl.updateDashboard;
 export const deleteDashboard = impl.deleteDashboard;
 export const listProjectWorklogs = impl.listProjectWorklogs;
+/**
+ * 저장 필터 — 목업은 localStorage(`alm.jira.ui.v1`), REST는 `/api/alm/me/filters`(본인 소유만).
+ * 화면(사이드바·검색)은 uiStore를 직접 만지지 않고 이 넷만 쓴다.
+ */
+export const listSavedFilters = impl.listSavedFilters;
+export const createSavedFilter = impl.createSavedFilter;
+export const updateSavedFilter = impl.updateSavedFilter;
+export const deleteSavedFilter = impl.deleteSavedFilter;
 /** AQL — 목업은 `store/aql/evaluate.ts`로 메모리 이슈에, REST는 `POST /api/alm/issues/query`로 실행한다 */
 export const queryIssuesAql = impl.queryIssuesAql;
 export const validateAql = impl.validateAql;

@@ -279,6 +279,27 @@ describe("AQL 모드 — 저장 필터와 전역 검색", () => {
     expect(await screen.findByText("ALM-8")).toBeInTheDocument();
   });
 
+  it("저장하려는 AQL이 틀리면 토스트가 아니라 에디터 밑줄로 돌려보낸다", async () => {
+    const user = userEvent.setup();
+    // 실행에서 이미 400인 질의 — 저장도 서버가 같은 계약(`{error, position, expected}`)으로 막는다
+    renderSearch(aqlPath("statuss = done"));
+    expect(await screen.findByTestId("aql-error")).toHaveTextContent("필드를 모릅니다: statuss");
+
+    await user.click(screen.getByRole("button", { name: "필터로 저장" }));
+    const dialog = await screen.findByRole("dialog", { name: "필터로 저장" });
+    await user.type(within(dialog).getByLabelText("필터 이름"), "틀린 필터");
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    // 고칠 곳은 질의라 대화상자를 닫고 밑줄 자리로 보낸다 — "필터 저장 실패" 토스트는 뜨지 않는다
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "필터로 저장" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("aql-error")).toHaveTextContent("필드를 모릅니다: statuss");
+    expect(screen.queryByText("필터 저장 실패")).not.toBeInTheDocument();
+    // 저장되지 않았으므로 사이드바 필터 섹션도 생기지 않는다
+    expect(within(globalNav()).queryByTestId("nav-filters")).not.toBeInTheDocument();
+  });
+
   it("전역 검색 입력이 AQL로 보이면 'AQL로 검색'이 뜬다", async () => {
     const user = userEvent.setup();
     renderSearch("/home");

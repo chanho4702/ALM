@@ -56,6 +56,34 @@ describe("해결(Resolution)", () => {
     expect(moved.resolution).toBe("duplicate");
   });
 
+  it("해결 시각은 해결이 생길 때 찍히고 풀리면 지워진다 (AQL resolved의 원천)", async () => {
+    const open = await getIssueByKey("ALM-5"); // 할 일 — 아직 해결 없음
+    expect(open!.resolvedAt).toBeNull();
+
+    const done = await updateIssue(open!.id, { status: "done" });
+    expect(done.resolution).toBe("done");
+    expect(done.resolvedAt).not.toBeNull();
+    const firstResolvedAt = done.resolvedAt!;
+
+    // 해결 값만 바꾸는 것은 "다시 해결"이 아니다 — 처음 해결한 시각을 지킨다
+    const changed = await updateIssue(open!.id, { resolution: "duplicate" });
+    expect(changed.resolvedAt).toBe(firstResolvedAt);
+
+    const reopened = await updateIssue(open!.id, { status: "inprogress" });
+    expect(reopened.resolution).toBeNull();
+    expect(reopened.resolvedAt).toBeNull();
+
+    const again = await updateIssue(open!.id, { status: "done" });
+    expect(again.resolvedAt).not.toBeNull();
+  });
+
+  it("해결 시각 도입 전 데이터는 마지막 수정 시각으로 백필된다", async () => {
+    // 시드는 resolvedAt 없이 들어오고 normalize가 채운다 (서버 V23 백필과 같은 규칙)
+    const seeded = await getIssueByKey("ALM-1");
+    expect(seeded!.resolution).toBe("done");
+    expect(seeded!.resolvedAt).toBe(seeded!.updatedAt);
+  });
+
   it("보드 드래그로 완료 컬럼에 놓아도 같은 규칙이 적용된다", async () => {
     const issue = await getIssueByKey("ALM-2"); // 진행 중
 

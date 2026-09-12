@@ -124,8 +124,8 @@ export const AQL_FIELDS: AqlFieldDef[] = [
   f("created", ["생성일"], "DATE", DATE_OPS, true, false),
   f("updated", ["수정일"], "DATE", DATE_OPS, true, false),
   f("due", ["마감일"], "DATE", DATE_OPS, true, true),
-  // 해결 시각을 저장하는 컬럼이 아직 없다 — 있는 척하고 다른 값으로 답하지 않는다(서버와 같은 거절)
-  f("resolved", ["해결일"], "DATE", DATE_OPS, false, false, false),
+  // 해결이 처음 설정된 순간(`Issue.resolvedAt`). 아직 해결되지 않았으면 비어 있다
+  f("resolved", ["해결일"], "DATE", DATE_OPS, true, true),
   f("estimate", ["예상시간"], "NUMBER", NUMBER_OPS, true, true),
   f("text", ["텍스트", "내용"], "TEXT", MATCH_ONLY, false, false),
   f("summary", ["요약", "제목"], "TEXT", TEXT_OPS, true, false),

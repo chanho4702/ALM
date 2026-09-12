@@ -108,6 +108,39 @@ describe("프로젝트 템플릿", () => {
     expect(within(grid).getByText("Sprint 1")).toBeInTheDocument();
   });
 
+  it("데모 템플릿은 진행바로 단계를 보여 주고, 만드는 동안 버튼을 잠근다", async () => {
+    const user = userEvent.setup();
+    renderCreate();
+    const grid = await screen.findByTestId("template-grid");
+
+    await user.click(within(grid).getByRole("radio", { name: /데모 프로젝트/ }));
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    await user.type(await screen.findByLabelText("이름 *"), "데모 진행");
+    await user.type(screen.getByLabelText("키 *"), "DEMO");
+
+    const submit = screen.getByRole("button", { name: "프로젝트 만들기" });
+    await user.click(submit);
+
+    // 시더가 도는 동안은 진행이 보이고 다시 누를 수 없다 — 두 번 누르면 데모가 두 벌 생긴다
+    const progress = await screen.findByTestId("demo-seed-progress");
+    const bar = within(progress).getByRole("progressbar", { name: "데모 데이터 생성 진행률" });
+    expect(submit).toBeDisabled();
+
+    // 값은 뒤로 가지 않고 올라간다(12단계라 한 번에 100으로 뛰지 않는다)
+    const valueOf = () => Number(bar.getAttribute("aria-valuenow") ?? "0");
+    const first = valueOf();
+    await waitFor(() => expect(valueOf()).toBeGreaterThan(first));
+
+    // 다 끝나면 진행 표시가 사라지고 완료를 알린 뒤 보드로 간다
+    expect(await screen.findByText("데모 데이터를 모두 채웠습니다")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("demo-seed-progress")).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("location").textContent).toMatch(/\/projects\/.+\/boards\/.+/);
+    });
+  });
+
   it("스크럼 템플릿으로 만들면 스프린트 보드로 이동하고 백로그에 샘플 이슈가 있다", async () => {
     const user = userEvent.setup();
     renderCreate();

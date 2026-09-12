@@ -52,6 +52,8 @@ export interface IssueDto {
   dueDate?: string | null;
   estimateHours?: number | null;
   resolution?: IssueResolutionDto | null;
+  /** 서버 V23부터 — resolution이 처음 붙은 순간(ISO-8601 UTC). 사유만 바꾸면 불변, 해제하면 null */
+  resolvedAt?: string | null;
   fixVersionId?: number | null;
   labels?: string[] | null;
   componentIds?: number[] | null;
@@ -263,6 +265,8 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     dueDate: dto.dueDate ?? null,
     estimateHours: dto.estimateHours ?? null,
     resolution: dto.resolution ? RESOLUTIONS_FROM_API[dto.resolution] : null,
+    // 옛 응답(V23 이전)에는 없다 — 없으면 "해결일 모름"으로 null이고, 화면은 그 줄을 감춘다
+    resolvedAt: dto.resolvedAt ?? null,
     fixVersionId: dto.fixVersionId == null ? null : String(dto.fixVersionId),
     archivedAt: dto.archivedAt ?? null,
     labels: dto.labels ? [...dto.labels] : [],

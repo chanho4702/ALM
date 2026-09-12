@@ -16,7 +16,8 @@
 | 한국어 스마트 검색 | `/search` | JQL 대신 `상태:진행중 담당:김찬호 버그` — 칩 빌더와 양방향, 못 알아듣는 입력은 검색어로 보존 |
 | AQL (ALM Query Language) | `/search?aql=…` | JQL 문법 + 한국어 필드 별칭(`상태 = 완료`) — 자동완성·실시간 오류 밑줄, 기본 모드와 양방향 번역 |
 | 필터 URL 공유 | `/search?q=…` | 검색 상태 전체가 읽을 수 있는 URL — 링크가 곧 필터 |
-| 저장 필터 사이드바 상주 | 전역 사이드바 "필터" | 저장 즉시 노출, 원클릭 적용, hover × 삭제 |
+| 저장 필터 사이드바 상주 | 전역 사이드바 "필터" | 저장 즉시 노출, 원클릭 적용, hover × 삭제. 서버 저장(`/api/alm/me/filters`, 본인 소유만) — 기기를 옮겨도 따라온다 |
+| 해결일로 거슬러 찾기 | AQL `resolved` | "언제 끝났나"를 수정일로 어림잡지 않는다 — 해결이 붙는 순간을 저장해 `resolved >= -7d`·`ORDER BY resolved DESC`가 선다 |
 | 정직한 템플릿 미리보기 | `/projects/new` | 카드 미리보기 데이터 = 실제 적용 로직과 같은 파일 |
 | 샘플 온보딩 | 생성 템플릿 | 첫 화면이 비지 않게 삭제 가능한 더미 이슈 자동 세팅 |
 | 단순한 시간 추적 | 이슈 상세 | 지라 3값 대신 예상+기록 2값 — 진행률 바 하나, 초과는 danger |
@@ -137,7 +138,7 @@ CI는 design-system을 매번 체크아웃해 최신 버전으로 tarball을 만
 
 ## 품질 상태
 
-- 테스트 **763 케이스 / 87 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
+- 테스트 **799 케이스 / 91 파일** — 스토어 단위 + REST 계약 + Testing Library 통합(App 전체 마운트)
 - 플레이키 대책: vitest `testTimeout` 15s, RTL `asyncUtilTimeout` 5s (병렬 워커 경합 대응)
 - `pnpm typecheck` / `pnpm build` 통과. dev는 `pnpm dev --port 5175 --strictPort`
 

@@ -231,10 +231,16 @@ describe("AQL 검증 — 필드·연산자·정렬 (해석 단계)", () => {
     });
   });
 
-  it("해결일은 아직 없는 필드다 — 다른 값으로 대신 답하지 않는다", () => {
-    expect(failure("resolved >= -7d")).toEqual({
-      message: "아직 지원하지 않는 필드입니다: resolved",
-      position: 0,
+  it("해결일은 날짜 필드다 — 비교·EMPTY·정렬이 모두 선다", () => {
+    expect(validate("resolved >= -7d")).toEqual({ ok: true, fields: ["resolved"] });
+    expect(validate("해결일 IS EMPTY ORDER BY resolved DESC")).toEqual({
+      ok: true,
+      fields: ["resolved"],
+    });
+    // 날짜 필드라 포함 연산자는 여전히 거절한다
+    expect(failure("resolved ~ 어제")).toEqual({
+      message: "'~'는 텍스트 필드에만 쓸 수 있습니다 (resolved)",
+      position: 9,
     });
   });
 

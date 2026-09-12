@@ -76,7 +76,15 @@ describe("alm-backend DTO mapping", () => {
       estimateHours: 3.5,
       labels: ["security", "backend"],
       order: 9,
+      // 서버 V23 이전 응답에는 resolvedAt이 없다 — 없으면 null이고 화면은 "해결일" 줄을 감춘다
+      resolvedAt: null,
     });
+  });
+
+  it("해결 시각은 서버 값을 그대로 싣는다 (AQL resolved와 같은 원천)", () => {
+    expect(
+      mapIssue({ ...ISSUE_DTO, resolution: "DONE", resolvedAt: "2026-09-10T02:00:00Z" }),
+    ).toMatchObject({ resolution: "done", resolvedAt: "2026-09-10T02:00:00Z" });
   });
 
   it("프론트 enum을 백엔드 enum으로 바꾼다", () => {

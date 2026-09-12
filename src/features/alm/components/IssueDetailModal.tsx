@@ -881,6 +881,15 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               />
             </div>
           ) : null}
+          {/* 해결일은 서버가 찍는 읽기 전용 값 — 해결된 이슈에만 줄이 선다(없으면 아예 감춘다) */}
+          {issue.resolvedAt ? (
+            <div className="alm-field">
+              <FieldLabel field="resolved" ariaHidden={false}>
+                해결일
+              </FieldLabel>
+              <span className="alm-field-readonly">{formatDateTime(issue.resolvedAt)}</span>
+            </div>
+          ) : null}
           {issue && fields.parent.visible ? (
             <div className="alm-field">
               <FieldLabel field="parent">상위 항목</FieldLabel>
