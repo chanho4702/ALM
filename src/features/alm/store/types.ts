@@ -658,4 +658,14 @@ export interface OrgProfile {
   joinedVia: string | null;
 }
 
+/**
+ * agent-service `GET /api/agent/personas` 항목 — "꺼지지 않는 개발팀" 페르소나 하나.
+ * ALM은 이름·개수만 안다: 배열이 비어 있지 않으면 AI 기능이 활성인 플랫폼이다
+ * (agent-service가 없는 배포는 404/5xx로 답하거나 아예 응답하지 않는다 — 빈 배열과 동일 취급).
+ */
+export interface AgentPersona {
+  id: string;
+  name: string;
+}
+
 export type OrgMemberStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";

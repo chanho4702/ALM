@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
+import * as store from "../store/jiraStore";
 import { __resetForTest } from "../store/jiraStore";
+import { __resetAiTeamActiveForTest } from "./useAiTeamActive";
 
 function LocationProbe() {
   const location = useLocation();
@@ -13,13 +15,27 @@ function LocationProbe() {
 
 const realLocationDescriptor = Object.getOwnPropertyDescriptor(window, "location")!;
 
+async function renderApp() {
+  render(
+    <ToastProvider>
+      <MemoryRouter initialEntries={["/projects"]}>
+        <App />
+        <LocationProbe />
+      </MemoryRouter>
+    </ToastProvider>,
+  );
+  await screen.findByRole("table", { name: "프로젝트 목록" });
+}
+
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
+  __resetAiTeamActiveForTest();
 });
 
 afterEach(() => {
   Object.defineProperty(window, "location", realLocationDescriptor);
+  vi.restoreAllMocks();
 });
 
 describe("⚙ 설정 메뉴 (지라 설정 드롭다운 구조)", () => {
@@ -78,5 +94,31 @@ describe("⚙ 설정 메뉴 (지라 설정 드롭다운 구조)", () => {
     expect(assign).toHaveBeenCalledWith("/app/tokens");
     // 라우터는 그대로 — 전체 이동이라 SPA 경로는 바뀌지 않는다
     expect(screen.getByTestId("location")).toHaveTextContent("/projects");
+  });
+
+  it("agent-service 페르소나가 없으면(AI 기능 비활성) 'AI 팀 가이드' 항목이 보이지 않는다", async () => {
+    const spy = vi.spyOn(store, "fetchAgentPersonas").mockResolvedValue([]);
+    const user = userEvent.setup();
+    await renderApp();
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await user.click(screen.getByRole("button", { name: "설정" }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).queryByRole("menuitem", { name: /AI 팀 가이드/ })).not.toBeInTheDocument();
+  });
+
+  it("agent-service 페르소나가 있으면(AI 기능 활성) 'AI 팀 가이드'가 위키 가이드 페이지를 새 탭으로 연다", async () => {
+    vi.spyOn(store, "fetchAgentPersonas").mockResolvedValue([{ id: "p1", name: "가이드" }]);
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+    const user = userEvent.setup();
+    await renderApp();
+    await user.click(screen.getByRole("button", { name: "설정" }));
+    const menu = await screen.findByRole("menu");
+    const guide = await within(menu).findByRole("menuitem", { name: /AI 팀 가이드/ });
+    expect(guide).toHaveTextContent("꺼지지 않는 개발팀");
+    await user.click(guide);
+    expect(openSpy).toHaveBeenCalledWith("/wiki/spaces/5/pages/47", "_blank", "noopener,noreferrer");
   });
 });

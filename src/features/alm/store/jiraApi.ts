@@ -36,6 +36,7 @@ import type {
   ProjectVersion,
   Sprint,
   Notification,
+  AgentPersona,
   AuditEntry,
   SystemStats,
   SettingsBody,
@@ -938,6 +939,22 @@ export async function listAuditLog(
 
 export async function systemStats(): Promise<SystemStats> {
   return (await json(await sharedApiFetch("/api/alm/admin/stats"))) as SystemStats;
+}
+
+/**
+ * agent-service 페르소나 목록 — "AI 팀 가이드" 진입점의 활성 판정에만 쓴다.
+ * agent-service가 없는 배포(401/403/404/5xx)나 네트워크 오류는 모두 "비활성"으로 접는다 —
+ * 이 기능이 없다고 화면에 오류를 띄우거나 콘솔에 로그를 남기면 안 된다(그레이스풀 디그레이드).
+ */
+export async function fetchAgentPersonas(): Promise<AgentPersona[]> {
+  try {
+    const res = await sharedApiFetch("/api/agent/personas");
+    if (!res.ok) return [];
+    const body: unknown = await res.json().catch(() => null);
+    return Array.isArray(body) ? (body as AgentPersona[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 // ── 설정 — 서버 V11(레지스트리·스킴·프로젝트 설정). 목업 스토어와 같은 시그니처 ──

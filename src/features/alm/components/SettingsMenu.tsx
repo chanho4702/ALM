@@ -1,5 +1,6 @@
 import {
   Bell,
+  Bot,
   FolderKanban,
   KeyRound,
   ListChecks,
@@ -13,6 +14,11 @@ import { Button, Dropdown } from "@chanho/react";
 import type { DropdownItem } from "@chanho/react";
 import { useOrgProfile } from "./OrgAccountGate";
 import { ORG_ADMIN_BASE } from "./SettingsSideNav";
+import { useAiTeamActive } from "./useAiTeamActive";
+
+// 위키 스페이스 5, 페이지 47 — "꺼지지 않는 개발팀"(agent-service) 가이드 페이지.
+// 같은 오리진에서 nginx가 두 앱을 함께 서빙하므로 절대 경로 하나로 충분하다.
+const AI_TEAM_GUIDE_URL = "/wiki/spaces/5/pages/47";
 
 /**
  * 상단바 ⚙ 메뉴 — 지라의 설정 드롭다운과 같은 구조: 그룹 제목 아래 "아이콘 · 이름 · 설명" 항목.
@@ -24,6 +30,17 @@ import { ORG_ADMIN_BASE } from "./SettingsSideNav";
 export function SettingsMenu() {
   const navigate = useNavigate();
   const { isGlobalAdmin } = useOrgProfile();
+  const aiTeamActive = useAiTeamActive();
+  const aiTeamItems: DropdownItem[] = aiTeamActive
+    ? [
+        {
+          label: "AI 팀 가이드",
+          description: "꺼지지 않는 개발팀(에이전트) 사용법을 위키에서 확인합니다",
+          icon: <Bot size={16} />,
+          onSelect: () => window.open(AI_TEAM_GUIDE_URL, "_blank", "noopener,noreferrer"),
+        },
+      ]
+    : [];
   const adminItems: DropdownItem[] = isGlobalAdmin
     ? [
         { separator: true },
@@ -92,6 +109,7 @@ export function SettingsMenu() {
           icon: <KeyRound size={16} />,
           onSelect: () => window.location.assign("/app/tokens"),
         },
+        ...aiTeamItems,
         ...adminItems,
       ]}
     />

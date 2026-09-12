@@ -83,6 +83,7 @@ export const rankIssue = impl.rankIssue;
 export const importIssues = impl.importIssues;
 export const listAuditLog = impl.listAuditLog;
 export const systemStats = impl.systemStats;
+export const fetchAgentPersonas = impl.fetchAgentPersonas;
 export const listIssuesPage = impl.listIssuesPage;
 export const listWatchers = impl.listWatchers;
 export const watchIssue = impl.watchIssue;

@@ -30,6 +30,7 @@ import type {
   StatusDef,
   StatusKind,
   WorkflowStatus,
+  AgentPersona,
   AuditEntry,
   SystemStats,
   IssueTypeDef,
@@ -2323,6 +2324,14 @@ export async function systemStats(): Promise<SystemStats> {
     attachmentBytes: data.attachments.reduce((sum, a) => sum + a.sizeBytes, 0),
     auditEntries: data.activities.length + data.projects.length,
   };
+}
+
+/**
+ * 목업 모드는 agent-service가 없다. 항상 페르소나 하나를 돌려줘 "AI 팀 가이드" 진입점을
+ * 목업 개발에서도 볼 수 있게 한다(불변 규칙: 목업 개발자는 모든 화면을 봐야 한다).
+ */
+export async function fetchAgentPersonas(): Promise<AgentPersona[]> {
+  return [{ id: "mock-persona", name: "가이드 에이전트" }];
 }
 
 // ── 페이징 ───────────────────────────────────────────────────
