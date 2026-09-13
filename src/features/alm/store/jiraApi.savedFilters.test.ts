@@ -242,3 +242,74 @@ describe("jiraApi 저장 필터 (/api/alm/me/filters)", () => {
     expect(spy.mock.calls.every(([, init]) => init?.method === undefined)).toBe(true);
   });
 });
+
+/**
+ * 이관 실패 분류 — 서버 계약상 영구 거절은 400·409뿐이다. 그 밖의 상태에서 로컬을 비우면
+ * 세션 만료·스로틀 한 번에 사용자의 저장 필터가 통째로 사라진다(2026-09-13 이전 결함).
+ */
+describe("jiraApi 저장 필터 이관 — 재시도 분류", () => {
+  /** GET은 서버 목록을 주고 POST만 주어진 상태로 거절하는 서버 */
+  function rejectingServer(status: number, body: unknown = { error: "거절" }) {
+    return fetchSpy((_path, init) => (init?.method === "POST" ? response(status, body) : response(200, [])));
+  }
+
+  it.each([
+    [401, "세션 만료(refresh 실패)"],
+    [403, "권한 없음·승인 대기"],
+    [404, "옛 배포에 라우트 없음"],
+    [408, "요청 시간 초과"],
+    [429, "스로틀"],
+    [502, "게이트웨이 오류"],
+  ])("POST %i(%s)는 로컬을 남겨 다음 조회에서 다시 시도한다", async (status) => {
+    await createLocalFilter({ name: "지켜야 할 필터", query: "타입:버그" });
+    rejectingServer(status);
+
+    const rows = await listSavedFilters();
+
+    expect(rows).toEqual([]);
+    expect(localSavedFilters().map((f) => f.name)).toEqual(["지켜야 할 필터"]);
+  });
+
+  it.each([
+    [400, { error: "필터 이름은 60자 이하여야 합니다" }],
+    [409, { error: "같은 이름의 필터가 있습니다" }],
+  ])("POST %i는 영구 거절 — 그 필터만 버리고 로컬을 비운다", async (status, body) => {
+    await createLocalFilter({ name: "서버가 거절하는 필터", query: "타입:버그" });
+    rejectingServer(status, body);
+
+    await listSavedFilters();
+
+    expect(localSavedFilters()).toEqual([]);
+  });
+
+  it("상태를 모르는 실패(네트워크 끊김)도 로컬을 남긴다", async () => {
+    await createLocalFilter({ name: "네트워크 실패", query: "a" });
+    vi.spyOn(client, "sharedApiFetch").mockImplementation((_path, init) =>
+      init?.method === "POST" ? Promise.reject(new TypeError("Failed to fetch")) : Promise.resolve(response(200, [])),
+    );
+
+    await listSavedFilters();
+
+    expect(localSavedFilters().map((f) => f.name)).toEqual(["네트워크 실패"]);
+  });
+
+  it("스로틀에 걸려 미뤄진 이관은 다음 조회에서 성공하고 그때 로컬을 비운다", async () => {
+    await createLocalFilter({ name: "나중에 옮길 필터", query: "타입:버그" });
+    const throttled = rejectingServer(429, { error: "잠시 후 다시 시도하세요" });
+    expect(await listSavedFilters()).toEqual([]);
+    expect(localSavedFilters()).toHaveLength(1);
+    throttled.mockRestore();
+
+    // 두 번째 조회: 서버가 받는다 — 옮긴 행이 목록에 합쳐지고 로컬은 비워진다
+    fetchSpy((_path, init) =>
+      init?.method === "POST"
+        ? response(201, { ...ROW, id: 9, name: "나중에 옮길 필터", query: "타입:버그" })
+        : response(200, []),
+    );
+
+    const rows = await listSavedFilters();
+
+    expect(rows).toEqual([{ id: "9", name: "나중에 옮길 필터", query: "타입:버그", kind: "smart" }]);
+    expect(localSavedFilters()).toEqual([]);
+  });
+});

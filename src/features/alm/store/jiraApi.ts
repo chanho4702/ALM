@@ -2247,10 +2247,18 @@ async function savedFilterWrite(path: string, init: RequestInit): Promise<SavedF
   throw Object.assign(failure, { status: response.status });
 }
 
-/** 다시 보내도 같은 답이 올 오류인가 — 4xx. 상태를 모르면(네트워크 끊김 등) 아니다 */
-function isClientError(error: unknown): boolean {
+/**
+ * 서버 계약(alm-backend `SavedFilterController` + common-starter 예외 매핑)에서 "다시 보내도 같은 답"인
+ * 거절만 — **400**(이름·질의 검증, AQL 문법, 본문 형식)과 **409**(같은 이름의 필터). 이 둘만 그 필터를 버린다.
+ *
+ * 나머지는 전부 재시도 대상이다: 401·403은 세션·권한이 바뀌면 통과하고, 404는 옛 배포에 라우트가
+ * 없는 것이며, 408·425·429는 스로틀, 5xx·네트워크·상태 없음은 서버 사정이다. 2026-09-13 이전에는
+ * 4xx 전부를 영구 실패로 봐서 세션 만료 한 번에 로컬 필터를 통째로 비웠다.
+ */
+const PERMANENT_REJECTION_STATUSES: ReadonlySet<number> = new Set([400, 409]);
+function isPermanentRejection(error: unknown): boolean {
   const status = (error as { status?: unknown } | null)?.status;
-  return typeof status === "number" && status >= 400 && status < 500;
+  return typeof status === "number" && PERMANENT_REJECTION_STATUSES.has(status);
 }
 
 /**
@@ -2258,10 +2266,11 @@ function isClientError(error: unknown): boolean {
  * 아니라 비워진 로컬 키다 — 다 처리하면 키를 비우므로 다음 조회는 아무 일도 하지 않는다.
  *
  * 실패를 두 갈래로 가른다.
- * - **4xx**: 그 필터 자체가 서버 규칙에 안 맞는다(옛 `saveFilter`가 막지 않던 빈 질의, 61자 이름,
+ * - **400·409**: 그 필터 자체가 서버 규칙에 안 맞는다(옛 `saveFilter`가 막지 않던 빈 질의, 61자 이름,
  *   경합으로 생긴 중복 이름). 다시 보내도 같은 답이라 **그 한 건만 버리고** 넘어간다 —
  *   남겨 두면 나쁜 필터 하나가 목록 조회를 영원히 막는다.
- * - **5xx·네트워크**: 지금 서버가 문제다. 로컬을 남겨 다음 조회에서 다시 시도한다.
+ * - **그 외 전부(401·403·404·429·5xx·네트워크·모르는 상태)**: 지금은 안 되지만 필터 탓이 아니다.
+ *   로컬을 남겨 다음 조회에서 다시 시도한다.
  */
 async function migrateLocalSavedFilters(server: SavedFilter[]): Promise<SavedFilter[]> {
   const local = localSavedFilters();
@@ -2277,7 +2286,7 @@ async function migrateLocalSavedFilters(server: SavedFilter[]): Promise<SavedFil
         await postSavedFilter({ name: filter.name, query: filter.query, kind: filter.kind }),
       );
     } catch (error) {
-      if (!isClientError(error)) {
+      if (!isPermanentRejection(error)) {
         retryLater = true;
         break;
       }
