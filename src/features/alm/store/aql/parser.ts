@@ -12,7 +12,7 @@
  * and     := term ("AND" term)*          -- AND가 OR보다 강하게 묶인다
  * term    := "NOT" term | "(" clause ")" | cond
  * cond    := field op value
- *          | field ("IN" | "NOT" "IN") "(" value ("," value)* ")"
+ *          | field ("IN" | "NOT" "IN") ( "(" value ("," value)* ")" | function )
  *          | field ("IS" | "IS" "NOT") "EMPTY"
  * value   := string | number | ident | ident "(" arg? ("," arg)* ")"
  * order   := field ("ASC" | "DESC")?
@@ -211,6 +211,13 @@ class Parser {
 
   private valueList(): AqlValue[] {
     if (this.peek().type !== "lparen") {
+      // JQL 관례 — 목록을 돌려주는 함수는 괄호 목록 없이 바로 온다: sprint IN openSprints()
+      const token = this.peek();
+      if (token.type === "ident" && this.peek(1).type === "lparen") {
+        const single = this.value();
+        if (single.type === "function") return [single];
+        throw new AqlError("여는 괄호가 필요합니다", token.position, ["("]);
+      }
       throw new AqlError("여는 괄호가 필요합니다", this.peek().position, ["("]);
     }
     this.next();

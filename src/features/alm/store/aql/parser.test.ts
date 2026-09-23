@@ -46,6 +46,15 @@ describe("AQL 파서 — §6 벡터 (서버 AqlParserTest와 글자까지 같다
     );
   });
 
+  it("IN 뒤에는 괄호 목록 대신 함수 하나가 올 수 있다 — sprint IN openSprints()", () => {
+    expect(ast("sprint IN openSprints()")).toBe(
+      '{"where":{"kind":"in","field":"sprint","negated":false,"values":[' +
+        '{"type":"function","name":"openSprints","args":[]}]},"orderBy":[]}',
+    );
+    // 함수가 아니면 여전히 괄호 목록이 필요하다
+    expect(() => parseAql("sprint IN backend")).toThrow("여는 괄호가 필요합니다");
+  });
+
   it("벡터4 IS EMPTY와 부등", () => {
     expect(ast("sprint IS EMPTY AND statusCategory != complete")).toBe(
       '{"where":{"kind":"and","children":[' +

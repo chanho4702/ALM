@@ -226,6 +226,7 @@ describe("AQL 실행 — 필드·연산자", () => {
   it("스프린트·버전·컴포넌트는 이름으로 건다", () => {
     expect(keys('sprint = "Sprint 1"')).toEqual(["ALM-1", "ALM-2", "ALM-3", "ALM-4", "ALM-9"]);
     expect(keys("sprint = openSprints()")).toEqual(["ALM-1", "ALM-2", "ALM-3", "ALM-4", "ALM-9"]);
+    expect(keys("sprint IN openSprints()")).toEqual(["ALM-1", "ALM-2", "ALM-3", "ALM-4", "ALM-9"]);
     expect(keys("fixVersion = 1.0")).toEqual(["ALM-11"]);
     expect(keys("component = 프론트엔드")).toEqual(["ALM-10"]);
   });
