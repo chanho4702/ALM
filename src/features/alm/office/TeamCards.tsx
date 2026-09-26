@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { Button } from "@chanho/react";
 import { Clock, Coins, FileText, Inbox } from "lucide-react";
 import type { AgentOfficePersona, AgentRunSummary } from "../store/types";
-import { AgentRoleGlyph, AgentStatusLozenge } from "../components/AgentGlyphs";
+import { AGENT_RUN_TYPE_LABEL, AgentRoleGlyph, AgentStatusLozenge } from "../components/AgentGlyphs";
 import { relTime } from "../components/time";
 import { OfficePortrait } from "./PixelSprite";
 import { activityText, formatUsd, personaState } from "./officeModel";
@@ -60,8 +60,11 @@ export function TeamCards({
 
             <p className="ai-team-card-issue">
               <FileText size={14} aria-hidden />
+              {run ? <span className="ai-team-card-kind">{AGENT_RUN_TYPE_LABEL[run.type]} · </span> : null}
               {run?.issueKey ? (
                 <Link to={links.issue(run.issueKey)}>{run.issueKey}</Link>
+              ) : run ? (
+                <span className="ai-team-card-subtle">이슈 없음</span>
               ) : (
                 <span className="ai-team-card-subtle">진행 중인 작업 없음</span>
               )}

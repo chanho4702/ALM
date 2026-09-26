@@ -39,6 +39,9 @@ import type {
   AgentPersona,
   AgentOffice,
   AgentPersonaActivity,
+  AgentRunStatus,
+  AgentRunSummary,
+  AgentGate,
   AuditEntry,
   SystemStats,
   SettingsBody,
@@ -104,10 +107,16 @@ import {
 } from "./aql/fields";
 
 import {
+  mapAgentGate,
   mapAgentOffice,
+  mapAgentPersona,
   mapAgentPersonaActivity,
+  mapAgentRunSummary,
+  type AgentGateDto,
   type AgentOfficeDto,
   type AgentPersonaActivityDto,
+  type AgentPersonaDto,
+  type AgentRunSummaryDto,
 } from "./agentMapping";
 
 async function json<T>(response: Response): Promise<T> {
@@ -971,7 +980,7 @@ export async function fetchAgentPersonas(): Promise<AgentPersona[]> {
     const res = await sharedApiFetch("/api/agent/personas");
     if (!res.ok) return [];
     const body: unknown = await res.json().catch(() => null);
-    return Array.isArray(body) ? (body as AgentPersona[]) : [];
+    return Array.isArray(body) ? (body as AgentPersonaDto[]).map(mapAgentPersona) : [];
   } catch {
     return [];
   }
@@ -992,6 +1001,50 @@ export async function fetchPersonaActivity(personaId: string): Promise<AgentPers
     await json<AgentPersonaActivityDto>(
       await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}/activity`),
     ),
+  );
+}
+
+// ── run·게이트 감독(P3a AGP-12/13) — 목록은 인증 사용자, 결정·취소·재개는 ADMIN(서버가 403) ──
+// 상태 전이 거부는 409 {"error"} — `json()`이 그 문구를 그대로 Error로 올린다(화면이 토스트로 보여 준다).
+
+/** run 요약 목록 — 서버에 프로젝트 축이 없어 전역 목록이다(프로젝트 필터는 화면이 이슈키로 한다) */
+export async function fetchAgentRuns(status?: AgentRunStatus): Promise<AgentRunSummary[]> {
+  const query = status ? `?status=${status}` : "";
+  const body = await json<AgentRunSummaryDto[] | null>(await sharedApiFetch(`/api/agent/runs${query}`));
+  return (body ?? []).map(mapAgentRunSummary);
+}
+
+export async function cancelRun(runId: string): Promise<void> {
+  await json<null>(
+    await sharedApiFetch(`/api/agent/runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
+  );
+}
+
+/** BLOCKED·FAILED만 — 서버가 attempt+1 후속 run을 만들고 원 run을 닫는다 */
+export async function resumeRun(runId: string): Promise<void> {
+  await json<null>(
+    await sharedApiFetch(`/api/agent/runs/${encodeURIComponent(runId)}/resume`, { method: "POST" }),
+  );
+}
+
+/** pending=true → 결정 전 전체, false → 요청순 최신 50건(결정된 것 포함) */
+export async function fetchAgentGates(options: { pending: boolean }): Promise<AgentGate[]> {
+  const body = await json<AgentGateDto[] | null>(
+    await sharedApiFetch(`/api/agent/gates?pending=${options.pending ? "true" : "false"}`),
+  );
+  return (body ?? []).map(mapAgentGate);
+}
+
+export async function approveGate(gateId: string): Promise<void> {
+  await json<null>(
+    await sharedApiFetch(`/api/agent/gates/${encodeURIComponent(gateId)}/approve`, { method: "POST" }),
+  );
+}
+
+/** 서버가 거절 사유를 받지 않는다(본문 없음) */
+export async function rejectGate(gateId: string): Promise<void> {
+  await json<null>(
+    await sharedApiFetch(`/api/agent/gates/${encodeURIComponent(gateId)}/reject`, { method: "POST" }),
   );
 }
 

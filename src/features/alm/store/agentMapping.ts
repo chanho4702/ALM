@@ -6,10 +6,12 @@ import type {
   AgentActiveRunStatus,
   AgentAuditEntry,
   AgentCurrentRun,
+  AgentGate,
   AgentGateKind,
   AgentOffice,
   AgentOfficePersona,
   AgentPendingGate,
+  AgentPersona,
   AgentPersonaActivity,
   AgentRole,
   AgentRunStatus,
@@ -73,6 +75,24 @@ export interface AgentPendingGateDto {
   kind: string;
   requestSummary: string | null;
   requestedAt: string;
+}
+
+/** `GET /api/agent/gates` 항목(GateSummaryResponse) */
+export interface AgentGateDto {
+  id: Id;
+  runId: Id;
+  issueKey: string | null;
+  kind: string;
+  request: string | null;
+  decision: string | null;
+  requestedAt: string;
+}
+
+/** `GET /api/agent/personas` 항목(PersonaResponse) — 목록 화면은 이름·이모지만 쓴다 */
+export interface AgentPersonaDto {
+  id: Id;
+  name: string;
+  emoji?: string | null;
 }
 
 export interface AgentOfficeDto {
@@ -211,4 +231,20 @@ export function mapAgentPersonaActivity(dto: AgentPersonaActivityDto): AgentPers
     todayAudits: (dto.todayAudits ?? []).map(mapAgentAuditEntry),
     todayCostUsd: money(dto.todayCostUsd) ?? 0,
   };
+}
+
+export function mapAgentGate(dto: AgentGateDto): AgentGate {
+  return {
+    id: String(dto.id),
+    runId: String(dto.runId),
+    issueKey: dto.issueKey ?? null,
+    kind: pick(GATE_KINDS, dto.kind, "ESCALATION"),
+    request: dto.request ?? "",
+    decision: dto.decision === "APPROVE" || dto.decision === "REJECT" ? dto.decision : null,
+    requestedAt: dto.requestedAt,
+  };
+}
+
+export function mapAgentPersona(dto: AgentPersonaDto): AgentPersona {
+  return { id: String(dto.id), name: dto.name, emoji: dto.emoji || null };
 }

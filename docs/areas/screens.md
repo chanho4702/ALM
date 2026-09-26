@@ -23,6 +23,7 @@
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
 | `/projects/:id/ai-office` | AiOfficePage(lazy) | **AI 사무실**(agent-service P3a) — 뷰 탭 맨 끝, `useAiTeamActive()`가 참일 때만 탭이 붙는다. 탑다운 픽셀 캔버스(인라인 SVG, 매트릭스 원본 `office/matrices.ts`, 팔레트 `--office-*`) + 개인 오피스 패널(비모달) + 팀 카드(`?view=team`, 캔버스의 텍스트 대안). 10초 폴링(탭 숨김 시 중단). 갈무리11 폰트(OFL)는 이 청크에서만 로드. 디자인 스펙: 설계문서 `plans/2026-09-26-p3a-office-design.md` |
+| `/projects/:id/ai-office/runs` · `/runs/:runId` · `/gates` | AgentRunsPage·AgentRunDetailPage·AgentGatesPage(lazy, 각자 청크) | **AI 팀 감독**(P3a AGP-12/13) — 사무실 밖이라 DS 표준만(픽셀 스타일·폰트 없음). 실행 기록: DS Table, 상태(`?group=active|finished`)·범위(`?scope=all`, 기본은 이슈키 접두어로 이 프로젝트) 필터. 상세: 목록 요약에서 찾음(상세 API 없음) + 계보(부모·파생·같은 이슈 시도 순). 승인 인박스: 결정 대기 전부 / `?archive=1` 최근 50건, `?persona=`(run→personaId). 취소·재개·승인·거절은 전역 관리자(`isGlobalAdmin`)에게만 보이고 확인 다이얼로그 → 서버 `{error}` 토스트. 30초 폴링 + 수동 새로 고침. 순수 규칙은 `office/runModel.ts` |
 | `/projects/:id/settings/:section` | ProjectSettingsPage(lazy) | **프로젝트 뷰(ProjectLayout) 바깥의 별도 페이지.** 구획 `general`/`members`/`components`/`workflow`/`types`/`fields`(필드 구성 — 커스텀일 때만 편집)/`import`(지라 CSV 이관 마법사), `/settings`는 `general`로 redirect. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
 | 그 외 전부 | → `/home` | |
 

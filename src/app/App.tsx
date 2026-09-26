@@ -48,6 +48,10 @@ const ReportsPage = lazy(() =>
 
 /** AI 사무실은 픽셀 에셋·갈무리11 폰트를 쓴다 — 사무실을 여는 사람만 내려받는다 */
 const AiOfficePage = lazy(() => import("../features/alm/office/AiOfficePage"));
+/** run 목록·상세·승인 인박스 — 사무실 밖 DS 화면(픽셀 에셋·폰트 없음), 각자 청크 */
+const AgentRunsPage = lazy(() => import("../features/alm/office/AgentRunsPage"));
+const AgentRunDetailPage = lazy(() => import("../features/alm/office/AgentRunDetailPage"));
+const AgentGatesPage = lazy(() => import("../features/alm/office/AgentGatesPage"));
 
 /** 조직 관리는 공용 패키지(@chanho/org-admin) 전체를 끌어온다 — 여는 사람만 내려받는다 */
 const OrgAdminPage = lazy(() =>
@@ -188,6 +192,48 @@ function AppRoutes() {
                 }
               >
                 <AiOfficePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="ai-office/runs"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="실행 기록 불러오는 중" />
+                  </div>
+                }
+              >
+                <AgentRunsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="ai-office/runs/:runId"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="실행 상세 불러오는 중" />
+                  </div>
+                }
+              >
+                <AgentRunDetailPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="ai-office/gates"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="승인 인박스 불러오는 중" />
+                  </div>
+                }
+              >
+                <AgentGatesPage />
               </Suspense>
             }
           />

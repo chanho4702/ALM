@@ -671,6 +671,7 @@ export interface OrgProfile {
 export interface AgentPersona {
   id: string;
   name: string;
+  emoji?: string | null;
 }
 
 export type OrgMemberStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
@@ -751,6 +752,21 @@ export interface AgentPendingGate {
   personaId: string;
   kind: AgentGateKind;
   requestSummary: string;
+  requestedAt: string;
+}
+
+export type AgentGateDecision = "APPROVE" | "REJECT";
+
+/** 게이트 감독 목록 한 건 — `GET /api/agent/gates`. 결정자·거절 사유는 서버가 주지 않는다 */
+export interface AgentGate {
+  id: string;
+  runId: string;
+  issueKey: string | null;
+  kind: AgentGateKind;
+  /** 요청 전문 */
+  request: string;
+  /** null = 아직 결정 전(pending) */
+  decision: AgentGateDecision | null;
   requestedAt: string;
 }
 

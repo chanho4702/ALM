@@ -37,6 +37,10 @@ import type {
   AgentPendingGate,
   AgentPersonaActivity,
   AgentRunSummary,
+  AgentRunStatus,
+  AgentCurrentRun,
+  AgentGate,
+  AgentGateDecision,
   AuditEntry,
   SystemStats,
   IssueTypeDef,
@@ -520,6 +524,7 @@ function nextId(): string {
 /** 테스트 전용: 메모리 캐시를 초기화한다 (localStorage는 건드리지 않음). */
 export function __resetForTest(): void {
   cache = null;
+  agentState = freshAgentState();
 }
 
 /** 저장된 아바타(dataURL)를 붙여 돌려준다 — 없으면 null(화면은 이니셜 아바타로 떨어진다) */
@@ -2357,11 +2362,11 @@ export async function systemStats(): Promise<SystemStats> {
 }
 
 /**
- * 목업 모드는 agent-service가 없다. 항상 페르소나 하나를 돌려줘 "AI 팀 가이드" 진입점을
- * 목업 개발에서도 볼 수 있게 한다(불변 규칙: 목업 개발자는 모든 화면을 봐야 한다).
+ * 목업 모드는 agent-service가 없다. 사무실 목업 6인을 그대로 돌려줘 "AI 팀 가이드" 진입점과
+ * run 목록의 페르소나 이름을 목업 개발에서도 볼 수 있게 한다(불변 규칙: 목업 개발자는 모든 화면을 봐야 한다).
  */
 export async function fetchAgentPersonas(): Promise<AgentPersona[]> {
-  return [{ id: "mock-persona", name: "가이드 에이전트" }];
+  return baseOfficePersonas(Date.now()).map(({ id, name, emoji }) => ({ id, name, emoji }));
 }
 
 // ── AI 사무실(목업) — 상태가 골고루 섞인 6인 팀 + 대기 게이트 1건 ─────────────
@@ -2396,8 +2401,8 @@ function mockRun(
   };
 }
 
-function mockOffice(now: number): AgentOffice {
-  const personas: AgentOfficePersona[] = [
+function baseOfficePersonas(now: number): AgentOfficePersona[] {
+  return [
     {
       id: "101", slug: "planner-bot", name: "기획봇", emoji: "📝", role: "PLANNER", active: true,
       currentRun: { id: "9001", status: "RUNNING", issueKey: "ALM-4", type: "TASK", trigger: "SCHEDULER", attempt: 1, model: "claude-sonnet-5", startedAt: ago(now, 14) },
@@ -2435,7 +2440,10 @@ function mockOffice(now: number): AgentOffice {
       todayCostUsd: 0.31,
     },
   ];
-  const recentRuns: AgentRunSummary[] = [
+}
+
+function baseRecentRuns(now: number): AgentRunSummary[] {
+  return [
     // BLOCKED run은 currentRun과 recentRuns 양쪽에 나온다(서버 계약) — 화면이 중복을 걸러야 한다
     mockRun(now, "9004", "104", "BLOCKED", "ALM-5", 95, null, { attempt: 3 }),
     mockRun(now, "8990", "105", "DONE", "ALM-6", 70, 52),
@@ -2443,12 +2451,19 @@ function mockOffice(now: number): AgentOffice {
     mockRun(now, "8988", "101", "FAILED", "ALM-7", 180, 171),
     mockRun(now, "8987", "103", "CANCELLED", null, 300, 296, { trigger: "USER" }),
   ];
-  const pendingGates: AgentPendingGate[] = [
-    {
-      id: "501", runId: "9003", issueKey: "ALM-3", personaId: "103", kind: "MERGE",
-      requestSummary: "PR #41 머지 승인 요청 — 이슈 상세 모달 개선", requestedAt: ago(now, 3),
-    },
-  ];
+}
+
+function mockOffice(now: number): AgentOffice {
+  const personas = baseOfficePersonas(now);
+  const recentRuns = baseRecentRuns(now);
+  applyAgentOverrides(personas, recentRuns);
+  const personaOfRun = new Map(mockAllRuns(now).map((r) => [r.id, r.personaId]));
+  const pendingGates: AgentPendingGate[] = mockGates(now)
+    .filter((g) => g.decision === null)
+    .map((g) => ({
+      id: g.id, runId: g.runId, issueKey: g.issueKey, personaId: personaOfRun.get(g.runId) ?? "",
+      kind: g.kind, requestSummary: g.request, requestedAt: g.requestedAt,
+    }));
   return {
     personas,
     recentRuns,
@@ -2490,6 +2505,184 @@ export async function fetchPersonaActivity(personaId: string): Promise<AgentPers
       ]
     : [];
   return { personaId, runs, todayAudits, todayCostUsd: persona.todayCostUsd };
+}
+
+// ── run·게이트 감독(목업) — 사무실 목업과 같은 run들 + 계보용 과거 run·다른 프로젝트 run ──────
+// 취소·재개·승인·거절은 모듈 상태(agentState)에 덮어쓰기로 남는다 — 사무실 목업도 같은 덮어쓰기를 본다.
+// 전이 규칙·거부 문구는 agent-service(Run.CANCELLABLE·RunResumeService·GateService)를 따른다.
+
+interface AgentMockState {
+  /** 닫힌 run — 원래 상태 대신 이 값을 본다 */
+  closed: Map<string, { status: AgentRunStatus; endedAt: string }>;
+  /** 재개·승인이 만든 후속 run(attempt+1) */
+  added: AgentRunSummary[];
+  decisions: Map<string, AgentGateDecision>;
+  seq: number;
+}
+
+function freshAgentState(): AgentMockState {
+  return { closed: new Map(), added: [], decisions: new Map(), seq: 9100 };
+}
+
+let agentState: AgentMockState = freshAgentState();
+
+const AGENT_CANCELLABLE: readonly AgentRunStatus[] = ["QUEUED", "RUNNING", "WAITING_APPROVAL", "BLOCKED", "FAILED"];
+const AGENT_RESUMABLE: readonly AgentRunStatus[] = ["BLOCKED", "FAILED"];
+const AGENT_ACTIVE: readonly AgentRunStatus[] = ["QUEUED", "RUNNING", "WAITING_APPROVAL", "BLOCKED"];
+
+function withOverride(run: AgentRunSummary): AgentRunSummary {
+  const closed = agentState.closed.get(run.id);
+  return closed ? { ...run, ...closed } : run;
+}
+
+function toCurrentRun(run: AgentRunSummary): AgentCurrentRun {
+  return {
+    id: run.id,
+    status: run.status as AgentCurrentRun["status"],
+    issueKey: run.issueKey,
+    type: run.type,
+    trigger: run.trigger,
+    attempt: run.attempt,
+    model: run.model,
+    startedAt: run.startedAt,
+  };
+}
+
+/** 사무실 응답에 덮어쓰기 반영 — 닫힌 현재 run은 후속 run(있으면)으로 바뀌고, 최근 run 상태도 갱신 */
+function applyAgentOverrides(personas: AgentOfficePersona[], recentRuns: AgentRunSummary[]): void {
+  for (const persona of personas) {
+    const successor = [...agentState.added]
+      .reverse()
+      .map(withOverride)
+      .find((r) => r.personaId === persona.id && AGENT_ACTIVE.includes(r.status));
+    const current = persona.currentRun;
+    if (!current || agentState.closed.has(current.id)) {
+      persona.currentRun = successor ? toCurrentRun(successor) : null;
+    }
+  }
+  recentRuns.forEach((run, i) => {
+    recentRuns[i] = withOverride(run);
+  });
+}
+
+/** 사무실 목업 밖의 과거 run — 같은 이슈 재시도 계보(ALM-5)·리뷰 부모(ALM-1)·다른 프로젝트(WEB-2) */
+function mockRunHistory(now: number): AgentRunSummary[] {
+  return [
+    mockRun(now, "8985", "103", "DONE", "ALM-1", 60, 20),
+    mockRun(now, "8983", "104", "FAILED", "ALM-5", 150, 140, { attempt: 2 }),
+    mockRun(now, "8982", "104", "FAILED", "ALM-5", 200, 190),
+    mockRun(now, "8981", "105", "DONE", "WEB-2", 400, 380, { trigger: "USER" }),
+  ];
+}
+
+/** 전체 run(서버 findAll처럼 전역) — 최신 id 먼저 */
+function mockAllRuns(now: number): AgentRunSummary[] {
+  const byId = new Map<string, AgentRunSummary>();
+  for (const persona of baseOfficePersonas(now)) {
+    const cur = persona.currentRun;
+    if (!cur) continue;
+    byId.set(cur.id, {
+      id: cur.id, issueKey: cur.issueKey, status: cur.status, personaId: persona.id, attempt: cur.attempt,
+      model: cur.model, startedAt: cur.startedAt, endedAt: null, type: cur.type, trigger: cur.trigger,
+      // 리뷰 run의 부모 = 검증 대상 TASK run
+      parentRunId: cur.id === "9006" ? "8985" : null,
+    });
+  }
+  for (const run of [...baseRecentRuns(now), ...mockRunHistory(now)]) {
+    if (!byId.has(run.id)) byId.set(run.id, run);
+  }
+  for (const run of agentState.added) byId.set(run.id, run);
+  return [...byId.values()].map(withOverride).sort((a, b) => Number(b.id) - Number(a.id));
+}
+
+function mockGates(now: number): AgentGate[] {
+  const seed: AgentGate[] = [
+    {
+      id: "501", runId: "9003", issueKey: "ALM-3", kind: "MERGE",
+      request: "PR #41 머지 승인 요청 — 이슈 상세 모달 개선", decision: null, requestedAt: ago(now, 3),
+    },
+    {
+      id: "498", runId: "8985", issueKey: "ALM-1", kind: "MERGE",
+      request: "PR #39 머지 승인 요청 — 로그인 리다이렉트 정리", decision: "APPROVE", requestedAt: ago(now, 40),
+    },
+    {
+      id: "497", runId: "8987", issueKey: null, kind: "PLAN",
+      request: "계획 승인 요청 — 알림 설정 화면을 두 단계로 나눈다", decision: "REJECT", requestedAt: ago(now, 298),
+    },
+  ];
+  return seed.map((g) => ({ ...g, decision: agentState.decisions.get(g.id) ?? g.decision }));
+}
+
+function closeRun(run: AgentRunSummary, now: number): void {
+  agentState.closed.set(run.id, { status: "CANCELLED", endedAt: new Date(now).toISOString() });
+}
+
+/** 서버 Run.continuation — attempt+1 새 run(QUEUED), 부모는 그대로 잇는다 */
+function continueRun(run: AgentRunSummary): void {
+  agentState.added.push({
+    ...run,
+    id: String(agentState.seq++),
+    status: "QUEUED",
+    attempt: run.attempt + 1,
+    startedAt: null,
+    endedAt: null,
+  });
+}
+
+function requireRun(now: number, runId: string): AgentRunSummary {
+  const run = mockAllRuns(now).find((r) => r.id === runId);
+  if (!run) throw new Error(`run을 찾을 수 없습니다: ${runId}`);
+  return run;
+}
+
+export async function fetchAgentRuns(status?: AgentRunStatus): Promise<AgentRunSummary[]> {
+  const runs = mockAllRuns(Date.now());
+  return status ? runs.filter((r) => r.status === status) : runs;
+}
+
+export async function cancelRun(runId: string): Promise<void> {
+  const now = Date.now();
+  const run = requireRun(now, runId);
+  if (!AGENT_CANCELLABLE.includes(run.status)) {
+    throw new Error(`취소할 수 없는 상태의 run입니다(현재: ${run.status}): run=${runId}`);
+  }
+  closeRun(run, now);
+}
+
+export async function resumeRun(runId: string): Promise<void> {
+  const now = Date.now();
+  const run = requireRun(now, runId);
+  if (!AGENT_RESUMABLE.includes(run.status)) {
+    throw new Error(`BLOCKED 또는 FAILED 상태가 아닌 run은 재개할 수 없습니다(현재: ${run.status}): run=${runId}`);
+  }
+  continueRun(run);
+  closeRun(run, now);
+}
+
+export async function fetchAgentGates(options: { pending: boolean }): Promise<AgentGate[]> {
+  const gates = mockGates(Date.now()).sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
+  return options.pending ? gates.filter((g) => g.decision === null) : gates.slice(0, 50);
+}
+
+function decideGate(gateId: string, decision: AgentGateDecision): void {
+  const now = Date.now();
+  const gate = mockGates(now).find((g) => g.id === gateId);
+  if (!gate) throw new Error(`게이트를 찾을 수 없습니다: ${gateId}`);
+  const run = requireRun(now, gate.runId);
+  if (gate.decision !== null || run.status !== "WAITING_APPROVAL") {
+    throw new Error(`WAITING_APPROVAL 상태가 아닌 run의 게이트는 결정할 수 없습니다(현재: ${run.status}): run=${run.id}`);
+  }
+  agentState.decisions.set(gateId, decision);
+  if (decision === "APPROVE") continueRun(run);
+  closeRun(run, now);
+}
+
+export async function approveGate(gateId: string): Promise<void> {
+  decideGate(gateId, "APPROVE");
+}
+
+export async function rejectGate(gateId: string): Promise<void> {
+  decideGate(gateId, "REJECT");
 }
 
 // ── 페이징 ───────────────────────────────────────────────────

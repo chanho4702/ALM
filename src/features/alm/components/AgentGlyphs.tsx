@@ -3,11 +3,14 @@ import { Lozenge } from "@chanho/react";
 import {
   AppWindow,
   Ban,
+  CalendarClock,
   CircleAlert,
   CircleCheck,
   CircleSlash,
+  ClipboardCheck,
   ClipboardList,
   Coffee,
+  GitMerge,
   HardHat,
   Hourglass,
   Keyboard,
@@ -15,9 +18,19 @@ import {
   PowerOff,
   SearchCheck,
   Server,
+  Siren,
   TriangleAlert,
+  UserRound,
+  Wrench,
 } from "lucide-react";
-import type { AgentActiveRunStatus, AgentRole, AgentRunStatus } from "../store/types";
+import type {
+  AgentActiveRunStatus,
+  AgentGateKind,
+  AgentRole,
+  AgentRunStatus,
+  AgentRunTrigger,
+  AgentRunType,
+} from "../store/types";
 
 /**
  * AI 팀 값 글리프(스펙 §6.2) — 페르소나 상태·run 상태·롤. 사무실(캔버스·카드·패널)과 T3(run 목록·게이트)이
@@ -139,4 +152,40 @@ export function AgentRoleGlyph({ role, size = 14 }: { role: AgentRole; size?: 12
       {def.label}
     </span>
   );
+}
+
+export const AGENT_RUN_TYPE_LABEL: Record<AgentRunType, string> = { TASK: "작업", REVIEW: "리뷰" };
+export const AGENT_RUN_TRIGGER_LABEL: Record<AgentRunTrigger, string> = { SCHEDULER: "자동", USER: "수동" };
+export const AGENT_GATE_KIND_LABEL: Record<AgentGateKind, string> = {
+  MERGE: "머지",
+  ESCALATION: "에스컬레이션",
+  PLAN: "계획",
+};
+
+const RUN_TYPE_ICONS: Record<AgentRunType, Icon> = { TASK: Wrench, REVIEW: SearchCheck };
+const RUN_TRIGGER_ICONS: Record<AgentRunTrigger, Icon> = { SCHEDULER: CalendarClock, USER: UserRound };
+const GATE_KIND_ICONS: Record<AgentGateKind, Icon> = { MERGE: GitMerge, ESCALATION: Siren, PLAN: ClipboardCheck };
+
+function IconText({ icon: IconComp, label, size = 14 }: { icon: Icon; label: string; size?: 12 | 14 | 16 }) {
+  return (
+    <span className="status-cell">
+      <IconComp size={size} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+/** run 종류 — 작업(렌치)/리뷰(돋보기, 캔버스 돋보기와 같은 뜻) */
+export function AgentRunTypeGlyph({ type, size }: { type: AgentRunType; size?: 12 | 14 | 16 }) {
+  return <IconText icon={RUN_TYPE_ICONS[type]} label={AGENT_RUN_TYPE_LABEL[type]} size={size} />;
+}
+
+/** run 트리거 — 자동(스케줄러)/수동(사람 요청) */
+export function AgentRunTriggerGlyph({ trigger, size }: { trigger: AgentRunTrigger; size?: 12 | 14 | 16 }) {
+  return <IconText icon={RUN_TRIGGER_ICONS[trigger]} label={AGENT_RUN_TRIGGER_LABEL[trigger]} size={size} />;
+}
+
+/** 게이트 종류 — 머지/에스컬레이션/계획 */
+export function AgentGateKindGlyph({ kind, size }: { kind: AgentGateKind; size?: 12 | 14 | 16 }) {
+  return <IconText icon={GATE_KIND_ICONS[kind]} label={AGENT_GATE_KIND_LABEL[kind]} size={size} />;
 }

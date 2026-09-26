@@ -5,6 +5,8 @@ import { History, Wrench, X } from "lucide-react";
 import type { AgentOfficePersona, AgentPersonaActivity, AgentRunSummary } from "../store/types";
 import {
   AGENT_RUN_STATUS_LABEL,
+  AGENT_RUN_TRIGGER_LABEL,
+  AGENT_RUN_TYPE_LABEL,
   AgentRoleGlyph,
   AgentRunStatusLozenge,
   AgentStatusLozenge,
@@ -24,8 +26,8 @@ export interface OfficeLinks {
 
 export type PanelTarget = { kind: "persona"; persona: AgentOfficePersona } | { kind: "board" };
 
-const RUN_TYPE_LABEL = { TASK: "작업", REVIEW: "리뷰" } as const;
-const TRIGGER_LABEL = { SCHEDULER: "자동", USER: "수동" } as const;
+const RUN_TYPE_LABEL = AGENT_RUN_TYPE_LABEL;
+const TRIGGER_LABEL = AGENT_RUN_TRIGGER_LABEL;
 
 function durationText(run: AgentRunSummary): string | null {
   if (!run.startedAt || !run.endedAt) return null;

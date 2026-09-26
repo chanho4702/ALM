@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
-import { mapAgentOffice, mapAgentPersonaActivity } from "./agentMapping";
-import { fetchOffice, fetchPersonaActivity } from "./jiraApi";
+import { mapAgentGate, mapAgentOffice, mapAgentPersonaActivity } from "./agentMapping";
+import {
+  approveGate,
+  cancelRun,
+  fetchAgentGates,
+  fetchAgentPersonas,
+  fetchAgentRuns,
+  fetchOffice,
+  fetchPersonaActivity,
+  rejectGate,
+  resumeRun,
+} from "./jiraApi";
 
 const OFFICE_DTO = {
   personas: [
@@ -120,5 +130,81 @@ describe("REST 어댑터 — AI 사무실", () => {
     const activity = await fetchPersonaActivity("104");
     expect(spy).toHaveBeenCalledWith("/api/agent/personas/104/activity");
     expect(activity.personaId).toBe("104");
+  });
+});
+
+describe("REST 어댑터 — run·게이트 감독(AGP-12/13)", () => {
+  const json = (status: number, body?: unknown) =>
+    new Response(body === undefined ? null : JSON.stringify(body), { status });
+
+  it("runs 목록은 status를 쿼리로 넘기고 long id를 string으로 바꾼다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValue(
+      json(200, [
+        {
+          id: 9004, issueKey: "ALM-5", status: "BLOCKED", personaId: 104, attempt: 3, model: null,
+          startedAt: null, endedAt: null, type: "TASK", trigger: "SCHEDULER", parentRunId: 8990,
+        },
+      ]),
+    );
+    const runs = await fetchAgentRuns("BLOCKED");
+    expect(spy).toHaveBeenCalledWith("/api/agent/runs?status=BLOCKED");
+    expect(runs[0]).toMatchObject({ id: "9004", personaId: "104", parentRunId: "8990", status: "BLOCKED" });
+    await fetchAgentRuns();
+    expect(spy).toHaveBeenLastCalledWith("/api/agent/runs");
+  });
+
+  it("취소·재개는 POST 204, 409 전이 거부는 서버 {error} 문구 그대로 올린다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(json(204));
+    await cancelRun("9004");
+    expect(spy).toHaveBeenCalledWith("/api/agent/runs/9004/cancel", { method: "POST" });
+
+    spy.mockResolvedValueOnce(
+      json(409, { error: "BLOCKED 또는 FAILED 상태가 아닌 run은 재개할 수 없습니다(현재: DONE): run=8990" }),
+    );
+    await expect(resumeRun("8990")).rejects.toThrow("BLOCKED 또는 FAILED 상태가 아닌 run은 재개할 수 없습니다(현재: DONE)");
+    expect(spy).toHaveBeenLastCalledWith("/api/agent/runs/8990/resume", { method: "POST" });
+
+    spy.mockResolvedValueOnce(json(403));
+    await expect(cancelRun("1")).rejects.toThrow("권한이 없습니다.");
+  });
+
+  it("게이트 목록은 pending 쿼리로 조회하고 GateSummaryResponse를 매핑한다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValue(
+      json(200, [
+        { id: 501, runId: 9003, issueKey: "ALM-3", kind: "MERGE", request: "PR 머지", decision: null, requestedAt: "2026-09-26T01:00:00Z" },
+      ]),
+    );
+    const gates = await fetchAgentGates({ pending: true });
+    expect(spy).toHaveBeenCalledWith("/api/agent/gates?pending=true");
+    expect(gates).toEqual([
+      { id: "501", runId: "9003", issueKey: "ALM-3", kind: "MERGE", request: "PR 머지", decision: null, requestedAt: "2026-09-26T01:00:00Z" },
+    ]);
+    await fetchAgentGates({ pending: false });
+    expect(spy).toHaveBeenLastCalledWith("/api/agent/gates?pending=false");
+  });
+
+  it("승인·거절은 본문 없는 POST — 실패는 삼키지 않는다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(json(204)).mockResolvedValueOnce(json(204));
+    await approveGate("501");
+    await rejectGate("502");
+    expect(spy).toHaveBeenNthCalledWith(1, "/api/agent/gates/501/approve", { method: "POST" });
+    expect(spy).toHaveBeenNthCalledWith(2, "/api/agent/gates/502/reject", { method: "POST" });
+    spy.mockResolvedValueOnce(json(409, { error: "WAITING_APPROVAL 상태가 아닌 run의 게이트는 결정할 수 없습니다" }));
+    await expect(approveGate("501")).rejects.toThrow("WAITING_APPROVAL 상태가 아닌 run의 게이트는 결정할 수 없습니다");
+  });
+
+  it("게이트 매퍼 — 모르는 kind·decision은 안전한 값으로, request null은 빈 문자열", () => {
+    expect(
+      mapAgentGate({ id: 1, runId: 2, issueKey: null, kind: "WHAT", request: null, decision: "MAYBE", requestedAt: "x" }),
+    ).toEqual({ id: "1", runId: "2", issueKey: null, kind: "ESCALATION", request: "", decision: null, requestedAt: "x" });
+  });
+
+  it("페르소나 목록은 id를 string으로, 이모지를 곁들여 돌려준다(실패는 여전히 빈 목록)", async () => {
+    vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      json(200, [{ id: 104, memberId: 9, slug: "backend-bot", role: "BACKEND", name: "백엔드봇", emoji: "🛠️", active: true }]),
+    );
+    expect(await fetchAgentPersonas()).toEqual([{ id: "104", name: "백엔드봇", emoji: "🛠️" }]);
+    vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(json(503));
+    expect(await fetchAgentPersonas()).toEqual([]);
   });
 });
