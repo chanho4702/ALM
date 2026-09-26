@@ -60,7 +60,8 @@ export default function AiOfficePage() {
       <EmptyState title="AI 팀이 아직 없습니다" description="agent-service가 연결된 플랫폼에서만 쓸 수 있습니다" />
     );
   }
-  return <AiOffice projectId={projectId} />;
+  // 프로젝트가 바뀌면 폴링·패널 상태를 새로 시작한다(이전 프로젝트 조회가 늦게 도착해 덮는 경합 차단)
+  return <AiOffice key={projectId} projectId={projectId} />;
 }
 
 function useDocked(): [(el: HTMLDivElement | null) => void, boolean] {

@@ -57,21 +57,43 @@ export function todayReportCount(runs: readonly AgentRunSummary[], now = Date.no
   return finishedRuns(runs).filter((run) => run.endedAt && sameLocalDay(run.endedAt, now)).length;
 }
 
-/** 말풍선 2행용 — 그래핌(Array.from) 기준 12자 + "…"(한글 조합 깨짐 방지) */
-export function clip(text: string, max = 12): string {
-  const chars = Array.from(text);
-  return chars.length > max ? `${chars.slice(0, max).join("")}…` : text;
-}
-
-/** 최근 활동 원문(5분 이내일 때만 서버가 준다) — 요약이 없으면 도구명 */
+/** 최근 활동 원문(5분 이내일 때만 서버가 준다) — 요약이 없으면 도구명. 접근 이름·팀 카드는 이 원문을 쓴다 */
 export function activityText(persona: AgentOfficePersona): string | null {
   const last = persona.lastActivity;
   if (!last) return null;
   return last.summary?.trim() || last.tool;
 }
 
+/** 서버가 내용을 가린 요약(AuditSummaryRedactor: "run=12 (본문 생략)", "ALM-3 (링크 생략)" 등) */
+export const isRedactedSummary = (summary: string): boolean => /\([^()]*생략\)$/.test(summary.trim());
+
+const TOOL_LABEL: Record<string, string> = {
+  report_progress: "진행 보고",
+  add_comment: "코멘트 작성",
+  create_issue: "이슈 생성",
+  create_page: "문서 작성",
+  update_page: "문서 수정",
+  search_issues: "이슈 검색",
+  find_pages: "문서 검색",
+  link_pr: "PR 연결",
+};
+
+/**
+ * 말풍선 2행 — 가림 표지는 좁은 말풍선에서 잘리면 "run=12 (본문 생…"처럼 깨진 문구가 되므로
+ * 도구의 한글 라벨로 바꾼다(모르는 도구는 도구명). 가리지 않은 요약은 원문(넘치면 CSS 말줄임 한 번).
+ */
+export function bubbleActivity(persona: AgentOfficePersona): string | null {
+  const text = activityText(persona);
+  const last = persona.lastActivity;
+  if (!text || !last) return text;
+  return isRedactedSummary(text) ? (TOOL_LABEL[last.tool] ?? last.tool) : text;
+}
+
 export interface BubbleText {
   line1: string;
+  /** line1의 상태 접두("승인 대기" 등) — 좁으면 접두가 먼저 줄고 이슈키는 보존된다 */
+  prefix: string | null;
+  issueKey: string | null;
   line2: string | null;
 }
 
@@ -87,16 +109,12 @@ export function bubbleText(persona: AgentOfficePersona): BubbleText | null {
   const run = persona.currentRun;
   if (!run || state === "IDLE" || state === "INACTIVE") return null;
   const key = run.issueKey;
-  let line1: string;
-  if (state === "RUNNING") {
-    if (run.type === "REVIEW") line1 = key ? `리뷰 · ${key}` : "리뷰 중";
-    else line1 = key ?? "작업 중";
-  } else {
-    const prefix = STATE_PREFIX[state] ?? "";
-    line1 = key ? `${prefix} · ${key}` : prefix;
-  }
-  const activity = state === "RUNNING" || state === "WAITING_APPROVAL" ? activityText(persona) : null;
-  return { line1, line2: activity ? clip(activity) : null };
+  let prefix: string | null;
+  if (state === "RUNNING") prefix = run.type === "REVIEW" ? (key ? "리뷰" : "리뷰 중") : key ? null : "작업 중";
+  else prefix = STATE_PREFIX[state] ?? "";
+  const line1 = prefix && key ? `${prefix} · ${key}` : (key ?? prefix ?? "");
+  const activity = state === "RUNNING" || state === "WAITING_APPROVAL" ? bubbleActivity(persona) : null;
+  return { line1, prefix, issueKey: key, line2: activity };
 }
 
 /** 아바타·책상 버튼의 접근 이름(스펙 §4.4) — 요약은 말줄임 전 원문 */

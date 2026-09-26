@@ -32,7 +32,7 @@ const OFFICE_DTO = {
         model: "claude-sonnet-5",
         startedAt: "2026-09-26T01:00:00Z",
       },
-      lastActivity: { id: 7, tool: "read_issue", status: "OK", summary: "(본문 생략)", createdAt: "2026-09-26T01:01:00Z" },
+      lastActivity: { id: 7, tool: "add_comment", status: "OK", summary: "ALM-5 (본문 생략)", createdAt: "2026-09-26T01:01:00Z" },
       todayCostUsd: "1.05",
     },
     {
@@ -85,7 +85,7 @@ describe("agent-service 경계 매퍼", () => {
     const office = mapAgentOffice(OFFICE_DTO);
     expect(office.personas[0]).toMatchObject({ id: "104", todayCostUsd: 1.05, role: "BACKEND" });
     expect(office.personas[0].currentRun).toMatchObject({ id: "9004", status: "BLOCKED", attempt: 3 });
-    expect(office.personas[0].lastActivity).toMatchObject({ id: "7", summary: "(본문 생략)" });
+    expect(office.personas[0].lastActivity).toMatchObject({ id: "7", summary: "ALM-5 (본문 생략)" });
     expect(office.recentRuns[0]).toMatchObject({ id: "9004", personaId: "104", parentRunId: "12", endedAt: null });
     expect(office.pendingGates[0]).toMatchObject({ id: "501", runId: "9003", personaId: "103", kind: "MERGE" });
     expect(office.budget).toEqual({ monthlyCapUsd: null, platformMonthToDateUsd: 18.4, killSwitch: true });

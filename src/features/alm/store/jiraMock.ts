@@ -2436,7 +2436,7 @@ function baseOfficePersonas(now: number): AgentOfficePersona[] {
     {
       id: "106", slug: "reviewer-bot", name: "리뷰봇", emoji: "🔍", role: "REVIEWER", active: true,
       currentRun: { id: "9006", status: "RUNNING", issueKey: "ALM-1", type: "REVIEW", trigger: "SCHEDULER", attempt: 1, model: "claude-opus-5-5", startedAt: ago(now, 6) },
-      lastActivity: { id: "70061", tool: "read_issue", status: "OK", summary: "run=9001 (본문 생략)", createdAt: ago(now, 2) },
+      lastActivity: { id: "70061", tool: "report_progress", status: "OK", summary: "run=9006 (본문 생략)", createdAt: ago(now, 2) },
       todayCostUsd: 0.31,
     },
   ];
@@ -2499,9 +2499,9 @@ export async function fetchPersonaActivity(personaId: string): Promise<AgentPers
   const todayAudits: AgentAuditEntry[] = persona.currentRun
     ? [
         ...(persona.lastActivity ? [persona.lastActivity] : []),
-        { id: `${personaId}-a2`, tool: "search_issues", status: "OK", summary: "(검색어 생략)", createdAt: ago(now, 8) },
-        { id: `${personaId}-a3`, tool: "read_issue", status: "OK", summary: `${persona.currentRun.issueKey ?? "이슈"} 읽음`, createdAt: ago(now, 12) },
-        { id: `${personaId}-a4`, tool: "add_comment", status: "ERROR", summary: "(본문 생략)", createdAt: ago(now, 40) },
+        { id: `${personaId}-a2`, tool: "search_issues", status: "OK", summary: "projectId=1 (검색어 생략)", createdAt: ago(now, 8) },
+        { id: `${personaId}-a3`, tool: "get_issue", status: "OK", summary: persona.currentRun.issueKey ?? "이슈", createdAt: ago(now, 12) },
+        { id: `${personaId}-a4`, tool: "add_comment", status: "ERROR", summary: `${persona.currentRun.issueKey ?? "ALM-1"} (본문 생략)`, createdAt: ago(now, 40) },
       ]
     : [];
   return { personaId, runs, todayAudits, todayCostUsd: persona.todayCostUsd };

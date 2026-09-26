@@ -77,8 +77,9 @@ describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
     expect(within(stage).getByRole("button", { name: /^리뷰봇, 리뷰, 작업 중, 이슈 ALM-1/ })).toBeInTheDocument();
 
     // 말풍선 — 작업 중=이슈키+활동, 리뷰=접두, 대기열·차단=접두만(2행 없음), 유휴=없음
-    expect(screen.getByTestId("office-bubble-101")).toHaveTextContent("ALM-4ALM-4 인수 조건 …");
-    expect(screen.getByTestId("office-bubble-106")).toHaveTextContent(/^리뷰 · ALM-1/);
+    expect(screen.getByTestId("office-bubble-101")).toHaveTextContent("ALM-4ALM-4 인수 조건 보완");
+    // 리뷰봇 최근 활동은 서버 가림 표지("run=9006 (본문 생략)") — 말풍선은 도구 라벨로
+    expect(screen.getByTestId("office-bubble-106")).toHaveTextContent(/^리뷰 · ALM-1진행 보고$/);
     expect(screen.getByTestId("office-bubble-102")).toHaveTextContent(/^대기열 · ALM-2$/);
     expect(screen.getByTestId("office-bubble-104")).toHaveTextContent(/^차단됨 · ALM-5$/);
     expect(screen.queryByTestId("office-bubble-105")).not.toBeInTheDocument();
@@ -168,7 +169,7 @@ describe("개인 오피스 패널", () => {
     expect(within(panel).getByText("차단됨 — 다음 조치가 필요합니다.")).toBeInTheDocument();
     expect(within(panel).getByText("3회")).toBeInTheDocument();
     expect(await within(panel).findByRole("heading", { name: /오늘 한 일/ })).toBeInTheDocument();
-    expect(within(panel).getByText("(검색어 생략)")).toBeInTheDocument();
+    expect(within(panel).getByText("projectId=1 (검색어 생략)")).toBeInTheDocument();
     expect(within(panel).getByRole("heading", { name: /최근 실행/ })).toBeInTheDocument();
 
     await user.keyboard("{Escape}");

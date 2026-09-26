@@ -4879,6 +4879,15 @@ th:last-child > [role="separator"] {
   padding-bottom: var(--chanho-space-75);
 }
 
+/* 본문 링크(run·이슈) — DS 링크 색(브라우저 기본 파랑은 다크에서 대비 부족). 돌아가기 링크는 자체 색 */
+.agent-sup a:not(.agent-sup-back) {
+  color: var(--chanho-color-text-link);
+}
+
+.agent-sup a:not(.agent-sup-back):hover {
+  color: var(--chanho-color-text-link-hovered);
+}
+
 .agent-sup-subtle {
   color: var(--chanho-color-text-subtle);
 }

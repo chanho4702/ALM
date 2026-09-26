@@ -118,7 +118,7 @@ export function AgentStatusLozenge({ state }: { state: AgentPersonaState }) {
   const def = PERSONA_STATES[state];
   const Icon = def.icon;
   return (
-    <Lozenge appearance={def.appearance} className="agent-lozenge">
+    <Lozenge appearance={def.appearance} className={`agent-lozenge is-${def.appearance}`}>
       <Icon size={12} strokeWidth={2.25} aria-hidden />
       {def.label}
     </Lozenge>
@@ -135,7 +135,7 @@ export function AgentRunStatusLozenge({ status }: { status: AgentRunStatus }) {
   const def = RUN_STATES[status];
   const Icon = def.icon;
   return (
-    <Lozenge appearance={def.appearance} className="agent-lozenge">
+    <Lozenge appearance={def.appearance} className={`agent-lozenge is-${def.appearance}`}>
       <Icon size={12} strokeWidth={2.25} aria-hidden />
       {def.label}
     </Lozenge>

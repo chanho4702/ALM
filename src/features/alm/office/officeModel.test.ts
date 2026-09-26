@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AgentOffice, AgentOfficePersona, AgentRunSummary } from "../store/types";
 import {
   bubbleText,
-  clip,
+  isRedactedSummary,
   finishedRuns,
   officeSummaryText,
   personaAccessibleName,
@@ -40,9 +40,9 @@ const run = (status: "QUEUED" | "RUNNING" | "WAITING_APPROVAL" | "BLOCKED", over
   ...over,
 });
 
-const activity = (summary: string | null) => ({
+const activity = (summary: string | null, tool = "update_issue") => ({
   id: "a",
-  tool: "update_issue",
+  tool,
   status: "OK" as const,
   summary,
   createdAt: "2026-09-26T00:00:00Z",
@@ -76,16 +76,22 @@ describe("상태 파생(스펙 §4.1)", () => {
     const act = activity("설명 보완");
     expect(bubbleText(persona({ currentRun: run("RUNNING"), lastActivity: act }))).toEqual({
       line1: "ALM-123",
+      prefix: null,
+      issueKey: "ALM-123",
       line2: "설명 보완",
     });
     expect(bubbleText(persona({ currentRun: run("RUNNING", { type: "REVIEW" }) }))?.line1).toBe("리뷰 · ALM-123");
     expect(bubbleText(persona({ currentRun: run("QUEUED"), lastActivity: act }))).toEqual({
       line1: "대기열 · ALM-123",
+      prefix: "대기열",
+      issueKey: "ALM-123",
       line2: null,
     });
     expect(bubbleText(persona({ currentRun: run("WAITING_APPROVAL"), lastActivity: act }))?.line2).toBe("설명 보완");
     expect(bubbleText(persona({ currentRun: run("BLOCKED"), lastActivity: act }))).toEqual({
       line1: "차단됨 · ALM-123",
+      prefix: "차단됨",
+      issueKey: "ALM-123",
       line2: null,
     });
     expect(bubbleText(persona())).toBeNull();
@@ -95,8 +101,11 @@ describe("상태 파생(스펙 §4.1)", () => {
   it("이슈키 없는 run은 상태 문구만, 5분 컷(lastActivity null)이면 2행 생략", () => {
     expect(bubbleText(persona({ currentRun: run("RUNNING", { issueKey: null }) }))).toEqual({
       line1: "작업 중",
+      prefix: "작업 중",
+      issueKey: null,
       line2: null,
     });
+    expect(bubbleText(persona({ currentRun: run("RUNNING", { issueKey: null, type: "REVIEW" }) }))?.line1).toBe("리뷰 중");
     expect(bubbleText(persona({ currentRun: run("QUEUED", { issueKey: null }) }))?.line1).toBe("대기열");
   });
 
@@ -106,9 +115,32 @@ describe("상태 파생(스펙 §4.1)", () => {
     );
   });
 
-  it("2행은 그래핌 12자 + … 로 자른다(한글 조합 깨짐 없음)", () => {
-    expect(clip("가나다라마바사아자차카타파하")).toBe("가나다라마바사아자차카타…");
-    expect(clip("짧음")).toBe("짧음");
+  it("2행은 원문 그대로 — 말줄임은 CSS 한 번만(데이터에 … 를 붙이지 않는다)", () => {
+    const long = "가나다라마바사아자차카타파하";
+    expect(bubbleText(persona({ currentRun: run("RUNNING"), lastActivity: activity(long) }))?.line2).toBe(long);
+  });
+
+  it("서버 가림 표지(…생략))는 말풍선에서 도구 한글 라벨로, 접근 이름은 원문 유지", () => {
+    const cases: [string, string, string][] = [
+      ["report_progress", "run=12 (본문 생략)", "진행 보고"],
+      ["add_comment", "ALM-123 (본문 생략)", "코멘트 작성"],
+      ["create_issue", "projectId=3 (제목 생략)", "이슈 생성"],
+      ["create_page", "spaceId=2 (제목 생략)", "문서 작성"],
+      ["update_page", "pageId=41 (제목 생략)", "문서 수정"],
+      ["search_issues", "projectId=3 (검색어 생략)", "이슈 검색"],
+      ["find_pages", "spaceId=2 (검색어 생략)", "문서 검색"],
+      ["link_pr", "ALM-123 (링크 생략)", "PR 연결"],
+      ["some_new_tool", "x=1 (본문 생략)", "some_new_tool"],
+    ];
+    for (const [tool, text, label] of cases) {
+      const p = persona({ currentRun: run("RUNNING"), lastActivity: activity(text, tool) });
+      expect(bubbleText(p)?.line2).toBe(label);
+      expect(personaAccessibleName(p)).toContain(`최근 활동: ${text}`);
+    }
+    // 가리지 않은 요약·괄호가 있지만 표지가 아닌 요약은 그대로
+    expect(isRedactedSummary("ALM-4 인수 조건 보완")).toBe(false);
+    expect(isRedactedSummary("ALM-4 상태 변경 (진행 중)")).toBe(false);
+    expect(isRedactedSummary("run=12 (본문 생략)")).toBe(true);
   });
 
   it("접근 이름은 이름·롤·상태·이슈·요약 원문을 담는다", () => {

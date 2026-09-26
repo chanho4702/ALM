@@ -378,7 +378,14 @@ function PersonaHtml({
           aria-hidden="true"
         >
           <div className="office-bubble-box">
-            <span className="office-bubble-line">{bubble.line1}</span>
+            {bubble.prefix && bubble.issueKey ? (
+              <span className="office-bubble-line is-split">
+                <span className="office-bubble-prefix">{bubble.prefix} ·</span>{" "}
+                <span className="office-bubble-key">{bubble.issueKey}</span>
+              </span>
+            ) : (
+              <span className="office-bubble-line">{bubble.line1}</span>
+            )}
             {bubble.line2 ? <span className="office-bubble-line">{bubble.line2}</span> : null}
           </div>
         </div>
