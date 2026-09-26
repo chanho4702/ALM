@@ -35,3 +35,18 @@ export function relTime(iso: string, now: number = Date.now()): string {
   if (days < 7) return `${days}일 전`;
   return formatDate(iso);
 }
+
+/** 초 단위까지 보는 상대 시간 — 1분 안은 "12초 전", 그 뒤는 `relTime`. 자주 갱신되는 "마지막 갱신" 표기용 */
+export function relTimeFine(iso: string, now: number = Date.now()): string {
+  const stamp = Date.parse(iso);
+  if (Number.isNaN(stamp)) return iso;
+  const seconds = Math.max(0, Math.floor((now - stamp) / 1000));
+  return seconds < 60 ? `${seconds}초 전` : relTime(iso, now);
+}
+
+/** `HH:MM` — 타임라인·활동 행의 시각 */
+export function formatClock(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

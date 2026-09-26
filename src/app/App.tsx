@@ -46,6 +46,9 @@ const ReportsPage = lazy(() =>
   import("../features/alm/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })),
 );
 
+/** AI 사무실은 픽셀 에셋·갈무리11 폰트를 쓴다 — 사무실을 여는 사람만 내려받는다 */
+const AiOfficePage = lazy(() => import("../features/alm/office/AiOfficePage"));
+
 /** 조직 관리는 공용 패키지(@chanho/org-admin) 전체를 끌어온다 — 여는 사람만 내려받는다 */
 const OrgAdminPage = lazy(() =>
   import("../features/alm/pages/OrgAdminPage").then((module) => ({ default: module.OrgAdminPage })),
@@ -174,6 +177,20 @@ function AppRoutes() {
           <Route path="backlog" element={<BacklogPage />} />
           <Route path="issues" element={<IssueListPage />} />
           <Route path="archive" element={<ArchivePage />} />
+          <Route
+            path="ai-office"
+            element={
+              <Suspense
+                fallback={
+                  <div className="board-loading">
+                    <Spinner size="large" label="AI 사무실 불러오는 중" />
+                  </div>
+                }
+              >
+                <AiOfficePage />
+              </Suspense>
+            }
+          />
         </Route>
         {/* 프로젝트 설정 — 뷰 탭(ProjectLayout) 바깥의 별도 페이지, 사이드바는 설정 메뉴로 바뀐다 */}
         <Route path="/projects/:projectId/settings" element={<Navigate to="general" replace />} />

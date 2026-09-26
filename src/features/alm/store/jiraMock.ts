@@ -31,6 +31,12 @@ import type {
   StatusKind,
   WorkflowStatus,
   AgentPersona,
+  AgentAuditEntry,
+  AgentOffice,
+  AgentOfficePersona,
+  AgentPendingGate,
+  AgentPersonaActivity,
+  AgentRunSummary,
   AuditEntry,
   SystemStats,
   IssueTypeDef,
@@ -2356,6 +2362,134 @@ export async function systemStats(): Promise<SystemStats> {
  */
 export async function fetchAgentPersonas(): Promise<AgentPersona[]> {
   return [{ id: "mock-persona", name: "가이드 에이전트" }];
+}
+
+// ── AI 사무실(목업) — 상태가 골고루 섞인 6인 팀 + 대기 게이트 1건 ─────────────
+// agent-service가 없는 목업에서도 사무실 화면의 모든 상태(작업 중·대기열·승인 대기·차단·휴식·리뷰)를 본다.
+
+const MINUTE = 60_000;
+const ago = (now: number, minutes: number) => new Date(now - minutes * MINUTE).toISOString();
+
+function mockRun(
+  now: number,
+  id: string,
+  personaId: string,
+  status: AgentRunSummary["status"],
+  issueKey: string | null,
+  startedMin: number,
+  endedMin: number | null,
+  extra: Partial<AgentRunSummary> = {},
+): AgentRunSummary {
+  return {
+    id,
+    issueKey,
+    status,
+    personaId,
+    attempt: 1,
+    model: "claude-sonnet-5",
+    startedAt: ago(now, startedMin),
+    endedAt: endedMin === null ? null : ago(now, endedMin),
+    type: "TASK",
+    trigger: "SCHEDULER",
+    parentRunId: null,
+    ...extra,
+  };
+}
+
+function mockOffice(now: number): AgentOffice {
+  const personas: AgentOfficePersona[] = [
+    {
+      id: "101", slug: "planner-bot", name: "기획봇", emoji: "📝", role: "PLANNER", active: true,
+      currentRun: { id: "9001", status: "RUNNING", issueKey: "ALM-4", type: "TASK", trigger: "SCHEDULER", attempt: 1, model: "claude-sonnet-5", startedAt: ago(now, 14) },
+      lastActivity: { id: "70011", tool: "update_issue", status: "OK", summary: "ALM-4 인수 조건 보완", createdAt: ago(now, 1) },
+      todayCostUsd: 0.42,
+    },
+    {
+      id: "102", slug: "designer-bot", name: "디자인봇", emoji: "🎨", role: "DESIGNER", active: true,
+      currentRun: { id: "9002", status: "QUEUED", issueKey: "ALM-2", type: "TASK", trigger: "USER", attempt: 1, model: null, startedAt: null },
+      lastActivity: null,
+      todayCostUsd: 0.18,
+    },
+    {
+      id: "103", slug: "frontend-bot", name: "프론트봇", emoji: "🖥️", role: "FRONTEND", active: true,
+      currentRun: { id: "9003", status: "WAITING_APPROVAL", issueKey: "ALM-3", type: "TASK", trigger: "SCHEDULER", attempt: 2, model: "claude-sonnet-5", startedAt: ago(now, 32) },
+      lastActivity: { id: "70031", tool: "create_pr", status: "OK", summary: "PR #41 생성 — 이슈 상세 모달", createdAt: ago(now, 3) },
+      todayCostUsd: 0.77,
+    },
+    {
+      id: "104", slug: "backend-bot", name: "백엔드봇", emoji: "🛠️", role: "BACKEND", active: true,
+      currentRun: { id: "9004", status: "BLOCKED", issueKey: "ALM-5", type: "TASK", trigger: "SCHEDULER", attempt: 3, model: "claude-sonnet-5", startedAt: ago(now, 95) },
+      lastActivity: null,
+      todayCostUsd: 1.05,
+    },
+    {
+      id: "105", slug: "ops-bot", name: "운영봇", emoji: "⛑️", role: "OPS", active: true,
+      currentRun: null,
+      lastActivity: null,
+      todayCostUsd: 0,
+    },
+    {
+      id: "106", slug: "reviewer-bot", name: "리뷰봇", emoji: "🔍", role: "REVIEWER", active: true,
+      currentRun: { id: "9006", status: "RUNNING", issueKey: "ALM-1", type: "REVIEW", trigger: "SCHEDULER", attempt: 1, model: "claude-opus-5-5", startedAt: ago(now, 6) },
+      lastActivity: { id: "70061", tool: "read_issue", status: "OK", summary: "run=9001 (본문 생략)", createdAt: ago(now, 2) },
+      todayCostUsd: 0.31,
+    },
+  ];
+  const recentRuns: AgentRunSummary[] = [
+    // BLOCKED run은 currentRun과 recentRuns 양쪽에 나온다(서버 계약) — 화면이 중복을 걸러야 한다
+    mockRun(now, "9004", "104", "BLOCKED", "ALM-5", 95, null, { attempt: 3 }),
+    mockRun(now, "8990", "105", "DONE", "ALM-6", 70, 52),
+    mockRun(now, "8989", "106", "DONE", "ALM-2", 120, 101, { type: "REVIEW" }),
+    mockRun(now, "8988", "101", "FAILED", "ALM-7", 180, 171),
+    mockRun(now, "8987", "103", "CANCELLED", null, 300, 296, { trigger: "USER" }),
+  ];
+  const pendingGates: AgentPendingGate[] = [
+    {
+      id: "501", runId: "9003", issueKey: "ALM-3", personaId: "103", kind: "MERGE",
+      requestSummary: "PR #41 머지 승인 요청 — 이슈 상세 모달 개선", requestedAt: ago(now, 3),
+    },
+  ];
+  return {
+    personas,
+    recentRuns,
+    pendingGateCount: pendingGates.length,
+    pendingGates,
+    budget: {
+      monthlyCapUsd: 50,
+      platformMonthToDateUsd: 18.4,
+      killSwitch: false,
+    },
+    generatedAt: new Date(now).toISOString(),
+  };
+}
+
+export async function fetchOffice(_projectId?: string): Promise<AgentOffice> {
+  return mockOffice(Date.now());
+}
+
+export async function fetchPersonaActivity(personaId: string): Promise<AgentPersonaActivity> {
+  const now = Date.now();
+  const office = mockOffice(now);
+  const persona = office.personas.find((p) => p.id === personaId);
+  if (!persona) throw new Error("페르소나를 찾을 수 없습니다");
+  const runs = office.recentRuns.filter((r) => r.personaId === personaId);
+  if (persona.currentRun && !runs.some((r) => r.id === persona.currentRun?.id)) {
+    const cur = persona.currentRun;
+    runs.unshift({
+      id: cur.id, issueKey: cur.issueKey, status: cur.status, personaId, attempt: cur.attempt,
+      model: cur.model, startedAt: cur.startedAt, endedAt: null, type: cur.type, trigger: cur.trigger,
+      parentRunId: null,
+    });
+  }
+  const todayAudits: AgentAuditEntry[] = persona.currentRun
+    ? [
+        ...(persona.lastActivity ? [persona.lastActivity] : []),
+        { id: `${personaId}-a2`, tool: "search_issues", status: "OK", summary: "(검색어 생략)", createdAt: ago(now, 8) },
+        { id: `${personaId}-a3`, tool: "read_issue", status: "OK", summary: `${persona.currentRun.issueKey ?? "이슈"} 읽음`, createdAt: ago(now, 12) },
+        { id: `${personaId}-a4`, tool: "add_comment", status: "ERROR", summary: "(본문 생략)", createdAt: ago(now, 40) },
+      ]
+    : [];
+  return { personaId, runs, todayAudits, todayCostUsd: persona.todayCostUsd };
 }
 
 // ── 페이징 ───────────────────────────────────────────────────

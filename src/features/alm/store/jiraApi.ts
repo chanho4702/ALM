@@ -37,6 +37,8 @@ import type {
   Sprint,
   Notification,
   AgentPersona,
+  AgentOffice,
+  AgentPersonaActivity,
   AuditEntry,
   SystemStats,
   SettingsBody,
@@ -100,6 +102,13 @@ import {
   type AqlFieldsInfo,
   type AqlFunctionInfo,
 } from "./aql/fields";
+
+import {
+  mapAgentOffice,
+  mapAgentPersonaActivity,
+  type AgentOfficeDto,
+  type AgentPersonaActivityDto,
+} from "./agentMapping";
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
@@ -966,6 +975,24 @@ export async function fetchAgentPersonas(): Promise<AgentPersona[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * AI 사무실 한 화면 분량(페르소나·현재 run·최근 run·대기 게이트·예산) — 사무실 화면이 10초마다 폴링한다.
+ * 진입점 판정(`fetchAgentPersonas`)과 달리 실패를 삼키지 않는다: 화면이 오류 상태·재시도를 보여 줘야 한다.
+ */
+export async function fetchOffice(projectId?: string): Promise<AgentOffice> {
+  const query = projectId ? `?projectId=${toBackendId(projectId)}` : "";
+  return mapAgentOffice(await json<AgentOfficeDto>(await sharedApiFetch(`/api/agent/office${query}`)));
+}
+
+/** 개인 오피스 — 최근 run 20·오늘 감사 50·오늘 비용 */
+export async function fetchPersonaActivity(personaId: string): Promise<AgentPersonaActivity> {
+  return mapAgentPersonaActivity(
+    await json<AgentPersonaActivityDto>(
+      await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}/activity`),
+    ),
+  );
 }
 
 // ── 설정 — 서버 V11(레지스트리·스킴·프로젝트 설정). 목업 스토어와 같은 시그니처 ──

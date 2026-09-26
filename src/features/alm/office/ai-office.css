@@ -1,0 +1,934 @@
+/*
+ * AI 사무실(P3a) — 이 파일은 사무실 라우트의 lazy 청크에서만 import된다.
+ *
+ * 색: 캔버스(SVG·명패·말풍선)와 픽셀 프레임(초상 액자·카드 테두리)만 기능 스코프 확장 패밀리 `--office-*`를 쓴다
+ * (wiki-front `--wiki-*`와 같은 지위). hex는 아래 변수 정의 블록에만 있고, 규칙은 전부 var()로 참조한다.
+ * 요약 바·탭·배너·패널 본문·카드 본문은 `--chanho-*` 토큰만.
+ *
+ * 토큰이 아닌 상수(스펙 §13에 명시된 예외): 패널 폭 380px, 도트 폰트 12px/16px·2px 테두리, 루프 주기.
+ */
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./fonts/Galmuri11.woff2") format("woff2");
+  font-display: swap;
+}
+
+/* ── 팔레트: 라이트 = 낮 사무실 ─────────────────────────────── */
+.ai-office {
+  --office-void: #8a9ba8;
+  --office-ol: #2b2233;
+  --office-hi: #fff8e7;
+  --office-floor1: #e8d9b0;
+  --office-floorln: #cdb887;
+  --office-wall1: #a9c3d1;
+  --office-wall2: #8faabb;
+  --office-trim: #5e7689;
+  --office-sky: #bfe6f2;
+  --office-sky2: #9ed3e6;
+  --office-wood1: #d3955e;
+  --office-wood2: #b07442;
+  --office-wood3: #80502c;
+  --office-metal1: #cdd2db;
+  --office-metal2: #959cad;
+  --office-scroff: #3d4a5c;
+  --office-scron: #7fe0c2;
+  --office-scron2: #4fc4a4;
+  --office-cork: #c9a06a;
+  --office-cork2: #ad8450;
+  --office-paper: #fff8e7;
+  --office-paper2: #e6dcc4;
+  --office-leaf: #5daa4e;
+  --office-leaf2: #3e7d33;
+  --office-pot: #c0694a;
+  --office-fabric: #6f8fc9;
+  --office-fabric2: #52709f;
+  --office-rug: #e3a7a0;
+  --office-rug2: #c98980;
+  --office-shadow: #2b223333;
+  --office-alert: #ffd84a;
+  --office-alert2: #e0a91e;
+  --office-red: #e0453a;
+  --office-zz: #ffffff;
+  --office-glass: #bfe6f2;
+  --office-label-bg: #2b2233;
+  --office-label-fg: #fff8e7;
+  --office-select: #ffd84a;
+  --office-bubble-bg: #fff8e7;
+  --office-bubble-fg: #2b2233;
+  --office-focus: #2b2233;
+  --office-frame: #3a3145;
+
+  /* 캐릭터 팔레트 — 테마 무관(사람 색은 밤에도 같다) */
+  --office-skin-a: #f2c9a0;
+  --office-skin-a2: #d9a57b;
+  --office-skin-b: #c98f62;
+  --office-skin-b2: #a8714a;
+  --office-skin-c: #8d5a3b;
+  --office-skin-c2: #6e432a;
+  --office-hair-0: #3b2a20;
+  --office-hair-02: #24180f;
+  --office-hair-1: #7a4e2a;
+  --office-hair-12: #57361b;
+  --office-hair-2: #d6a84a;
+  --office-hair-22: #b08434;
+  --office-hair-3: #2f3350;
+  --office-hair-32: #1e2138;
+  --office-pants: #3d4468;
+  --office-pants2: #2b3150;
+  --office-role-planner: #f0b43c;
+  --office-role-planner2: #c98a1e;
+  --office-acc-planner: #ffe08a;
+  --office-acc-planner2: #e0a91e;
+  --office-role-designer: #d9589a;
+  --office-role-designer2: #a83a72;
+  --office-acc-designer: #7a3fb0;
+  --office-acc-designer2: #5a2a86;
+  --office-role-frontend: #3fb8b0;
+  --office-role-frontend2: #23857f;
+  --office-acc-frontend: #4a5468;
+  --office-acc-frontend2: #2e3445;
+  --office-role-backend: #5b6cd6;
+  --office-role-backend2: #3c49a3;
+  --office-acc-backend: #2f3a7a;
+  --office-acc-backend2: #222a5a;
+  --office-role-ops: #5daa4e;
+  --office-role-ops2: #3e7d33;
+  --office-acc-ops: #f08a3c;
+  --office-acc-ops2: #c2621e;
+  --office-role-reviewer: #d64f4f;
+  --office-role-reviewer2: #a33434;
+  --office-acc-reviewer: #2b2233;
+  --office-acc-reviewer2: #2b2233;
+
+  position: relative;
+}
+
+/* ── 팔레트: 다크 = 밤 사무실(조명 낮춤, 모니터 빛 강조) ───────── */
+[data-theme="dark"] .ai-office {
+  --office-void: #0e0b14;
+  --office-ol: #120e18;
+  --office-hi: #f4f0e6;
+  --office-floor1: #3a3450;
+  --office-floorln: #2e2942;
+  --office-wall1: #2c3a55;
+  --office-wall2: #243049;
+  --office-trim: #18203a;
+  --office-sky: #1e2a5a;
+  --office-sky2: #f4e9a8;
+  --office-wood1: #8a5e3e;
+  --office-wood2: #6b4630;
+  --office-wood3: #4a2f20;
+  --office-metal1: #8a90a0;
+  --office-metal2: #5f6576;
+  --office-scroff: #1c2433;
+  --office-scron: #5cf2c8;
+  --office-scron2: #2fbf98;
+  --office-cork: #7e6444;
+  --office-cork2: #66502f;
+  --office-paper: #d9d2c0;
+  --office-paper2: #b8b09b;
+  --office-leaf: #3f7a38;
+  --office-leaf2: #2a5626;
+  --office-pot: #8a4a36;
+  --office-fabric: #46608f;
+  --office-fabric2: #34496d;
+  --office-rug: #8f5e5a;
+  --office-rug2: #744945;
+  --office-shadow: #00000055;
+  --office-alert: #ffd84a;
+  --office-alert2: #e0a91e;
+  --office-red: #ff5a4e;
+  --office-zz: #f4f0e6;
+  --office-glass: #8fb8cc;
+  --office-label-bg: #120e18;
+  --office-label-fg: #f4f0e6;
+  --office-select: #ffd84a;
+  --office-bubble-bg: #e9e4d6;
+  --office-bubble-fg: #2b2233;
+  --office-focus: #ffe066;
+  --office-frame: #5b5270;
+}
+
+/* ── 공용 ─────────────────────────────────────────────────── */
+.ai-office-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ai-office-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+/* 탭 줄 오른쪽 링크(실행 기록·승인 인박스) — DOM은 탭 목록 바로 뒤라 키보드 순서가 탭 → 링크 → 요약 */
+.ai-office-links {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  min-height: calc(var(--chanho-space-100) * 2 + var(--chanho-font-lineHeight-100));
+}
+
+@media (max-width: 720px) {
+  .ai-office-links {
+    position: static;
+    justify-content: flex-end;
+  }
+}
+
+/* ── 요약 바 ──────────────────────────────────────────────── */
+.ai-office-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-300);
+  margin: 0;
+  padding: var(--chanho-space-150) var(--chanho-space-200);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-subtle);
+}
+
+.ai-office-summary-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+}
+
+.ai-office-summary-icon {
+  display: inline-flex;
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-office-summary dt {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-office-summary dd {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-default);
+}
+
+.ai-office-summary-warn {
+  color: var(--chanho-color-text-warning);
+}
+
+.ai-office-refresh.is-spinning svg {
+  animation: office-spin 1s linear infinite;
+}
+
+@keyframes office-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── 본문: 캔버스/카드 + 패널 ─────────────────────────────── */
+.ai-office-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.ai-office-body.is-docked.has-panel {
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--chanho-space-300);
+}
+
+/* ── 캔버스 프레임과 배율 ─────────────────────────────────── */
+.ai-office-stage {
+  position: relative;
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-large);
+  background: var(--office-void);
+  padding: var(--chanho-space-200);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.ai-office-stage.is-placeholder {
+  display: grid;
+  place-items: center;
+}
+
+.ai-office-room {
+  position: relative;
+  width: calc(var(--room-w) * var(--k) * 1px);
+  height: calc(var(--room-h) * var(--k) * 1px);
+  margin: 0 auto;
+}
+
+.ai-office-room.is-placeholder {
+  --k: 2;
+  --room-w: 352;
+  --room-h: 192;
+  display: grid;
+  place-items: center;
+  background: var(--office-void);
+}
+
+.ai-office-room svg {
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+}
+
+.ai-office-layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── 매트릭스 문자 → 색(계열별, 스펙 §2.5 · sprites.py env_color/char_color 정본) ── */
+/* 캐릭터(아바타·손) */
+.px-char-K { fill: var(--office-ol); }
+.px-char-S { fill: var(--av-skin); }
+.px-char-s { fill: var(--av-skin2); }
+.px-char-H { fill: var(--av-hair); }
+.px-char-h { fill: var(--av-hair2); }
+.px-char-C { fill: var(--av-shirt); }
+.px-char-c { fill: var(--av-shirt2); }
+.px-char-P { fill: var(--office-pants); }
+.px-char-p { fill: var(--office-pants2); }
+.px-char-A { fill: var(--av-acc); }
+.px-char-a { fill: var(--av-acc2); }
+.px-char-G { fill: var(--office-glass); }
+/* 가구(책상·모니터·의자·소파) */
+.px-furn-K { fill: var(--office-ol); }
+.px-furn-W { fill: var(--office-wood1); }
+.px-furn-w { fill: var(--office-wood2); }
+.px-furn-x { fill: var(--office-wood2); }
+.px-furn-y { fill: var(--office-wood3); }
+.px-furn-M { fill: var(--office-metal2); }
+.px-furn-m { fill: var(--office-metal1); }
+.px-furn-O { fill: var(--office-scroff); }
+.px-furn-G { fill: var(--office-scron); }
+.px-furn-g { fill: var(--office-scron2); }
+.px-furn-F { fill: var(--office-fabric); }
+.px-furn-f { fill: var(--office-fabric2); }
+/* 오버레이(❗·Zz·⌛·돋보기·빨간 표식) */
+.px-ovl-K { fill: var(--office-ol); }
+.px-ovl-Y { fill: var(--office-alert); }
+.px-ovl-y { fill: var(--office-alert2); }
+.px-ovl-Z { fill: var(--office-zz); }
+.px-ovl-M { fill: var(--office-wood2); }
+.px-ovl-R { fill: var(--office-red); }
+.px-ovl-G { fill: var(--office-glass); }
+.px-ovl-H { fill: var(--office-hi); }
+/* 게시판 */
+.px-board-K { fill: var(--office-ol); }
+.px-board-x { fill: var(--office-wood2); }
+.px-board-c { fill: var(--office-cork); }
+.px-board-d { fill: var(--office-cork2); }
+.px-board-p { fill: var(--office-paper); }
+.px-board-q { fill: var(--office-paper2); }
+.px-board-R { fill: var(--office-red); }
+.px-board-Y { fill: var(--office-alert); }
+.px-board-B { fill: var(--office-fabric); }
+.px-board-C { fill: var(--office-red); }
+/* 벽·창·바닥·화분·커피 */
+.px-wall-w { fill: var(--office-wall1); }
+.px-wall-v { fill: var(--office-wall2); }
+.px-wall-t { fill: var(--office-trim); }
+.px-wall-K { fill: var(--office-ol); }
+.px-window-K { fill: var(--office-ol); }
+.px-window-M { fill: var(--office-hi); }
+.px-window-k { fill: var(--office-sky); }
+.px-window-q { fill: var(--office-sky2); }
+.px-floor-a { fill: var(--office-floor1); }
+.px-floor-b { fill: var(--office-floorln); }
+.px-floor-l { fill: var(--office-floorln); }
+.px-plant-K { fill: var(--office-ol); }
+.px-plant-L { fill: var(--office-leaf); }
+.px-plant-l { fill: var(--office-leaf2); }
+.px-plant-O { fill: var(--office-pot); }
+.px-plant-o { fill: var(--office-wood3); }
+.px-coffee-K { fill: var(--office-ol); }
+.px-coffee-m { fill: var(--office-metal1); }
+.px-coffee-M { fill: var(--office-metal2); }
+.px-coffee-G { fill: var(--office-scron); }
+.px-coffee-R { fill: var(--office-red); }
+.px-coffee-W { fill: var(--office-hi); }
+.px-coffee-w { fill: var(--office-paper2); }
+/* 러그(사각형 3겹)·그림자 */
+.px-rug-ol { fill: var(--office-ol); }
+.px-rug-fill { fill: var(--office-rug); }
+.px-rug-line { fill: var(--office-rug2); }
+.px-shadow { fill: var(--office-shadow); }
+
+/* ── 아바타 이동·들림 ─────────────────────────────────────── */
+.office-avatar {
+  transform: translate(calc(var(--ax) * 1px), calc(var(--ay) * 1px));
+}
+
+/* 첫 데이터 적용 뒤에만 전이 — 8계단으로 끊어 걷는 느낌 */
+.ai-office-room.is-animated .office-avatar {
+  transition: transform 640ms steps(8, end);
+}
+
+.office-avatar-lift.is-hover {
+  transform: translateY(-1px);
+}
+
+/* ── 두 프레임 루프(스펙 §8.1) ────────────────────────────── */
+@keyframes office-2f {
+  0%,
+  49.99% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.office-loop .f-a {
+  animation: office-2f var(--loop) steps(1, end) infinite;
+  animation-delay: var(--phase);
+}
+
+.office-loop .f-b {
+  animation: office-2f var(--loop) steps(1, end) infinite reverse;
+  animation-delay: var(--phase);
+}
+
+@keyframes office-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.ai-office-room.is-animated .office-fx {
+  animation: office-fade-in var(--chanho-transition-base);
+}
+
+/* ── 명패 ─────────────────────────────────────────────────── */
+.office-nameplate {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--x) * var(--k) * 1px);
+  top: calc(var(--y) * var(--k) * 1px);
+  transform: translateX(-50%);
+  max-width: calc(56 * var(--k) * 1px);
+  padding: 0 4px;
+  overflow: hidden;
+  background: var(--office-label-bg);
+  color: var(--office-label-fg);
+  font: 12px/16px "Galmuri11", var(--chanho-font-family-sans);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.office-nameplate.is-hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.office-nameplate.is-selected {
+  background: var(--office-select);
+  color: var(--office-ol);
+}
+
+/* ── 말풍선 ───────────────────────────────────────────────── */
+.office-bubble {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--x) * var(--k) * 1px);
+  bottom: calc((var(--room-h) - var(--y)) * var(--k) * 1px + 6px);
+  max-width: calc(60 * var(--k) * 1px);
+  width: max-content;
+  pointer-events: none;
+}
+
+.ai-office-room.is-animated .office-bubble {
+  animation: office-fade-in var(--chanho-transition-base);
+}
+
+.office-bubble-box {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px;
+  border: 2px solid var(--office-ol);
+  border-radius: 0;
+  background: var(--office-bubble-bg);
+  color: var(--office-bubble-fg);
+  font: 12px/16px "Galmuri11", var(--chanho-font-family-sans);
+  /* 2px 계단 노치 — 픽셀 둥근 모서리 */
+  clip-path: polygon(
+    0 2px,
+    2px 2px,
+    2px 0,
+    calc(100% - 2px) 0,
+    calc(100% - 2px) 2px,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    2px calc(100% - 2px),
+    0 calc(100% - 2px)
+  );
+}
+
+.office-bubble-line {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.office-bubble::after {
+  content: "";
+  position: absolute;
+  top: calc(100% - 1px);
+  left: calc(var(--tail) * var(--k) * 1px - 3px);
+  width: 6px;
+  height: 4px;
+  background: var(--office-ol);
+  clip-path: polygon(0 0, 100% 0, 100% 2px, calc(100% - 2px) 2px, calc(100% - 2px) 100%, 2px 100%, 2px 2px, 0 2px);
+}
+
+/* ── 클릭 대상(투명 버튼) ─────────────────────────────────── */
+.office-hit,
+.office-hit-alert,
+.office-hit-board {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--x) * var(--k) * 1px);
+  top: calc(var(--y) * var(--k) * 1px);
+  width: calc(var(--w) * var(--k) * 1px);
+  height: calc(var(--h) * var(--k) * 1px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.office-hit:focus-visible,
+.office-hit-alert:focus-visible,
+.office-hit-board:focus-visible {
+  z-index: 3;
+  outline: 2px solid var(--office-focus);
+  outline-offset: 2px;
+}
+
+.office-board-badge {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--x) * var(--k) * 1px);
+  top: calc(var(--y) * var(--k) * 1px);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* ── 개인 오피스 패널 ─────────────────────────────────────── */
+.ai-office-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-300);
+  padding: 0 var(--chanho-space-300) var(--chanho-space-300);
+  overflow-y: auto;
+  border-left: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-surface);
+  color: var(--chanho-color-text-default);
+}
+
+.ai-office-panel.is-overlay {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 100%;
+  background: var(--chanho-color-background-surface-overlay);
+  box-shadow: var(--chanho-shadow-overlay);
+  animation: office-panel-in var(--chanho-transition-slow);
+}
+
+@keyframes office-panel-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+.office-panel-band {
+  flex-shrink: 0;
+  height: 8px;
+  margin: 0 calc(-1 * var(--chanho-space-300));
+  background: var(--office-frame);
+  border-bottom: 2px solid var(--office-ol);
+}
+
+.office-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--chanho-space-200);
+}
+
+.office-panel-id {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--chanho-space-75);
+}
+
+.office-panel-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-400);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.office-panel-title:focus {
+  outline: none;
+}
+
+.office-panel-title:focus-visible {
+  box-shadow: var(--chanho-focus-ring);
+}
+
+.office-panel-role {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.office-panel-h3 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.office-panel-count {
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-panel-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--chanho-space-75) var(--chanho-space-200);
+  margin: 0;
+}
+
+.office-panel-dl dt {
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-panel-dl dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.office-mono {
+  font-family: var(--chanho-font-family-mono);
+}
+
+.office-panel-empty {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-panel-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--chanho-space-300) 0;
+}
+
+.office-panel-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--chanho-space-100);
+}
+
+.office-panel-error p {
+  margin: 0;
+  color: var(--chanho-color-text-danger);
+}
+
+.office-audit-list,
+.office-run-list,
+.office-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.office-audit {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.office-audit-time {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-audit-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+}
+
+.office-audit-summary {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.office-audit-error {
+  color: var(--chanho-color-text-danger);
+}
+
+.office-run-row,
+.office-board-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-75) var(--chanho-space-100);
+  border-radius: var(--chanho-radius-medium);
+  color: var(--chanho-color-text-default);
+  text-decoration: none;
+}
+
+.office-run-row:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.office-run-row:focus-visible {
+  outline: none;
+  box-shadow: var(--chanho-focus-ring);
+}
+
+.office-run-key {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+}
+
+.office-run-meta {
+  margin-left: auto;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-board-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}
+
+/* ── 초상(픽셀 액자) ──────────────────────────────────────── */
+.office-portrait {
+  display: inline-block;
+  flex-shrink: 0;
+  box-sizing: content-box;
+  border: 4px solid var(--office-ol);
+  box-shadow: inset 0 0 0 2px var(--office-hi);
+  background: var(--office-floor1);
+}
+
+.office-portrait svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.office-portrait.is-panel {
+  width: 64px;
+  height: 64px;
+}
+
+.office-portrait.is-board {
+  width: 64px;
+  height: 44px;
+}
+
+.office-portrait.is-card {
+  width: 48px;
+  height: 48px;
+  border-width: 2px;
+  box-shadow: none;
+}
+
+/* ── 팀 카드 ──────────────────────────────────────────────── */
+.ai-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--chanho-space-200);
+  align-content: start;
+}
+
+.ai-team-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  padding: calc(var(--chanho-space-200) + 4px) var(--chanho-space-200) var(--chanho-space-200);
+  border: 2px solid var(--office-frame);
+  border-radius: 0;
+  background: var(--chanho-color-background-surface-raised);
+  clip-path: polygon(
+    0 2px,
+    2px 2px,
+    2px 0,
+    calc(100% - 2px) 0,
+    calc(100% - 2px) 2px,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    2px calc(100% - 2px),
+    0 calc(100% - 2px)
+  );
+}
+
+/* 롤 색 띠 — 장식(롤은 텍스트로도 표기) */
+.ai-team-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--card-role);
+}
+
+.ai-team-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--chanho-space-150);
+}
+
+.ai-team-card-id {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--chanho-space-50);
+}
+
+.ai-team-card-name {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.ai-team-card-role {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-team-card-issue,
+.ai-team-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin: 0;
+}
+
+.ai-team-card-meta {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-team-card-subtle {
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-team-card-activity {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--chanho-font-size-75);
+}
+
+.ai-team-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+  margin-top: auto;
+}
+
+/* ── reduced-motion(스펙 §8.3) — 움직임에 기대는 정보는 없다: RUNNING은 모니터 ON+말풍선, WAITING은 정지 ❗ ── */
+@media (prefers-reduced-motion: reduce) {
+  .office-loop .f-a,
+  .office-loop .f-b {
+    animation: none;
+  }
+
+  .office-loop .f-b {
+    opacity: 0;
+  }
+
+  .ai-office-room.is-animated .office-avatar,
+  .ai-office-room.is-animated .office-fx,
+  .ai-office-room.is-animated .office-bubble,
+  .ai-office-panel.is-overlay {
+    transition: none;
+    animation: none;
+  }
+
+  .office-avatar-lift.is-hover {
+    transform: none;
+  }
+
+  .ai-office-refresh.is-spinning svg {
+    animation: none;
+  }
+}
+
+/* 본문 링크(이슈 키 등) — DS 링크 색 */
+.ai-team-card a,
+.ai-office-panel a:not(.office-run-row) {
+  color: var(--chanho-color-text-link);
+}
+
+.ai-team-card a:hover,
+.ai-office-panel a:not(.office-run-row):hover {
+  color: var(--chanho-color-text-link-hovered);
+}
+
+.ai-team-card {
+  font-size: var(--chanho-font-size-100);
+}

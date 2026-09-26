@@ -7,6 +7,7 @@ import { listProjectShortcuts } from "../store/jiraStore";
 import { SHORTCUTS_CHANGED_EVENT } from "./ProjectShortcutsPanel";
 import { UI_CHANGED_EVENT, listStarredProjectIds, toggleProjectStar } from "../store/uiStore";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { useAiTeamActive } from "./useAiTeamActive";
 
 export interface ProjectLayoutProps {
   projects: Project[];
@@ -32,6 +33,9 @@ const VIEW_TABS = [
   { id: "archive", label: "보관함" },
 ];
 
+/** AI 사무실 탭 — agent-service가 붙은 플랫폼(useAiTeamActive)에서만 뷰 탭 맨 끝에 붙는다 */
+const AI_OFFICE_TAB = { id: "ai-office", label: "AI 사무실" };
+
 /**
  * 프로젝트 내부 레이아웃 — 지라의 프로젝트 화면 상단 구조.
  * 브레드크럼(프로젝트/이름) → 프로젝트 헤더(아바타·이름·별표) → 가로 뷰 탭 → 콘텐츠.
@@ -41,6 +45,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
   const navigate = useNavigate();
   const location = useLocation();
   const [starredIds, setStarredIds] = useState<string[]>([]);
+  const aiTeamActive = useAiTeamActive();
 
   const refreshStarred = useCallback(() => {
     void listStarredProjectIds().then(setStarredIds);
@@ -107,7 +112,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
 
       {/* 가로 뷰 탭 — 밑줄 액티브, 라우터 이동 */}
       <nav aria-label="프로젝트 뷰" className="project-tabs">
-        {VIEW_TABS.map((tab) => (
+        {(aiTeamActive ? [...VIEW_TABS, AI_OFFICE_TAB] : VIEW_TABS).map((tab) => (
           <button
             key={tab.id}
             type="button"

@@ -22,6 +22,7 @@
 | `/projects/:id/releases` | ReleasesPage(lazy) | 릴리스 허브: 버전 만들기·진행률·릴리스(미완료 이관 선택)·보관·삭제 |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts` |
 | `/projects/:id/dashboard` | DashboardPage | 요약: 지표 타일 4 + 활성 스프린트·완료 진행·상태별 분포·담당자별 작업량·마감 임박/지연·최근 업데이트 (집계는 `dashboardMetrics.ts`) |
+| `/projects/:id/ai-office` | AiOfficePage(lazy) | **AI 사무실**(agent-service P3a) — 뷰 탭 맨 끝, `useAiTeamActive()`가 참일 때만 탭이 붙는다. 탑다운 픽셀 캔버스(인라인 SVG, 매트릭스 원본 `office/matrices.ts`, 팔레트 `--office-*`) + 개인 오피스 패널(비모달) + 팀 카드(`?view=team`, 캔버스의 텍스트 대안). 10초 폴링(탭 숨김 시 중단). 갈무리11 폰트(OFL)는 이 청크에서만 로드. 디자인 스펙: 설계문서 `plans/2026-09-26-p3a-office-design.md` |
 | `/projects/:id/settings/:section` | ProjectSettingsPage(lazy) | **프로젝트 뷰(ProjectLayout) 바깥의 별도 페이지.** 구획 `general`/`members`/`components`/`workflow`/`types`/`fields`(필드 구성 — 커스텀일 때만 편집)/`import`(지라 CSV 이관 마법사), `/settings`는 `general`로 redirect. **진입은 사이드바 프로젝트 행의 ⋯ 메뉴** — 뷰 탭에는 설정이 없다 |
 | 그 외 전부 | → `/home` | |
 

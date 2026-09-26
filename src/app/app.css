@@ -4816,3 +4816,10 @@ th:last-child > [role="separator"] {
   display: flex;
   gap: var(--chanho-space-100);
 }
+
+/* AI 팀 상태·run 상태 Lozenge — 안에 아이콘 + 라벨(AgentGlyphs, 사무실·run 목록 공용) */
+.agent-lozenge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}

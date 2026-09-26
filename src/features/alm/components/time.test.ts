@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime, relTime } from "./time";
+import { formatDate, formatDateTime, relTime, relTimeFine } from "./time";
 
 describe("formatDate", () => {
   it("ISO 일시를 yyyy-mm-dd로 (지역 포맷 `2026. 9. 4.` 대신)", () => {
@@ -64,5 +64,14 @@ describe("relTime", () => {
 
   it("파싱할 수 없으면 원문", () => {
     expect(relTime("어제쯤", now)).toBe("어제쯤");
+  });
+});
+
+describe("relTimeFine — 초 단위 상대 시간", () => {
+  const now = Date.parse("2026-09-26T12:00:00Z");
+  it("1분 안은 초로, 그 뒤는 relTime", () => {
+    expect(relTimeFine(new Date(now - 12_000).toISOString(), now)).toBe("12초 전");
+    expect(relTimeFine(new Date(now - 5 * 60_000).toISOString(), now)).toBe("5분 전");
+    expect(relTimeFine("모름", now)).toBe("모름");
   });
 });

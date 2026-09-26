@@ -1,0 +1,142 @@
+import type { ComponentType } from "react";
+import { Lozenge } from "@chanho/react";
+import {
+  AppWindow,
+  Ban,
+  CircleAlert,
+  CircleCheck,
+  CircleSlash,
+  ClipboardList,
+  Coffee,
+  HardHat,
+  Hourglass,
+  Keyboard,
+  Palette,
+  PowerOff,
+  SearchCheck,
+  Server,
+  TriangleAlert,
+} from "lucide-react";
+import type { AgentActiveRunStatus, AgentRole, AgentRunStatus } from "../store/types";
+
+/**
+ * AI 팀 값 글리프(스펙 §6.2) — 페르소나 상태·run 상태·롤. 사무실(캔버스·카드·패널)과 T3(run 목록·게이트)이
+ * 같은 표기를 쓴다. 아이콘 + 텍스트 규약: 텍스트만 쓰지 않고, 색만으로 구분하지 않는다.
+ * `variant`는 `StatusGlyph`와 같은 계약 — `auto`는 아이콘이 스스로 이름을 읽고, `icon`은 옆에 이름이 있을 때 숨는다.
+ */
+
+export type AgentPersonaState = AgentActiveRunStatus | "IDLE" | "INACTIVE";
+
+type Appearance = "neutral" | "info" | "success" | "warning" | "danger";
+type Icon = ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
+
+interface GlyphDef {
+  icon: Icon;
+  label: string;
+  appearance: Appearance;
+}
+
+const PERSONA_STATES: Record<AgentPersonaState, GlyphDef> = {
+  RUNNING: { icon: Keyboard, label: "작업 중", appearance: "info" },
+  QUEUED: { icon: Hourglass, label: "대기열", appearance: "neutral" },
+  WAITING_APPROVAL: { icon: CircleAlert, label: "승인 대기", appearance: "warning" },
+  BLOCKED: { icon: Ban, label: "차단됨", appearance: "danger" },
+  IDLE: { icon: Coffee, label: "휴식 중", appearance: "neutral" },
+  INACTIVE: { icon: PowerOff, label: "비활성", appearance: "neutral" },
+};
+
+const RUN_STATES: Record<AgentRunStatus, GlyphDef> = {
+  QUEUED: { icon: Hourglass, label: "대기열", appearance: "neutral" },
+  RUNNING: { icon: Keyboard, label: "실행 중", appearance: "info" },
+  WAITING_APPROVAL: { icon: CircleAlert, label: "승인 대기", appearance: "warning" },
+  BLOCKED: { icon: Ban, label: "차단됨", appearance: "danger" },
+  DONE: { icon: CircleCheck, label: "완료", appearance: "success" },
+  FAILED: { icon: TriangleAlert, label: "실패", appearance: "danger" },
+  CANCELLED: { icon: CircleSlash, label: "취소됨", appearance: "neutral" },
+};
+
+const ROLES: Record<AgentRole, { icon: Icon; label: string }> = {
+  PLANNER: { icon: ClipboardList, label: "기획" },
+  DESIGNER: { icon: Palette, label: "디자인" },
+  FRONTEND: { icon: AppWindow, label: "프론트엔드" },
+  BACKEND: { icon: Server, label: "백엔드" },
+  OPS: { icon: HardHat, label: "운영" },
+  REVIEWER: { icon: SearchCheck, label: "리뷰" },
+};
+
+export const AGENT_STATUS_LABEL: Record<AgentPersonaState, string> = Object.fromEntries(
+  Object.entries(PERSONA_STATES).map(([k, v]) => [k, v.label]),
+) as Record<AgentPersonaState, string>;
+
+export const AGENT_RUN_STATUS_LABEL: Record<AgentRunStatus, string> = Object.fromEntries(
+  Object.entries(RUN_STATES).map(([k, v]) => [k, v.label]),
+) as Record<AgentRunStatus, string>;
+
+export const AGENT_ROLE_LABEL: Record<AgentRole, string> = Object.fromEntries(
+  Object.entries(ROLES).map(([k, v]) => [k, v.label]),
+) as Record<AgentRole, string>;
+
+interface GlyphProps {
+  size?: 12 | 14 | 16;
+  variant?: "auto" | "icon";
+}
+
+function Glyph({ def, prefix, size = 14, variant = "auto" }: GlyphProps & { def: GlyphDef; prefix: string }) {
+  const Icon = def.icon;
+  const name = `${prefix}${def.label}`;
+  const labelProps =
+    variant === "icon"
+      ? { "aria-hidden": true as const, title: name }
+      : { role: "img", "aria-label": name, title: name };
+  return (
+    <span className={`status-glyph is-${def.appearance}`} {...labelProps}>
+      <Icon size={size} strokeWidth={2.25} aria-hidden />
+    </span>
+  );
+}
+
+/** 페르소나 상태 아이콘 — 접근 이름 "AI 상태: 작업 중" */
+export function AgentStatusGlyph({ state, ...rest }: GlyphProps & { state: AgentPersonaState }) {
+  return <Glyph def={PERSONA_STATES[state]} prefix="AI 상태: " {...rest} />;
+}
+
+/** 페르소나 상태 Lozenge — 안에 아이콘 12px + 라벨 */
+export function AgentStatusLozenge({ state }: { state: AgentPersonaState }) {
+  const def = PERSONA_STATES[state];
+  const Icon = def.icon;
+  return (
+    <Lozenge appearance={def.appearance} className="agent-lozenge">
+      <Icon size={12} strokeWidth={2.25} aria-hidden />
+      {def.label}
+    </Lozenge>
+  );
+}
+
+/** run 상태 아이콘 — 접근 이름 "실행 상태: 완료" */
+export function AgentRunStatusGlyph({ status, ...rest }: GlyphProps & { status: AgentRunStatus }) {
+  return <Glyph def={RUN_STATES[status]} prefix="실행 상태: " {...rest} />;
+}
+
+/** run 상태 Lozenge — 아이콘 + 텍스트(목록 행·게시판) */
+export function AgentRunStatusLozenge({ status }: { status: AgentRunStatus }) {
+  const def = RUN_STATES[status];
+  const Icon = def.icon;
+  return (
+    <Lozenge appearance={def.appearance} className="agent-lozenge">
+      <Icon size={12} strokeWidth={2.25} aria-hidden />
+      {def.label}
+    </Lozenge>
+  );
+}
+
+/** 롤 — 아이콘 + 한국어 라벨(색만으로 롤을 말하지 않는다) */
+export function AgentRoleGlyph({ role, size = 14 }: { role: AgentRole; size?: 12 | 14 | 16 }) {
+  const def = ROLES[role];
+  const Icon = def.icon;
+  return (
+    <span className="status-cell agent-role">
+      <Icon size={size} aria-hidden />
+      {def.label}
+    </span>
+  );
+}

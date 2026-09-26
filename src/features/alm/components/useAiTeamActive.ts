@@ -42,6 +42,30 @@ export function useAiTeamActive(): boolean {
   return active;
 }
 
+export type AiTeamStatus = "unknown" | "active" | "inactive";
+
+/**
+ * 판정 전(로드 중)까지 구분하는 버전 — AI 사무실 페이지처럼 URL로 직접 들어온 화면이
+ * "아직 모름"을 "비활성"으로 오인해 빈 상태를 번쩍 보여 주지 않게 한다. 조회·캐시는 `useAiTeamActive`와 공유.
+ */
+export function useAiTeamStatus(): AiTeamStatus {
+  const [status, setStatus] = useState<AiTeamStatus>(
+    cached === null ? "unknown" : cached ? "active" : "inactive",
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAiTeamActive().then((value) => {
+      if (!cancelled) setStatus(value ? "active" : "inactive");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return status;
+}
+
 /** 테스트 전용 — 모듈 캐시를 리셋해 각 테스트가 독립적으로 조회하게 한다 */
 export function __resetAiTeamActiveForTest(): void {
   cached = null;

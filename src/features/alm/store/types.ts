@@ -674,3 +674,107 @@ export interface AgentPersona {
 }
 
 export type OrgMemberStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+
+// ── AI 사무실(agent-service P3a) — `GET /api/agent/office`, `GET /api/agent/personas/{id}/activity` ──
+// 서버 long id는 경계(jiraApi)에서 string으로 바꾼다. 시각은 ISO-8601 UTC 문자열 그대로.
+
+export type AgentRole = "PLANNER" | "DESIGNER" | "FRONTEND" | "BACKEND" | "OPS" | "REVIEWER";
+
+export type AgentRunStatus =
+  | "QUEUED"
+  | "RUNNING"
+  | "WAITING_APPROVAL"
+  | "BLOCKED"
+  | "DONE"
+  | "FAILED"
+  | "CANCELLED";
+
+/** 아직 끝나지 않은 run — 페르소나의 "현재 run"이 될 수 있는 상태 */
+export type AgentActiveRunStatus = "QUEUED" | "RUNNING" | "WAITING_APPROVAL" | "BLOCKED";
+
+export type AgentRunType = "TASK" | "REVIEW";
+export type AgentRunTrigger = "SCHEDULER" | "USER";
+
+export interface AgentCurrentRun {
+  id: string;
+  status: AgentActiveRunStatus;
+  issueKey: string | null;
+  type: AgentRunType;
+  trigger: AgentRunTrigger;
+  attempt: number;
+  model: string | null;
+  startedAt: string | null;
+}
+
+/** 도구 호출 감사 한 건 — summary는 서버가 본문을 가린 값("(본문 생략)" 등)일 수 있다 */
+export interface AgentAuditEntry {
+  id: string;
+  tool: string;
+  status: "OK" | "ERROR";
+  summary: string | null;
+  createdAt: string;
+}
+
+export interface AgentOfficePersona {
+  id: string;
+  slug: string;
+  name: string;
+  emoji: string | null;
+  role: AgentRole;
+  active: boolean;
+  currentRun: AgentCurrentRun | null;
+  /** 5분 이내 활동만 온다 — 없으면 null(말풍선 2행 생략) */
+  lastActivity: AgentAuditEntry | null;
+  todayCostUsd: number;
+}
+
+export interface AgentRunSummary {
+  id: string;
+  issueKey: string | null;
+  status: AgentRunStatus;
+  personaId: string;
+  attempt: number;
+  model: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  type: AgentRunType;
+  trigger: AgentRunTrigger;
+  parentRunId: string | null;
+}
+
+export type AgentGateKind = "MERGE" | "ESCALATION" | "PLAN";
+
+export interface AgentPendingGate {
+  id: string;
+  runId: string;
+  issueKey: string | null;
+  personaId: string;
+  kind: AgentGateKind;
+  requestSummary: string;
+  requestedAt: string;
+}
+
+export interface AgentBudget {
+  monthlyCapUsd: number | null;
+  platformMonthToDateUsd: number;
+  killSwitch: boolean;
+}
+
+export interface AgentOffice {
+  personas: AgentOfficePersona[];
+  /** 최근 run — BLOCKED run은 personas[].currentRun과 여기 양쪽에 나온다(endedAt null) */
+  recentRuns: AgentRunSummary[];
+  pendingGateCount: number;
+  pendingGates: AgentPendingGate[];
+  budget: AgentBudget;
+  generatedAt: string;
+}
+
+export interface AgentPersonaActivity {
+  personaId: string;
+  /** 최근 run 20 */
+  runs: AgentRunSummary[];
+  /** 오늘 감사 ≤ 50, 최신 먼저 */
+  todayAudits: AgentAuditEntry[];
+  todayCostUsd: number;
+}
