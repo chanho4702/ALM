@@ -362,6 +362,24 @@ describe("안건 이슈 없는 회의 run — 목록·상세", () => {
     expect(table).not.toHaveTextContent("PROJECT-1");
   });
 
+  it("매니저 보고 run(P3c) — 종류 칸이 클립보드 아이콘 + '매니저 보고', 이슈 칸은 '프로젝트 전반'", async () => {
+    const original = store.fetchAgentRuns;
+    vi.spyOn(store, "fetchAgentRuns").mockImplementation(async (status) => [
+      ...(await original(status)),
+      {
+        id: "8996", issueKey: "PROJECT-1", status: "DONE", personaId: "101", attempt: 1, model: null,
+        startedAt: new Date(Date.now() - 20 * 60_000).toISOString(), endedAt: new Date(Date.now() - 12 * 60_000).toISOString(),
+        type: "MANAGER", trigger: "SCHEDULER", parentRunId: null,
+      },
+    ]);
+    renderApp(`${BASE}/runs`);
+    const table = await runsTable();
+    const row = within(table).getByRole("link", { name: "실행 #8996 상세" }).closest("tr")!;
+    const type = within(row).getByText("매니저 보고");
+    expect(type.querySelector(".lucide-clipboard-pen")).not.toBeNull();
+    expect(within(row).getByText("프로젝트 전반")).toBeInTheDocument();
+  });
+
   it("상세 — 이슈 칸 '프로젝트 전반', 같은 키 타임라인(한 이슈의 시도)은 없다", async () => {
     const { run } = await store.createMeeting({ type: "RETRO", projectId: "p1" });
     renderApp(`${BASE}/runs/${run.id}`);

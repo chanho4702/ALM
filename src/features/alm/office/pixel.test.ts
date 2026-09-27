@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { AVATAR_STAND } from "./matrices";
 import * as M from "./matrices";
-import { avatarMatrix, avatarPaths, avatarVars, breathe, fnv1a32, matrixToPaths, overlay, roomGeometry } from "./pixel";
+import type { AgentRole } from "../store/types";
+import {
+  avatarMatrix,
+  avatarPaths,
+  avatarVars,
+  breathe,
+  drawnRole,
+  fnv1a32,
+  matrixToPaths,
+  overlay,
+  roomGeometry,
+} from "./pixel";
 
 /** 스펙 §2.6 "완성 예" — FRONTEND 서기 프레임 A를 규칙대로 변환한 정본 */
 const SPEC_FRONTEND_STAND_A: Record<string, string> = {
@@ -96,5 +107,25 @@ describe("피부·머리 배정", () => {
     expect(a["--av-acc2"]).toBe("var(--office-acc-backend2)");
     expect(a["--av-skin"]).toMatch(/^var\(--office-skin-[abc]\)$/);
     expect(a["--av-hair2"]).toMatch(/^var\(--office-hair-[0-3]2\)$/);
+  });
+});
+
+describe("도트 시안 없는 롤 — MANAGER(D-P3c-5)", () => {
+  it("기획 아바타를 빌려 그리고, 팔레트도 기획 변수로 — 빈 매트릭스·정의 안 된 CSS 변수가 없다", () => {
+    expect(drawnRole("MANAGER")).toBe("PLANNER");
+    expect(drawnRole("OPS")).toBe("OPS");
+    expect(avatarMatrix("MANAGER", "standA")).toEqual(avatarMatrix("PLANNER", "standA"));
+    expect(avatarPaths("MANAGER", "seat")).toBe(avatarPaths("PLANNER", "seat"));
+    const v = avatarVars("manager-bot", "MANAGER");
+    expect(v["--av-shirt"]).toBe("var(--office-role-planner)");
+    expect(v["--av-acc2"]).toBe("var(--office-acc-planner2)");
+  });
+
+  it("타입 밖 값이 새어 들어와도(서버 신규 롤) 모든 프레임이 그려진다", () => {
+    const odd = "JANITOR" as AgentRole;
+    for (const frame of ["standA", "standB", "seat", "slump"] as const) {
+      expect(avatarPaths(odd, frame).length).toBeGreaterThan(0);
+    }
+    expect(avatarVars("odd", odd)["--av-shirt"]).toBe("var(--office-role-planner)");
   });
 });

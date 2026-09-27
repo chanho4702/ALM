@@ -6,6 +6,7 @@ import type { AgentOfficePersona, AgentRunSummary } from "../store/types";
 import { AGENT_RUN_TYPE_LABEL, AgentRoleGlyph, AgentStatusLozenge } from "../components/AgentGlyphs";
 import { relTime } from "../components/time";
 import { OfficePortrait } from "./PixelSprite";
+import { drawnRole } from "./pixel";
 import { activityText, formatUsd, linkableIssueKey, personaState, PROJECT_WIDE_LABEL } from "./officeModel";
 import type { OfficeLinks } from "./OfficePanel";
 
@@ -42,7 +43,7 @@ export function TeamCards({
             key={persona.id}
             className="ai-team-card"
             aria-labelledby={nameId}
-            style={{ "--card-role": `var(--office-role-${persona.role.toLowerCase()})` } as CSSProperties}
+            style={{ "--card-role": `var(--office-role-${drawnRole(persona.role).toLowerCase()})` } as CSSProperties}
           >
             <div className="ai-team-card-top">
               <OfficePortrait slug={persona.slug} role={persona.role} className="is-card" />

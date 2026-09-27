@@ -679,7 +679,8 @@ export type OrgMemberStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED"
 // ── AI 사무실(agent-service P3a) — `GET /api/agent/office`, `GET /api/agent/personas/{id}/activity` ──
 // 서버 long id는 경계(jiraApi)에서 string으로 바꾼다. 시각은 ISO-8601 UTC 문자열 그대로.
 
-export type AgentRole = "PLANNER" | "DESIGNER" | "FRONTEND" | "BACKEND" | "OPS" | "REVIEWER";
+/** MANAGER(P3c)는 보드 순찰·보고를 맡는 매니저 — 실무 회의·회고 자동 참석에서 빠진다 */
+export type AgentRole = "PLANNER" | "DESIGNER" | "FRONTEND" | "BACKEND" | "OPS" | "REVIEWER" | "MANAGER";
 
 export type AgentRunStatus =
   | "QUEUED"
@@ -693,8 +694,11 @@ export type AgentRunStatus =
 /** 아직 끝나지 않은 run — 페르소나의 "현재 run"이 될 수 있는 상태 */
 export type AgentActiveRunStatus = "QUEUED" | "RUNNING" | "WAITING_APPROVAL" | "BLOCKED";
 
-/** 회의 run(P3b) — MEETING=착수/계획, RETRO=회고, ESCALATION=에스컬레이션 */
-export type AgentMeetingType = "MEETING" | "RETRO" | "ESCALATION";
+/**
+ * 회의 계열 run(P3b) — MEETING=착수/계획, RETRO=회고, ESCALATION=에스컬레이션, MANAGER=매니저 보고(P3c, 매니저 1명의
+ * 보드 순찰 — 회의는 아니지만 서버 MEETING_TYPES에 들어 소집 API·게시판·활성 회의 가드를 공유한다)
+ */
+export type AgentMeetingType = "MEETING" | "RETRO" | "ESCALATION" | "MANAGER";
 export type AgentRunType = "TASK" | "REVIEW" | AgentMeetingType;
 export type AgentRunTrigger = "SCHEDULER" | "USER";
 

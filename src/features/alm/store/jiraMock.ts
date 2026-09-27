@@ -2458,9 +2458,10 @@ function baseRecentRuns(now: number): AgentRunSummary[] {
   ];
 }
 
-/** 게시판 목업 — 회고(안건 이슈 없음)·착수/계획·에스컬레이션 각 1건, 최신 먼저. 회의록 스페이스는 5 */
+/** 게시판 목업 — 매니저 보고·회고(안건 이슈 없음)·착수/계획·에스컬레이션 각 1건, 최신 먼저. 회의록 스페이스는 5 */
 function baseBoardPosts(now: number, projectId: string): AgentBoardPost[] {
   return [
+    { runId: "8996", type: "MANAGER", agendaIssueKey: null, projectId, pageId: "315", spaceId: "5", endedAt: ago(now, 12) },
     { runId: "8995", type: "RETRO", agendaIssueKey: null, projectId, pageId: "312", spaceId: "5", endedAt: ago(now, 25) },
     { runId: "8994", type: "MEETING", agendaIssueKey: "ALM-4", projectId, pageId: "308", spaceId: "5", endedAt: ago(now, 190) },
     { runId: "8993", type: "ESCALATION", agendaIssueKey: "ALM-5", projectId, pageId: "305", spaceId: "5", endedAt: ago(now, 60 * 26) },
@@ -2709,15 +2710,21 @@ const MEETING_PLANNING_ROLES: readonly AgentRole[] = ["PLANNER", "DESIGNER", "FR
 function mockMeetingAttendees(input: AgentMeetingInput, now: number): AgentOfficePersona[] {
   const active = baseOfficePersonas(now).filter((p) => p.active);
   if (input.personaSlugs && input.personaSlugs.length > 0) {
-    return input.personaSlugs.map((slug) => {
+    const picked = input.personaSlugs.map((slug) => {
       const persona = baseOfficePersonas(now).find((p) => p.slug === slug);
       if (!persona) throw new Error(`페르소나를 찾을 수 없습니다: ${slug}`);
       if (!persona.active) throw new Error(`비활성 페르소나는 회의에 참석할 수 없습니다: ${slug}`);
       return persona;
     });
+    if (input.type === "MANAGER" && (picked.length !== 1 || picked[0].role !== "MANAGER")) {
+      throw new Error("MANAGER run의 personaSlugs는 MANAGER 롤 페르소나 1명이어야 합니다");
+    }
+    return picked;
   }
   if (input.type === "MEETING") return active.filter((p) => MEETING_PLANNING_ROLES.includes(p.role));
-  if (input.type === "RETRO") return active;
+  // 매니저 보고는 매니저 1명 단독(여럿이면 id 최솟값), 회고 "전원"에서 매니저는 빠진다
+  if (input.type === "MANAGER") return active.filter((p) => p.role === "MANAGER").slice(0, 1);
+  if (input.type === "RETRO") return active.filter((p) => p.role !== "MANAGER");
   // 에스컬레이션 — 목업은 run 이력으로 "관련 롤"을 찾지 않고 기획 + 리뷰로 앉힌다(서버의 관련 run 없음 경로)
   return active.filter((p) => p.role === "PLANNER" || p.role === "REVIEWER");
 }
@@ -2729,7 +2736,7 @@ export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeet
   if (issueKeyInput && issueKeyInput.length > 40) throw new Error("agendaIssueKey는 40자 이하여야 합니다");
   if (agenda && agenda.length > 4000) throw new Error("agenda는 4000자 이하여야 합니다");
   if ((input.personaSlugs?.length ?? 0) > 20) throw new Error("personaSlugs는 20명 이하여야 합니다");
-  if (input.type !== "RETRO" && !issueKeyInput && !agenda) {
+  if (input.type !== "RETRO" && input.type !== "MANAGER" && !issueKeyInput && !agenda) {
     throw new Error(`${input.type} 회의에는 agendaIssueKey 또는 agenda가 필요합니다`);
   }
   const attendees = mockMeetingAttendees(input, now);

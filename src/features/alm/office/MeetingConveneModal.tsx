@@ -2,19 +2,28 @@ import { useState, type FormEvent } from "react";
 import { Button, Checkbox, Modal, Radio, RadioGroup, Select, TextArea, TextField, useToast } from "@chanho/react";
 import type { AgentMeetingCreated, AgentMeetingType, AgentOfficePersona } from "../store/types";
 import { createMeeting } from "../store/jiraStore";
-import { AGENT_MEETING_TYPE_LABEL, AgentMeetingTypeIcon, AgentRoleGlyph } from "../components/AgentGlyphs";
+import {
+  AGENT_MEETING_TYPE_LABEL,
+  agentMeetingRunName,
+  AgentMeetingTypeIcon,
+  AgentRoleGlyph,
+} from "../components/AgentGlyphs";
 
 const AGENDA_MAX = 4000;
 const ISSUE_KEY_MAX = 40;
 const ATTENDEES_MAX = 20;
 
-const MEETING_TYPES: readonly AgentMeetingType[] = ["MEETING", "RETRO", "ESCALATION"];
+const MEETING_TYPES: readonly AgentMeetingType[] = ["MEETING", "RETRO", "ESCALATION", "MANAGER"];
+
+/** 안건 없이 열 수 있는 종류 — 회고는 최근 run, 매니저 보고는 프로젝트 전반 순찰 자체가 안건(서버 MeetingService와 같은 분기) */
+const AGENDA_OPTIONAL: readonly AgentMeetingType[] = ["RETRO", "MANAGER"];
 
 /** 자동 참석 규칙(서버 MeetingService.defaultAttendees) — 참석자를 고르지 않으면 이대로 앉는다 */
 const AUTO_RULE: Record<AgentMeetingType, string> = {
   MEETING: "기획·디자인·프론트엔드·백엔드",
   RETRO: "활성 팀원 전원",
   ESCALATION: "안건 이슈를 맡았던 팀원 + 리뷰",
+  MANAGER: "매니저 롤 1명(단독 순찰)",
 };
 
 type AttendeeMode = "auto" | "pick";
@@ -43,7 +52,7 @@ export function MeetingConveneModal({ projectId, personas, open, onOpenChange, o
   const [busy, setBusy] = useState(false);
 
   const candidates = personas.filter((p) => p.active);
-  const needsAgenda = type !== "RETRO" && !issueKey.trim() && !agenda.trim();
+  const needsAgenda = !AGENDA_OPTIONAL.includes(type) && !issueKey.trim() && !agenda.trim();
   const agendaError = submitted && needsAgenda ? "착수/계획·에스컬레이션 회의에는 안건 이슈나 안건 지시가 필요합니다" : undefined;
   const attendeeError =
     submitted && mode === "pick" && picked.length === 0
@@ -83,7 +92,7 @@ export function MeetingConveneModal({ projectId, personas, open, onOpenChange, o
         personaSlugs: mode === "pick" ? picked : undefined,
       });
       toast({
-        title: `${AGENT_MEETING_TYPE_LABEL[type]} 회의를 소집했습니다`,
+        title: `${agentMeetingRunName(type)}를 소집했습니다`,
         description: result.attendees.length > 0 ? `참석: ${result.attendees.map((a) => a.name).join(", ")}` : undefined,
         appearance: "success",
       });

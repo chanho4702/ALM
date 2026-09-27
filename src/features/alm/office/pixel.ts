@@ -89,7 +89,10 @@ export function breathe(frame: Matrix): string[] {
 /** 모니터 ON 프레임 — 이미 매트릭스로 있다 */
 export const MONITOR = { off: M.MONITOR_OFF, onA: M.MONITOR_ON_A, onB: M.MONITOR_ON_B };
 
-const ACC: Record<AgentRole, Matrix> = {
+/** 도트 시안이 있는 6롤 — 액세서리 매트릭스와 `--office-role-*`·`--office-acc-*` 팔레트가 이 키로만 있다 */
+type DrawnRole = Exclude<AgentRole, "MANAGER">;
+
+const ACC: Record<DrawnRole, Matrix> = {
   PLANNER: M.ACC_PLANNER,
   DESIGNER: M.ACC_DESIGNER,
   FRONTEND: M.ACC_FRONTEND,
@@ -98,10 +101,18 @@ const ACC: Record<AgentRole, Matrix> = {
   REVIEWER: M.ACC_REVIEWER,
 };
 
+/**
+ * 그릴 롤 — MANAGER는 전용 도트가 아직 없어 기획 아바타(연필)를 빌려 쓰고, 명판·카드·패널의 롤 라벨("매니저")로
+ * 구분한다(D-P3c-5). 시안 밖 값이 와도 매트릭스·팔레트가 비지 않게 기획으로 접는다.
+ */
+export function drawnRole(role: AgentRole): DrawnRole {
+  return role in ACC ? (role as DrawnRole) : "PLANNER";
+}
+
 export type AvatarFrame = "standA" | "standB" | "seat" | "slump";
 
 export function avatarMatrix(role: AgentRole, frame: AvatarFrame): string[] {
-  const acc = ACC[role];
+  const acc = ACC[drawnRole(role)];
   switch (frame) {
     case "standA":
       return overlay(M.AVATAR_STAND, acc, 0);
@@ -126,7 +137,8 @@ function cached(key: string, build: () => PixelPath[]): PixelPath[] {
 }
 
 export function avatarPaths(role: AgentRole, frame: AvatarFrame): PixelPath[] {
-  return cached(`av:${role}:${frame}`, () => matrixToPaths(avatarMatrix(role, frame), "char"));
+  const drawn = drawnRole(role);
+  return cached(`av:${drawn}:${frame}`, () => matrixToPaths(avatarMatrix(drawn, frame), "char"));
 }
 
 /** 이름 붙은 스프라이트(가구·오버레이)의 원점 기준 path — memo */
@@ -218,7 +230,7 @@ export function avatarVars(slug: string, role: AgentRole): Record<string, string
   const h = fnv1a32(slug);
   const skin = SKINS[h % 3];
   const hair = (h >>> 2) % 4;
-  const r = role.toLowerCase();
+  const r = drawnRole(role).toLowerCase();
   return {
     "--av-skin": `var(--office-skin-${skin})`,
     "--av-skin2": `var(--office-skin-${skin}2)`,

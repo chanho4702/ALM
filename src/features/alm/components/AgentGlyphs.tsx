@@ -9,6 +9,7 @@ import {
   CircleSlash,
   ClipboardCheck,
   ClipboardList,
+  ClipboardPen,
   Coffee,
   GitMerge,
   HardHat,
@@ -78,6 +79,8 @@ const ROLES: Record<AgentRole, { icon: Icon; label: string }> = {
   BACKEND: { icon: Server, label: "백엔드" },
   OPS: { icon: HardHat, label: "운영" },
   REVIEWER: { icon: SearchCheck, label: "리뷰" },
+  // 기획(ClipboardList)·계획 게이트(ClipboardCheck)와 겹치지 않는 클립보드 — 매니저 보고 run과 같은 그림
+  MANAGER: { icon: ClipboardPen, label: "매니저" },
 };
 
 export const AGENT_STATUS_LABEL: Record<AgentPersonaState, string> = Object.fromEntries(
@@ -162,7 +165,12 @@ export const AGENT_MEETING_TYPE_LABEL: Record<AgentMeetingType, string> = {
   MEETING: "착수/계획",
   RETRO: "회고",
   ESCALATION: "에스컬레이션",
+  MANAGER: "매니저 보고",
 };
+/** 말풍선·토스트의 run 이름 — 매니저 보고는 회의가 아니라 " 회의"를 붙이지 않는다 */
+export function agentMeetingRunName(type: AgentMeetingType): string {
+  return type === "MANAGER" ? AGENT_MEETING_TYPE_LABEL[type] : `${AGENT_MEETING_TYPE_LABEL[type]} 회의`;
+}
 export const AGENT_RUN_TYPE_LABEL: Record<AgentRunType, string> = {
   TASK: "작업",
   REVIEW: "리뷰",
@@ -176,7 +184,12 @@ export const AGENT_GATE_KIND_LABEL: Record<AgentGateKind, string> = {
 };
 
 /** 에스컬레이션은 게이트 종류와 같은 사이렌 — 같은 뜻에 같은 그림 */
-const MEETING_TYPE_ICONS: Record<AgentMeetingType, Icon> = { MEETING: UsersRound, RETRO: RotateCcw, ESCALATION: Siren };
+const MEETING_TYPE_ICONS: Record<AgentMeetingType, Icon> = {
+  MEETING: UsersRound,
+  RETRO: RotateCcw,
+  ESCALATION: Siren,
+  MANAGER: ClipboardPen,
+};
 const RUN_TYPE_ICONS: Record<AgentRunType, Icon> = { TASK: Wrench, REVIEW: SearchCheck, ...MEETING_TYPE_ICONS };
 const RUN_TRIGGER_ICONS: Record<AgentRunTrigger, Icon> = { SCHEDULER: CalendarClock, USER: UserRound };
 const GATE_KIND_ICONS: Record<AgentGateKind, Icon> = { MERGE: GitMerge, ESCALATION: Siren, PLAN: ClipboardCheck };
@@ -195,7 +208,7 @@ export function AgentRunTypeGlyph({ type, size }: { type: AgentRunType; size?: 1
   return <IconText icon={RUN_TYPE_ICONS[type]} label={AGENT_RUN_TYPE_LABEL[type]} size={size} />;
 }
 
-/** 회의 종류 — 착수/계획(사람들)/회고(되감기)/에스컬레이션(사이렌) */
+/** 회의 종류 — 착수/계획(사람들)/회고(되감기)/에스컬레이션(사이렌)/매니저 보고(펜 든 클립보드) */
 export function AgentMeetingTypeGlyph({ type, size }: { type: AgentMeetingType; size?: 12 | 14 | 16 }) {
   return <IconText icon={MEETING_TYPE_ICONS[type]} label={AGENT_MEETING_TYPE_LABEL[type]} size={size} />;
 }

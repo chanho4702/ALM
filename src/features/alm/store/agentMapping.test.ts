@@ -262,6 +262,24 @@ describe("게시판·회의 소집(P3b)", () => {
     expect(mapAgentRunSummary({ ...base, type: "WHAT" }).type).toBe("TASK");
   });
 
+  it("매니저(P3c) — run 종류·게시물 종류·페르소나 롤 MANAGER를 그대로 읽고, 모르는 롤은 여전히 FRONTEND", () => {
+    const base = { id: 1, issueKey: "PROJECT-3", status: "DONE", personaId: 5, attempt: 1, model: null, startedAt: null, endedAt: null };
+    expect(mapAgentRunSummary({ ...base, type: "MANAGER" }).type).toBe("MANAGER");
+    expect(isProjectWideMeeting({ type: "MANAGER", issueKey: "PROJECT-3" })).toBe(true);
+    const office = mapAgentOffice({
+      ...OFFICE_DTO,
+      personas: [
+        { ...OFFICE_DTO.personas[1], id: 107, slug: "manager-bot", role: "MANAGER" },
+        { ...OFFICE_DTO.personas[1], id: 108, slug: "odd-bot", role: "JANITOR" },
+      ],
+      boardPosts: [
+        { runId: 40, type: "MANAGER", issueKey: "PROJECT-3", projectId: 3, pageId: 50, spaceId: 5, endedAt: "2026-09-27T02:00:00Z" },
+      ],
+    });
+    expect(office.personas.map((p) => p.role)).toEqual(["MANAGER", "FRONTEND"]);
+    expect(office.boardPosts[0]).toMatchObject({ type: "MANAGER", agendaIssueKey: null });
+  });
+
   it("소집은 숫자 projectId로 POST하고, 빈 안건·빈 참석자는 보내지 않는다", async () => {
     const spy = vi.spyOn(client, "sharedApiFetch").mockImplementation(async () =>
       json(201, {

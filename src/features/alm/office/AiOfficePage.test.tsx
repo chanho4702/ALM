@@ -140,11 +140,41 @@ describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
   });
 });
 
+describe("매니저 롤 페르소나(D-P3c-5) — 도트 시안 없이도 그린다", () => {
+  it("캔버스·팀 카드에 기획 아바타로 앉고, 접근 이름·카드의 롤 라벨 '매니저'로 구분된다", async () => {
+    const user = userEvent.setup();
+    const base = await store.fetchOffice("p1");
+    vi.spyOn(store, "fetchOffice").mockResolvedValue({
+      ...base,
+      personas: [
+        ...base.personas,
+        {
+          id: "107", slug: "manager-bot", name: "매니저봇", emoji: null, role: "MANAGER", active: true,
+          currentRun: null, lastActivity: null, todayCostUsd: 0,
+        },
+      ],
+    });
+    const { container } = renderApp(OFFICE_PATH);
+    expect(await screen.findByRole("button", { name: "매니저봇, 매니저, 휴식 중 — 개인 오피스 열기" })).toBeInTheDocument();
+    // 7명 모두 아바타가 그려진다 — 매니저 몫도 빈 path가 아니다(팔레트 폴백은 pixel 단위 테스트)
+    const avatars = container.querySelectorAll(".office-avatar");
+    expect(avatars).toHaveLength(7);
+    avatars.forEach((a) => expect(a.querySelector("path")).not.toBeNull());
+
+    await user.click(screen.getByRole("tab", { name: "팀 카드" }));
+    const cards = await screen.findAllByRole("article");
+    expect(cards).toHaveLength(7);
+    const manager = cards.find((c) => within(c).queryByRole("heading", { name: "매니저봇" }))!;
+    expect(within(manager).getByText("매니저")).toBeInTheDocument();
+    expect(manager.querySelector(".lucide-clipboard-pen")).not.toBeNull();
+  });
+});
+
 describe("게시판 — BLOCKED run 중복 방지", () => {
   it("currentRun과 recentRuns 양쪽의 BLOCKED run은 게시판 보고서에 나오지 않는다", async () => {
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
-    const board = await screen.findByRole("button", { name: "게시판 — 회의록 3건, 최근 작업 보고서 4건" });
+    const board = await screen.findByRole("button", { name: "게시판 — 회의록 4건, 최근 작업 보고서 4건" });
     await user.click(board);
     const panel = await screen.findByRole("complementary", { name: "게시판" });
     const reports = within(panel).getByRole("list", { name: "최근 종결 보고서" });
@@ -159,11 +189,21 @@ describe("게시판 — 회의록 게시물(AGP-41)", () => {
   it("종류(아이콘+텍스트)·안건·회의록·시각 — 합성 키 회의는 '프로젝트 전반'이고 안건 이슈 링크가 없다", async () => {
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
-    await user.click(await screen.findByRole("button", { name: /^게시판 — 회의록 3건/ }));
+    await user.click(await screen.findByRole("button", { name: /^게시판 — 회의록 4건/ }));
     const panel = await screen.findByRole("complementary", { name: "게시판" });
-    expect(within(panel).getByRole("heading", { name: /회의록\s*3/ })).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { name: /회의록\s*4/ })).toBeInTheDocument();
     const posts = within(panel).getByRole("list", { name: "회의록 게시물" });
-    expect(within(posts).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(posts).getAllByRole("listitem")).toHaveLength(4);
+
+    // 매니저 보고(P3c) — 회의 계열이라 게시판에 같이 오고, 안건 이슈 없는 순찰이라 '프로젝트 전반'
+    const manager = within(posts).getByTestId("office-board-post-8996");
+    expect(within(manager).getByText("매니저 보고")).toBeInTheDocument();
+    expect(manager.querySelector(".lucide-clipboard-pen")).not.toBeNull();
+    expect(manager).toHaveTextContent("프로젝트 전반");
+    expect(within(manager).getByRole("link", { name: "매니저 보고 회의록 — 위키에서 열기(새 탭)" })).toHaveAttribute(
+      "href",
+      "/wiki/spaces/5/pages/315",
+    );
 
     const retro = within(posts).getByTestId("office-board-post-8995");
     expect(retro).toHaveTextContent("회고");
@@ -187,8 +227,8 @@ describe("게시판 — 회의록 게시물(AGP-41)", () => {
     expect(minutes).toHaveAttribute("href", "/wiki/spaces/5/pages/312");
     expect(minutes).toHaveAttribute("target", "_blank");
     expect(minutes).toHaveAttribute("rel", "noopener noreferrer");
-    // 안건 이슈 링크 2 + 회의록 링크 3
-    expect(within(posts).getAllByRole("link")).toHaveLength(5);
+    // 안건 이슈 링크 2 + 회의록 링크 4
+    expect(within(posts).getAllByRole("link")).toHaveLength(6);
   });
 
   it("spaceId가 없으면(구 백엔드·스페이스 미설정) 회의록은 링크 없이 라벨만", async () => {
@@ -199,12 +239,12 @@ describe("게시판 — 회의록 게시물(AGP-41)", () => {
       boardPosts: base.boardPosts.map((p) => ({ ...p, spaceId: null })),
     });
     renderApp(OFFICE_PATH);
-    await user.click(await screen.findByRole("button", { name: /^게시판 — 회의록 3건/ }));
+    await user.click(await screen.findByRole("button", { name: /^게시판 — 회의록 4건/ }));
     const posts = within(await screen.findByRole("complementary", { name: "게시판" })).getByRole("list", {
       name: "회의록 게시물",
     });
     expect(within(posts).queryByRole("link", { name: /회의록/ })).not.toBeInTheDocument();
-    expect(within(posts).getAllByText("회의록")).toHaveLength(3);
+    expect(within(posts).getAllByText("회의록")).toHaveLength(4);
     expect(within(posts).getAllByRole("link")).toHaveLength(2);
   });
 
@@ -298,6 +338,34 @@ describe("회의 소집(D-P3b-4)", () => {
     );
     expect(await screen.findByText("참석: 운영봇, 리뷰봇")).toBeInTheDocument();
   });
+
+  it("매니저 보고 — 자동 규칙은 매니저 1명, 안건 없이 보내고 서버 거부 문구를 그대로 토스트", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(store, "createMeeting");
+    renderApp(OFFICE_PATH);
+    await user.click(await screen.findByRole("button", { name: "회의 소집" }));
+    const dialog = await screen.findByRole("dialog", { name: "회의 소집" });
+    await user.click(within(dialog).getByRole("combobox", { name: "종류" }));
+    await user.click(await screen.findByRole("option", { name: "매니저 보고" }));
+    expect(within(dialog).getByRole("radio", { name: "자동(롤 규칙) — 매니저 롤 1명(단독 순찰)" })).toBeChecked();
+
+    await user.click(within(dialog).getByRole("button", { name: "소집" }));
+    expect(within(dialog).queryByText(/안건 이슈나 안건 지시가 필요합니다/)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        type: "MANAGER", projectId: "p1", agendaIssueKey: undefined, agenda: undefined, personaSlugs: undefined,
+      }),
+    );
+    // 목업 6인에는 매니저가 없다 — 서버와 같은 문구
+    expect(await screen.findByText("MANAGER 회의에 참석할 활성 페르소나가 없습니다")).toBeInTheDocument();
+
+    // 직접 고르기에서 실무 롤을 고르면 클라가 막지 않고 서버 400 문구를 보여 준다
+    await user.click(within(dialog).getByRole("radio", { name: "직접 고르기" }));
+    await user.click(within(within(dialog).getByRole("group", { name: "참석할 팀원" })).getByRole("checkbox", { name: /^기획봇/ }));
+    await user.click(within(dialog).getByRole("button", { name: "소집" }));
+    expect(await screen.findByText("MANAGER run의 personaSlugs는 MANAGER 롤 페르소나 1명이어야 합니다")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "회의 소집" })).toBeInTheDocument();
+  });
 });
 
 describe("회의 소집 목업 — 서버 규칙 미러", () => {
@@ -315,6 +383,15 @@ describe("회의 소집 목업 — 서버 규칙 미러", () => {
       "이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=p1",
     );
     expect((await store.fetchAgentRuns()).some((r) => r.id === retro.run.id && r.type === "RETRO")).toBe(true);
+  });
+
+  it("매니저 보고는 안건 없이 통과하지만 매니저 롤 1명만 — 실무 롤·여럿 지정은 서버 문구로 거부", async () => {
+    await expect(store.createMeeting({ type: "MANAGER", projectId: "p1" })).rejects.toThrow(
+      "MANAGER 회의에 참석할 활성 페르소나가 없습니다",
+    );
+    await expect(
+      store.createMeeting({ type: "MANAGER", projectId: "p1", personaSlugs: ["planner-bot"] }),
+    ).rejects.toThrow("MANAGER run의 personaSlugs는 MANAGER 롤 페르소나 1명이어야 합니다");
   });
 });
 

@@ -13,7 +13,7 @@ import type {
 } from "../store/types";
 import { isProjectWideMeeting } from "../store/agentMapping";
 import {
-  AGENT_MEETING_TYPE_LABEL,
+  agentMeetingRunName,
   AGENT_ROLE_LABEL,
   AGENT_STATUS_LABEL,
   type AgentPersonaState,
@@ -27,17 +27,23 @@ export function linkableIssueKey(run: { type: AgentRunType; issueKey: string | n
   return isProjectWideMeeting(run) ? null : run.issueKey;
 }
 
-/** "회고 회의" — 회의 run의 종류 라벨 */
-const meetingLabel = (type: AgentRunType) => `${AGENT_MEETING_TYPE_LABEL[type as AgentMeetingType]} 회의`;
+/** "회고 회의"·"매니저 보고" — 회의 계열 run의 이름 */
+const meetingLabel = (type: AgentRunType) => agentMeetingRunName(type as AgentMeetingType);
 
-export const ROLE_ORDER: readonly AgentRole[] = ["PLANNER", "DESIGNER", "FRONTEND", "BACKEND", "OPS", "REVIEWER"];
+/** MANAGER는 맨 끝 — 기존 6롤의 책상·카드 자리를 밀지 않는다. 목록에 없는 롤도 끝으로(indexOf −1을 앞으로 보내지 않게) */
+export const ROLE_ORDER: readonly AgentRole[] = ["PLANNER", "DESIGNER", "FRONTEND", "BACKEND", "OPS", "REVIEWER", "MANAGER"];
+
+const roleRank = (role: AgentRole) => {
+  const i = ROLE_ORDER.indexOf(role);
+  return i < 0 ? ROLE_ORDER.length : i;
+};
 
 const TERMINAL: readonly AgentRunStatus[] = ["DONE", "FAILED", "CANCELLED"];
 
 /** 롤 순서 → 같은 롤은 id 오름차순(숫자 id면 숫자로). 책상·유휴 자리·카드·탭 순서 공통(스펙 §1.5) */
 export function sortPersonas(personas: readonly AgentOfficePersona[]): AgentOfficePersona[] {
   return [...personas].sort((a, b) => {
-    const byRole = ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);
+    const byRole = roleRank(a.role) - roleRank(b.role);
     if (byRole !== 0) return byRole;
     const na = Number(a.id);
     const nb = Number(b.id);

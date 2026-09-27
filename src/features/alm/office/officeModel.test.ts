@@ -160,6 +160,18 @@ describe("상태 파생(스펙 §4.1)", () => {
     );
     expect(personaAccessibleName(persona())).toBe("백엔드봇, 백엔드, 휴식 중 — 개인 오피스 열기");
   });
+
+  it("매니저 보고 run — 롤 라벨 '매니저', 말풍선·접근 이름은 '매니저 보고'(뒤에 '회의'를 붙이지 않는다)", () => {
+    const p = persona({
+      name: "매니저봇",
+      role: "MANAGER",
+      currentRun: run("RUNNING", { type: "MANAGER", issueKey: "PROJECT-1" }),
+    });
+    expect(bubbleText(p)?.line1).toBe("매니저 보고");
+    expect(personaAccessibleName(p)).toBe("매니저봇, 매니저, 작업 중, 매니저 보고 프로젝트 전반 — 개인 오피스 열기");
+    const retro = persona({ currentRun: run("RUNNING", { type: "RETRO", issueKey: "PROJECT-1" }) });
+    expect(bubbleText(retro)?.line1).toBe("회고 회의");
+  });
 });
 
 describe("정렬(스펙 §1.5)", () => {
@@ -171,6 +183,15 @@ describe("정렬(스펙 §1.5)", () => {
       persona({ id: "11", role: "BACKEND" }),
     ]);
     expect(sorted.map((p) => p.id)).toEqual(["3", "9", "11", "10"]);
+  });
+
+  it("매니저는 맨 끝 — 기존 6롤 자리를 밀지 않는다", () => {
+    const sorted = sortPersonas([
+      persona({ id: "1", role: "MANAGER" }),
+      persona({ id: "10", role: "REVIEWER" }),
+      persona({ id: "3", role: "PLANNER" }),
+    ]);
+    expect(sorted.map((p) => p.role)).toEqual(["PLANNER", "REVIEWER", "MANAGER"]);
   });
 });
 

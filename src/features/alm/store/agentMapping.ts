@@ -145,7 +145,7 @@ export interface AgentPersonaActivityDto {
   todayCostUsd: number | string | null;
 }
 
-const ROLES: readonly AgentRole[] = ["PLANNER", "DESIGNER", "FRONTEND", "BACKEND", "OPS", "REVIEWER"];
+const ROLES: readonly AgentRole[] = ["PLANNER", "DESIGNER", "FRONTEND", "BACKEND", "OPS", "REVIEWER", "MANAGER"];
 const RUN_STATUSES: readonly AgentRunStatus[] = [
   "QUEUED",
   "RUNNING",
@@ -157,7 +157,7 @@ const RUN_STATUSES: readonly AgentRunStatus[] = [
 ];
 const ACTIVE_STATUSES: readonly AgentActiveRunStatus[] = ["QUEUED", "RUNNING", "WAITING_APPROVAL", "BLOCKED"];
 const GATE_KINDS: readonly AgentGateKind[] = ["MERGE", "ESCALATION", "PLAN"];
-const MEETING_TYPES: readonly AgentMeetingType[] = ["MEETING", "RETRO", "ESCALATION"];
+const MEETING_TYPES: readonly AgentMeetingType[] = ["MEETING", "RETRO", "ESCALATION", "MANAGER"];
 
 function pick<T extends string>(allowed: readonly T[], value: unknown, fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
