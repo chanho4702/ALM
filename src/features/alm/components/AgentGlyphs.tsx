@@ -16,16 +16,19 @@ import {
   Keyboard,
   Palette,
   PowerOff,
+  RotateCcw,
   SearchCheck,
   Server,
   Siren,
   TriangleAlert,
   UserRound,
+  UsersRound,
   Wrench,
 } from "lucide-react";
 import type {
   AgentActiveRunStatus,
   AgentGateKind,
+  AgentMeetingType,
   AgentRole,
   AgentRunStatus,
   AgentRunTrigger,
@@ -154,7 +157,17 @@ export function AgentRoleGlyph({ role, size = 14 }: { role: AgentRole; size?: 12
   );
 }
 
-export const AGENT_RUN_TYPE_LABEL: Record<AgentRunType, string> = { TASK: "작업", REVIEW: "리뷰" };
+/** 회의 종류 — 게시판·회의 소집 모달·run 목록이 같은 이름을 쓴다 */
+export const AGENT_MEETING_TYPE_LABEL: Record<AgentMeetingType, string> = {
+  MEETING: "착수/계획",
+  RETRO: "회고",
+  ESCALATION: "에스컬레이션",
+};
+export const AGENT_RUN_TYPE_LABEL: Record<AgentRunType, string> = {
+  TASK: "작업",
+  REVIEW: "리뷰",
+  ...AGENT_MEETING_TYPE_LABEL,
+};
 export const AGENT_RUN_TRIGGER_LABEL: Record<AgentRunTrigger, string> = { SCHEDULER: "자동", USER: "수동" };
 export const AGENT_GATE_KIND_LABEL: Record<AgentGateKind, string> = {
   MERGE: "머지",
@@ -162,7 +175,9 @@ export const AGENT_GATE_KIND_LABEL: Record<AgentGateKind, string> = {
   PLAN: "계획",
 };
 
-const RUN_TYPE_ICONS: Record<AgentRunType, Icon> = { TASK: Wrench, REVIEW: SearchCheck };
+/** 에스컬레이션은 게이트 종류와 같은 사이렌 — 같은 뜻에 같은 그림 */
+const MEETING_TYPE_ICONS: Record<AgentMeetingType, Icon> = { MEETING: UsersRound, RETRO: RotateCcw, ESCALATION: Siren };
+const RUN_TYPE_ICONS: Record<AgentRunType, Icon> = { TASK: Wrench, REVIEW: SearchCheck, ...MEETING_TYPE_ICONS };
 const RUN_TRIGGER_ICONS: Record<AgentRunTrigger, Icon> = { SCHEDULER: CalendarClock, USER: UserRound };
 const GATE_KIND_ICONS: Record<AgentGateKind, Icon> = { MERGE: GitMerge, ESCALATION: Siren, PLAN: ClipboardCheck };
 
@@ -178,6 +193,17 @@ function IconText({ icon: IconComp, label, size = 14 }: { icon: Icon; label: str
 /** run 종류 — 작업(렌치)/리뷰(돋보기, 캔버스 돋보기와 같은 뜻) */
 export function AgentRunTypeGlyph({ type, size }: { type: AgentRunType; size?: 12 | 14 | 16 }) {
   return <IconText icon={RUN_TYPE_ICONS[type]} label={AGENT_RUN_TYPE_LABEL[type]} size={size} />;
+}
+
+/** 회의 종류 — 착수/계획(사람들)/회고(되감기)/에스컬레이션(사이렌) */
+export function AgentMeetingTypeGlyph({ type, size }: { type: AgentMeetingType; size?: 12 | 14 | 16 }) {
+  return <IconText icon={MEETING_TYPE_ICONS[type]} label={AGENT_MEETING_TYPE_LABEL[type]} size={size} />;
+}
+
+/** 아이콘만(Select 옵션처럼 라벨이 따로 있는 자리) — 장식이라 접근 이름이 없다 */
+export function AgentMeetingTypeIcon({ type, size = 14 }: { type: AgentMeetingType; size?: 12 | 14 | 16 }) {
+  const IconComp = MEETING_TYPE_ICONS[type];
+  return <IconComp size={size} aria-hidden />;
 }
 
 /** run 트리거 — 자동(스케줄러)/수동(사람 요청) */

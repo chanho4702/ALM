@@ -27,6 +27,8 @@ export interface OfficeCanvasProps {
   selectedId: string | null;
   boardOpen: boolean;
   boardCount: number;
+  /** 게시판 회의록 게시물 수 */
+  postCount: number;
   todayReports: number;
   onOpenPersona: (id: string, opener: HTMLElement) => void;
   onOpenBoard: (opener: HTMLElement) => void;
@@ -236,6 +238,7 @@ export function OfficeCanvas({
   selectedId,
   boardOpen,
   boardCount,
+  postCount,
   todayReports,
   onOpenPersona,
   onOpenBoard,
@@ -299,7 +302,7 @@ export function OfficeCanvas({
             type="button"
             className="office-hit-board"
             style={vars({ "--x": 258, "--y": 4, "--w": 64, "--h": 22 })}
-            aria-label={`게시판 — 최근 작업 보고서 ${boardCount}건`}
+            aria-label={`게시판 — 회의록 ${postCount}건, 최근 작업 보고서 ${boardCount}건`}
             aria-controls="ai-office-panel"
             aria-expanded={boardOpen}
             onClick={(e) => onOpenBoard(e.currentTarget)}

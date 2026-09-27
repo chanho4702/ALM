@@ -93,6 +93,7 @@ export const resumeRun = impl.resumeRun;
 export const fetchAgentGates = impl.fetchAgentGates;
 export const approveGate = impl.approveGate;
 export const rejectGate = impl.rejectGate;
+export const createMeeting = impl.createMeeting;
 export const listIssuesPage = impl.listIssuesPage;
 export const listWatchers = impl.listWatchers;
 export const watchIssue = impl.watchIssue;

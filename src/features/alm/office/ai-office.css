@@ -955,3 +955,65 @@
   background: var(--chanho-color-background-subtle);
   box-shadow: inset 0 0 0 1px var(--chanho-color-border-default);
 }
+
+/* ── 게시판 회의록 게시물(P3b) ─────────────────────────────── */
+.office-board-agenda {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-board-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* ── 회의 소집 모달(P3b) — 캔버스 밖이라 DS 토큰만, 픽셀 스타일 없음 ───────── */
+.meeting-convene-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.meeting-convene-attendees {
+  margin: 0;
+  padding: var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.meeting-convene-legend {
+  padding: 0 var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.meeting-convene-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-100) var(--chanho-space-200);
+}
+
+.meeting-convene-person {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+}
+
+.meeting-convene-error {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-danger);
+}
+
+.meeting-convene-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}

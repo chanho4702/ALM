@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate } from "react-router";
 import { Banner, Button, Spinner } from "@chanho/react";
-import { History, Wrench, X } from "lucide-react";
-import type { AgentOfficePersona, AgentPersonaActivity, AgentRunSummary } from "../store/types";
+import { FileText, History, Wrench, X } from "lucide-react";
+import type { AgentBoardPost, AgentOfficePersona, AgentPersonaActivity, AgentRunSummary } from "../store/types";
 import {
   AGENT_RUN_STATUS_LABEL,
   AGENT_RUN_TRIGGER_LABEL,
+  AGENT_MEETING_TYPE_LABEL,
   AGENT_RUN_TYPE_LABEL,
+  AgentMeetingTypeGlyph,
   AgentRoleGlyph,
   AgentRunStatusLozenge,
   AgentStatusLozenge,
@@ -59,6 +61,7 @@ export function OfficePanel({
   target,
   personaNames,
   recentFinished,
+  boardPosts,
   activity,
   activityStatus,
   links,
@@ -69,6 +72,7 @@ export function OfficePanel({
   target: PanelTarget;
   personaNames: Map<string, AgentOfficePersona>;
   recentFinished: AgentRunSummary[];
+  boardPosts: AgentBoardPost[];
   activity: AgentPersonaActivity | null;
   activityStatus: LoadStatus | "idle";
   links: OfficeLinks;
@@ -108,6 +112,7 @@ export function OfficePanel({
         />
       ) : (
         <BoardBody
+          posts={boardPosts}
           runs={recentFinished}
           personaNames={personaNames}
           links={links}
@@ -297,12 +302,14 @@ function TodayAudits({ activity }: { activity: AgentPersonaActivity }) {
 }
 
 function BoardBody({
+  posts,
   runs,
   personaNames,
   links,
   titleRef,
   onClose,
 }: {
+  posts: AgentBoardPost[];
   runs: AgentRunSummary[];
   personaNames: Map<string, AgentOfficePersona>;
   links: OfficeLinks;
@@ -317,15 +324,26 @@ function BoardBody({
           <h2 id="ai-office-panel-title" className="office-panel-title" tabIndex={-1} ref={titleRef}>
             게시판
           </h2>
-          <span className="office-panel-role">최근 작업 보고서</span>
+          <span className="office-panel-role">회의록 · 최근 작업 보고서</span>
         </div>
         <CloseButton onClose={onClose} label="게시판 닫기" />
       </header>
+      <Section title="회의록" count={posts.length}>
+        {posts.length === 0 ? (
+          <p className="office-panel-empty">아직 게시물이 없습니다</p>
+        ) : (
+          <ul className="office-board-list" aria-label="회의록 게시물">
+            {posts.map((post) => (
+              <BoardPostRow key={post.runId} post={post} links={links} />
+            ))}
+          </ul>
+        )}
+      </Section>
       <Section title="최근 종결" count={runs.length}>
         {runs.length === 0 ? (
           <p className="office-panel-empty">아직 게시된 보고서가 없습니다</p>
         ) : (
-          <ul className="office-board-list">
+          <ul className="office-board-list" aria-label="최근 종결 보고서">
             {runs.map((r) => {
               const persona = personaNames.get(r.personaId);
               return (
@@ -352,5 +370,35 @@ function BoardBody({
         )}
       </Section>
     </>
+  );
+}
+
+/**
+ * 게시물 한 줄 — 종류·안건·회의록·시각. 서버가 위키 페이지 id만 주고 스페이스 id를 주지 않는데, 위키 라우트는
+ * `/spaces/:spaceId/pages/:pageId`뿐이고 모르는 스페이스는 "찾을 수 없음"이 된다 — 그래서 회의록은 링크 없이 라벨만 둔다.
+ */
+function BoardPostRow({ post, links }: { post: AgentBoardPost; links: OfficeLinks }) {
+  return (
+    <li className="office-board-row" data-testid={`office-board-post-${post.runId}`}>
+      <AgentMeetingTypeGlyph type={post.type} size={12} />
+      {post.agendaIssueKey ? (
+        <Link
+          to={links.issue(post.agendaIssueKey)}
+          className="office-run-key"
+          aria-label={`${AGENT_MEETING_TYPE_LABEL[post.type]} 안건 ${post.agendaIssueKey}`}
+        >
+          {post.agendaIssueKey}
+        </Link>
+      ) : (
+        <span className="office-board-agenda">프로젝트 전반</span>
+      )}
+      <span className="office-board-doc" title={`위키 페이지 #${post.pageId}`}>
+        <FileText size={12} aria-hidden />
+        회의록
+      </span>
+      <span className="office-run-meta" title={formatDateTime(post.endedAt)}>
+        {relTime(post.endedAt)}
+      </span>
+    </li>
   );
 }

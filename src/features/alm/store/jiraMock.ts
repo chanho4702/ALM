@@ -41,6 +41,10 @@ import type {
   AgentCurrentRun,
   AgentGate,
   AgentGateDecision,
+  AgentBoardPost,
+  AgentMeetingCreated,
+  AgentMeetingInput,
+  AgentRole,
   AuditEntry,
   SystemStats,
   IssueTypeDef,
@@ -2453,7 +2457,16 @@ function baseRecentRuns(now: number): AgentRunSummary[] {
   ];
 }
 
-function mockOffice(now: number): AgentOffice {
+/** 게시판 목업 — 회고(안건 이슈 없음)·착수/계획·에스컬레이션 각 1건, 최신 먼저 */
+function baseBoardPosts(now: number, projectId: string): AgentBoardPost[] {
+  return [
+    { runId: "8995", type: "RETRO", agendaIssueKey: null, projectId, pageId: "312", endedAt: ago(now, 25) },
+    { runId: "8994", type: "MEETING", agendaIssueKey: "ALM-4", projectId, pageId: "308", endedAt: ago(now, 190) },
+    { runId: "8993", type: "ESCALATION", agendaIssueKey: "ALM-5", projectId, pageId: "305", endedAt: ago(now, 60 * 26) },
+  ];
+}
+
+function mockOffice(now: number, projectId = "p1"): AgentOffice {
   const personas = baseOfficePersonas(now);
   const recentRuns = baseRecentRuns(now);
   applyAgentOverrides(personas, recentRuns);
@@ -2475,11 +2488,12 @@ function mockOffice(now: number): AgentOffice {
       killSwitch: false,
     },
     generatedAt: new Date(now).toISOString(),
+    boardPosts: baseBoardPosts(now, projectId),
   };
 }
 
-export async function fetchOffice(_projectId?: string): Promise<AgentOffice> {
-  return mockOffice(Date.now());
+export async function fetchOffice(projectId?: string): Promise<AgentOffice> {
+  return mockOffice(Date.now(), projectId);
 }
 
 export async function fetchPersonaActivity(personaId: string): Promise<AgentPersonaActivity> {
@@ -2517,11 +2531,13 @@ interface AgentMockState {
   /** 재개·승인이 만든 후속 run(attempt+1) */
   added: AgentRunSummary[];
   decisions: Map<string, AgentGateDecision>;
+  /** 프로젝트 → 소집된 회의 run id — 그 run이 아직 활성이면 같은 프로젝트 재소집은 409 */
+  meetings: Map<string, string>;
   seq: number;
 }
 
 function freshAgentState(): AgentMockState {
-  return { closed: new Map(), added: [], decisions: new Map(), seq: 9100 };
+  return { closed: new Map(), added: [], decisions: new Map(), meetings: new Map(), seq: 9100 };
 }
 
 let agentState: AgentMockState = freshAgentState();
@@ -2683,6 +2699,74 @@ export async function approveGate(gateId: string): Promise<void> {
 
 export async function rejectGate(gateId: string): Promise<void> {
   decideGate(gateId, "REJECT");
+}
+
+// ── 회의 소집(목업) — 검증 순서·거부 문구는 agent-service MeetingService·MeetingCreateRequest를 따른다 ──
+
+const MEETING_PLANNING_ROLES: readonly AgentRole[] = ["PLANNER", "DESIGNER", "FRONTEND", "BACKEND"];
+
+function mockMeetingAttendees(input: AgentMeetingInput, now: number): AgentOfficePersona[] {
+  const active = baseOfficePersonas(now).filter((p) => p.active);
+  if (input.personaSlugs && input.personaSlugs.length > 0) {
+    return input.personaSlugs.map((slug) => {
+      const persona = baseOfficePersonas(now).find((p) => p.slug === slug);
+      if (!persona) throw new Error(`페르소나를 찾을 수 없습니다: ${slug}`);
+      if (!persona.active) throw new Error(`비활성 페르소나는 회의에 참석할 수 없습니다: ${slug}`);
+      return persona;
+    });
+  }
+  if (input.type === "MEETING") return active.filter((p) => MEETING_PLANNING_ROLES.includes(p.role));
+  if (input.type === "RETRO") return active;
+  // 에스컬레이션 — 목업은 run 이력으로 "관련 롤"을 찾지 않고 기획 + 리뷰로 앉힌다(서버의 관련 run 없음 경로)
+  return active.filter((p) => p.role === "PLANNER" || p.role === "REVIEWER");
+}
+
+export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeetingCreated> {
+  const now = Date.now();
+  const issueKeyInput = input.agendaIssueKey?.trim() || null;
+  const agenda = input.agenda?.trim() || null;
+  if (issueKeyInput && issueKeyInput.length > 40) throw new Error("agendaIssueKey는 40자 이하여야 합니다");
+  if (agenda && agenda.length > 4000) throw new Error("agenda는 4000자 이하여야 합니다");
+  if ((input.personaSlugs?.length ?? 0) > 20) throw new Error("personaSlugs는 20명 이하여야 합니다");
+  if (input.type !== "RETRO" && !issueKeyInput && !agenda) {
+    throw new Error(`${input.type} 회의에는 agendaIssueKey 또는 agenda가 필요합니다`);
+  }
+  const attendees = mockMeetingAttendees(input, now);
+  if (attendees.length === 0) throw new Error(`${input.type} 회의에 참석할 활성 페르소나가 없습니다`);
+
+  let issueKey = `PROJECT-${input.projectId}`;
+  if (issueKeyInput) {
+    const issue = load().issues.find((i) => i.key === issueKeyInput.toUpperCase());
+    if (!issue) throw new Error(`이슈를 찾을 수 없습니다: ${issueKeyInput}`);
+    if (issue.projectId !== input.projectId) {
+      throw new Error(`안건 이슈 ${issue.key}는 프로젝트 ${input.projectId} 소속이 아닙니다`);
+    }
+    issueKey = issue.key;
+  }
+  const activeId = agentState.meetings.get(input.projectId);
+  if (activeId && mockAllRuns(now).some((r) => r.id === activeId && AGENT_ACTIVE.includes(r.status))) {
+    throw new Error(`이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=${input.projectId}`);
+  }
+
+  const run: AgentRunSummary = {
+    id: String(agentState.seq++),
+    issueKey,
+    status: "QUEUED",
+    personaId: attendees[0].id,
+    attempt: 1,
+    model: "claude-sonnet-5",
+    startedAt: null,
+    endedAt: null,
+    type: input.type,
+    trigger: "USER",
+    parentRunId: null,
+  };
+  agentState.added.push(run);
+  agentState.meetings.set(input.projectId, run.id);
+  return {
+    run: { ...run },
+    attendees: attendees.map((p) => ({ personaId: p.id, slug: p.slug, name: p.name, role: p.role, emoji: p.emoji })),
+  };
 }
 
 // ── 페이징 ───────────────────────────────────────────────────

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
-import { mapAgentGate, mapAgentOffice, mapAgentPersonaActivity } from "./agentMapping";
+import { mapAgentGate, mapAgentOffice, mapAgentPersonaActivity, mapAgentRunSummary } from "./agentMapping";
 import {
   approveGate,
   cancelRun,
+  createMeeting,
   fetchAgentGates,
   fetchAgentPersonas,
   fetchAgentRuns,
@@ -206,5 +207,73 @@ describe("REST 어댑터 — run·게이트 감독(AGP-12/13)", () => {
     expect(await fetchAgentPersonas()).toEqual([{ id: "104", name: "백엔드봇", emoji: "🛠️" }]);
     vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(json(503));
     expect(await fetchAgentPersonas()).toEqual([]);
+  });
+});
+
+describe("게시판·회의 소집(P3b)", () => {
+  const json = (status: number, body?: unknown) =>
+    new Response(body === undefined ? null : JSON.stringify(body), { status });
+
+  it("구 백엔드 응답(boardPosts 없음·null)은 빈 게시판으로 읽는다", () => {
+    expect(mapAgentOffice(OFFICE_DTO).boardPosts).toEqual([]);
+    expect(mapAgentOffice({ ...OFFICE_DTO, boardPosts: null }).boardPosts).toEqual([]);
+  });
+
+  it("게시물 — long id → string, 합성 키 PROJECT-<projectId>는 안건 없음(null), 모르는 종류는 MEETING", () => {
+    const office = mapAgentOffice({
+      ...OFFICE_DTO,
+      boardPosts: [
+        { runId: 31, type: "RETRO", issueKey: "PROJECT-3", projectId: 3, pageId: 47, endedAt: "2026-09-27T01:00:00Z" },
+        { runId: 30, type: "ESCALATION", issueKey: "ALM-5", projectId: 3, pageId: 46, endedAt: "2026-09-27T00:00:00Z" },
+        // 다른 프로젝트 번호의 PROJECT- 키는 합성 키가 아니다 — 실제 이슈 키로 둔다
+        { runId: 29, type: "PLANNING", issueKey: "PROJECT-7", projectId: 3, pageId: 45, endedAt: "2026-09-26T00:00:00Z" },
+      ],
+    });
+    expect(office.boardPosts).toEqual([
+      { runId: "31", type: "RETRO", agendaIssueKey: null, projectId: "3", pageId: "47", endedAt: "2026-09-27T01:00:00Z" },
+      { runId: "30", type: "ESCALATION", agendaIssueKey: "ALM-5", projectId: "3", pageId: "46", endedAt: "2026-09-27T00:00:00Z" },
+      { runId: "29", type: "MEETING", agendaIssueKey: "PROJECT-7", projectId: "3", pageId: "45", endedAt: "2026-09-26T00:00:00Z" },
+    ]);
+  });
+
+  it("run 요약의 회의 종류(MEETING·RETRO·ESCALATION)를 작업으로 접지 않는다", () => {
+    const base = { id: 1, issueKey: null, status: "DONE", personaId: 5, attempt: 1, model: null, startedAt: null, endedAt: null };
+    expect(mapAgentRunSummary({ ...base, type: "RETRO" }).type).toBe("RETRO");
+    expect(mapAgentRunSummary({ ...base, type: "ESCALATION" }).type).toBe("ESCALATION");
+    expect(mapAgentRunSummary({ ...base, type: "WHAT" }).type).toBe("TASK");
+  });
+
+  it("소집은 숫자 projectId로 POST하고, 빈 안건·빈 참석자는 보내지 않는다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockImplementation(async () =>
+      json(201, {
+        run: {
+          id: 9200, issueKey: "PROJECT-3", status: "QUEUED", personaId: 101, attempt: 1, model: null,
+          startedAt: null, endedAt: null, type: "RETRO", trigger: "USER", parentRunId: null,
+        },
+        attendees: [{ personaId: 101, slug: "planner-bot", name: "기획봇", role: "PLANNER", emoji: "📝" }],
+      }),
+    );
+    const created = await createMeeting({ type: "RETRO", projectId: "3", agendaIssueKey: "  ", agenda: "", personaSlugs: [] });
+    expect(spy).toHaveBeenCalledWith("/api/agent/meetings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "RETRO", projectId: 3 }),
+    });
+    expect(created.run).toMatchObject({ id: "9200", type: "RETRO", trigger: "USER", personaId: "101" });
+    expect(created.attendees).toEqual([{ personaId: "101", slug: "planner-bot", name: "기획봇", role: "PLANNER", emoji: "📝" }]);
+
+    await createMeeting({ type: "MEETING", projectId: "3", agendaIssueKey: " ALM-4 ", agenda: "로그인 개편", personaSlugs: ["planner-bot"] });
+    expect(JSON.parse(spy.mock.lastCall?.[1]?.body as string)).toEqual({
+      type: "MEETING", projectId: 3, agendaIssueKey: "ALM-4", agenda: "로그인 개편", personaSlugs: ["planner-bot"],
+    });
+  });
+
+  it("409(같은 프로젝트 활성 회의)는 서버 {error} 문구 그대로 올린다", async () => {
+    vi.spyOn(client, "sharedApiFetch").mockResolvedValue(
+      json(409, { error: "이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=3" }),
+    );
+    await expect(createMeeting({ type: "RETRO", projectId: "3" })).rejects.toThrow(
+      "이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=3",
+    );
   });
 });

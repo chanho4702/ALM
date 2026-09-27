@@ -5,9 +5,13 @@
 import type {
   AgentActiveRunStatus,
   AgentAuditEntry,
+  AgentBoardPost,
   AgentCurrentRun,
   AgentGate,
   AgentGateKind,
+  AgentMeetingAttendee,
+  AgentMeetingCreated,
+  AgentMeetingType,
   AgentOffice,
   AgentOfficePersona,
   AgentPendingGate,
@@ -95,6 +99,28 @@ export interface AgentPersonaDto {
   emoji?: string | null;
 }
 
+/** 게시판 게시물(P3b) — issueKey는 안건 이슈 없는 회의면 서버 합성 키 `PROJECT-<projectId>` */
+export interface AgentBoardPostDto {
+  runId: Id;
+  type: string;
+  issueKey: string;
+  projectId: Id;
+  pageId: Id;
+  endedAt: string;
+}
+
+/** `POST /api/agent/meetings` 201 */
+export interface AgentMeetingCreatedDto {
+  run: AgentRunSummaryDto;
+  attendees?: {
+    personaId: Id;
+    slug: string;
+    name: string;
+    role: string;
+    emoji: string | null;
+  }[] | null;
+}
+
 export interface AgentOfficeDto {
   personas?: AgentOfficePersonaDto[] | null;
   recentRuns?: AgentRunSummaryDto[] | null;
@@ -106,6 +132,8 @@ export interface AgentOfficeDto {
     killSwitch: boolean;
   } | null;
   generatedAt?: string | null;
+  /** P3b 이전 백엔드는 이 필드가 없다 */
+  boardPosts?: AgentBoardPostDto[] | null;
 }
 
 export interface AgentPersonaActivityDto {
@@ -127,6 +155,7 @@ const RUN_STATUSES: readonly AgentRunStatus[] = [
 ];
 const ACTIVE_STATUSES: readonly AgentActiveRunStatus[] = ["QUEUED", "RUNNING", "WAITING_APPROVAL", "BLOCKED"];
 const GATE_KINDS: readonly AgentGateKind[] = ["MERGE", "ESCALATION", "PLAN"];
+const MEETING_TYPES: readonly AgentMeetingType[] = ["MEETING", "RETRO", "ESCALATION"];
 
 function pick<T extends string>(allowed: readonly T[], value: unknown, fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
@@ -139,7 +168,8 @@ function money(value: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const runType = (value: unknown): AgentRunType => (value === "REVIEW" ? "REVIEW" : "TASK");
+const RUN_TYPES: readonly AgentRunType[] = ["TASK", "REVIEW", ...MEETING_TYPES];
+const runType = (value: unknown): AgentRunType => pick(RUN_TYPES, value, "TASK");
 const runTrigger = (value: unknown): AgentRunTrigger => (value === "USER" ? "USER" : "SCHEDULER");
 
 export function mapAgentAuditEntry(dto: AgentAuditEntryDto): AgentAuditEntry {
@@ -209,6 +239,34 @@ function mapGate(dto: AgentPendingGateDto): AgentPendingGate {
   };
 }
 
+/** 합성 키(`PROJECT-<projectId>`)는 ALM에 없는 이슈다 — 화면이 이슈 링크를 걸지 않게 여기서 null로 접는다 */
+export function mapAgentBoardPost(dto: AgentBoardPostDto): AgentBoardPost {
+  const projectId = String(dto.projectId);
+  return {
+    runId: String(dto.runId),
+    type: pick(MEETING_TYPES, dto.type, "MEETING"),
+    agendaIssueKey: !dto.issueKey || dto.issueKey === `PROJECT-${projectId}` ? null : dto.issueKey,
+    projectId,
+    pageId: String(dto.pageId),
+    endedAt: dto.endedAt,
+  };
+}
+
+export function mapAgentMeetingCreated(dto: AgentMeetingCreatedDto): AgentMeetingCreated {
+  return {
+    run: mapAgentRunSummary(dto.run),
+    attendees: (dto.attendees ?? []).map(
+      (a): AgentMeetingAttendee => ({
+        personaId: String(a.personaId),
+        slug: a.slug,
+        name: a.name,
+        role: pick(ROLES, a.role, "FRONTEND"),
+        emoji: a.emoji || null,
+      }),
+    ),
+  };
+}
+
 export function mapAgentOffice(dto: AgentOfficeDto): AgentOffice {
   return {
     personas: (dto.personas ?? []).map(mapPersona),
@@ -221,6 +279,7 @@ export function mapAgentOffice(dto: AgentOfficeDto): AgentOffice {
       killSwitch: dto.budget?.killSwitch ?? false,
     },
     generatedAt: dto.generatedAt ?? new Date().toISOString(),
+    boardPosts: (dto.boardPosts ?? []).map(mapAgentBoardPost),
   };
 }
 

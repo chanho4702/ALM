@@ -144,13 +144,155 @@ describe("게시판 — BLOCKED run 중복 방지", () => {
   it("currentRun과 recentRuns 양쪽의 BLOCKED run은 게시판 보고서에 나오지 않는다", async () => {
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
-    const board = await screen.findByRole("button", { name: "게시판 — 최근 작업 보고서 4건" });
+    const board = await screen.findByRole("button", { name: "게시판 — 회의록 3건, 최근 작업 보고서 4건" });
     await user.click(board);
     const panel = await screen.findByRole("complementary", { name: "게시판" });
-    expect(within(panel).getByRole("link", { name: "ALM-6" })).toBeInTheDocument();
-    expect(within(panel).queryByText("ALM-5")).not.toBeInTheDocument();
-    expect(within(panel).getAllByText("완료").length).toBeGreaterThan(0);
-    expect(within(panel).getAllByRole("listitem")).toHaveLength(4);
+    const reports = within(panel).getByRole("list", { name: "최근 종결 보고서" });
+    expect(within(reports).getByRole("link", { name: "ALM-6" })).toBeInTheDocument();
+    expect(within(reports).queryByText("ALM-5")).not.toBeInTheDocument();
+    expect(within(reports).getAllByText("완료").length).toBeGreaterThan(0);
+    expect(within(reports).getAllByRole("listitem")).toHaveLength(4);
+  });
+});
+
+describe("게시판 — 회의록 게시물(AGP-41)", () => {
+  it("종류(아이콘+텍스트)·안건·회의록·시각 — 합성 키 회의는 '프로젝트 전반'이고 이슈 링크가 없다", async () => {
+    const user = userEvent.setup();
+    renderApp(OFFICE_PATH);
+    await user.click(await screen.findByRole("button", { name: /^게시판 — 회의록 3건/ }));
+    const panel = await screen.findByRole("complementary", { name: "게시판" });
+    expect(within(panel).getByRole("heading", { name: /회의록\s*3/ })).toBeInTheDocument();
+    const posts = within(panel).getByRole("list", { name: "회의록 게시물" });
+    expect(within(posts).getAllByRole("listitem")).toHaveLength(3);
+
+    const retro = within(posts).getByTestId("office-board-post-8995");
+    expect(retro).toHaveTextContent("회고");
+    expect(retro).toHaveTextContent("프로젝트 전반");
+    expect(retro).toHaveTextContent("회의록");
+    expect(retro).toHaveTextContent("25분 전");
+    expect(within(retro).queryByRole("link")).not.toBeInTheDocument();
+
+    const planning = within(posts).getByTestId("office-board-post-8994");
+    expect(planning).toHaveTextContent("착수/계획");
+    expect(within(planning).getByRole("link", { name: "착수/계획 안건 ALM-4" })).toHaveAttribute(
+      "href",
+      `${OFFICE_PATH}?issue=ALM-4`,
+    );
+
+    const escalation = within(posts).getByTestId("office-board-post-8993");
+    expect(escalation).toHaveTextContent("에스컬레이션");
+    expect(within(escalation).getByRole("link", { name: "에스컬레이션 안건 ALM-5" })).toBeInTheDocument();
+    // 회의록은 스페이스 id가 없어 위키 링크를 걸지 않는다 — 게시물 링크는 안건 이슈 2개뿐
+    expect(within(posts).getAllByRole("link")).toHaveLength(2);
+  });
+
+  it("게시물이 없으면(구 백엔드 포함) 빈 문구, 보고서 목록은 그대로", async () => {
+    const user = userEvent.setup();
+    const base = await store.fetchOffice("p1");
+    vi.spyOn(store, "fetchOffice").mockResolvedValue({ ...base, boardPosts: [] });
+    renderApp(OFFICE_PATH);
+    await user.click(await screen.findByRole("button", { name: "게시판 — 회의록 0건, 최근 작업 보고서 4건" }));
+    const panel = await screen.findByRole("complementary", { name: "게시판" });
+    expect(within(panel).getByText("아직 게시물이 없습니다")).toBeInTheDocument();
+    expect(within(panel).getByRole("list", { name: "최근 종결 보고서" })).toBeInTheDocument();
+  });
+});
+
+describe("회의 소집(D-P3b-4)", () => {
+  it("전역 관리자가 아니면 헤더에 소집 버튼이 없다", async () => {
+    vi.spyOn(store, "getMyOrgProfile").mockResolvedValue({
+      id: "u2", displayName: "일반", email: null, status: "ACTIVE", kind: "HUMAN",
+      globalRoles: [], teams: [], joinedVia: "LEGACY",
+    });
+    renderApp(OFFICE_PATH);
+    await screen.findByRole("button", { name: /^기획봇, 기획, 작업 중/ });
+    expect(screen.getByRole("button", { name: "실행 기록" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "회의 소집" })).not.toBeInTheDocument();
+  });
+
+  it("안건 없는 착수/계획은 화면이 막고, 안건을 넣으면 소집 → 성공 토스트 + 사무실 재조회", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(store, "createMeeting");
+    const office = vi.spyOn(store, "fetchOffice");
+    renderApp(OFFICE_PATH);
+    await user.click(await screen.findByRole("button", { name: "회의 소집" }));
+    const dialog = await screen.findByRole("dialog", { name: "회의 소집" });
+    expect(within(dialog).getByText("0 / 4,000자")).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: /자동\(롤 규칙\) — 기획·디자인·프론트엔드·백엔드/ })).toBeChecked();
+
+    await user.click(within(dialog).getByRole("button", { name: "소집" }));
+    expect(
+      await within(dialog).findByText("착수/계획·에스컬레이션 회의에는 안건 이슈나 안건 지시가 필요합니다"),
+    ).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+
+    await user.type(within(dialog).getByLabelText("안건 지시 (선택)"), "알림 설정 개편");
+    expect(within(dialog).getByText("8 / 4,000자")).toBeInTheDocument();
+    const before = office.mock.calls.length;
+    await user.click(within(dialog).getByRole("button", { name: "소집" }));
+
+    expect(await screen.findByText("착수/계획 회의를 소집했습니다")).toBeInTheDocument();
+    expect(screen.getByText("참석: 기획봇, 디자인봇, 프론트봇, 백엔드봇")).toBeInTheDocument();
+    expect(create).toHaveBeenCalledWith({
+      type: "MEETING", projectId: "p1", agendaIssueKey: undefined, agenda: "알림 설정 개편", personaSlugs: undefined,
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "회의 소집" })).not.toBeInTheDocument());
+    await waitFor(() => expect(office.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it("같은 프로젝트에 활성 회의가 있으면 409 문구를 그대로 토스트로 보여 주고 모달은 남는다", async () => {
+    const user = userEvent.setup();
+    await store.createMeeting({ type: "RETRO", projectId: "p1" });
+    renderApp(OFFICE_PATH);
+    await user.click(await screen.findByRole("button", { name: "회의 소집" }));
+    const dialog = await screen.findByRole("dialog", { name: "회의 소집" });
+    await user.type(within(dialog).getByLabelText("안건 지시 (선택)"), "재소집");
+    await user.click(within(dialog).getByRole("button", { name: "소집" }));
+    expect(await screen.findByText("회의를 소집하지 못했습니다")).toBeInTheDocument();
+    expect(screen.getByText("이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=p1")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "회의 소집" })).toBeInTheDocument();
+  });
+
+  it("참석자 직접 고르기 — 아무도 안 고르면 막고, 고른 페르소나 slug만 보낸다", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(store, "createMeeting");
+    renderApp(OFFICE_PATH);
+    await user.click(await screen.findByRole("button", { name: "회의 소집" }));
+    const dialog = await screen.findByRole("dialog", { name: "회의 소집" });
+    await user.type(within(dialog).getByLabelText("안건 지시 (선택)"), "배포 장애 회고");
+    await user.click(within(dialog).getByRole("radio", { name: "직접 고르기" }));
+    const people = within(dialog).getByRole("group", { name: "참석할 팀원" });
+    expect(within(people).getAllByRole("checkbox")).toHaveLength(6);
+
+    await user.click(within(dialog).getByRole("button", { name: "소집" }));
+    expect(await within(dialog).findByText("참석자를 한 명 이상 고르세요")).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+
+    await user.click(within(people).getByRole("checkbox", { name: /^운영봇/ }));
+    await user.click(within(people).getByRole("checkbox", { name: /^리뷰봇/ }));
+    await user.click(within(dialog).getByRole("button", { name: "소집" }));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ personaSlugs: ["ops-bot", "reviewer-bot"] })),
+    );
+    expect(await screen.findByText("참석: 운영봇, 리뷰봇")).toBeInTheDocument();
+  });
+});
+
+describe("회의 소집 목업 — 서버 규칙 미러", () => {
+  it("안건 규칙·이슈 존재·409, 회고는 안건 없이 전원·합성 키", async () => {
+    await expect(store.createMeeting({ type: "ESCALATION", projectId: "p1" })).rejects.toThrow(
+      "ESCALATION 회의에는 agendaIssueKey 또는 agenda가 필요합니다",
+    );
+    await expect(store.createMeeting({ type: "MEETING", projectId: "p1", agendaIssueKey: "NOPE-1" })).rejects.toThrow(
+      "이슈를 찾을 수 없습니다: NOPE-1",
+    );
+    const retro = await store.createMeeting({ type: "RETRO", projectId: "p1" });
+    expect(retro.run).toMatchObject({ type: "RETRO", status: "QUEUED", trigger: "USER", issueKey: "PROJECT-p1" });
+    expect(retro.attendees).toHaveLength(6);
+    await expect(store.createMeeting({ type: "RETRO", projectId: "p1" })).rejects.toThrow(
+      "이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=p1",
+    );
+    expect((await store.fetchAgentRuns()).some((r) => r.id === retro.run.id && r.type === "RETRO")).toBe(true);
   });
 });
 

@@ -204,6 +204,7 @@ describe("요약·라이브 알림", () => {
       pendingGates: [],
       budget: { monthlyCapUsd: null, platformMonthToDateUsd: 0, killSwitch: false },
       generatedAt: "",
+      boardPosts: [],
     });
     const before = office([persona({ id: "1", currentRun: run("RUNNING") }), persona({ id: "2", name: "운영봇" })]);
     const after = office([

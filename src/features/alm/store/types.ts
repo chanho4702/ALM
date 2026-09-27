@@ -693,7 +693,9 @@ export type AgentRunStatus =
 /** 아직 끝나지 않은 run — 페르소나의 "현재 run"이 될 수 있는 상태 */
 export type AgentActiveRunStatus = "QUEUED" | "RUNNING" | "WAITING_APPROVAL" | "BLOCKED";
 
-export type AgentRunType = "TASK" | "REVIEW";
+/** 회의 run(P3b) — MEETING=착수/계획, RETRO=회고, ESCALATION=에스컬레이션 */
+export type AgentMeetingType = "MEETING" | "RETRO" | "ESCALATION";
+export type AgentRunType = "TASK" | "REVIEW" | AgentMeetingType;
 export type AgentRunTrigger = "SCHEDULER" | "USER";
 
 export interface AgentCurrentRun {
@@ -784,6 +786,46 @@ export interface AgentOffice {
   pendingGates: AgentPendingGate[];
   budget: AgentBudget;
   generatedAt: string;
+  /** 게시판 — 회의록이 보고된 완료 회의 run 최신 5건. 구 백엔드 응답이면 빈 배열 */
+  boardPosts: AgentBoardPost[];
+}
+
+/**
+ * 게시판 게시물(P3b D-P3b-7). 제목은 서버가 위키를 조회하지 않아 없다 — 화면은 종류 라벨 + 시각으로 그린다.
+ * 위키 페이지는 id만 온다(스페이스 id 없음).
+ */
+export interface AgentBoardPost {
+  runId: string;
+  type: AgentMeetingType;
+  /** 안건 이슈 키 — 안건 이슈 없는 회의(서버 합성 키 `PROJECT-<projectId>`)면 null */
+  agendaIssueKey: string | null;
+  projectId: string;
+  pageId: string;
+  endedAt: string;
+}
+
+/** `POST /api/agent/meetings` 요청 — MEETING·ESCALATION은 안건 이슈나 안건 지시 중 하나가 필요하다 */
+export interface AgentMeetingInput {
+  type: AgentMeetingType;
+  projectId: string;
+  agendaIssueKey?: string;
+  agenda?: string;
+  /** 생략하면 서버의 롤 기본 참석 규칙 */
+  personaSlugs?: string[];
+}
+
+export interface AgentMeetingAttendee {
+  personaId: string;
+  slug: string;
+  name: string;
+  role: AgentRole;
+  emoji: string | null;
+}
+
+export interface AgentMeetingCreated {
+  run: AgentRunSummary;
+  /** 첫 번째가 진행자 */
+  attendees: AgentMeetingAttendee[];
 }
 
 export interface AgentPersonaActivity {

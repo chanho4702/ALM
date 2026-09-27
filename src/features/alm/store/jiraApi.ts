@@ -42,6 +42,8 @@ import type {
   AgentRunStatus,
   AgentRunSummary,
   AgentGate,
+  AgentMeetingCreated,
+  AgentMeetingInput,
   AuditEntry,
   SystemStats,
   SettingsBody,
@@ -108,11 +110,13 @@ import {
 
 import {
   mapAgentGate,
+  mapAgentMeetingCreated,
   mapAgentOffice,
   mapAgentPersona,
   mapAgentPersonaActivity,
   mapAgentRunSummary,
   type AgentGateDto,
+  type AgentMeetingCreatedDto,
   type AgentOfficeDto,
   type AgentPersonaActivityDto,
   type AgentPersonaDto,
@@ -1045,6 +1049,31 @@ export async function approveGate(gateId: string): Promise<void> {
 export async function rejectGate(gateId: string): Promise<void> {
   await json<null>(
     await sharedApiFetch(`/api/agent/gates/${encodeURIComponent(gateId)}/reject`, { method: "POST" }),
+  );
+}
+
+/**
+ * 회의 소집(P3b, ADMIN) — 빈 안건·빈 참석자 목록은 보내지 않는다(서버 롤 기본 규칙을 쓰게).
+ * 안건 누락 400·같은 프로젝트 활성 회의 409는 `{"error"}` 문구 그대로 Error로 올린다.
+ */
+export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeetingCreated> {
+  const agendaIssueKey = input.agendaIssueKey?.trim();
+  const agenda = input.agenda?.trim();
+  const body = {
+    type: input.type,
+    projectId: toBackendId(input.projectId),
+    ...(agendaIssueKey ? { agendaIssueKey } : {}),
+    ...(agenda ? { agenda } : {}),
+    ...(input.personaSlugs && input.personaSlugs.length > 0 ? { personaSlugs: input.personaSlugs } : {}),
+  };
+  return mapAgentMeetingCreated(
+    await json<AgentMeetingCreatedDto>(
+      await sharedApiFetch("/api/agent/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
   );
 }
 

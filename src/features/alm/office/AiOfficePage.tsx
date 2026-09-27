@@ -13,13 +13,16 @@ import {
   OctagonX,
   Power,
   RefreshCw,
+  UsersRound,
   Wallet,
 } from "lucide-react";
 import type { AgentOffice } from "../store/types";
 import { useAiTeamStatus } from "../components/useAiTeamActive";
+import { useOrgProfile } from "../components/OrgAccountGate";
 import { useIssueModal } from "../components/useIssueModal";
 import { relTimeFine } from "../components/time";
 import { OfficeCanvas } from "./OfficeCanvas";
+import { MeetingConveneModal } from "./MeetingConveneModal";
 import { OfficePanel, type OfficeLinks, type PanelTarget } from "./OfficePanel";
 import { TeamCards } from "./TeamCards";
 import { useOfficeData, type OfficeData } from "./useOfficeData";
@@ -86,6 +89,8 @@ function AiOffice({ projectId }: { projectId: string }) {
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   const data = useOfficeData(projectId, panel?.kind === "persona" ? panel.id : null);
   const { issueModal } = useIssueModal(() => undefined);
+  const { isGlobalAdmin } = useOrgProfile();
+  const [conveneOpen, setConveneOpen] = useState(false);
 
   const base = `/projects/${projectId}/ai-office`;
   const links: OfficeLinks = useMemo(
@@ -164,6 +169,17 @@ function AiOffice({ projectId }: { projectId: string }) {
           승인 인박스
           {pending > 0 ? <Badge appearance="danger">{pending}</Badge> : null}
         </Button>
+        {/* 회의 소집은 예산을 쓰는 행위라 서버도 ADMIN만 받는다 — 버튼도 전역 관리자에게만 */}
+        {isGlobalAdmin ? (
+          <Button
+            variant="ghost"
+            size="small"
+            iconBefore={<UsersRound size={14} aria-hidden />}
+            onClick={() => setConveneOpen(true)}
+          >
+            회의 소집
+          </Button>
+        ) : null}
       </div>
       {office ? <OfficeSummary data={data} office={office} gatesHref={links.gates} /> : null}
       {office?.budget.killSwitch ? (
@@ -188,6 +204,7 @@ function AiOffice({ projectId }: { projectId: string }) {
                   target={panelTarget}
                   personaNames={personaById}
                   recentFinished={finished}
+                  boardPosts={office?.boardPosts ?? []}
                   activity={data.activity}
                   activityStatus={data.activityStatus}
                   links={links}
@@ -206,6 +223,7 @@ function AiOffice({ projectId }: { projectId: string }) {
             selectedId={panel?.kind === "persona" ? panel.id : null}
             boardOpen={panel?.kind === "board"}
             boardCount={finished.length}
+            postCount={office?.boardPosts.length ?? 0}
             todayReports={todayReportCount(office?.recentRuns ?? [])}
             onOpenPersona={openPersona}
             onOpenBoard={openBoard}
@@ -257,6 +275,15 @@ function AiOffice({ projectId }: { projectId: string }) {
         {data.announcement}
       </div>
       {issueModal}
+      {isGlobalAdmin ? (
+        <MeetingConveneModal
+          projectId={projectId}
+          personas={personas}
+          open={conveneOpen}
+          onOpenChange={setConveneOpen}
+          onCreated={data.refresh}
+        />
+      ) : null}
     </div>
   );
 }
