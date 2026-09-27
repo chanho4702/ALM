@@ -4,6 +4,7 @@ import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
 import { sharedApiFetch, sharedAuthClient } from "./apiClient";
 import type { IssueQuery } from "./searchQuery";
 import {
+  ApiError,
   extractApiError,
   mapIssue,
   mapProject,
@@ -44,8 +45,13 @@ import type {
   AgentGate,
   AgentMeetingCreated,
   AgentMeetingInput,
+  AgentChatInput,
+  AgentChatReply,
   AgentCredentialInput,
+  AgentDialogEntryInput,
+  AgentDialogPage,
   AgentPermissions,
+  AgentRunCreateInput,
   AgentPersonaInput,
   AgentProjectCredential,
   AgentTeamPersona,
@@ -116,6 +122,8 @@ import {
 } from "./aql/fields";
 
 import {
+  mapAgentChatReply,
+  mapAgentDialogPage,
   mapAgentGate,
   mapAgentMeetingCreated,
   mapAgentOffice,
@@ -127,6 +135,8 @@ import {
   mapAgentTeamPersona,
   mapAgentToken,
   mapAgentTokenIssued,
+  type AgentChatReplyDto,
+  type AgentDialogPageDto,
   type AgentGateDto,
   type AgentMeetingCreatedDto,
   type AgentOfficeDto,
@@ -142,7 +152,7 @@ import {
 
 async function json<T>(response: Response): Promise<T> {
   const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractApiError(response.status, body));
+  if (!response.ok) throw new ApiError(response.status, extractApiError(response.status, body));
   return body as T;
 }
 
@@ -1207,6 +1217,87 @@ export async function deleteProjectCredential(projectId: string): Promise<void> 
   await json<null>(
     await sharedApiFetch(`/api/agent/credentials/projects/${toBackendId(projectId)}`, { method: "DELETE" }),
   );
+}
+
+// ── AI 사무실 1:1 대화(P3g AGP-65) — 오류는 상태를 싣는 ApiError로 올린다(화면이 409/429/503을 대사로 번역) ──
+
+/**
+ * USER run(AGP-42) — 이슈 조회 뒤 서버가 프로젝트 관리 권한을 판정한다(403). 없는 이슈·슬러그 404, 이미 활성 run 409,
+ * 비활성 페르소나 400. 모델·지시문이 비면 보내지 않는다(서버 기본 = 프로젝트 정책).
+ */
+export async function createAgentRun(input: AgentRunCreateInput): Promise<AgentRunSummary> {
+  const instruction = input.instruction?.trim();
+  const model = input.model?.trim();
+  const body = {
+    issueKey: input.issueKey.trim(),
+    ...(instruction ? { instruction } : {}),
+    ...(model ? { model } : {}),
+    personaSlug: input.personaSlug,
+  };
+  return mapAgentRunSummary(
+    await json<AgentRunSummaryDto>(
+      await sharedApiFetch("/api/agent/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+}
+
+/** 수다 한 턴 — 503(꺼짐·키 없음)·409(킬 스위치·예산)·429(속도)·404·400. 서버가 턴을 대화 기록(SAY)에 직접 남긴다 */
+export async function sendPersonaChat(personaId: string, input: AgentChatInput): Promise<AgentChatReply> {
+  const body = {
+    message: input.message,
+    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    ...(input.projectId ? { projectId: toBackendId(input.projectId) } : {}),
+  };
+  return mapAgentChatReply(
+    await json<AgentChatReplyDto>(
+      await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+}
+
+/** 호출자 본인의 대화 기록 — 구 백엔드면 404 ApiError(화면이 메모리 기록으로 폴백한다) */
+export async function fetchPersonaDialog(
+  personaId: string,
+  options: { before?: string; limit?: number } = {},
+): Promise<AgentDialogPage> {
+  const params = new URLSearchParams();
+  if (options.before) params.set("before", options.before);
+  params.set("limit", String(options.limit ?? 50));
+  return mapAgentDialogPage(
+    await json<AgentDialogPageDto>(
+      await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}/dialog?${params.toString()}`),
+    ),
+  );
+}
+
+/** 1회 20건 이하 — 저장된 건수를 돌려준다 */
+export async function savePersonaDialog(personaId: string, entries: AgentDialogEntryInput[]): Promise<number> {
+  const body = {
+    entries: entries.map((e) => ({
+      speaker: e.speaker,
+      kind: e.kind,
+      text: e.text,
+      ...(e.issueKey ? { issueKey: e.issueKey } : {}),
+      ...(e.runId ? { runId: e.runId } : {}),
+      ...(e.commentId ? { commentId: e.commentId } : {}),
+    })),
+  };
+  const saved = await json<{ saved?: number } | null>(
+    await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}/dialog`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+  return saved?.saved ?? entries.length;
 }
 
 // ── 설정 — 서버 V11(레지스트리·스킴·프로젝트 설정). 목업 스토어와 같은 시그니처 ──

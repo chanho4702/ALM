@@ -80,7 +80,7 @@ describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
     expect(within(stage).getByRole("button", { name: /^디자인봇, 디자인, 대기열, 이슈 ALM-2 — / })).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^프론트봇, 프론트엔드, 승인 대기, 이슈 ALM-3/ })).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^백엔드봇, 백엔드, 차단됨, 이슈 ALM-5 — / })).toBeInTheDocument();
-    expect(within(stage).getByRole("button", { name: "운영봇, 운영, 휴식 중 — 개인 오피스 열기" })).toBeInTheDocument();
+    expect(within(stage).getByRole("button", { name: "운영봇, 운영, 휴식 중 — 말 걸기" })).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^리뷰봇, 리뷰, 작업 중, 이슈 ALM-1/ })).toBeInTheDocument();
 
     // 말풍선 — 작업 중=이슈키+활동, 리뷰=접두, 대기열·차단=접두만(2행 없음), 유휴=없음
@@ -163,7 +163,7 @@ describe("매니저 롤 페르소나(D-P3c-5) — 도트 시안 없이도 그린
       ],
     });
     const { container } = renderApp(OFFICE_PATH);
-    expect(await screen.findByRole("button", { name: "매니저봇, 매니저, 휴식 중 — 개인 오피스 열기" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "매니저봇, 매니저, 휴식 중 — 말 걸기" })).toBeInTheDocument();
     // 7명 모두 아바타가 그려진다 — 매니저 몫도 빈 path가 아니다(팔레트 폴백은 pixel 단위 테스트)
     const avatars = container.querySelectorAll(".office-avatar");
     expect(avatars).toHaveLength(7);
@@ -411,18 +411,45 @@ describe("회의 소집 목업 — 서버 규칙 미러", () => {
   });
 });
 
+/** P3g — 봇 클릭은 걸어가서 말 걸기. 개인 오피스는 대화 장면의 "개인 오피스 열기" 버튼으로 연다(스펙 §2.5) */
+async function openPanelViaDialog(user: ReturnType<typeof userEvent.setup>, avatar: HTMLElement, name: string) {
+  await user.click(avatar);
+  const dialog = await screen.findByRole("dialog", { name: new RegExp(`^${name}(과|와) 대화$`) });
+  await user.click(within(dialog).getByRole("button", { name: "개인 오피스 열기" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), { timeout: 3000 });
+  return screen.findByRole("complementary", { name });
+}
+
+function reduceMotion() {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      onchange: null,
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
 describe("개인 오피스 패널", () => {
-  it("아바타를 누르면 비모달 패널이 열리고 제목으로 포커스, Esc로 닫고 연 버튼으로 돌아간다", async () => {
+  beforeEach(reduceMotion);
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  it("아바타 → 대화 장면 → '개인 오피스 열기'로 비모달 패널이 열리고 제목으로 포커스, Esc로 닫고 그 봇 버튼으로 돌아간다", async () => {
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
     const avatar = await screen.findByRole("button", { name: /^백엔드봇, 백엔드, 차단됨/ });
-    expect(avatar).toHaveAttribute("aria-expanded", "false");
-    await user.click(avatar);
-
-    const panel = await screen.findByRole("complementary", { name: "백엔드봇" });
+    expect(avatar).toHaveAttribute("aria-haspopup", "dialog");
+    const panel = await openPanelViaDialog(user, avatar, "백엔드봇");
     const title = within(panel).getByRole("heading", { level: 2, name: "백엔드봇" });
     await waitFor(() => expect(title).toHaveFocus());
-    expect(avatar).toHaveAttribute("aria-expanded", "true");
     expect(within(panel).getByText("차단됨 — 다음 조치가 필요합니다.")).toBeInTheDocument();
     expect(within(panel).getByText("3회")).toBeInTheDocument();
     expect(await within(panel).findByRole("heading", { name: /오늘 한 일/ })).toBeInTheDocument();
@@ -434,16 +461,14 @@ describe("개인 오피스 패널", () => {
     await waitFor(() => expect(avatar).toHaveFocus());
   });
 
-  it("다른 아바타를 누르면 패널 내용만 바뀌고, 닫기 버튼으로도 닫힌다", async () => {
+  it("다른 봇과 대화해 '개인 오피스 열기'를 누르면 패널 내용만 바뀌고, 닫기 버튼으로도 닫힌다", async () => {
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
-    await user.click(await screen.findByRole("button", { name: /^운영봇, 운영, 휴식 중/ }));
-    const idle = await screen.findByRole("complementary", { name: "운영봇" });
+    const idle = await openPanelViaDialog(user, await screen.findByRole("button", { name: /^운영봇, 운영, 휴식 중/ }), "운영봇");
     expect(within(idle).getByText("지금 진행 중인 작업이 없습니다")).toBeInTheDocument();
     expect(await within(idle).findByText("오늘 기록된 활동이 없습니다")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^프론트봇, 프론트엔드, 승인 대기/ }));
-    const waiting = await screen.findByRole("complementary", { name: "프론트봇" });
+    const waiting = await openPanelViaDialog(user, screen.getByRole("button", { name: /^프론트봇, 프론트엔드, 승인 대기/ }), "프론트봇");
     expect(within(waiting).getByText("사람의 승인을 기다리고 있습니다.")).toBeInTheDocument();
     await user.click(within(waiting).getByRole("button", { name: "개인 오피스 닫기" }));
     await waitFor(() => expect(screen.queryByRole("complementary")).not.toBeInTheDocument());
@@ -554,6 +579,11 @@ describe("폴링 — 10초, 탭이 숨으면 멈춤", () => {
 });
 
 describe("안건 이슈 없는 회의 run — 합성 키 가드", () => {
+  beforeEach(reduceMotion);
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
   it("말풍선은 회의 라벨, 접근 이름은 '프로젝트 전반', 개인 오피스 현재 작업은 이슈 링크 없음", async () => {
     const user = userEvent.setup();
     const base = await store.fetchOffice("p1");
@@ -571,8 +601,7 @@ describe("안건 이슈 없는 회의 run — 합성 키 가드", () => {
     expect(screen.getByTestId("office-bubble-101")).toHaveTextContent(/^회고 회의$/);
     expect(screen.queryByText("PROJECT-1")).not.toBeInTheDocument();
 
-    await user.click(avatar);
-    const panel = await screen.findByRole("complementary", { name: "기획봇" });
+    const panel = await openPanelViaDialog(user, avatar, "기획봇");
     expect(within(panel).getByText("프로젝트 전반")).toBeInTheDocument();
     expect(within(panel).queryByRole("link", { name: "PROJECT-1" })).not.toBeInTheDocument();
   });

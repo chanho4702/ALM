@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router";
 import { Button } from "@chanho/react";
-import { Clock, Coins, FileText, Inbox } from "lucide-react";
+import { Clock, Coins, FileText, Inbox, MessageCircle } from "lucide-react";
 import type { AgentActiveMeeting, AgentOfficePersona, AgentRunSummary } from "../store/types";
 import {
   AGENT_MEETING_TYPE_LABEL,
@@ -36,6 +36,7 @@ export function TeamCards({
   selectedId,
   links,
   onOpenPersona,
+  onTalk,
 }: {
   personas: readonly AgentOfficePersona[];
   /** 회의실에 앉은 참석자는 "회의 중" 줄이 붙는다(P3e §2.9 — 캔버스의 텍스트 동등성) */
@@ -46,6 +47,8 @@ export function TeamCards({
   selectedId: string | null;
   links: OfficeLinks;
   onOpenPersona: (id: string, opener: HTMLElement) => void;
+  /** P3g — 사무실 뷰로 바꾸고 그 봇에게 걸어간다(캔버스를 거치지 않는 동등 경로) */
+  onTalk: (id: string, opener: HTMLElement) => void;
 }) {
   const navigate = useNavigate();
   return (
@@ -130,6 +133,17 @@ export function TeamCards({
                   onClick={() => navigate(`${links.gates}?persona=${encodeURIComponent(persona.id)}`)}
                 >
                   승인 인박스
+                </Button>
+              ) : null}
+              {state !== "INACTIVE" ? (
+                <Button
+                  variant="secondary"
+                  size="small"
+                  iconBefore={<MessageCircle size={14} aria-hidden />}
+                  aria-label={`${persona.name}에게 말 걸기`}
+                  onClick={(e) => onTalk(persona.id, e.currentTarget)}
+                >
+                  말 걸기
                 </Button>
               ) : null}
               <Button

@@ -172,7 +172,7 @@ export function personaAccessibleName(persona: AgentOfficePersona, meetingName: 
   const activity = state === "INACTIVE" ? null : activityText(persona);
   if (activity) parts.push(`최근 활동: ${activity}`);
   if (meetingName) parts.push(`회의 중 — ${meetingName}`);
-  return `${parts.join(", ")} — 개인 오피스 열기`;
+  return `${parts.join(", ")} — 말 걸기`;
 }
 
 export interface OfficeCounts {

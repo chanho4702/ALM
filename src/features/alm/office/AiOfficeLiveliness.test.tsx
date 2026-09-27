@@ -57,7 +57,7 @@ describe("회의실 — 착석·예외(목업: 기획봇 진행 착수/계획 �
     const { container } = renderApp(OFFICE_PATH);
     const room = await stage();
 
-    const host = within(room).getByRole("button", { name: /^기획봇, 기획, 작업 중, .*회의 중 — 착수\/계획 회의 — 개인 오피스 열기$/ });
+    const host = within(room).getByRole("button", { name: /^기획봇, 기획, 작업 중, .*회의 중 — 착수\/계획 회의 — 말 걸기$/ });
     expect(host).toHaveAttribute("data-seat", "far");
     expect(host).toHaveAttribute("data-host", "true");
     // 상석 = 먼 쪽 가운데(x 402) — 버튼은 좌석 좌상단에서 2ap 왼쪽
@@ -237,8 +237,9 @@ describe("커피 머신·고양이(P3e §4.2·§4.6)", () => {
     const buttons = within(room).getAllByRole("button");
     const cat = within(room).getByRole("button", { name: "사무실 고양이" });
     expect(buttons[buttons.length - 1]).toBe(cat);
-    // 캔버스 탭 순서: 게시판 → 회의실 → 커피 머신 → 페르소나
-    expect(buttons.slice(0, 3).map((b) => b.getAttribute("aria-label")?.split(" — ")[0])).toEqual([
+    // 캔버스 탭 순서(P3g §2.6 정정): 나 → 게시판 → 회의실 → 커피 머신 → 페르소나
+    expect(buttons.slice(0, 4).map((b) => b.getAttribute("aria-label")?.split(" — ")[0])).toEqual([
+      "나",
       "게시판",
       "회의실",
       "커피 머신",

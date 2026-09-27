@@ -1,4 +1,15 @@
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Link } from "react-router";
 import { Badge } from "@chanho/react";
 import type { AgentActiveMeeting, AgentBudget, AgentOfficePersona } from "../store/types";
@@ -13,6 +24,7 @@ import {
   roomFurniturePaths,
   roomGeometry,
   spritePaths,
+  userPaths,
   WINDOWS,
   type AvatarFrame,
   ROOM_W,
@@ -35,6 +47,21 @@ import {
   type MeetingSeat,
 } from "./officeModel";
 import { useOfficeAmbience, type AmbienceSnapshot, type Stroll } from "./useOfficeAmbience";
+import {
+  avatarPosition,
+  botFootTile,
+  botSpriteXY,
+  cellOf,
+  DOORMAT_X,
+  findPath,
+  idleSpot,
+  isReachable,
+  tileAt,
+  userSpriteXY,
+  type Facing,
+  type Tile,
+  type WalkGrid,
+} from "./walkGrid";
 
 /** 자리 이동 시간 — CSS `transition: transform 640ms steps(8)`과 같은 값 */
 const WALK_MS = 640;
@@ -63,46 +90,60 @@ export interface OfficeCanvasProps {
   /** 진행 중 목표(에픽) 수 — 게시판을 한 번도 열지 않아 모르면 null */
   goalCount: number | null;
   todayReports: number;
-  onOpenPersona: (id: string, opener: HTMLElement) => void;
   onOpenBoard: (opener: HTMLElement) => void;
   onOpenMeeting: (opener: HTMLElement) => void;
   /** 클릭 반응(커피값·고양이)을 라이브 영역으로 */
   onAnnounce: (text: string) => void;
+  // ── P3g 사람 아바타·1:1 대화 ──
+  /** 보행 맵(인원·방 높이로 memo) — 바닥 클릭 좌표를 타일로 바꾼다 */
+  grid: WalkGrid;
+  /** 사람 아바타 — 입장 전이면 null */
+  user: CanvasUser | null;
+  /** 말 걸기 대상(다가가는 중부터 대화가 끝날 때까지) — 💬 표시·말풍선 숨김·디렉터 제외 */
+  talkTargetId: string | null;
+  /** 대화 장면이 열려 있다 — 디렉터 정지 + CSS 애니 정지(캔버스가 가려져 있다) */
+  dialogOpen: boolean;
+  /** 맡기기 성공 뒤 봇이 일어나 책상으로 걷는 연출(서버 응답으로 만든 낙관적 상태) */
+  botWalk: BotWalkRequest | null;
+  /** 페르소나 버튼·빈 책상 = 걸어가서 말 걸기(P3g §2.5) */
+  onTalk: (id: string, opener: HTMLElement) => void;
+  /** 바닥 클릭 = 이동 */
+  onFloor: (tile: Tile) => void;
+  /** "나" 버튼 키보드(방향키·Enter) */
+  onMeKey: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  /** "나" 버튼 접근 이름 — "나 — {구역}. 방향키로 이동, Enter로 옆 팀원에게 말 걸기" */
+  meLabel: string;
+}
+
+export interface CanvasUser {
+  tile: Tile;
+  facing: Facing;
+  moving: boolean;
+  stepMs: number;
+  pin: Tile | null;
+  alignX: number;
+  puff: number;
+  /** 대화 위치에 도착해 장면이 열려 있으면 "나" 표를 숨긴다(대상 봇을 가리므로) */
+  tagHidden: boolean;
+  /** 피부·머리 슬롯(로그인 사용자 id 해시) */
+  vars: Record<string, string>;
+}
+
+export interface BotWalkRequest {
+  personaId: string;
+  /** 연출 시작 자리(낙관적 상태를 덮기 전 아바타 좌상단) */
+  from: { x: number; y: number };
+  /** 같은 봇에게 두 번 맡겨도 다시 걷게 하는 순번 */
+  seq: number;
 }
 
 type Pose = "seat" | "slump" | "stand" | "seatFar" | "seatBack";
-
-interface Seat {
-  x0: number;
-  y0: number;
-}
-
-const cellOf = (i: number): Seat => ({ x0: 64 * (i % 4), y0: 40 + 64 * Math.floor(i / 4) });
 
 function poseOf(state: AgentPersonaState): Pose | null {
   if (state === "RUNNING" || state === "WAITING_APPROVAL") return "seat";
   if (state === "BLOCKED") return "slump";
   if (state === "QUEUED" || state === "IDLE") return "stand";
   return null;
-}
-
-const idleSpot = (i: number) => ({ x: 270 + 24 * (i % 3), y: 52 + 32 * Math.floor(i / 3) });
-
-/** 아바타 좌상단(아트 픽셀) — 앉음은 자기 책상, 대기열은 책상 옆, 유휴는 휴게 구역의 고정 자리(k = i) */
-function avatarPosition(state: AgentPersonaState, i: number): { x: number; y: number } | null {
-  const { x0, y0 } = cellOf(i);
-  switch (state) {
-    case "RUNNING":
-    case "WAITING_APPROVAL":
-    case "BLOCKED":
-      return { x: x0 + 16, y: y0 };
-    case "QUEUED":
-      return { x: x0 + 44, y: y0 + 10 };
-    case "IDLE":
-      return idleSpot(i);
-    default:
-      return null;
-  }
 }
 
 const seatPose = (seat: MeetingSeat): Pose => (seat.side === "far" ? "seatFar" : seat.side === "near" ? "seatBack" : "stand");
@@ -355,6 +396,150 @@ function Sky({ clipBase }: { clipBase: string }) {
   );
 }
 
+/**
+ * 사람 아바타(P3g §2.1·§2.3) — 칸마다 transform 전이(걷기 시간·8계단). 걷는 중이면 다리 2프레임 루프(칸 시간과 같은 주기),
+ * 멈추면 마지막 방향의 서기 프레임, 정면이면 머그를 든다. 포인터는 통과시킨다(밑의 바닥·봇 클릭이 된다).
+ */
+function UserAvatar({ user }: { user: CanvasUser }) {
+  const { x, y } = userSpriteXY(user.tile);
+  const frame = (f: "stand" | "walkA" | "walkB") => <PixelSprite paths={userPaths(user.facing, f)} />;
+  return (
+    <g
+      className={user.moving ? "office-user is-moving" : "office-user"}
+      data-facing={user.facing}
+      data-moving={user.moving ? "true" : undefined}
+      style={vars({ ...user.vars, "--ux": x + user.alignX, "--uy": y, "--step-ms": user.stepMs })}
+    >
+      <path className="px-shadow" d="M2 23h12v1h-12z" />
+      {user.moving ? (
+        <Loop ms={user.stepMs} phase={0} a={frame("walkA")} b={frame("walkB")} />
+      ) : (
+        <>
+          {frame("stand")}
+          {user.facing === "down" ? <PixelSprite paths={spritePaths("CUP", "item")} x={12} y={14} /> : null}
+        </>
+      )}
+      {user.puff > 0 ? <PixelSprite key={user.puff} className="office-user-puff" paths={spritePaths("MB_PUFF", "puff")} x={4} y={4} /> : null}
+    </g>
+  );
+}
+
+/** 목적지 핀 — 400ms 2프레임 통통(핀만 1ap 위, 바닥 고리는 고정). 바닥 층(책상 셀 다음)에 칠한다 */
+function DestinationPin({ tile }: { tile: Tile }) {
+  const x = 16 * tile.tx + 4;
+  const y = 16 * tile.ty + 6;
+  return (
+    <g className="office-pin" data-testid="office-pin">
+      <Loop
+        ms={400}
+        phase={0}
+        a={<PixelSprite paths={spritePaths("PIN_A", "pin")} x={x} y={y} />}
+        b={<PixelSprite paths={spritePaths("PIN_B", "pin")} x={x} y={y} />}
+      />
+    </g>
+  );
+}
+
+/** 대화 표시(§7.1) — 말 걸기 대상 머리 위, 400ms 2프레임 통통 */
+function TalkMark({ x, y }: { x: number; y: number }) {
+  const paths = spritePaths("TALK_MARK", "mb");
+  return (
+    <g className="office-fx" data-overlay="talk">
+      <Loop ms={400} phase={0} a={<PixelSprite paths={paths} x={x} y={y} />} b={<PixelSprite paths={paths} x={x} y={y - 1} />} />
+    </g>
+  );
+}
+
+/**
+ * 맡기기 뒤 봇 걷기(§5.4-7) — 이번 이동만 A* 경로 + 걷기 프레임(정면/뒷모습), 1타일/250ms. 출발 타일이 닿지 않는 곳이면
+ * (회의실 좌석 등) 연출 없이 P3a 이동으로 둔다. 마지막 칸 뒤 대기열 자리 좌표로 반걸음 맞춘다.
+ */
+function useBotWalk(request: BotWalkRequest | null, target: { x: number; y: number } | null, grid: WalkGrid): Stroll | null {
+  const [leg, setLeg] = useState<Stroll | null>(null);
+  const reqSeq = request?.seq ?? null;
+  const targetKey = target ? `${target.x},${target.y}` : null;
+  useEffect(() => {
+    setLeg(null);
+    if (!request || !target || prefersReducedMotion()) return;
+    const start = botFootTile(request.from);
+    const goal = botFootTile(target);
+    const route = isReachable(grid, start) && isReachable(grid, goal) ? findPath(grid, start, goal) : null;
+    if (!route) return;
+    const points = [...route.slice(1).map(botSpriteXY), target];
+    let i = 0;
+    let at = request.from;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const next = () => {
+      if (i >= points.length) {
+        setLeg(null);
+        return;
+      }
+      const to = points[i++];
+      const dist = Math.abs(to.x - at.x) + Math.abs(to.y - at.y);
+      const legMs = Math.max(1, Math.round((dist * 250) / 16));
+      setLeg({
+        personaId: request.personaId,
+        leg: 0,
+        x: to.x,
+        y: to.y,
+        legMs,
+        steps: Math.max(1, Math.round(dist / 2)),
+        facing: to.y < at.y ? "back" : "front",
+        walking: true,
+        cup: false,
+        home: target,
+      });
+      at = to;
+      timer = setTimeout(next, legMs);
+    };
+    next();
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+    };
+    // 같은 요청(seq)·같은 목표면 다시 걷지 않는다 — 폴링이 연출을 리셋하지 않게
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reqSeq, targetKey, grid]);
+  return leg;
+}
+
+/**
+ * 디렉터 스냅샷(P3e §5.2) — 말 걸기 대상은 산책·작업 이펙트·미니 말풍선에서 뺀다(P3g §7.2). 대상이 산책 중이었으면
+ * idleIds에서 빠지므로 디렉터가 즉시 걷어 유휴 자리로 돌린다. 선택·hover 중인 봇은 새 산책을 시작하지 않는다.
+ */
+export function ambienceSnapshot({
+  personas,
+  seats,
+  activeMeeting,
+  meetingPaused,
+  excludeStrollIds,
+  talkTargetId,
+  killSwitch,
+}: {
+  personas: readonly AgentOfficePersona[];
+  seats: ReadonlyMap<string, MeetingSeat>;
+  activeMeeting: AgentActiveMeeting | null;
+  meetingPaused: boolean;
+  excludeStrollIds: readonly (string | null)[];
+  talkTargetId: string | null;
+  killSwitch: boolean;
+}): AmbienceSnapshot {
+  const notTarget = (id: string) => id !== talkTargetId;
+  const seated = personas.filter((p) => seats.has(p.id) && seats.get(p.id)!.side !== "stand" && notTarget(p.id)).map((p) => p.id);
+  const idle = (p: AgentOfficePersona) => personaState(p) === "IDLE" && !seats.has(p.id) && notTarget(p.id);
+  return {
+    meeting:
+      activeMeeting && !meetingPaused && seated.length > 0
+        ? { type: activeMeeting.type, hostId: activeMeeting.hostPersonaId, seatedIds: seated }
+        : null,
+    strollCandidates: personas.flatMap((p, i) => (idle(p) && !excludeStrollIds.includes(p.id) ? [{ id: p.id, ...idleSpot(i) }] : [])),
+    idleIds: personas.filter(idle).map((p) => p.id),
+    effectTargets: personas
+      .filter((p) => personaState(p) === "RUNNING" && !seats.has(p.id) && notTarget(p.id))
+      .map((p) => ({ id: p.id, attempt: p.currentRun?.attempt ?? 1 })),
+    killSwitch,
+  };
+}
+
 /** 스테이지 폭에 맞춘 정수 배율 k(2~4) — 비정수 배율은 도트가 뭉개진다 */
 function useScale(stage: RefObject<HTMLDivElement | null>): number {
   const [k, setK] = useState(2);
@@ -388,10 +573,18 @@ export function OfficeCanvas({
   postCount,
   goalCount,
   todayReports,
-  onOpenPersona,
   onOpenBoard,
   onOpenMeeting,
   onAnnounce,
+  grid,
+  user,
+  talkTargetId,
+  dialogOpen,
+  botWalk,
+  onTalk,
+  onFloor,
+  onMeKey,
+  meLabel,
 }: OfficeCanvasProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const k = useScale(stageRef);
@@ -413,26 +606,24 @@ export function OfficeCanvas({
   const host = activeMeeting ? personas.find((p) => p.id === activeMeeting.hostPersonaId) : undefined;
   const hostSeat = host ? seats.get(host.id) : undefined;
 
-  const snapshot = useMemo<AmbienceSnapshot>(() => {
-    const seated = personas.filter((p) => seats.has(p.id) && seats.get(p.id)!.side !== "stand").map((p) => p.id);
-    return {
-      meeting:
-        activeMeeting && !meetingPaused && seated.length > 0
-          ? { type: activeMeeting.type, hostId: activeMeeting.hostPersonaId, seatedIds: seated }
-          : null,
-      strollCandidates: personas.flatMap((p, i) =>
-        personaState(p) === "IDLE" && !seats.has(p.id) && p.id !== selectedId && p.id !== hoveredId
-          ? [{ id: p.id, ...idleSpot(i) }]
-          : [],
-      ),
-      idleIds: personas.filter((p) => personaState(p) === "IDLE" && !seats.has(p.id)).map((p) => p.id),
-      effectTargets: personas
-        .filter((p) => personaState(p) === "RUNNING" && !seats.has(p.id))
-        .map((p) => ({ id: p.id, attempt: p.currentRun?.attempt ?? 1 })),
-      killSwitch: budget.killSwitch,
-    };
-  }, [personas, seats, activeMeeting, meetingPaused, selectedId, hoveredId, budget.killSwitch]);
-  const ambience = useOfficeAmbience({ snapshot, stageRef });
+  const snapshot = useMemo(
+    () =>
+      ambienceSnapshot({
+        personas,
+        seats,
+        activeMeeting,
+        meetingPaused,
+        excludeStrollIds: [selectedId, hoveredId],
+        talkTargetId,
+        killSwitch: budget.killSwitch,
+      }),
+    [personas, seats, activeMeeting, meetingPaused, selectedId, hoveredId, talkTargetId, budget.killSwitch],
+  );
+  // 장면이 열리면 디렉터 정지(캔버스가 가려져 있다), 닫히면 새 간격부터 재개 — 폴링은 계속 돈다
+  const ambience = useOfficeAmbience({ snapshot, stageRef, enabled: !dialogOpen });
+  const walkIndex = botWalk ? personas.findIndex((p) => p.id === botWalk.personaId) : -1;
+  const walkTarget = walkIndex >= 0 ? avatarPosition(personaState(personas[walkIndex]), walkIndex) : null;
+  const botLeg = useBotWalk(botWalk, walkTarget, grid);
 
   const reduced = ambience.reducedMotion;
   const todayUsd = todayCostTotal(personas);
@@ -449,6 +640,11 @@ export function OfficeCanvas({
     return () => clearTimeout(timer);
   }, [catAwake]);
 
+  const floorClick = (e: MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    onFloor(tileAt(grid, (e.clientX - rect.left) / k, (e.clientY - rect.top) / k));
+  };
+
   const toggleCoffee = () => {
     if (!coffeeOpen) onAnnounce(`오늘 커피값 ${formatUsd(todayUsd)} — ${copy}`);
     setCoffeeOpen(!coffeeOpen);
@@ -460,11 +656,39 @@ export function OfficeCanvas({
   };
 
   const seatedCount = seats.size;
+  // 아바타 자리 — 배열 순서는 페르소나 순서로 고정한다(순서를 바꾸면 DOM 이동으로 걷기 전이가 끊긴다)
+  const placed = personas.flatMap((persona, index) => {
+    const seat = seats.get(persona.id);
+    const state = personaState(persona);
+    const stroll =
+      ambience.stroll?.personaId === persona.id ? ambience.stroll : botLeg?.personaId === persona.id ? botLeg : null;
+    const pose = seat ? seatPose(seat) : poseOf(state);
+    const pos = stroll ?? seat ?? avatarPosition(state, index);
+    return pose && pos ? [{ persona, index, pose, pos, stroll, standing: stroll !== null || pose === "stand" }] : [];
+  });
+  // 사람은 "서 있는 스프라이트" 층에서 발 y로 정렬된다(§2.3) — 봇끼리는 겹치지 않으니 사람과 겹치는 서 있는 봇만 본다:
+  // 그 봇의 발이 더 아래면 사람을 봇들보다 먼저(뒤에) 칠한다
+  const userXY = user ? userSpriteXY(user.tile) : null;
+  const userBehind =
+    userXY !== null &&
+    placed.some(
+      ({ pos, standing }) =>
+        standing &&
+        pos.y + 22 > userXY.y + 23 &&
+        Math.abs(pos.x - userXY.x) < 16 &&
+        pos.y < userXY.y + 24 &&
+        userXY.y < pos.y + 24,
+    );
+  const targetPlace = talkTargetId ? placed.find((p) => p.persona.id === talkTargetId) : undefined;
+  const talkMark =
+    targetPlace && !seats.has(talkTargetId!)
+      ? { x: targetPlace.pos.x + 3, y: targetPlace.pos.y - (targetPlace.pose === "stand" ? 7 : 8) }
+      : null;
   const catFrame = catAwake > 0 ? "CAT_AWAKE" : ambience.catStretch ? "CAT_STRETCH" : null;
   const roomCls = [
     "ai-office-room",
     animated ? "is-animated" : "",
-    ambience.offscreen ? "is-offscreen" : "",
+    ambience.offscreen || dialogOpen ? "is-offscreen" : "",
     budget.killSwitch ? "is-killed" : "",
     ambience.stroll?.leg === 3 ? "is-brewing" : "",
   ]
@@ -486,6 +710,7 @@ export function OfficeCanvas({
           {backgroundPaths(geo).map((p, i) => (
             <path key={i} className={p.cls} d={p.d} />
           ))}
+          <PixelSprite paths={spritePaths("DOORMAT", "mat")} x={DOORMAT_X} y={geo.height - 14} />
           <Sky clipBase={clipBase} />
           {backgroundTopPaths().map((p, i) => (
             <path key={`t${i}`} className={p.cls} d={p.d} />
@@ -524,6 +749,7 @@ export function OfficeCanvas({
           {personas.map((persona, i) => (
             <DeskSet key={persona.id} persona={persona} index={i} away={seats.has(persona.id)} />
           ))}
+          {user?.pin && !reduced ? <DestinationPin tile={user.pin} /> : null}
           {FAR_SEATS_X.map((sx, slot) =>
             slot === 2 ? (
               <PixelSprite key={sx} paths={spritePaths("CHAIR_HOST", "furn2")} x={sx + 1} y={82} />
@@ -532,29 +758,23 @@ export function OfficeCanvas({
             ),
           )}
           <PixelSprite paths={spritePaths("MEETING_TABLE", "furn2")} x={360} y={98} />
-          {personas.map((persona, i) => {
-            const seat = seats.get(persona.id);
-            const state = personaState(persona);
-            const stroll = ambience.stroll?.personaId === persona.id ? ambience.stroll : null;
-            const pose = seat ? seatPose(seat) : poseOf(state);
-            const pos = stroll ?? seat ?? avatarPosition(state, i);
-            if (!pose || !pos) return null;
-            return (
-              <Avatar
-                key={persona.id}
-                persona={persona}
-                index={i}
-                pose={pose}
-                x={pos.x}
-                y={pos.y}
-                hovered={hoveredId === persona.id}
-                stroll={stroll}
-              />
-            );
-          })}
+          {user && userBehind ? <UserAvatar key="user-behind" user={user} /> : null}
+          {placed.map(({ persona, index, pose, pos, stroll }) => (
+            <Avatar
+              key={persona.id}
+              persona={persona}
+              index={index}
+              pose={pose}
+              x={pos.x}
+              y={pos.y}
+              hovered={hoveredId === persona.id}
+              stroll={stroll}
+            />
+          ))}
           {NEAR_SEATS_X.map((sx) => (
             <PixelSprite key={sx} paths={spritePaths("CHAIR_BACK", "furn2")} x={sx + 1} y={124} />
           ))}
+          {user && !userBehind ? <UserAvatar key="user-front" user={user} /> : null}
           {ambience.stroll?.leg === 3 ? (
             <g className="office-steam">
               <Loop
@@ -568,6 +788,7 @@ export function OfficeCanvas({
           {personas.map((persona, i) =>
             seats.has(persona.id) ? null : <StateOverlay key={persona.id} state={personaState(persona)} index={i} />,
           )}
+          {talkMark ? <TalkMark x={talkMark.x} y={talkMark.y} /> : null}
           {hostSeat && runStatus === "WAITING_APPROVAL" ? (
             <Bob name="ALERT" x={hostSeat.x + 4} y={71} ms={800} phase={0} />
           ) : null}
@@ -614,6 +835,21 @@ export function OfficeCanvas({
             if (coffeeOpen && !(e.target as HTMLElement).closest(".office-hit-coffee")) setCoffeeOpen(false);
           }}
         >
+          {/* 바닥 클릭 = 이동(포인터 전용 — 키보드는 "나" 버튼의 방향키). 모든 버튼보다 아래 */}
+          <div className="office-floor-hit" aria-hidden="true" onClick={floorClick} />
+          {user ? (
+            <div
+              className={user.moving ? "office-me is-moving" : "office-me"}
+              style={vars({ "--ux": userSpriteXY(user.tile).x + user.alignX, "--uy": userSpriteXY(user.tile).y, "--step-ms": user.stepMs })}
+            >
+              {user.tagHidden ? null : (
+                <span className="office-nameplate office-me-tag" aria-hidden="true">
+                  나
+                </span>
+              )}
+              <button type="button" className="office-me-hit" aria-label={meLabel} onKeyDown={onMeKey} />
+            </div>
+          ) : null}
           <button
             type="button"
             className="office-hit-board"
@@ -638,7 +874,7 @@ export function OfficeCanvas({
           <button
             type="button"
             className="office-hit-meeting"
-            style={vars({ "--x": 356, "--y": 32, "--w": 108, "--h": 101 })}
+            style={vars({ "--x": 356, "--y": 0, "--w": 108, "--h": 34 })}
             aria-label={meetingRoomAccessibleName(activeMeeting, Date.now())}
             aria-controls="ai-office-panel"
             aria-expanded={meetingOpen}
@@ -679,8 +915,9 @@ export function OfficeCanvas({
               hostAlert={persona.id === host?.id && hostSeat && runStatus === "WAITING_APPROVAL" ? hostSeat : null}
               selected={selectedId === persona.id}
               hovered={hoveredId === persona.id}
+              talking={talkTargetId === persona.id}
               gatesHref={gatesHref}
-              onOpen={onOpenPersona}
+              onOpen={onTalk}
               onHover={setHoveredId}
             />
           ))}
@@ -723,6 +960,7 @@ function PersonaHtml({
   hostAlert,
   selected,
   hovered,
+  talking,
   gatesHref,
   onOpen,
   onHover,
@@ -736,13 +974,15 @@ function PersonaHtml({
   hostAlert: MeetingSeat | null;
   selected: boolean;
   hovered: boolean;
+  /** 말 걸기 대상 — 그동안 P3a 말풍선을 숨긴다(💬 자리) */
+  talking: boolean;
   gatesHref: string;
   onOpen: (id: string, opener: HTMLElement) => void;
   onHover: (id: string | null) => void;
 }) {
   const { x0, y0 } = cellOf(index);
   const state = personaState(persona);
-  const bubble = seat ? null : bubbleText(persona);
+  const bubble = seat || talking ? null : bubbleText(persona);
   const standing = state === "QUEUED" || state === "IDLE";
   const pos = seat ?? avatarPosition(state, index);
   const tailX = (state === "QUEUED" ? x0 + 52 : x0 + 24) - (x0 + 2);
@@ -815,8 +1055,8 @@ function PersonaHtml({
             className={selected ? "office-hit is-selected" : "office-hit"}
             style={hitBox}
             aria-label={label}
-            aria-controls="ai-office-panel"
-            aria-expanded={selected}
+            aria-haspopup="dialog"
+            data-persona={persona.id}
             data-state={state}
             data-seat={seat ? seat.side : undefined}
             data-host={seat?.host ? "true" : undefined}
@@ -832,8 +1072,8 @@ function PersonaHtml({
           className={selected ? "office-hit is-selected" : "office-hit"}
           style={deskBox}
           aria-label={label}
-          aria-controls="ai-office-panel"
-          aria-expanded={selected}
+          aria-haspopup="dialog"
+          data-persona={persona.id}
           data-state={state}
           onClick={(e) => onOpen(persona.id, e.currentTarget)}
           {...hoverProps}

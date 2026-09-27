@@ -111,6 +111,15 @@
   --office-role-reviewer2: #a33434;
   --office-acc-reviewer: #2b2233;
   --office-acc-reviewer2: #2b2233;
+  /* 사람 아바타(P3g §10) — 테마 무관 */
+  --office-user-top: #6e7489;
+  --office-user-top2: #535870;
+  --office-user-jeans: #5b80b4;
+  --office-user-jeans2: #44628c;
+  --office-user-strap: #d64545;
+  --office-user-card: #ffffff;
+  --office-user-card2: #9fb4cc;
+  --office-user-sole: #f4f1ea;
 
   position: relative;
 }
@@ -1493,4 +1502,650 @@ button.office-attendee:focus-visible {
   display: flex;
   justify-content: flex-end;
   gap: var(--chanho-space-100);
+}
+
+/* ══ P3g 사람 아바타·1:1 대화(AGP-65) ═══════════════════════════════════════
+ * 예외 상수(스펙 §10): 장면 격자 156×70 · 대화창 글꼴 24px/28px · 대화창 테두리 3px · 타자 30/150/80ms ·
+ * 걷기 250ms/타일 · 와이프 240+8×10ms · 폼 패널 최소 폭 360px. 장면 밖(폼·백로그·도구 버튼)은 DS 토큰만.
+ */
+
+/* 사람·핀·발판·노트북·벽시계 계열(sprites_p3g.py FAMILIES_G 정본) */
+.px-user-K { fill: var(--office-ol); }
+.px-user-S { fill: var(--av-skin); }
+.px-user-s { fill: var(--av-skin2); }
+.px-user-H { fill: var(--av-hair); }
+.px-user-h { fill: var(--av-hair2); }
+.px-user-U { fill: var(--office-user-top); }
+.px-user-u { fill: var(--office-user-top2); }
+.px-user-J { fill: var(--office-user-jeans); }
+.px-user-j { fill: var(--office-user-jeans2); }
+.px-user-R { fill: var(--office-user-strap); }
+.px-user-W { fill: var(--office-user-card); }
+.px-user-w { fill: var(--office-user-card2); }
+.px-user-E { fill: var(--office-user-sole); }
+.px-pin-K { fill: var(--office-ol); }
+.px-pin-R { fill: var(--office-red); }
+.px-pin-H { fill: var(--office-hi); }
+.px-mat-K { fill: var(--office-ol); }
+.px-mat-F { fill: var(--office-fabric); }
+.px-mat-f { fill: var(--office-fabric2); }
+.px-laptop-K { fill: var(--office-ol); }
+.px-laptop-m { fill: var(--office-metal1); }
+.px-laptop-M { fill: var(--office-metal2); }
+.px-laptop-O { fill: var(--office-scroff); }
+.px-laptop-G { fill: var(--office-scron); }
+.px-laptop-g { fill: var(--office-scron2); }
+.px-clock-K { fill: var(--office-ol); }
+.px-clock-M { fill: var(--office-metal2); }
+.px-clock-p { fill: var(--office-paper); }
+
+/* ── 사람 아바타 — 칸마다 transform 전이(걷기 시간·8계단), 도착 뒤 반걸음 정렬은 4계단 ── */
+.office-user {
+  transform: translate(calc(var(--ux) * 1px), calc(var(--uy) * 1px));
+  pointer-events: none;
+}
+
+.ai-office-room.is-animated .office-user {
+  transition: transform 125ms steps(4, end);
+}
+
+.ai-office-room.is-animated .office-user.is-moving {
+  transition: transform calc(var(--step-ms) * 1ms) steps(8, end);
+}
+
+.office-user-puff {
+  animation: office-puff-once 160ms steps(1, end) forwards;
+}
+
+@keyframes office-puff-once {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* "나" 표·키보드용 "나" 버튼 — 사람 스프라이트와 같은 전이로 함께 움직인다 */
+.office-me {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform: translate(calc(var(--ux) * var(--k) * 1px), calc(var(--uy) * var(--k) * 1px));
+}
+
+.ai-office-room.is-animated .office-me {
+  transition: transform 125ms steps(4, end);
+}
+
+.ai-office-room.is-animated .office-me.is-moving {
+  transition: transform calc(var(--step-ms) * 1ms) steps(8, end);
+}
+
+.office-nameplate.office-me-tag {
+  left: calc(8 * var(--k) * 1px);
+  top: calc(-1 * var(--k) * 1px);
+  transform: translate(-50%, -100%);
+  background: var(--office-hi);
+  color: var(--office-ol);
+  box-shadow: 0 0 0 1px var(--office-ol);
+}
+
+.office-me-hit {
+  position: absolute;
+  left: calc(-2 * var(--k) * 1px);
+  top: calc(-2 * var(--k) * 1px);
+  width: calc(20 * var(--k) * 1px);
+  height: calc(28 * var(--k) * 1px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  /* 키보드 전용 — 마우스는 밑의 바닥·봇 클릭이 된다 */
+  pointer-events: none;
+}
+
+.office-me-hit:focus-visible {
+  outline: 2px solid var(--office-focus);
+  outline-offset: 2px;
+}
+
+/* 바닥 클릭 = 이동 — 모든 버튼보다 아래 */
+.office-floor-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  cursor: pointer;
+}
+
+/* ── 대화 장면(모달) ─────────────────────────────────────── */
+.office-dialog-blanket {
+  position: fixed;
+  inset: 0;
+  z-index: var(--chanho-z-blanket);
+  background: var(--chanho-color-blanket);
+}
+
+.office-dialog-window {
+  position: fixed;
+  z-index: var(--chanho-z-modal);
+  overflow: hidden;
+  background: var(--office-void);
+  outline: none;
+}
+
+.office-scene {
+  position: absolute;
+}
+
+.office-scene-svg {
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+}
+
+.office-scene-el {
+  position: absolute;
+  left: calc(var(--x) * var(--s) * 1px);
+  top: calc(var(--y) * var(--s) * 1px);
+  width: calc(var(--w) * var(--s) * 1px);
+  height: calc(var(--h) * var(--s) * 1px);
+}
+
+/* 와이프 — 가로 띠 8개, 짝수는 왼쪽·홀수는 오른쪽에서 8계단으로 들어오고 같은 길로 빠진다 */
+.office-wipe {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-rows: repeat(8, 1fr);
+  pointer-events: none;
+}
+
+.office-wipe i {
+  display: block;
+  background: var(--office-void);
+}
+
+.office-wipe.is-cover-in i.is-left,
+.office-wipe.is-cover-out i.is-left {
+  animation: office-wipe-l-in 240ms steps(8, end) calc(var(--band) * 10ms) both;
+}
+
+.office-wipe.is-cover-in i.is-right,
+.office-wipe.is-cover-out i.is-right {
+  animation: office-wipe-r-in 240ms steps(8, end) calc(var(--band) * 10ms) both;
+}
+
+.office-wipe.is-reveal i.is-left {
+  animation: office-wipe-l-in 240ms steps(8, end) calc(var(--band) * 10ms) both reverse;
+}
+
+.office-wipe.is-reveal i.is-right {
+  animation: office-wipe-r-in 240ms steps(8, end) calc(var(--band) * 10ms) both reverse;
+}
+
+@keyframes office-wipe-l-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes office-wipe-r-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* 표정 연출 — 기쁨 폴짝(1ap × 2), 생각 중 점점점, 곤란 땀 통통 */
+.office-scene-bot.is-happy {
+  animation: office-hop 480ms steps(1, end) 1;
+}
+
+@keyframes office-hop {
+  0% { transform: translateY(0); }
+  25% { transform: translateY(-1px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
+}
+
+.office-scene-dot:nth-of-type(2) {
+  animation: office-dot-2 1600ms steps(1, end) infinite;
+}
+
+.office-scene-dot:nth-of-type(3) {
+  animation: office-dot-3 1600ms steps(1, end) infinite;
+}
+
+@keyframes office-dot-2 {
+  0% { opacity: 0; }
+  25%, 100% { opacity: 1; }
+}
+
+@keyframes office-dot-3 {
+  0% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+
+.office-scene-sweat {
+  animation: office-bob 800ms steps(1, end) infinite;
+}
+
+/* 픽셀 상자(대화창·선택지 메뉴) — 3px 테두리, 3px 계단 노치 */
+.office-pixel-box {
+  box-sizing: border-box;
+  border: 3px solid var(--office-ol);
+  background: var(--office-bubble-bg);
+  color: var(--office-bubble-fg);
+  clip-path: polygon(
+    0 3px,
+    3px 3px,
+    3px 0,
+    calc(100% - 3px) 0,
+    calc(100% - 3px) 3px,
+    100% 3px,
+    100% calc(100% - 3px),
+    calc(100% - 3px) calc(100% - 3px),
+    calc(100% - 3px) 100%,
+    3px 100%,
+    3px calc(100% - 3px),
+    0 calc(100% - 3px)
+  );
+}
+
+.office-dialog-box {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1 * var(--s) * 1px);
+  min-height: calc(var(--h) * var(--s) * 1px);
+  height: auto;
+  padding: calc(1.5 * var(--s) * 1px);
+  font: 24px/28px "Galmuri11", var(--chanho-font-family-sans);
+  cursor: pointer;
+}
+
+.office-dialog-box:focus-visible,
+.office-choice:focus-visible {
+  outline: 3px solid var(--office-focus);
+  outline-offset: 2px;
+}
+
+.office-dialog-text {
+  flex: 1;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.office-dialog-name {
+  z-index: 1;
+  width: auto;
+  height: auto;
+  max-width: calc(30 * var(--s) * 1px);
+  padding: 0 8px;
+  overflow: hidden;
+  background: var(--office-label-bg);
+  color: var(--office-label-fg);
+  font: 24px/28px "Galmuri11", var(--chanho-font-family-sans);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.office-dialog-skip {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.office-next-arrow {
+  position: absolute;
+  right: calc(2 * var(--s) * 1px);
+  bottom: calc(1 * var(--s) * 1px);
+  width: calc(3.5 * var(--s) * 1px);
+  animation: office-bob-s 800ms steps(1, end) infinite;
+}
+
+.office-next-arrow svg,
+.office-choice-cursor svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@keyframes office-bob-s {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(calc(-0.5 * var(--s) * 1px)); }
+}
+
+.office-chat-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--chanho-space-100);
+  font: var(--chanho-font-size-100) / 1.4 var(--chanho-font-family-sans);
+  cursor: auto;
+}
+
+.office-chat-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 수다 입력 라벨은 시각 숨김(접근 이름은 남는다) */
+.office-chat-field label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 선택지 메뉴 */
+.office-scene-menu {
+  height: auto;
+}
+
+.office-choice-menu {
+  display: flex;
+  flex-direction: column;
+  padding: calc(1 * var(--s) * 1px) 0;
+}
+
+.office-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0 calc(1.5 * var(--s) * 1px) 0 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 24px/32px "Galmuri11", var(--chanho-font-family-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.office-choice.is-active {
+  background: var(--office-select);
+  color: var(--office-ol);
+}
+
+.office-choice[aria-disabled="true"] .office-choice-label {
+  opacity: 0.45;
+}
+
+.office-choice-cursor {
+  flex-shrink: 0;
+  width: 10px;
+}
+
+.office-choice-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.office-choice-lock {
+  flex-shrink: 0;
+}
+
+/* 헤더·도구(DS 세계) */
+.office-scene-header {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  width: auto;
+  height: auto;
+  font-size: var(--chanho-font-size-100);
+}
+
+.office-scene-name,
+.office-scene-meeting {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  padding: 2px var(--chanho-space-100);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--office-label-bg);
+  color: var(--office-hi);
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.office-scene-meeting {
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.office-scene-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-50);
+  height: auto;
+}
+
+.office-scene-tools button {
+  background: var(--chanho-color-background-surface);
+}
+
+/* 폼 패널·백로그 — DS 표면 */
+.office-form-panel {
+  z-index: 2;
+  box-sizing: border-box;
+  /* 스펙 max(60s, 360px)에서 최소 폭을 61s로 묶는다 — s=6이면 그대로 360px, s≤5에서도 봇 얼굴(x ≥ 64)을 가리지 않게 */
+  width: max(calc(60 * var(--s) * 1px), min(360px, calc(61 * var(--s) * 1px)));
+  height: auto;
+  max-height: calc(40 * var(--s) * 1px);
+  padding: var(--chanho-space-200);
+  overflow-y: auto;
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface-overlay);
+  box-shadow: var(--chanho-shadow-overlay);
+  color: var(--chanho-color-text-default);
+  font-family: var(--chanho-font-family-sans);
+  font-size: var(--chanho-font-size-100);
+}
+
+.office-form-panel.office-backlog {
+  z-index: 3;
+  width: calc(150 * var(--s) * 1px);
+  height: calc(40 * var(--s) * 1px);
+}
+
+.office-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.office-form-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.office-form-summary,
+.office-form-text {
+  margin: 0;
+}
+
+.office-form-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  margin: 0;
+  overflow: hidden;
+  padding: var(--chanho-space-100);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-subtle);
+  white-space: pre-wrap;
+}
+
+.office-form-notice,
+.office-form-empty {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-form-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--chanho-space-50) var(--chanho-space-200);
+  margin: 0;
+}
+
+.office-form-dl dt {
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-form-dl dd {
+  margin: 0;
+}
+
+.office-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.office-issue-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.office-issue-row {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border-radius: var(--chanho-radius-medium);
+  cursor: pointer;
+}
+
+.office-issue-row.is-active {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.office-issue-row.is-selected {
+  background: var(--chanho-color-background-selected);
+}
+
+.office-issue-row.is-busy .office-issue-title,
+.office-issue-row.is-busy .office-issue-key {
+  opacity: 0.6;
+}
+
+.office-issue-key {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+}
+
+.office-issue-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.office-issue-status,
+.office-issue-busy {
+  font-size: var(--chanho-font-size-75);
+}
+
+.office-issue-busy {
+  grid-column: 2 / -1;
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 대화 기록 줄(장면 백로그·패널 탭 공용) */
+.office-backlog-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.office-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.office-log-row {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-100);
+}
+
+.office-log-time {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-log-who {
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.office-log-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.office-log-quote {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.office-backlog a,
+.office-log-row a {
+  color: var(--chanho-color-text-link);
+}
+
+.office-log-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.office-panel-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-300);
+  padding-top: var(--chanho-space-200);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-office-room.is-animated .office-user,
+  .ai-office-room.is-animated .office-user.is-moving,
+  .ai-office-room.is-animated .office-me,
+  .ai-office-room.is-animated .office-me.is-moving {
+    transition: none;
+  }
+
+  .office-user-puff,
+  .office-scene-bot.is-happy,
+  .office-scene-dot:nth-of-type(2),
+  .office-scene-dot:nth-of-type(3),
+  .office-scene-sweat,
+  .office-next-arrow,
+  .office-wipe i {
+    animation: none;
+  }
 }

@@ -105,6 +105,11 @@ export const revokeAgentToken = impl.revokeAgentToken;
 export const fetchProjectCredential = impl.fetchProjectCredential;
 export const saveProjectCredential = impl.saveProjectCredential;
 export const deleteProjectCredential = impl.deleteProjectCredential;
+/** AI 사무실 1:1 대화(P3g) — USER run·수다·대화 기록 */
+export const createAgentRun = impl.createAgentRun;
+export const sendPersonaChat = impl.sendPersonaChat;
+export const fetchPersonaDialog = impl.fetchPersonaDialog;
+export const savePersonaDialog = impl.savePersonaDialog;
 /** 테스트 전용 — 목업의 권한·키 시나리오 전환(REST에는 없다) */
 export const __setAgentMockScenario = mock.__setAgentMockScenario;
 export type { AgentMockScenario } from "./jiraMock";

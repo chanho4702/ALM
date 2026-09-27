@@ -7,8 +7,14 @@ import type {
   AgentActiveRunStatus,
   AgentAuditEntry,
   AgentBoardPost,
+  AgentChatMood,
+  AgentChatReply,
   AgentCredentialScope,
   AgentCurrentRun,
+  AgentDialogEntry,
+  AgentDialogKind,
+  AgentDialogPage,
+  AgentDialogSpeaker,
   AgentGate,
   AgentGateKind,
   AgentMeetingAttendee,
@@ -145,6 +151,8 @@ export interface AgentOfficeDto {
   boardPosts?: AgentBoardPostDto[] | null;
   /** P3e 이전 백엔드는 이 필드가 없다 */
   activeMeeting?: AgentActiveMeetingDto | null;
+  /** P3g 이전 백엔드는 이 필드가 없다 — 없으면 전부 꺼짐 */
+  features?: { chat?: boolean | null } | null;
 }
 
 export interface AgentActiveMeetingDto {
@@ -345,6 +353,7 @@ export function mapAgentOffice(dto: AgentOfficeDto): AgentOffice {
     generatedAt: dto.generatedAt ?? new Date().toISOString(),
     boardPosts: (dto.boardPosts ?? []).map(mapAgentBoardPost),
     activeMeeting: mapAgentActiveMeeting(dto.activeMeeting),
+    features: { chat: dto.features?.chat === true },
   };
 }
 
@@ -477,4 +486,68 @@ export function mapAgentProjectCredential(dto: AgentProjectCredentialDto | null)
       keyHint: dto?.effective?.keyHint ?? null,
     },
   };
+}
+
+// ── P3g 1:1 대화 — 수다·대화 기록 ──
+
+export interface AgentChatReplyDto {
+  sessionId: string;
+  reply: string | null;
+  mood?: string | null;
+  suggest?: string | null;
+}
+
+const CHAT_MOODS: readonly AgentChatMood[] = ["NEUTRAL", "THINKING", "HAPPY", "TROUBLED"];
+
+/** 모르는 mood는 null(평소 표정), suggest는 "DIRECTIVE"만 인정한다 */
+export function mapAgentChatReply(dto: AgentChatReplyDto): AgentChatReply {
+  return {
+    sessionId: dto.sessionId,
+    reply: dto.reply ?? "",
+    mood: CHAT_MOODS.includes(dto.mood as AgentChatMood) ? (dto.mood as AgentChatMood) : null,
+    suggest: dto.suggest === "DIRECTIVE" ? "DIRECTIVE" : null,
+  };
+}
+
+export interface AgentDialogEntryDto {
+  id: Id;
+  speaker: string;
+  kind: string;
+  text: string | null;
+  issueKey?: string | null;
+  runId?: Id | null;
+  commentId?: Id | null;
+  createdAt: string;
+}
+
+export interface AgentDialogPageDto {
+  entries?: AgentDialogEntryDto[] | null;
+  hasMore?: boolean | null;
+}
+
+const DIALOG_SPEAKERS: readonly AgentDialogSpeaker[] = ["USER", "PERSONA"];
+const DIALOG_KINDS: readonly AgentDialogKind[] = ["SAY", "STATUS", "DIRECTIVE", "ASSIGN"];
+
+export function mapAgentDialogEntry(dto: AgentDialogEntryDto): AgentDialogEntry {
+  return {
+    id: String(dto.id),
+    speaker: pick(DIALOG_SPEAKERS, dto.speaker, "PERSONA"),
+    kind: pick(DIALOG_KINDS, dto.kind, "SAY"),
+    text: dto.text ?? "",
+    issueKey: dto.issueKey ?? null,
+    runId: optId(dto.runId),
+    commentId: optId(dto.commentId),
+    createdAt: dto.createdAt,
+  };
+}
+
+/** 시간순(오래된 것 먼저)으로 정렬해 둔다 — 서버 계약이 이미 그렇지만 순서에 기대는 백로그가 깨지지 않게 */
+export function mapAgentDialogPage(dto: AgentDialogPageDto | null): AgentDialogPage {
+  const entries = (dto?.entries ?? []).map(mapAgentDialogEntry);
+  entries.sort((a, b) => {
+    const na = Number(a.id);
+    const nb = Number(b.id);
+    return Number.isFinite(na) && Number.isFinite(nb) ? na - nb : a.createdAt.localeCompare(b.createdAt);
+  });
+  return { entries, hasMore: dto?.hasMore === true };
 }

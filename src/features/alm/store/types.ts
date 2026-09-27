@@ -882,6 +882,72 @@ export interface AgentOffice {
   boardPosts: AgentBoardPost[];
   /** 진행 중(RUNNING) 회의 계열 run(P3e) — 대기·차단 회의·회의 없음·구 백엔드 응답이면 null */
   activeMeeting: AgentActiveMeeting | null;
+  /** 설치·키 상태로 켜지는 기능(P3g) — 구 백엔드 응답이면 전부 false */
+  features: AgentOfficeFeatures;
+}
+
+export interface AgentOfficeFeatures {
+  /** 수다 API(`POST /api/agent/personas/{id}/chat`)가 동작 가능 — LLM 키 해석됨 + `CHAT_ENABLED` */
+  chat: boolean;
+}
+
+// ── AI 사무실 1:1 대화(P3g AGP-65) — 수다·대화 기록·USER run ──
+
+/** `POST /api/agent/runs` — 사람이 지시문을 붙여 run을 직접 요청한다(모델 생략 = 프로젝트 정책) */
+export interface AgentRunCreateInput {
+  issueKey: string;
+  instruction?: string;
+  model?: string;
+  personaSlug: string;
+}
+
+export type AgentChatMood = "NEUTRAL" | "THINKING" | "HAPPY" | "TROUBLED";
+
+export interface AgentChatInput {
+  /** 1~500자 */
+  message: string;
+  /** 첫 턴은 생략 — 서버가 발급해 응답에 싣는다 */
+  sessionId?: string;
+  projectId?: string;
+}
+
+/** `POST /api/agent/personas/{id}/chat` 200 — 수다는 일을 시키지 못한다: 작업 요청으로 보이면 suggest="DIRECTIVE" */
+export interface AgentChatReply {
+  sessionId: string;
+  reply: string;
+  mood: AgentChatMood | null;
+  suggest: "DIRECTIVE" | null;
+}
+
+export type AgentDialogSpeaker = "USER" | "PERSONA";
+/** SAY = 수다 한 턴(서버가 저장), STATUS = "지금 뭐 해?" 답, DIRECTIVE = 지시 코멘트, ASSIGN = USER run 생성 */
+export type AgentDialogKind = "SAY" | "STATUS" | "DIRECTIVE" | "ASSIGN";
+
+/** 대화 기록 한 줄 — 호출자 본인 기록만(관리자도 남의 기록은 못 본다) */
+export interface AgentDialogEntry {
+  id: string;
+  speaker: AgentDialogSpeaker;
+  kind: AgentDialogKind;
+  text: string;
+  issueKey: string | null;
+  runId: string | null;
+  commentId: string | null;
+  createdAt: string;
+}
+
+/** `GET /api/agent/personas/{id}/dialog` — entries는 시간순(오래된 것 먼저), 더 이전은 entries[0].id를 before로 */
+export interface AgentDialogPage {
+  entries: AgentDialogEntry[];
+  hasMore: boolean;
+}
+
+export interface AgentDialogEntryInput {
+  speaker: AgentDialogSpeaker;
+  kind: AgentDialogKind;
+  text: string;
+  issueKey?: string | null;
+  runId?: string | null;
+  commentId?: string | null;
 }
 
 /** 사무실 회의실에 앉힐 진행 중 회의(P3e). 매니저 보고는 매니저 1명 */

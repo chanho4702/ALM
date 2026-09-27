@@ -163,9 +163,9 @@ describe("상태 파생(스펙 §4.1)", () => {
   it("접근 이름은 이름·롤·상태·이슈·요약 원문을 담는다", () => {
     const p = persona({ currentRun: run("RUNNING"), lastActivity: activity("가나다라마바사아자차카타파하") });
     expect(personaAccessibleName(p)).toBe(
-      "백엔드봇, 백엔드, 작업 중, 이슈 ALM-123, 최근 활동: 가나다라마바사아자차카타파하 — 개인 오피스 열기",
+      "백엔드봇, 백엔드, 작업 중, 이슈 ALM-123, 최근 활동: 가나다라마바사아자차카타파하 — 말 걸기",
     );
-    expect(personaAccessibleName(persona())).toBe("백엔드봇, 백엔드, 휴식 중 — 개인 오피스 열기");
+    expect(personaAccessibleName(persona())).toBe("백엔드봇, 백엔드, 휴식 중 — 말 걸기");
   });
 
   it("매니저 보고 run — 롤 라벨 '매니저', 말풍선·접근 이름은 '매니저 보고'(뒤에 '회의'를 붙이지 않는다)", () => {
@@ -175,7 +175,7 @@ describe("상태 파생(스펙 §4.1)", () => {
       currentRun: run("RUNNING", { type: "MANAGER", issueKey: "PROJECT-1" }),
     });
     expect(bubbleText(p)?.line1).toBe("매니저 보고");
-    expect(personaAccessibleName(p)).toBe("매니저봇, 매니저, 작업 중, 매니저 보고 프로젝트 전반 — 개인 오피스 열기");
+    expect(personaAccessibleName(p)).toBe("매니저봇, 매니저, 작업 중, 매니저 보고 프로젝트 전반 — 말 걸기");
     const retro = persona({ currentRun: run("RUNNING", { type: "RETRO", issueKey: "PROJECT-1" }) });
     expect(bubbleText(retro)?.line1).toBe("회고 회의");
   });
@@ -244,6 +244,7 @@ describe("요약·라이브 알림", () => {
       generatedAt: "",
       boardPosts: [],
       activeMeeting: null,
+      features: { chat: false },
     });
     const before = office([persona({ id: "1", currentRun: run("RUNNING") }), persona({ id: "2", name: "운영봇" })]);
     const after = office([
@@ -355,7 +356,7 @@ describe("회의실 문구(P3e §2.4·§2.7)", () => {
 
   it("좌석 버튼 접근 이름 끝에 '회의 중 — {회의 이름}', 캔버스 요약 끝에 '회의 중 n'", () => {
     expect(personaAccessibleName(persona(), "착수/계획 회의")).toBe(
-      "백엔드봇, 백엔드, 휴식 중, 회의 중 — 착수/계획 회의 — 개인 오피스 열기",
+      "백엔드봇, 백엔드, 휴식 중, 회의 중 — 착수/계획 회의 — 말 걸기",
     );
     expect(officeSummaryText([persona(), persona({ id: "2" })], 2)).toBe("AI 팀원 2명 — 휴식 중 2, 회의 중 2");
   });
@@ -370,6 +371,7 @@ describe("회의실 문구(P3e §2.4·§2.7)", () => {
       generatedAt: "",
       boardPosts: [],
       activeMeeting,
+      features: { chat: false },
     });
     expect(transitionAnnouncements(office(null), office(meeting()))).toEqual([
       "착수/계획 회의가 시작됐습니다 — 참석 4명",

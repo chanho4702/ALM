@@ -1021,3 +1021,526 @@ export const CAT_AWAKE: readonly string[] = [
   "..KOOOOOOOKKOK..",
   "...KKKKKKKKKK...",
 ];
+
+// ── P3g(AGP-65) — sprites_p3g.py ASSETS에서 스크립트로 추출(손으로 고치지 말 것) ──
+
+/** 사람 정면 서기 16×24 — 아호게(0~1행)·옆가르마·후드·사원증(14~16행)·청바지·흰 운동화, 봇보다 1ap 큼(발 23행) — 계열 `user`, 16×24 */
+export const USER_FRONT: readonly string[] = [
+  ".........KK.....",
+  ".....KKKKHK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHSSSShK..",
+  "..KHHSSSSSSSHK..",
+  "..KHSKSSSSKSHK..",
+  "..KSSKSSSSKSSK..",
+  "..KSSSSssSSSSK..",
+  "...KSSSSSSSSK...",
+  "...KUuRssRuUK...",
+  "...KUUURRUUUK...",
+  "..KUKUUWWUUKUK..",
+  "..KUKUUwWUUKUK..",
+  "..KuKUUWWUUKuK..",
+  "..KSKuuuuuuKSK..",
+  "...KKJJJJJJKK...",
+  "....KJJJJJJK....",
+  "....KJJKKJJK....",
+  "....KJjKKjJK....",
+  "...KEEK..KEEK...",
+  "...KKKK..KKKK...",
+];
+
+/** 사람 뒷모습 16×24 — 목 뒤 후드(11~13행) — 계열 `user`, 16×24 */
+export const USER_BACK: readonly string[] = [
+  ".........KK.....",
+  ".....KKKKHK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KSHHHHHHHHSK..",
+  "..KShHHHHHHhSK..",
+  "...KhhhhhhhhK...",
+  "....KUUUUUUK....",
+  "...KUuUUUUuUK...",
+  "..KUKUuuuuUKUK..",
+  "..KUKUUUUUUKUK..",
+  "..KUKUUUUUUKUK..",
+  "..KuKUUUUUUKuK..",
+  "..KSKuuuuuuKSK..",
+  "...KKJJJJJJKK...",
+  "....KJJJJJJK....",
+  "....KJJKKJJK....",
+  "....KJjKKjJK....",
+  "...KEEK..KEEK...",
+  "...KKKK..KKKK...",
+];
+
+/** 사람 옆모습(오른쪽) 16×24 — 왼쪽은 좌우 반전. 사람만 옆모습이 있다(봇은 P3e 규칙대로 정면/뒷모습) — 계열 `user`, 16×24 */
+export const USER_SIDE_R: readonly string[] = [
+  "........KK......",
+  "......KKKHK.....",
+  "....KKHHHHHK....",
+  "...KHHHHHHHHK...",
+  "...KHHHHHHHHK...",
+  "...KHHHHHHHHK...",
+  "...KHHHHHHHHSK..",
+  "...KHHHHHHSSSK..",
+  "...KHhsSSSKSSK..",
+  "...KHhsSSSKSSSK.",
+  "...KhSSSSSSSSK..",
+  "....KKSSSSSSK...",
+  "....KUUUssK.....",
+  "...KUUUUURRK....",
+  "...KUKuuKUWK....",
+  "...KUKuuKUwK....",
+  "...KuKuuKUWK....",
+  "...KuKSSKuuK....",
+  "....KJJJJJJK....",
+  "....KJJJJJJK....",
+  ".....KJJjJK.....",
+  ".....KJJjJK.....",
+  ".....KEEEEEK....",
+  ".....KKKKKKK....",
+];
+
+/** 정면 걷기 A(18~23행만 다름) — 계열 `user`, 16×24 */
+export const USER_FRONT_WALK_A: readonly string[] = [
+  ".........KK.....",
+  ".....KKKKHK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHSSSShK..",
+  "..KHHSSSSSSSHK..",
+  "..KHSKSSSSKSHK..",
+  "..KSSKSSSSKSSK..",
+  "..KSSSSssSSSSK..",
+  "...KSSSSSSSSK...",
+  "...KUuRssRuUK...",
+  "...KUUURRUUUK...",
+  "..KUKUUWWUUKUK..",
+  "..KUKUUwWUUKUK..",
+  "..KuKUUWWUUKuK..",
+  "..KSKuuuuuuKSK..",
+  "...KKJJJJJJKK...",
+  "....KJJJJJJK....",
+  "....KJJKKJJK....",
+  "....KJjK.KEEK...",
+  "...KEEK..KKKK...",
+  "...KKKK.........",
+];
+
+/** 정면 걷기 B — 계열 `user`, 16×24 */
+export const USER_FRONT_WALK_B: readonly string[] = [
+  ".........KK.....",
+  ".....KKKKHK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHSSSShK..",
+  "..KHHSSSSSSSHK..",
+  "..KHSKSSSSKSHK..",
+  "..KSSKSSSSKSSK..",
+  "..KSSSSssSSSSK..",
+  "...KSSSSSSSSK...",
+  "...KUuRssRuUK...",
+  "...KUUURRUUUK...",
+  "..KUKUUWWUUKUK..",
+  "..KUKUUwWUUKUK..",
+  "..KuKUUWWUUKuK..",
+  "..KSKuuuuuuKSK..",
+  "...KKJJJJJJKK...",
+  "....KJJJJJJK....",
+  "....KJJKKJJK....",
+  "...KEEK.KjJK....",
+  "...KKKK..KEEK...",
+  ".........KKKK...",
+];
+
+/** 뒷모습 걷기 A — 다리 행은 정면과 같다 — 계열 `user`, 16×24 */
+export const USER_BACK_WALK_A: readonly string[] = [
+  ".........KK.....",
+  ".....KKKKHK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KSHHHHHHHHSK..",
+  "..KShHHHHHHhSK..",
+  "...KhhhhhhhhK...",
+  "....KUUUUUUK....",
+  "...KUuUUUUuUK...",
+  "..KUKUuuuuUKUK..",
+  "..KUKUUUUUUKUK..",
+  "..KUKUUUUUUKUK..",
+  "..KuKUUUUUUKuK..",
+  "..KSKuuuuuuKSK..",
+  "...KKJJJJJJKK...",
+  "....KJJJJJJK....",
+  "....KJJKKJJK....",
+  "....KJjK.KEEK...",
+  "...KEEK..KKKK...",
+  "...KKKK.........",
+];
+
+/** 뒷모습 걷기 B — 계열 `user`, 16×24 */
+export const USER_BACK_WALK_B: readonly string[] = [
+  ".........KK.....",
+  ".....KKKKHK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KSHHHHHHHHSK..",
+  "..KShHHHHHHhSK..",
+  "...KhhhhhhhhK...",
+  "....KUUUUUUK....",
+  "...KUuUUUUuUK...",
+  "..KUKUuuuuUKUK..",
+  "..KUKUUUUUUKUK..",
+  "..KUKUUUUUUKUK..",
+  "..KuKUUUUUUKuK..",
+  "..KSKuuuuuuKSK..",
+  "...KKJJJJJJKK...",
+  "....KJJJJJJK....",
+  "....KJJKKJJK....",
+  "...KEEK.KjJK....",
+  "...KKKK..KEEK...",
+  ".........KKKK...",
+];
+
+/** 옆 걷기 A(다리 벌림). B = USER_SIDE_R 그대로(다리 모음) — 계열 `user`, 16×24 */
+export const USER_SIDE_WALK_A: readonly string[] = [
+  "........KK......",
+  "......KKKHK.....",
+  "....KKHHHHHK....",
+  "...KHHHHHHHHK...",
+  "...KHHHHHHHHK...",
+  "...KHHHHHHHHK...",
+  "...KHHHHHHHHSK..",
+  "...KHHHHHHSSSK..",
+  "...KHhsSSSKSSK..",
+  "...KHhsSSSKSSSK.",
+  "...KhSSSSSSSSK..",
+  "....KKSSSSSSK...",
+  "....KUUUssK.....",
+  "...KUUUUURRK....",
+  "...KUKuuKUWK....",
+  "...KUKuuKUwK....",
+  "...KuKuuKUWK....",
+  "...KuKSSKuuK....",
+  "....KJJJJJJK....",
+  "....KJJJJJJK....",
+  "....KJJKKJJK....",
+  "...KJJK..KJJK...",
+  "..KEEEK..KEEEK..",
+  "..KKKKK..KKKKK..",
+];
+
+/** 대화 장면 전경 — 사람 뒷모습 상반신 30×26(어깨 너머 구도). 아래는 대화창이 가린다 — 계열 `user`, 30×26 */
+export const USER_BACK_BUST: readonly string[] = [
+  "...............KK.............",
+  "...........KKKKHK.............",
+  ".........KKHHHHHHKK...........",
+  "........KHHHHHHHHHHK..........",
+  ".......KHHHHHHHHHHHHK.........",
+  "......KHHHHHHHHHHHHHHK........",
+  "......KHHHHHHHHHHHHHhK........",
+  "......KHHHHHHHHHHHHHhK........",
+  "......KHHHHHHHHHHHHHhK........",
+  "....KsKHHHHHHHHHHHHHhKsK......",
+  "....KsKHHHHHHHHHHHHHhKsK......",
+  ".....KKhHHHHHHHHHHHhhKK.......",
+  "......KhhhhhhhhhhhhhhK........",
+  ".......KRSSSSSSSSSSRK.........",
+  ".....KKUUUUUUUUUUUUUUKK.......",
+  "....KUUuUUUUUUUUUUUUuUUK......",
+  "...KUUUuuUUUUUUUUUUuuUUUK.....",
+  "..KUUUUUuuuuuuuuuuuuUUUUUK....",
+  ".KUUUUUUUUUUUUUUUUUUUUUUUK....",
+  "KUUUUUUUUUUUUUUUUUUUUUUUUUK...",
+  "KUUUUUUUUUUUUUUUUUUUUUUUUUuK..",
+  "KUUUUUUUUUUUUUUUUUUUUUUUUUuK..",
+  "KUUUUUUUUUUUUUUUUUUUUUUUUuuK..",
+  "KUUUUUUUUUUUUUUUUUUUUUUUUuuK..",
+  "KUUUUUUUUUUUUUUUUUUUUUUUuuuK..",
+  "KUUUUUUUUUUUUUUUUUUUUUUUuuuK..",
+];
+
+/** 봇 표정: 평소 = P3a 앉음 프레임 그대로 — 계열 `char`, 16×16 */
+export const FACE_NORMAL: readonly string[] = [
+  "................",
+  ".....KKKKKK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHSSSSSSHhK..",
+  "..KHSSSSSSSSHK..",
+  "..KHSKSSSSKSHK..",
+  "..KSSKSSSSKSSK..",
+  "..KSSSSssSSSSK..",
+  "...KSSSSSSSSK...",
+  "....KCCssCCK....",
+  "...KCCCCCCCCK...",
+  "..KCKCCCCCCKCK..",
+  "..KCKCCCCCCKCK..",
+];
+
+/** 봇 표정: 생각 중 — 눈 1px 위·오른쪽(8~9행). 장면에서 머리 오른쪽 위에 P3e `MB_DOTS` 말풍선 — 계열 `char`, 16×16 */
+export const FACE_THINKING: readonly string[] = [
+  "................",
+  ".....KKKKKK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHSSSSSSHhK..",
+  "..KHSSSSSSSSHK..",
+  "..KHSSKSSSSKHK..",
+  "..KSSSSSSSSSSK..",
+  "..KSSSSssSSSSK..",
+  "...KSSSSSSSSK...",
+  "....KCCssCCK....",
+  "...KCCCCCCCCK...",
+  "..KCKCCCCCCKCK..",
+  "..KCKCCCCCCKCK..",
+];
+
+/** 봇 표정: 기쁨 — ^ ^ 눈(8~9행) + ∪ 웃는 입(10~11행, 코 음영 생략) — 계열 `char`, 16×16 */
+export const FACE_HAPPY: readonly string[] = [
+  "................",
+  ".....KKKKKK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHSSSSSSHhK..",
+  "..KHSSSSSSSSHK..",
+  "..KHSKSSSSKSHK..",
+  "..KSKSKSSKSKSK..",
+  "..KSSSKSSKSSSK..",
+  "...KSSSKKSSSK...",
+  "....KCCssCCK....",
+  "...KCCCCCCCCK...",
+  "..KCKCCCCCCKCK..",
+  "..KCKCCCCCCKCK..",
+];
+
+/** 봇 표정: 곤란 — 내리깐 1px 눈(8행 비움) + 넓은 일자 입(11행). 장면에서 P3e `FX_SWEAT` — 계열 `char`, 16×16 */
+export const FACE_TROUBLED: readonly string[] = [
+  "................",
+  ".....KKKKKK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHSSSSSSHhK..",
+  "..KHSSSSSSSSHK..",
+  "..KHSSSSSSSSHK..",
+  "..KSSKSSSSKSSK..",
+  "..KSSSSssSSSSK..",
+  "...KSSKKKKSSK...",
+  "....KCCssCCK....",
+  "...KCCCCCCCCK...",
+  "..KCKCCCCCCKCK..",
+  "..KCKCCCCCCKCK..",
+];
+
+/** 평소 표정의 눈 깜빡임 프레임(8~9행) — 계열 `char`, 16×16 */
+export const FACE_BLINK: readonly string[] = [
+  "................",
+  ".....KKKKKK.....",
+  "...KKHHHHHHKK...",
+  "..KHHHHHHHHHHK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHHHHHHHHhK..",
+  "..KHHSSSSSSHhK..",
+  "..KHSSSSSSSSHK..",
+  "..KHSSSSSSSSHK..",
+  "..KSKKSSSSKKSK..",
+  "..KSSSSssSSSSK..",
+  "...KSSSSSSSSK...",
+  "....KCCssCCK....",
+  "...KCCCCCCCCK...",
+  "..KCKCCCCCCKCK..",
+  "..KCKCCCCCCKCK..",
+];
+
+/** 입구 발판 32×12 — 방 맨 아래 타일 줄, 사람 입장 위치 — 계열 `mat`, 32×12 */
+export const DOORMAT: readonly string[] = [
+  ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
+  "KffffffffffffffffffffffffffffffK",
+  "KfFFFFFFFFFFFFFFFFFFFFFFFFFFFFfK",
+  "KfFFFFFFFFFFFFFFFFFFFFFFFFFFFFfK",
+  "KfFffffffffffffffffffffffffffFfK",
+  "KfFFFFFFFFFFFFFFFFFFFFFFFFFFFFfK",
+  "KfFFFFFFFFFFFFFFFFFFFFFFFFFFFFfK",
+  "KfFffffffffffffffffffffffffffFfK",
+  "KfFFFFFFFFFFFFFFFFFFFFFFFFFFFFfK",
+  "KfFFFFFFFFFFFFFFFFFFFFFFFFFFFFfK",
+  "KffffffffffffffffffffffffffffffK",
+  ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
+];
+
+/** 목적지 핀 7×10 프레임 A — 계열 `pin`, 7×10 */
+export const PIN_A: readonly string[] = [
+  ".KKKKK.",
+  "KRRRRRK",
+  "KRHRRRK",
+  "KRRRRRK",
+  ".KRRRK.",
+  "..KRK..",
+  "..KRK..",
+  "...K...",
+  ".KK.KK.",
+  "..KKK..",
+];
+
+/** 목적지 핀 프레임 B — 핀만 1ap 위(바닥 고리는 그대로) — 계열 `pin`, 7×10 */
+export const PIN_B: readonly string[] = [
+  "KRRRRRK",
+  "KRHRRRK",
+  "KRRRRRK",
+  ".KRRRK.",
+  "..KRK..",
+  "..KRK..",
+  "...K...",
+  ".......",
+  ".KK.KK.",
+  "..KKK..",
+];
+
+/** 갈 수 없음 표시 7×7(600ms) — 계열 `pin`, 7×7 */
+export const PIN_NO: readonly string[] = [
+  "KK...KK",
+  "KRK.KRK",
+  ".KRKRK.",
+  "..KRK..",
+  ".KRKRK.",
+  "KRK.KRK",
+  "KK...KK",
+];
+
+/** 대화 중 표시 9×7 — 봇 머리 위(유니코드 💬 대신) — 계열 `mb`, 9×7 */
+export const TALK_MARK: readonly string[] = [
+  ".KKKKKKK.",
+  "KBBBBBBBK",
+  "KBKBKBKBK",
+  "KBBBBBBBK",
+  ".KBBKKKK.",
+  ".KBK.....",
+  ".KK......",
+];
+
+/** 대화 장면 작은 테이블 56×18(장면 px) — 계열 `furn2`, 56×18 */
+export const TABLE_SMALL: readonly string[] = [
+  ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
+  "KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK",
+  "KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK",
+  "KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK",
+  "KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK",
+  "KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK",
+  "KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK",
+  "KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK",
+  "KwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwK",
+  "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+  "KxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK",
+  "KxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK",
+  "KxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK",
+  "KxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK",
+  "KyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyK",
+  "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+  "..KMK..............................................KMK..",
+  "..KMK..............................................KMK..",
+];
+
+/** 대화 장면 봇의 노트북 14×11 — 작업 없음 — 계열 `laptop`, 14×11 */
+export const LAPTOP_OFF: readonly string[] = [
+  "KKKKKKKKKKKK..",
+  "KmmmmmmmmmmK..",
+  "KmOOOOOOOOmK..",
+  "KmOOOOOOOOmK..",
+  "KmOOOOOOOOmK..",
+  "KmOOOOOOOOmK..",
+  "KmmmmmmmmmmK..",
+  ".KKKKKKKKKKKKK",
+  "KMmMmMmMmMmMmK",
+  "KMMMMMMMMMMMMK",
+  "KKKKKKKKKKKKKK",
+];
+
+/** 노트북 켜짐 A — 봇의 run이 RUNNING이면 대화 중에도 켜져 있다(연출≠실제 분리의 표지) — 계열 `laptop`, 14×11 */
+export const LAPTOP_ON_A: readonly string[] = [
+  "KKKKKKKKKKKK..",
+  "KmmmmmmmmmmK..",
+  "KmGGGGGGGGmK..",
+  "KmGggGgggGmK..",
+  "KmGGGGGGGGmK..",
+  "KmGgggGGGGmK..",
+  "KmmmmmmmmmmK..",
+  ".KKKKKKKKKKKKK",
+  "KMmMmMmMmMmMmK",
+  "KMMMMMMMMMMMMK",
+  "KKKKKKKKKKKKKK",
+];
+
+/** 노트북 켜짐 B — 계열 `laptop`, 14×11 */
+export const LAPTOP_ON_B: readonly string[] = [
+  "KKKKKKKKKKKK..",
+  "KmmmmmmmmmmK..",
+  "KmGGGGGGGGmK..",
+  "KmGgggGggGmK..",
+  "KmGGGGGGGGmK..",
+  "KmGggGgggGmK..",
+  "KmmmmmmmmmmK..",
+  ".KKKKKKKKKKKKK",
+  "KMmMmMmMmMmMmK",
+  "KMMMMMMMMMMMMK",
+  "KKKKKKKKKKKKKK",
+];
+
+/** 대화 장면 벽시계 10×10(장식) — 계열 `clock`, 10×10 */
+export const WALL_CLOCK: readonly string[] = [
+  "...KKKK...",
+  ".KKMMMMKK.",
+  ".KMppppMK.",
+  "KMpppKppMK",
+  "KMpppKppMK",
+  "KMpppKKKMK",
+  "KMppppppMK",
+  ".KMppppMK.",
+  ".KKMMMMKK.",
+  "...KKKK...",
+];
+
+/** 선택지 커서 ▶ 5×7(HTML 인라인 SVG) — 계열 `mb`, 5×7 */
+export const CHOICE_CURSOR: readonly string[] = [
+  "K....",
+  "KK...",
+  "KBK..",
+  "KBBK.",
+  "KBK..",
+  "KK...",
+  "K....",
+];
+
+/** 대화창 넘김 ▼ 7×4(HTML 인라인 SVG) — 계열 `mb`, 7×4 */
+export const NEXT_ARROW: readonly string[] = [
+  "KKKKKKK",
+  ".KBBBK.",
+  "..KBK..",
+  "...K...",
+];
+

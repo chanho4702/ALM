@@ -277,6 +277,25 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
   };
 }
 
+/**
+ * HTTP 상태를 싣는 API 오류 — 메시지는 `extractApiError`와 같다(기존 `Error` 소비자는 그대로 동작).
+ * 상태로 갈래를 나눠야 하는 화면(AI 사무실 대화의 409/429/503 대사 등)만 `errorStatus`로 읽는다.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/** 오류의 HTTP 상태 — 상태를 모르는 오류(네트워크·목업의 일반 Error)면 null */
+export function errorStatus(error: unknown): number | null {
+  return error instanceof ApiError ? error.status : null;
+}
+
 export function extractApiError(status: number, body: unknown): string {
   const error = body as { error?: unknown; message?: unknown } | null;
   if (typeof error?.error === "string" && error.error) return error.error;

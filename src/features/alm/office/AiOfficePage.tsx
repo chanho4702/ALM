@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { Badge, Banner, Button, EmptyState, Lozenge, Spinner, Tabs } from "@chanho/react";
 import {
@@ -16,7 +16,8 @@ import {
   UsersRound,
   Wallet,
 } from "lucide-react";
-import type { AgentOffice } from "../store/types";
+import type { AgentCurrentRun, AgentOffice, AgentPersonaActivity, AgentRunSummary } from "../store/types";
+import { fetchPersonaActivity, getCurrentUser } from "../store/jiraStore";
 import { useAiTeamStatus } from "../components/useAiTeamActive";
 import { useAgentPermissions } from "../components/useAgentPermissions";
 import { useIssueModal } from "../components/useIssueModal";
@@ -27,12 +28,31 @@ import { OfficePanel, type GoalsView, type OfficeLinks, type PanelTarget } from 
 import { TeamCards } from "./TeamCards";
 import { useOfficeData, type OfficeData } from "./useOfficeData";
 import { useEpicGoals } from "./useEpicGoals";
+import { OfficeDialog, type DialogCloseResult } from "./OfficeDialog";
+import { DialogMemory, useDialogLog } from "./useDialogLog";
+import { useOfficeWalker } from "./useOfficeWalker";
+import { roomGeometry, userVars } from "./pixel";
+import { awayNotice, NOBODY_NEAR } from "./officeDialogCopy";
+import {
+  avatarPosition,
+  personaPlace,
+  resolveTarget,
+  standingFeet,
+  stepTile,
+  talkSpot,
+  tileKey,
+  walkGrid,
+  zoneName,
+  type Facing,
+  type Tile,
+} from "./walkGrid";
 import {
   epicGoals,
   finishedRuns,
   formatUsd,
   meetingSeats,
   officeCounts,
+  personaState,
   sortPersonas,
   todayCostTotal,
   todayReportCount,
@@ -50,6 +70,25 @@ const STALE_AFTER_MS = 30_000;
 
 type View = "office" | "team";
 type PanelState = { kind: "persona"; id: string } | { kind: "board" } | { kind: "meeting" } | null;
+
+/** 말 걸기(P3g §3.1) — 다가가는 중(approaching) → 장면 열림(open). 대상이 움직이면 goal을 바꿔 다시 경로를 잡는다 */
+interface TalkState {
+  personaId: string;
+  phase: "approaching" | "open";
+  /** 대화를 시작한 요소 — 닫히면 포커스를 돌린다 */
+  opener: HTMLElement | null;
+  /** 지금 향하는 대화 위치 타일 키 */
+  goal: string;
+}
+
+/** 맡기기 성공 뒤 낙관적 currentRun — 다음 폴링 결과가 오면 폐기(서버가 이긴다) */
+interface Optimistic {
+  personaId: string;
+  run: AgentCurrentRun;
+  stamp: number | null;
+}
+
+const ARROW_FACING: Record<string, Facing> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
 
 /**
  * AI 사무실(P3a AGP-39·40·11) — `/projects/:projectId/ai-office`. 라우트 lazy 청크라
@@ -120,7 +159,24 @@ function AiOffice({ projectId }: { projectId: string }) {
   );
 
   const office = data.office;
-  const personas = useMemo(() => sortPersonas(office?.personas ?? []), [office]);
+  const [optimistic, setOptimistic] = useState<Optimistic | null>(null);
+  const [botWalk, setBotWalk] = useState<{ personaId: string; from: { x: number; y: number }; seq: number } | null>(null);
+  const walkSeq = useRef(0);
+  // 다음 폴링 결과가 오면 낙관적 상태·봇 걷기 연출을 버린다 — 서버 상태를 따른다
+  useEffect(() => {
+    if (optimistic && optimistic.stamp !== data.lastUpdated) {
+      setOptimistic(null);
+      setBotWalk(null);
+    }
+  }, [data.lastUpdated, optimistic]);
+  const basePersonas = useMemo(() => sortPersonas(office?.personas ?? []), [office]);
+  const personas = useMemo(
+    () =>
+      optimistic
+        ? basePersonas.map((p) => (p.id === optimistic.personaId ? { ...p, currentRun: optimistic.run } : p))
+        : basePersonas,
+    [basePersonas, optimistic],
+  );
   const personaById = useMemo(() => new Map(personas.map((p) => [p.id, p])), [personas]);
   const finished = useMemo(() => finishedRuns(office?.recentRuns ?? []), [office]);
   const activeMeeting = office?.activeMeeting ?? null;
@@ -144,7 +200,7 @@ function AiOffice({ projectId }: { projectId: string }) {
         ? { kind: "persona", persona: personaById.get(panel.id)! }
         : null;
 
-  const openPersona = useCallback((id: string, el: HTMLElement) => {
+  const openPersona = useCallback((id: string, el: HTMLElement | null) => {
     setOpener(el);
     setPanel((prev) => (prev?.kind === "persona" && prev.id === id ? prev : { kind: "persona", id }));
   }, []);
@@ -158,22 +214,232 @@ function AiOffice({ projectId }: { projectId: string }) {
   }, []);
   const closePanel = useCallback(() => {
     // 연 요소가 폴링으로 바뀌었으면(유휴→책상 등) 같은 페르소나를 가리키는 현재 버튼으로 돌아간다
-    const fallback = document.querySelector<HTMLElement>('.ai-office [aria-controls="ai-office-panel"][aria-expanded="true"]');
+    const current = panel?.kind === "persona" ? personaButton(panel.id) : null;
+    const fallback = current ?? document.querySelector<HTMLElement>('.ai-office [aria-controls="ai-office-panel"][aria-expanded="true"]');
     setPanel(null);
-    const target = opener?.isConnected ? opener : fallback;
+    const target = opener?.isConnected && isFocusable(opener) ? opener : fallback;
     requestAnimationFrame(() => target?.focus());
-  }, [opener]);
+  }, [opener, panel]);
 
-  const setView = (value: string) =>
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (value === "team") next.set("view", "team");
-        else next.delete("view");
-        return next;
-      },
-      { replace: true },
+  const setView = useCallback(
+    (value: string) =>
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value === "team") next.set("view", "team");
+          else next.delete("view");
+          return next;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
+
+  // ── P3g 사람 아바타·1:1 대화 — 상태는 페이지에 둔다(사무실 ↔ 팀 카드 탭 전환에도 유지, 라우트를 떠나면 초기화) ──
+  const [memory] = useState(() => new DialogMemory());
+  const [logVersion, setLogVersion] = useState(0);
+  const [meId, setMeId] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getCurrentUser().then(
+      (u) => alive && setMeId(u.id),
+      () => alive && setMeId(null),
     );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const meVars = useMemo(() => userVars(meId), [meId]);
+
+  const personaCount = personas.length;
+  const grid = useMemo(
+    () => (office && personaCount > 0 ? walkGrid(personaCount, roomGeometry(personaCount).height) : null),
+    [office !== null, personaCount], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const walker = useOfficeWalker(grid);
+  const places = useMemo(
+    () => personas.map((p, i) => personaPlace(personaState(p), i, seats.has(p.id))),
+    [personas, seats],
+  );
+  const soft = useMemo(() => new Set([...standingFeet(places).values()].map(tileKey)), [places]);
+
+  const [talk, setTalk] = useState<TalkState | null>(null);
+  const [talkActivity, setTalkActivity] = useState<{ personaId: string; activity: AgentPersonaActivity | null; failed: boolean } | null>(null);
+  const dialogLog = useDialogLog(talk?.personaId ?? null, memory);
+  const loadLog = dialogLog.load;
+  const talkId = talk?.personaId ?? null;
+  // 다가가는 동안 미리 받아 둔다 — "지금 뭐 해?" 즉답·인사("또 오셨네요")의 전제
+  useEffect(() => {
+    if (talkId) loadLog();
+  }, [talkId, loadLog]);
+
+  const openTalk = useCallback((id: string) => {
+    setTalk((t) => (t && t.personaId === id ? { ...t, phase: "open" } : t));
+  }, []);
+
+  const startTalk = useCallback(
+    (id: string, opener: HTMLElement | null) => {
+      const index = personas.findIndex((p) => p.id === id);
+      const persona = personas[index];
+      if (!persona || !grid) return;
+      const spot = talkSpot(grid, places[index], places);
+      if (!spot) {
+        setNote(awayNotice(persona.name));
+        return;
+      }
+      if (view !== "office") setView("office");
+      const options = { soft, face: spot.facing, alignX: spot.alignX, onArrive: () => openTalk(id) };
+      // 같은 봇을 걷는 중에 한 번 더 — 남은 걸음을 건너뛰고 대화 위치로 바로("뽁")
+      if (talk?.personaId === id && talk.phase === "approaching") {
+        walker.jumpTo(spot.tile, options);
+        return;
+      }
+      setTalk({ personaId: id, phase: "approaching", opener, goal: tileKey(spot.tile) });
+      setTalkActivity({ personaId: id, activity: null, failed: false });
+      fetchPersonaActivity(id).then(
+        (activity) => setTalkActivity((prev) => (prev?.personaId === id ? { ...prev, activity } : prev)),
+        () => setTalkActivity((prev) => (prev?.personaId === id ? { ...prev, failed: true } : prev)),
+      );
+      walker.walkTo(spot.tile, options);
+    },
+    [grid, openTalk, personas, places, setView, soft, talk, view, walker],
+  );
+
+  // 걷는 동안 대상이 움직이면 새 대화 위치로, 비활성이 되면 걷기·핀 취소
+  useEffect(() => {
+    if (!talk || talk.phase !== "approaching" || !grid) return;
+    const index = personas.findIndex((p) => p.id === talk.personaId);
+    const persona = personas[index];
+    const spot = persona && persona.active ? talkSpot(grid, places[index], places) : null;
+    if (!spot) {
+      walker.cancel();
+      setTalk(null);
+      setNote(awayNotice(persona?.name ?? "그 팀원"));
+      return;
+    }
+    const key = tileKey(spot.tile);
+    if (key === talk.goal) return;
+    setTalk({ ...talk, goal: key });
+    walker.walkTo(spot.tile, { soft, face: spot.facing, alignX: spot.alignX, onArrive: () => openTalk(talk.personaId) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [places, grid]);
+
+  const onFloor = useCallback(
+    (tile: Tile) => {
+      if (!grid || talk?.phase === "open") return;
+      // 걷는 동안 바닥을 누르면 말 걸기 의도를 취소하고 그냥 이동한다
+      if (talk) setTalk(null);
+      const goal = resolveTarget(grid, tile, soft);
+      if (goal) walker.walkTo(goal, { soft });
+    },
+    [grid, soft, talk, walker],
+  );
+
+  const onMeKey = useCallback(
+    (e: KeyboardEvent<HTMLButtonElement>) => {
+      const facing = ARROW_FACING[e.key];
+      if (facing) {
+        e.preventDefault();
+        if (talk) {
+          walker.cancel();
+          setTalk(null);
+        }
+        walker.step(facing);
+        return;
+      }
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      if (!grid) return;
+      const here = walker.tile;
+      const ahead = stepTile(here, walker.facing);
+      const near = personas
+        .map((p, i) => ({ p, i, spot: p.active ? talkSpot(grid, places[i], places) : null }))
+        .filter(({ spot }) => spot && Math.abs(spot.tile.tx - here.tx) + Math.abs(spot.tile.ty - here.ty) <= 1)
+        .map((c) => {
+          const at = c.spot!.tile.tx === here.tx && c.spot!.tile.ty === here.ty;
+          const rank = at && c.spot!.facing === walker.facing ? 0 : at ? 1 : c.spot!.tile.tx === ahead.tx && c.spot!.tile.ty === ahead.ty ? 2 : 3;
+          return { ...c, rank };
+        })
+        .sort((a, b) => a.rank - b.rank || a.i - b.i);
+      if (near.length > 0) startTalk(near[0].p.id, e.currentTarget);
+      else setNote(NOBODY_NEAR);
+    },
+    [grid, personas, places, startTalk, talk, walker],
+  );
+
+  // 구역 이름 — "나" 접근 이름 안, 그리고 구역이 바뀔 때만 live로 읽는다(걸음마다 읽지 않는다)
+  const zone = grid ? zoneName(grid, { tx: walker.tile.tx, ty: Math.min(grid.rows - 1, walker.tile.ty) }) : "입구";
+  const lastZone = useRef(zone);
+  useEffect(() => {
+    if (zone === lastZone.current) return;
+    lastZone.current = zone;
+    setNote(`나 — ${zone}`);
+  }, [zone]);
+
+  const canvasUser =
+    grid && walker.entered
+      ? {
+          tile: walker.tile,
+          facing: walker.facing,
+          moving: walker.moving,
+          stepMs: walker.stepMs,
+          pin: walker.pin,
+          alignX: walker.alignX,
+          puff: walker.puff,
+          tagHidden: talk?.phase === "open",
+          vars: meVars,
+        }
+      : null;
+
+  const talkFromPanel = useCallback(
+    (id: string, el: HTMLElement) => {
+      setPanel(null);
+      startTalk(id, el);
+    },
+    [startTalk],
+  );
+
+  const applyAssigned = useCallback(
+    (personaId: string, run: AgentRunSummary) => {
+      const index = basePersonas.findIndex((p) => p.id === personaId);
+      const persona = basePersonas[index];
+      // 쉬고 있던 봇만 — 바쁜 봇에게 맡긴 run은 서버 대기열 뒤에 선다(자리가 바뀌지 않는다)
+      if (!persona || persona.currentRun || run.status !== "QUEUED") return;
+      const from = seats.has(personaId) ? null : avatarPosition(personaState(persona), index);
+      setOptimistic({ personaId, run: toCurrentRun(run), stamp: data.lastUpdated });
+      walkSeq.current += 1;
+      if (from) setBotWalk({ personaId, from, seq: walkSeq.current });
+    },
+    [basePersonas, data.lastUpdated, seats],
+  );
+
+  const onDialogClosed = useCallback(
+    (result: DialogCloseResult) => {
+      const t = talk;
+      setTalk(null);
+      if (!t) return;
+      if (panel?.kind === "persona" && panel.id === t.personaId) setLogVersion((v) => v + 1);
+      if (result.kind === "navigate") {
+        navigate(result.to);
+        return;
+      }
+      if (result.kind === "panel") {
+        setLogVersion((v) => v + 1);
+        openPersona(t.personaId, personaButton(t.personaId));
+        return;
+      }
+      if (result.kind === "assigned") applyAssigned(t.personaId, result.run);
+      const target = t.opener?.isConnected && isFocusable(t.opener) ? t.opener : personaButton(t.personaId);
+      requestAnimationFrame(() => target?.focus());
+    },
+    [applyAssigned, navigate, openPersona, panel, talk],
+  );
+
+  const talkPersona = talk ? personas.find((p) => p.id === talk.personaId) : undefined;
+  // 장면이 열린 채 대상이 응답에서 사라지면(삭제 등) 장면은 내려가므로 대화 상태도 비운다 — 캔버스가 멈춘 채 남지 않게
+  useEffect(() => {
+    if (talk?.phase === "open" && office && !talkPersona) setTalk(null);
+  }, [office, talk, talkPersona]);
 
   const pending = office?.pendingGateCount ?? 0;
 
@@ -245,6 +511,9 @@ function AiOffice({ projectId }: { projectId: string }) {
                   onOpenPersona={openPersona}
                   onOpenBoard={openBoard}
                   onConvene={canManage ? () => setConveneOpen(true) : undefined}
+                  dialogMemory={memory}
+                  logVersion={logVersion}
+                  onTalk={talkFromPanel}
                 />
               )
             : null
@@ -264,10 +533,18 @@ function AiOffice({ projectId }: { projectId: string }) {
             postCount={office?.boardPosts.length ?? 0}
             goalCount={goalsData.loaded ? goals.filter((g) => g.kind !== "complete").length : null}
             todayReports={todayReportCount(office?.recentRuns ?? [])}
-            onOpenPersona={openPersona}
             onOpenBoard={openBoard}
             onOpenMeeting={openMeeting}
             onAnnounce={setNote}
+            grid={grid ?? EMPTY_GRID}
+            user={canvasUser}
+            talkTargetId={talk?.personaId ?? null}
+            dialogOpen={talk?.phase === "open"}
+            botWalk={botWalk}
+            onTalk={startTalk}
+            onFloor={onFloor}
+            onMeKey={onMeKey}
+            meLabel={`나 — ${zone}. 방향키로 이동, Enter로 옆 팀원에게 말 걸기`}
           />
         ) : (
           <TeamCards
@@ -278,6 +555,7 @@ function AiOffice({ projectId }: { projectId: string }) {
             selectedId={panel?.kind === "persona" ? panel.id : null}
             links={links}
             onOpenPersona={openPersona}
+            onTalk={startTalk}
           />
         )}
       </OfficeBody>
@@ -318,6 +596,27 @@ function AiOffice({ projectId }: { projectId: string }) {
         {note}
       </div>
       {issueModal}
+      {talk?.phase === "open" && talkPersona && office ? (
+        <OfficeDialog
+          persona={talkPersona}
+          inMeeting={seats.has(talkPersona.id)}
+          meetingType={seats.has(talkPersona.id) ? (activeMeeting?.type ?? null) : null}
+          activity={talkActivity?.personaId === talkPersona.id ? talkActivity.activity : null}
+          activityFailed={talkActivity?.personaId === talkPersona.id && talkActivity.failed}
+          recentRuns={office.recentRuns}
+          personas={personas}
+          features={office.features}
+          budget={office.budget}
+          canManage={canManage}
+          projectId={projectId}
+          userVars={meVars}
+          stageEl={document.querySelector<HTMLElement>(".ai-office .ai-office-stage")}
+          log={dialogLog}
+          links={links}
+          announcement={data.announcement}
+          onClosed={onDialogClosed}
+        />
+      ) : null}
       {canManage ? (
         <MeetingConveneModal
           projectId={projectId}
@@ -329,6 +628,29 @@ function AiOffice({ projectId }: { projectId: string }) {
       ) : null}
     </div>
   );
+}
+
+/** 사무실 로딩 전 캔버스에 넘기는 빈 맵 — 캔버스는 사무실이 있을 때만 그려지므로 실제로 쓰이지 않는다 */
+const EMPTY_GRID = walkGrid(0, 192);
+
+/** 캔버스에서 그 페르소나를 가리키는 지금 버튼 — 폴링으로 자리가 바뀌면 연 요소가 사라질 수 있다 */
+function personaButton(id: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`.ai-office .office-hit[data-persona="${CSS.escape(id)}"]`);
+}
+
+const isFocusable = (el: HTMLElement) => el.matches("button, a, input, textarea, [tabindex]");
+
+function toCurrentRun(run: AgentRunSummary): AgentCurrentRun {
+  return {
+    id: run.id,
+    status: run.status as AgentCurrentRun["status"],
+    issueKey: run.issueKey,
+    type: run.type,
+    trigger: run.trigger,
+    attempt: run.attempt,
+    model: run.model,
+    startedAt: run.startedAt,
+  };
 }
 
 /** 본문 그리드(캔버스/카드 + 패널) — 로딩·첫 실패·빈 팀 상태도 여기서 */

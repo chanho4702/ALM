@@ -27,7 +27,12 @@ export type Family =
   | "fx"
   | "item"
   | "sky"
-  | "cat";
+  | "cat"
+  | "user"
+  | "pin"
+  | "mat"
+  | "laptop"
+  | "clock";
 
 /** 계열별 칠 순서 — 밝은 면 먼저, 외곽선 `K`는 마지막(겹침이 없어 순서는 가독용이다) */
 const PAINT_ORDER: Record<Family, string> = {
@@ -51,6 +56,11 @@ const PAINT_ORDER: Record<Family, string> = {
   item: "pHcK",
   sky: "WwqH",
   cat: "WPOoK",
+  user: "WwEJjUuRSsHhK",
+  pin: "HRK",
+  mat: "FfK",
+  laptop: "GgOmMK",
+  clock: "pMK",
 };
 
 export interface PixelPath {
@@ -403,4 +413,95 @@ export function avatarVars(slug: string, role: AgentRole): Record<string, string
     "--av-acc": `var(--office-acc-${r})`,
     "--av-acc2": `var(--office-acc-${r}2)`,
   };
+}
+
+// ── P3g 사람 아바타·대화 장면(AGP-65) ─────────────────────────────
+
+/** 사람 아바타 프레임 — 4방향 × (서기·걷기 A·B). 왼쪽은 오른쪽 옆모습의 좌우 반전, 옆 걷기 B = 옆 서기 */
+export type UserFrame = "stand" | "walkA" | "walkB";
+
+const mirrorRows = (m: Matrix): string[] => m.map((row) => [...row].reverse().join(""));
+
+export function userMatrix(facing: "down" | "up" | "left" | "right", frame: UserFrame): readonly string[] {
+  if (facing === "down") return frame === "walkA" ? M.USER_FRONT_WALK_A : frame === "walkB" ? M.USER_FRONT_WALK_B : M.USER_FRONT;
+  if (facing === "up") return frame === "walkA" ? M.USER_BACK_WALK_A : frame === "walkB" ? M.USER_BACK_WALK_B : M.USER_BACK;
+  const right = frame === "walkA" ? M.USER_SIDE_WALK_A : M.USER_SIDE_R;
+  return facing === "right" ? right : mirrorRows(right);
+}
+
+export function userPaths(facing: "down" | "up" | "left" | "right", frame: UserFrame): PixelPath[] {
+  return cached(`user:${facing}:${frame}`, () => matrixToPaths(userMatrix(facing, frame), "user"));
+}
+
+/** 사람 아바타 `<g>`에 꽂는 슬롯 — 8슬롯 중 피부·머리 4개만(나머지는 --office-user-* 고정색). 배정식은 봇과 같다 */
+export function userVars(userId: string | null): Record<string, string> {
+  const h = userId ? fnv1a32(userId) : 0;
+  const skin = userId ? SKINS[h % 3] : "a";
+  const hair = userId ? (h >>> 2) % 4 : 0;
+  return {
+    "--av-skin": `var(--office-skin-${skin})`,
+    "--av-skin2": `var(--office-skin-${skin}2)`,
+    "--av-hair": `var(--office-hair-${hair})`,
+    "--av-hair2": `var(--office-hair-${hair}2)`,
+  };
+}
+
+/** 봇 표정(§4.6) — 평소·생각 중·기쁨·곤란 + 깜빡임 */
+export type FaceExpression = "NORMAL" | "THINKING" | "HAPPY" | "TROUBLED" | "BLINK";
+
+const FACES: Record<FaceExpression, Matrix> = {
+  NORMAL: M.FACE_NORMAL,
+  THINKING: M.FACE_THINKING,
+  HAPPY: M.FACE_HAPPY,
+  TROUBLED: M.FACE_TROUBLED,
+  BLINK: M.FACE_BLINK,
+};
+
+/** 앉음 기본 → 표정 패치 → 롤 액세서리(리뷰 안경은 눈 위에 덮이고 입·효과로 구분된다) */
+export function facePaths(role: AgentRole, expression: FaceExpression): PixelPath[] {
+  const drawn = drawnRole(role);
+  return cached(`face:${drawn}:${expression}`, () => matrixToPaths(overlay(FACES[expression], ACC[drawn], 0), "char"));
+}
+
+/** 대화 장면 격자(§4.2) — 156×70 장면 px */
+export const SCENE_W = 156;
+export const SCENE_H = 70;
+
+/**
+ * 대화 장면의 정적 배경(벽·바닥·창·벽시계·화분·러그·봇 의자) — 테마 무관(색은 CSS 변수)이라 모듈 memo 1벌.
+ * 벽은 P3a WALL을 y=−12에 반복해 걸레받이가 벽 아래쪽에 오게 한다. 창밖 이펙트는 넣지 않는다(장면은 정적).
+ */
+export function sceneBackgroundPaths(): PixelPath[] {
+  return cached("scene-bg", () => {
+    const out: PixelPath[] = [];
+    const floor = new Map<string, string[]>();
+    for (let ty = 0; ty < 4; ty += 1) {
+      for (let tx = 0; tx < 10; tx += 1) {
+        const tile = (tx + ty) % 2 === 0 ? M.FLOOR_A : M.FLOOR_B;
+        for (const [ch, list] of runs(tile, tx * 16, 20 + ty * 16)) floor.set(ch, [...(floor.get(ch) ?? []), ...list]);
+      }
+    }
+    for (const ch of ["a", "l"]) {
+      const list = floor.get(ch);
+      if (list) out.push({ cls: `px-floor-${ch}`, d: list.join("") });
+    }
+    const wall = new Map<string, string[]>();
+    for (let tx = 0; tx < 10; tx += 1) {
+      for (const [ch, list] of runs(M.WALL.slice(12), tx * 16, 0)) wall.set(ch, [...(wall.get(ch) ?? []), ...list]);
+    }
+    for (const ch of ["w", "v", "t", "K"]) {
+      const list = wall.get(ch);
+      if (list) out.push({ cls: `px-wall-${ch}`, d: list.join("") });
+    }
+    out.push(...matrixToPaths(M.WINDOW, "window", 54, 1));
+    out.push(...matrixToPaths(M.WALL_CLOCK, "clock", 30, 8));
+    out.push(...matrixToPaths(M.PLANT, "plant", 6, 12));
+    const [rx, ry, rw, rh] = [18, 44, 116, 26];
+    out.push({ cls: "px-rug-ol", d: rectPath(rx, ry, rw, rh) });
+    out.push({ cls: "px-rug-fill", d: rectPath(rx + 1, ry + 1, rw - 2, rh - 2) });
+    out.push({ cls: "px-rug-line", d: rectPath(rx + 3, ry + 3, rw - 6, rh - 6) });
+    out.push({ cls: "px-rug-fill", d: rectPath(rx + 4, ry + 4, rw - 8, rh - 8) });
+    out.push(...matrixToPaths(M.CHAIR, "furn", 65, 28));
+    return out;
+  });
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate } from "react-router";
-import { Badge, Banner, Button, Lozenge, Spinner } from "@chanho/react";
-import { ExternalLink, FileText, History, Keyboard, Users, UsersRound, Wrench, X } from "lucide-react";
+import { Badge, Banner, Button, Lozenge, Spinner, Tabs } from "@chanho/react";
+import { ExternalLink, FileText, History, Keyboard, MessageCircle, Users, UsersRound, Wrench, X } from "lucide-react";
 import type {
   AgentActiveMeeting,
   AgentBoardPost,
@@ -29,6 +29,9 @@ import { formatClock, formatDateTime, relTime } from "../components/time";
 import type { LoadStatus } from "./useOfficeData";
 import { BoardPortrait, OfficePortrait, WhiteboardPortrait } from "./PixelSprite";
 import { PixelProgress } from "./PixelProgress";
+import { useDialogLog, type DialogMemory } from "./useDialogLog";
+import { dayHeading, DialogLogRow } from "./DialogLogRows";
+import { plainName } from "./officeDialogCopy";
 import {
   deskStayState,
   linkableIssueKey,
@@ -106,6 +109,9 @@ export function OfficePanel({
   onOpenPersona,
   onOpenBoard,
   onConvene,
+  dialogMemory,
+  logVersion,
+  onTalk,
 }: {
   target: PanelTarget;
   personaNames: Map<string, AgentOfficePersona>;
@@ -123,6 +129,10 @@ export function OfficePanel({
   onOpenBoard: (opener: HTMLElement) => void;
   /** 회의 소집 모달 열기 — 소집 권한(전역 관리자)이 없으면 없음 */
   onConvene?: () => void;
+  /** P3g — 대화 기록(메모리 폴백 공유)·다시 조회 신호·말 걸기 */
+  dialogMemory: DialogMemory;
+  logVersion: number;
+  onTalk: (id: string, opener: HTMLElement) => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const targetKey = target.kind === "persona" ? target.persona.id : target.kind;
@@ -146,6 +156,7 @@ export function OfficePanel({
       <div className="office-panel-band" aria-hidden="true" />
       {target.kind === "persona" ? (
         <PersonaBody
+          key={target.persona.id}
           persona={target.persona}
           activity={activity}
           activityStatus={activityStatus}
@@ -153,6 +164,9 @@ export function OfficePanel({
           titleRef={titleRef}
           onClose={onClose}
           onRetry={onRetry}
+          dialogMemory={dialogMemory}
+          logVersion={logVersion}
+          onTalk={onTalk}
         />
       ) : target.kind === "meeting" ? (
         <MeetingBody
@@ -196,6 +210,9 @@ function PersonaBody({
   titleRef,
   onClose,
   onRetry,
+  dialogMemory,
+  logVersion,
+  onTalk,
 }: {
   persona: AgentOfficePersona;
   activity: AgentPersonaActivity | null;
@@ -204,6 +221,176 @@ function PersonaBody({
   titleRef: RefObject<HTMLHeadingElement | null>;
   onClose: () => void;
   onRetry: () => void;
+  dialogMemory: DialogMemory;
+  logVersion: number;
+  onTalk: (id: string, opener: HTMLElement) => void;
+}) {
+  const [tab, setTab] = useState("activity");
+  return (
+    <>
+      <PersonaHead persona={persona} titleRef={titleRef} onClose={onClose} />
+      {/* P3g §6.2 — 게시판·회의실 모드에는 탭이 없다. 대화 기록은 탭을 열 때 1회 조회(폴링에 싣지 않는다) */}
+      <Tabs
+        label={`${persona.name} 개인 오피스`}
+        className="office-panel-tabs"
+        value={tab}
+        onValueChange={setTab}
+        items={[
+          {
+            value: "activity",
+            label: "활동",
+            content: (
+              <div className="office-panel-tab">
+                <PersonaActivity persona={persona} activity={activity} activityStatus={activityStatus} links={links} onRetry={onRetry} />
+              </div>
+            ),
+          },
+          {
+            value: "log",
+            label: "대화 기록",
+            content:
+              tab === "log" ? (
+                <div className="office-panel-tab">
+                  <DialogHistory persona={persona} memory={dialogMemory} version={logVersion} links={links} onTalk={onTalk} />
+                </div>
+              ) : null,
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+function PersonaHead({
+  persona,
+  titleRef,
+  onClose,
+}: {
+  persona: AgentOfficePersona;
+  titleRef: RefObject<HTMLHeadingElement | null>;
+  onClose: () => void;
+}) {
+  const state = personaState(persona);
+  return (
+    <header className="office-panel-head">
+      <OfficePortrait slug={persona.slug} role={persona.role} className="is-panel" />
+      <div className="office-panel-id">
+        <h2 id="ai-office-panel-title" className="office-panel-title" tabIndex={-1} ref={titleRef}>
+          {persona.emoji ? <span aria-hidden="true">{persona.emoji} </span> : null}
+          {persona.name}
+        </h2>
+        <span className="office-panel-role">
+          <AgentRoleGlyph role={persona.role} />
+        </span>
+        <AgentStatusLozenge state={state} />
+      </div>
+      <CloseButton onClose={onClose} label="개인 오피스 닫기" />
+    </header>
+  );
+}
+
+/**
+ * "대화 기록" 탭(P3g §6.2) — 맨 위 "말 걸기"(패널을 닫고 그 봇에게 걸어간다) → 날짜 묶음 → 줄. 최근 50 + "더 보기".
+ * 구 백엔드면 이 화면에 있는 동안만 메모리 — 안내를 맨 위에.
+ */
+function DialogHistory({
+  persona,
+  memory,
+  version,
+  links,
+  onTalk,
+}: {
+  persona: AgentOfficePersona;
+  memory: DialogMemory;
+  version: number;
+  links: OfficeLinks;
+  onTalk: (id: string, opener: HTMLElement) => void;
+}) {
+  const log = useDialogLog(persona.id, memory);
+  const { load } = log;
+  useEffect(() => {
+    load();
+  }, [load, version]);
+  const name = plainName(persona);
+  const groups: { day: string; rows: typeof log.entries }[] = [];
+  for (const entry of log.entries) {
+    const day = dayHeading(entry.createdAt);
+    const last = groups[groups.length - 1];
+    if (last && last.day === day) last.rows.push(entry);
+    else groups.push({ day, rows: [entry] });
+  }
+  return (
+    <section className="office-panel-section">
+      <div>
+        <Button
+          variant="primary"
+          size="small"
+          iconBefore={<MessageCircle size={14} aria-hidden />}
+          disabled={!persona.active}
+          onClick={(e) => onTalk(persona.id, e.currentTarget)}
+        >
+          말 걸기
+        </Button>
+      </div>
+      {log.memoryOnly ? (
+        <p className="office-panel-empty">이 서버는 대화 기록을 저장하지 않아요 — 화면을 떠나면 사라져요</p>
+      ) : null}
+      {log.status === "loading" || log.status === "idle" ? (
+        <div className="office-panel-loading">
+          <Spinner size="small" label="대화 기록을 불러오는 중" />
+        </div>
+      ) : log.status === "error" ? (
+        <div className="office-panel-error">
+          <p role="alert">대화 기록을 불러오지 못했습니다</p>
+          <Button variant="secondary" size="small" onClick={load}>
+            다시 시도
+          </Button>
+        </div>
+      ) : log.entries.length === 0 ? (
+        <p className="office-panel-empty">아직 나눈 대화가 없습니다</p>
+      ) : (
+        <>
+          {log.hasMore ? (
+            <div>
+              <Button variant="ghost" size="small" loading={log.loadingMore} onClick={log.loadMore}>
+                더 보기
+              </Button>
+            </div>
+          ) : null}
+          {groups.map((g) => (
+            <div key={g.day} className="office-log-group">
+              <h3 className="office-panel-h3">{g.day}</h3>
+              <ol className="office-log-list" aria-label={`${g.day} 대화`}>
+                {g.rows.map((entry) => (
+                  <DialogLogRow
+                    key={entry.id}
+                    entry={entry}
+                    personaName={name}
+                    links={links}
+                    renderLink={(to, label) => <Link to={to}>{label}</Link>}
+                  />
+                ))}
+              </ol>
+            </div>
+          ))}
+        </>
+      )}
+    </section>
+  );
+}
+
+function PersonaActivity({
+  persona,
+  activity,
+  activityStatus,
+  links,
+  onRetry,
+}: {
+  persona: AgentOfficePersona;
+  activity: AgentPersonaActivity | null;
+  activityStatus: LoadStatus | "idle";
+  links: OfficeLinks;
+  onRetry: () => void;
 }) {
   const navigate = useNavigate();
   const state = personaState(persona);
@@ -211,21 +398,6 @@ function PersonaBody({
 
   return (
     <>
-      <header className="office-panel-head">
-        <OfficePortrait slug={persona.slug} role={persona.role} className="is-panel" />
-        <div className="office-panel-id">
-          <h2 id="ai-office-panel-title" className="office-panel-title" tabIndex={-1} ref={titleRef}>
-            {persona.emoji ? <span aria-hidden="true">{persona.emoji} </span> : null}
-            {persona.name}
-          </h2>
-          <span className="office-panel-role">
-            <AgentRoleGlyph role={persona.role} />
-          </span>
-          <AgentStatusLozenge state={state} />
-        </div>
-        <CloseButton onClose={onClose} label="개인 오피스 닫기" />
-      </header>
-
       <Section title="현재 작업">
         {run ? (
           <>

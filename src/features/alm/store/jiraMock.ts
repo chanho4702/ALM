@@ -46,8 +46,14 @@ import type {
   AgentMeetingCreated,
   AgentMeetingInput,
   AgentRole,
+  AgentChatInput,
+  AgentChatReply,
   AgentCredentialInput,
+  AgentDialogEntry,
+  AgentDialogEntryInput,
+  AgentDialogPage,
   AgentPermissions,
+  AgentRunCreateInput,
   AgentPersonaInput,
   AgentProjectCredential,
   AgentTeamPersona,
@@ -79,6 +85,7 @@ import { createSeedData } from "../../../mock/seed";
 import { ISSUE_FIELD_IDS, ISSUE_FIELD_NAMES, WORKFLOW_ANY_NODE } from "./types";
 import type { IssueQuery } from "./searchQuery";
 import { projectWideIssueKey } from "./agentMapping";
+import { ApiError } from "./mapping";
 import { getTemplate } from "./projectTemplates";
 import type { ProjectTemplateId } from "./projectTemplates";
 import { extractMentionIds, htmlToText, newMentionIds } from "./richText";
@@ -2526,6 +2533,7 @@ function mockOffice(now: number, projectId = "p1"): AgentOffice {
     generatedAt: new Date(now).toISOString(),
     boardPosts: baseBoardPosts(now, projectId),
     activeMeeting: mockActiveMeeting(now, projectId),
+    features: { chat: teamState.chat },
   };
 }
 
@@ -2838,6 +2846,16 @@ interface AgentTeamMockState {
   masterKey: boolean;
   permissions: AgentPermissions;
   seq: number;
+  /** office features.chat(P3g) */
+  chat: boolean;
+  /** false면 대화 기록 API가 404(구 백엔드) */
+  dialogApi: boolean;
+  /** 설정하면 수다 API가 이 상태로 실패한다(503·409·429 대사 확인용) */
+  chatError: number | null;
+  /** 페르소나 id → 대화 기록(시간순) */
+  dialogs: Map<string, AgentDialogEntry[]>;
+  /** 수다 세션 발급 번호 */
+  chatSeq: number;
 }
 
 function freshTeamState(): AgentTeamMockState {
@@ -2865,6 +2883,11 @@ function freshTeamState(): AgentTeamMockState {
     masterKey: true,
     permissions: { canManage: true, isGlobalAdmin: false },
     seq: 500,
+    chat: true,
+    dialogApi: true,
+    chatError: null,
+    dialogs: new Map(),
+    chatSeq: 1,
   };
 }
 
@@ -2881,6 +2904,12 @@ export interface AgentMockScenario {
   envKey?: boolean;
   /** AGENT_CREDENTIAL_MASTER_KEY — false면 저장 503 */
   masterKey?: boolean;
+  /** office features.chat(P3g) — false면 수다 API도 503 */
+  chat?: boolean;
+  /** false면 대화 기록 API 404(구 백엔드 폴백 확인용) */
+  dialogApi?: boolean;
+  /** 수다 API 강제 실패 상태(409·429·503 등) — null이면 정상 */
+  chatError?: number | null;
 }
 
 /** 테스트 전용 — 권한·키 시나리오를 바꾼다(`__resetForTest`가 기본으로 되돌린다) */
@@ -2897,6 +2926,9 @@ export function __setAgentMockScenario(scenario: AgentMockScenario): void {
   }
   if (scenario.envKey !== undefined) teamState.envKey = scenario.envKey;
   if (scenario.masterKey !== undefined) teamState.masterKey = scenario.masterKey;
+  if (scenario.chat !== undefined) teamState.chat = scenario.chat;
+  if (scenario.dialogApi !== undefined) teamState.dialogApi = scenario.dialogApi;
+  if (scenario.chatError !== undefined) teamState.chatError = scenario.chatError;
 }
 
 function requireManage(): void {
@@ -3046,6 +3078,134 @@ export async function saveProjectCredential(
 export async function deleteProjectCredential(projectId: string): Promise<void> {
   requireManage();
   teamState.projectKeys.delete(projectId);
+}
+
+// ── AI 사무실 1:1 대화(목업, P3g) — 거부 문구·순서는 agent-service RunService.createUserRun·ChatService·DialogService를 따른다 ──
+
+const CHAT_OFF = "수다 기능이 꺼져 있습니다";
+const CHAT_ERRORS: Record<number, string> = {
+  409: "킬 스위치가 켜져 있거나 이달 예산 상한에 도달했습니다",
+  429: "잠시 뒤 다시 시도하세요",
+  503: CHAT_OFF,
+};
+
+/** 서버 USER run — 이슈 404 → 페르소나 404 → 관리 권한 403 → 비활성 400 → 같은 이슈 활성 run 409 */
+export async function createAgentRun(input: AgentRunCreateInput): Promise<AgentRunSummary> {
+  const now = Date.now();
+  const key = input.issueKey.trim().toUpperCase();
+  if (!key) throw new ApiError(400, "issueKey는 필수입니다");
+  if ((input.instruction?.length ?? 0) > 4000) throw new ApiError(400, "instruction은 4000자 이하여야 합니다");
+  const issue = load().issues.find((i) => i.key === key);
+  if (!issue) throw new ApiError(404, `이슈를 찾을 수 없습니다: ${key}`);
+  const persona = baseOfficePersonas(now).find((p) => p.slug === input.personaSlug);
+  if (!persona) throw new ApiError(404, `페르소나를 찾을 수 없습니다: ${input.personaSlug}`);
+  if (!teamState.permissions.canManage) throw new ApiError(403, AGENT_FORBIDDEN);
+  const team = teamState.personas.find((p) => p.slug === input.personaSlug);
+  if (team && !team.active) throw new ApiError(400, `비활성 페르소나입니다: ${input.personaSlug}`);
+  if (mockAllRuns(now).some((r) => r.issueKey === key && AGENT_ACTIVE.includes(r.status))) {
+    throw new ApiError(409, `이미 진행 중인 run이 있습니다: ${key}`);
+  }
+  const run: AgentRunSummary = {
+    id: String(agentState.seq++),
+    issueKey: key,
+    status: "QUEUED",
+    personaId: persona.id,
+    attempt: 1,
+    model: input.model?.trim() || null,
+    startedAt: null,
+    endedAt: null,
+    type: "TASK",
+    trigger: "USER",
+    parentRunId: null,
+  };
+  agentState.added.push(run);
+  return { ...run };
+}
+
+function mockDialogOf(personaId: string): AgentDialogEntry[] {
+  let list = teamState.dialogs.get(personaId);
+  if (!list) {
+    list = [];
+    teamState.dialogs.set(personaId, list);
+  }
+  return list;
+}
+
+function pushDialog(personaId: string, input: AgentDialogEntryInput): AgentDialogEntry {
+  const entry: AgentDialogEntry = {
+    id: String(teamState.seq++),
+    speaker: input.speaker,
+    kind: input.kind,
+    text: input.text.slice(0, 2000),
+    issueKey: input.issueKey ?? null,
+    runId: input.runId ?? null,
+    commentId: input.commentId ?? null,
+    createdAt: new Date().toISOString(),
+  };
+  mockDialogOf(personaId).push(entry);
+  return entry;
+}
+
+function requireMockPersona(personaId: string): void {
+  if (!baseOfficePersonas(Date.now()).some((p) => p.id === personaId)) {
+    throw new ApiError(404, `페르소나를 찾을 수 없습니다: id=${personaId}`);
+  }
+}
+
+/** 작업을 시키는 말투면 서버처럼 suggest=DIRECTIVE — 수다는 일을 시키지 못한다 */
+const WORK_REQUEST = /(해\s?줘|해\s?주세요|고쳐|만들어|추가해|수정해)/;
+
+function mockChatReply(message: string): Omit<AgentChatReply, "sessionId"> {
+  if (WORK_REQUEST.test(message)) {
+    return { reply: "그건 '지시하기'로 남겨 주시면 다음 단계에서 꼭 챙길게요!", mood: "NEUTRAL", suggest: "DIRECTIVE" };
+  }
+  if (/(힘들|어려|막혀)/.test(message)) {
+    return { reply: "음… 테스트가 자꾸 깨져서 조금 헤매는 중이에요.", mood: "TROUBLED", suggest: null };
+  }
+  if (/(고마|잘했|최고|수고)/.test(message)) {
+    return { reply: "헤헤, 그렇게 말해 주시니 힘이 나요!", mood: "HAPPY", suggest: null };
+  }
+  return { reply: "그렇군요! 저는 오늘도 이슈들을 하나씩 정리하는 중이에요.", mood: null, suggest: null };
+}
+
+export async function sendPersonaChat(personaId: string, input: AgentChatInput): Promise<AgentChatReply> {
+  if (!teamState.chat) throw new ApiError(503, CHAT_OFF);
+  if (teamState.chatError !== null) {
+    throw new ApiError(teamState.chatError, CHAT_ERRORS[teamState.chatError] ?? `요청 실패(${teamState.chatError})`);
+  }
+  requireMockPersona(personaId);
+  const message = input.message.trim();
+  if (!message || message.length > 500) throw new ApiError(400, "message는 1~500자여야 합니다");
+  const sessionId = input.sessionId ?? `c-${teamState.chatSeq++}`;
+  const answer = mockChatReply(message);
+  if (teamState.dialogApi) {
+    pushDialog(personaId, { speaker: "USER", kind: "SAY", text: message });
+    pushDialog(personaId, { speaker: "PERSONA", kind: "SAY", text: answer.reply });
+  }
+  return { sessionId, ...answer };
+}
+
+export async function fetchPersonaDialog(
+  personaId: string,
+  options: { before?: string; limit?: number } = {},
+): Promise<AgentDialogPage> {
+  if (!teamState.dialogApi) throw new ApiError(404, "찾을 수 없습니다.");
+  requireMockPersona(personaId);
+  const limit = options.limit ?? 50;
+  const all = mockDialogOf(personaId);
+  const end = options.before ? all.findIndex((e) => e.id === options.before) : all.length;
+  const upto = end < 0 ? all.length : end;
+  const start = Math.max(0, upto - limit);
+  return { entries: clone(all.slice(start, upto)), hasMore: start > 0 };
+}
+
+export async function savePersonaDialog(personaId: string, entries: AgentDialogEntryInput[]): Promise<number> {
+  if (!teamState.dialogApi) throw new ApiError(404, "찾을 수 없습니다.");
+  requireMockPersona(personaId);
+  if (entries.length === 0) throw new ApiError(400, "entries가 필요합니다");
+  if (entries.length > 20) throw new ApiError(400, "한 번에 20건까지 저장할 수 있습니다");
+  for (const entry of entries) pushDialog(personaId, entry);
+  return entries.length;
 }
 
 // ── 페이징 ───────────────────────────────────────────────────
