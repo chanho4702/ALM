@@ -354,14 +354,14 @@ describe("승인 인박스(AGP-13)", () => {
 });
 
 describe("팀 카드 — 현재 run 종류 표기(캔버스 돋보기와 등가)", () => {
-  it("리뷰 run은 '리뷰 · 이슈키', 작업 run은 '작업 · 이슈키', 유휴는 종류 없음", async () => {
+  it("리뷰 run은 '리뷰 · 이슈키', 작업 run은 '작업 · 이슈키', run 없는 봇(원격 접속)은 종류 없음", async () => {
     renderApp(`${BASE}?view=team`);
     const reviewer = await screen.findByRole("article", { name: /리뷰봇/ });
     expect(within(reviewer).getByText(/리뷰 ·/).closest("p")).toHaveTextContent(/리뷰 ·\s*ALM-1/);
     const planner = screen.getByRole("article", { name: /기획봇/ });
     expect(within(planner).getByText(/작업 ·/).closest("p")).toHaveTextContent(/작업 ·\s*ALM-4/);
     const ops = screen.getByRole("article", { name: /운영봇/ });
-    expect(within(ops).getByText("진행 중인 작업 없음")).toBeInTheDocument();
+    expect(within(ops).getByText("원격 접속 중 — 외부 MCP")).toBeInTheDocument();
     expect(within(ops).queryByText(/작업 ·|리뷰 ·/)).not.toBeInTheDocument();
   });
 });

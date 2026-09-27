@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router";
 import { Button } from "@chanho/react";
-import { Clock, Coins, FileText, Inbox, MessageCircle } from "lucide-react";
+import { Clock, Coins, FileText, Inbox, Laptop, MessageCircle } from "lucide-react";
 import type { AgentActiveMeeting, AgentOfficePersona, AgentRunSummary } from "../store/types";
 import {
   AGENT_MEETING_TYPE_LABEL,
@@ -19,6 +19,7 @@ import {
   linkableIssueKey,
   meetingAgendaText,
   personaState,
+  personaStateText,
   PROJECT_WIDE_LABEL,
   type MeetingSeat,
 } from "./officeModel";
@@ -87,19 +88,26 @@ export function TeamCards({
                 회의 중 · {AGENT_MEETING_TYPE_LABEL[activeMeeting.type]} · {meetingAgendaText(activeMeeting)}
               </p>
             ) : null}
-            <p className="ai-team-card-issue">
-              <FileText size={14} aria-hidden />
-              {run ? <span className="ai-team-card-kind">{AGENT_RUN_TYPE_LABEL[run.type]} · </span> : null}
-              {run && linkableIssueKey(run) ? (
-                <Link to={links.issue(run.issueKey!)}>{run.issueKey}</Link>
-              ) : run?.issueKey ? (
-                <span className="ai-team-card-subtle">{PROJECT_WIDE_LABEL}</span>
-              ) : run ? (
-                <span className="ai-team-card-subtle">이슈 없음</span>
-              ) : (
-                <span className="ai-team-card-subtle">진행 중인 작업 없음</span>
-              )}
-            </p>
+            {state === "REMOTE" ? (
+              <p className="ai-team-card-issue ai-team-card-remote">
+                <Laptop size={14} aria-hidden />
+                {personaStateText(state)}
+              </p>
+            ) : (
+              <p className="ai-team-card-issue">
+                <FileText size={14} aria-hidden />
+                {run ? <span className="ai-team-card-kind">{AGENT_RUN_TYPE_LABEL[run.type]} · </span> : null}
+                {run && linkableIssueKey(run) ? (
+                  <Link to={links.issue(run.issueKey!)}>{run.issueKey}</Link>
+                ) : run?.issueKey ? (
+                  <span className="ai-team-card-subtle">{PROJECT_WIDE_LABEL}</span>
+                ) : run ? (
+                  <span className="ai-team-card-subtle">이슈 없음</span>
+                ) : (
+                  <span className="ai-team-card-subtle">진행 중인 작업 없음</span>
+                )}
+              </p>
+            )}
             {activity ? (
               <p className="ai-team-card-activity" title={activity}>
                 {activity}

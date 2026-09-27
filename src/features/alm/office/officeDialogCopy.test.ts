@@ -70,7 +70,7 @@ describe("'지금 뭐 해?' 즉답(§5.2)", () => {
     const activity: AgentPersonaActivity = {
       personaId: "104",
       runs: [],
-      todayAudits: [{ id: "1", tool: "report_progress", status: "OK", summary: "run=1 (본문 생략)", createdAt: ago(1) }],
+      todayAudits: [{ id: "1", tool: "report_progress", status: "OK", summary: "run=1 (본문 생략)", createdAt: ago(1), origin: "WORKER", runId: "9" }],
       todayCostUsd: 0,
     };
     const a = statusAnswer(p, activity, [], plainNo(p), NOW);
@@ -104,7 +104,7 @@ describe("'지금 뭐 해?' 즉답(§5.2)", () => {
         { id: "1", issueKey: "ALM-6", status: "DONE", personaId: "104", attempt: 1, model: null, startedAt: ago(90), endedAt: ago(60), type: "TASK", trigger: "USER", parentRunId: null },
         { id: "2", issueKey: "ALM-7", status: "FAILED", personaId: "104", attempt: 1, model: null, startedAt: ago(50), endedAt: ago(40), type: "TASK", trigger: "USER", parentRunId: null },
       ],
-      todayAudits: [{ id: "1", tool: "search_issues", status: "OK", summary: null, createdAt: ago(20) }],
+      todayAudits: [{ id: "1", tool: "search_issues", status: "OK", summary: null, createdAt: ago(20), origin: null, runId: null }],
       todayCostUsd: 0,
     };
     const a = statusAnswer(p, activity, [], plainNo(p), NOW);
@@ -141,6 +141,54 @@ describe("쪽 나누기(§4.4)", () => {
     expect(paginate("가나 다라 마바", 50, 2, measure)).toEqual(["가나 다라\n마바"]);
     expect(paginate("가나 다라 마바 사아 자차", 50, 2, measure)).toEqual(["가나 다라\n마바 사아", "자차"]);
     expect(paginate("가나다라마바사아자차", 40, 3, measure)).toEqual(["가나다라\n마바사아\n자차"]);
+  });
+});
+
+describe("원격 접속(AGP-63)", () => {
+  const remote = (over: Partial<AgentOfficePersona> = {}) =>
+    persona({
+      presence: "EXTERNAL",
+      lastActivity: { id: "1", tool: "search_issues", status: "OK", summary: null, createdAt: ago(2), origin: "EXTERNAL", runId: null },
+      ...over,
+    });
+
+  it("'지금 뭐 해?' — 원격 분기 + 최신 감사 꼬리, 활동 조회 전이면 사무실 스냅샷의 최근 활동으로", () => {
+    const p = remote();
+    const activity: AgentPersonaActivity = {
+      personaId: "104",
+      runs: [],
+      todayAudits: [{ id: "9", tool: "get_issue", status: "OK", summary: "ALM-6", createdAt: ago(1), origin: "EXTERNAL", runId: null }],
+      todayCostUsd: 0,
+    };
+    const a = statusAnswer(p, activity, [], plainNo(p), NOW);
+    expect(a.text).toBe("지금 밖에서 원격으로 작업 중이에요 — 외부 MCP로 연결돼 있어요. 방금 전엔 이슈 조회를 했어요.");
+    expect(a).toMatchObject({ mood: "NORMAL", context: null });
+    expect(statusAnswer(p, null, [], plainNo(p), NOW).text).toBe(
+      "지금 밖에서 원격으로 작업 중이에요 — 외부 MCP로 연결돼 있어요. 방금 전엔 이슈 검색을 했어요.",
+    );
+    // 유휴는 스냅샷 최근 활동으로 꼬리를 달지 않는다(기존 규칙 유지)
+    const idle = persona({ lastActivity: p.lastActivity });
+    expect(statusAnswer(idle, null, [], plainNo(idle), NOW).text).toBe("지금은 쉬는 중이에요.");
+  });
+
+  it("run이 있으면 run 대사가 이긴다", () => {
+    const p = remote({ currentRun: run() });
+    expect(statusAnswer(p, null, [], plainNo(p), NOW).text).toMatch(/^지금은 ALM-5 작업 중이에요\./);
+  });
+
+  it("디렉터 — 원격 접속은 산책 후보·유휴·작업 이펙트 대상이 아니다", () => {
+    const snap = ambienceSnapshot({
+      personas: [remote({ id: "1", slug: "bot-1" }), persona({ id: "2", slug: "bot-2" })],
+      seats: new Map(),
+      activeMeeting: null,
+      meetingPaused: false,
+      excludeStrollIds: [],
+      talkTargetId: null,
+      killSwitch: false,
+    });
+    expect(snap.idleIds).toEqual(["2"]);
+    expect(snap.strollCandidates.map((c) => c.id)).toEqual(["2"]);
+    expect(snap.effectTargets).toEqual([]);
   });
 });
 

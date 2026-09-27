@@ -184,6 +184,12 @@ describe("대화 위치(§2.4)", () => {
     }
   });
 
+  it("원격 접속(AGP-63)은 책상 봇 — 작업 중과 같은 자리·같은 대화 위치", () => {
+    const ps = places(["RUNNING", "REMOTE"]);
+    expect(ps[1]).toEqual({ kind: "desk", index: 1, x: 64 + 16, y: 40 });
+    expect(talkSpot(grid7, ps[1], ps)).toEqual({ tile: t(7, 3), facing: "left", alignX: 0 });
+  });
+
   it("비활성은 대화 위치 없음", () => {
     const ps = places(["INACTIVE"]);
     expect(talkSpot(grid7, ps[0], ps)).toBeNull();

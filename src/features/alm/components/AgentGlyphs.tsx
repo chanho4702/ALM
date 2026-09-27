@@ -3,6 +3,7 @@ import { Lozenge } from "@chanho/react";
 import {
   AppWindow,
   Ban,
+  Bot,
   CalendarClock,
   CircleAlert,
   CircleCheck,
@@ -11,11 +12,14 @@ import {
   ClipboardList,
   ClipboardPen,
   Coffee,
+  Cog,
   GitMerge,
   HardHat,
   Hourglass,
   Keyboard,
+  Laptop,
   Palette,
+  Plug,
   PowerOff,
   RotateCcw,
   SearchCheck,
@@ -28,6 +32,7 @@ import {
 } from "lucide-react";
 import type {
   AgentActiveRunStatus,
+  AgentAuditOrigin,
   AgentGateKind,
   AgentMeetingType,
   AgentRole,
@@ -42,7 +47,11 @@ import type {
  * `variant`는 `StatusGlyph`와 같은 계약 — `auto`는 아이콘이 스스로 이름을 읽고, `icon`은 옆에 이름이 있을 때 숨는다.
  */
 
-export type AgentPersonaState = AgentActiveRunStatus | "IDLE" | "INACTIVE";
+/** REMOTE(AGP-63) = 활성 run 없이 외부 MCP(사람이 발급한 페르소나 토큰)로 일하는 중 */
+export type AgentPersonaState = AgentActiveRunStatus | "REMOTE" | "IDLE" | "INACTIVE";
+
+/** 원격 접속 상태의 부연 — 접근 이름·팀 카드가 상태 라벨 뒤에 붙인다("원격 접속 중 — 외부 MCP") */
+export const AGENT_REMOTE_DETAIL = "외부 MCP";
 
 type Appearance = "neutral" | "info" | "success" | "warning" | "danger";
 type Icon = ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
@@ -58,6 +67,7 @@ const PERSONA_STATES: Record<AgentPersonaState, GlyphDef> = {
   QUEUED: { icon: Hourglass, label: "대기열", appearance: "neutral" },
   WAITING_APPROVAL: { icon: CircleAlert, label: "승인 대기", appearance: "warning" },
   BLOCKED: { icon: Ban, label: "차단됨", appearance: "danger" },
+  REMOTE: { icon: Laptop, label: "원격 접속 중", appearance: "info" },
   IDLE: { icon: Coffee, label: "휴식 중", appearance: "neutral" },
   INACTIVE: { icon: PowerOff, label: "비활성", appearance: "neutral" },
 };
@@ -233,4 +243,28 @@ export function AgentRunTriggerGlyph({ trigger, size }: { trigger: AgentRunTrigg
 /** 게이트 종류 — 머지/에스컬레이션/계획 */
 export function AgentGateKindGlyph({ kind, size }: { kind: AgentGateKind; size?: 12 | 14 | 16 }) {
   return <IconText icon={GATE_KIND_ICONS[kind]} label={AGENT_GATE_KIND_LABEL[kind]} size={size} />;
+}
+
+/** 감사 출처(AGP-63) — 워커 실행(로봇)/외부 MCP(플러그)/시스템(톱니) */
+const AUDIT_ORIGINS: Record<AgentAuditOrigin, { icon: Icon; label: string }> = {
+  WORKER: { icon: Bot, label: "워커 실행" },
+  EXTERNAL: { icon: Plug, label: "외부 MCP" },
+  SYSTEM: { icon: Cog, label: "시스템" },
+};
+
+/** 감사 출처 텍스트 — 워커는 run 번호를 붙인다("워커 실행 #12") */
+export function auditOriginLabel(origin: AgentAuditOrigin, runId: string | null): string {
+  const base = AUDIT_ORIGINS[origin].label;
+  return origin === "WORKER" && runId ? `${base} #${runId}` : base;
+}
+
+/** 감사 출처 배지 — 아이콘 + 텍스트. 링크로 감쌀지는 쓰는 쪽이 정한다 */
+export function AgentAuditOriginGlyph({ origin, runId }: { origin: AgentAuditOrigin; runId: string | null }) {
+  const IconComp = AUDIT_ORIGINS[origin].icon;
+  return (
+    <span className={`status-cell agent-origin is-${origin.toLowerCase()}`}>
+      <IconComp size={12} aria-hidden />
+      {auditOriginLabel(origin, runId)}
+    </span>
+  );
 }

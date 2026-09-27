@@ -6,6 +6,7 @@ import type {
   AgentActiveMeeting,
   AgentActiveRunStatus,
   AgentAuditEntry,
+  AgentAuditOrigin,
   AgentBoardPost,
   AgentChatMood,
   AgentChatReply,
@@ -46,6 +47,9 @@ export interface AgentAuditEntryDto {
   status: string;
   summary: string | null;
   createdAt: string;
+  /** AGP-63 — 구 백엔드·출처 기록 전 감사는 없거나 null */
+  origin?: string | null;
+  runId?: Id | null;
 }
 
 export interface AgentCurrentRunDto {
@@ -71,6 +75,8 @@ export interface AgentOfficePersonaDto {
   todayCostUsd: number | string | null;
   /** AGP-62 — JSON 문자열(구 백엔드는 없음) */
   avatarConfig?: unknown;
+  /** AGP-63 — "EXTERNAL"|null(구 백엔드는 없음) */
+  presence?: string | null;
 }
 
 export interface AgentRunSummaryDto {
@@ -189,6 +195,7 @@ const RUN_STATUSES: readonly AgentRunStatus[] = [
 const ACTIVE_STATUSES: readonly AgentActiveRunStatus[] = ["QUEUED", "RUNNING", "WAITING_APPROVAL", "BLOCKED"];
 const GATE_KINDS: readonly AgentGateKind[] = ["MERGE", "ESCALATION", "PLAN"];
 const MEETING_TYPES: readonly AgentMeetingType[] = ["MEETING", "RETRO", "ESCALATION", "MANAGER"];
+const AUDIT_ORIGINS: readonly AgentAuditOrigin[] = ["WORKER", "EXTERNAL", "SYSTEM"];
 
 function pick<T extends string>(allowed: readonly T[], value: unknown, fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
@@ -212,6 +219,9 @@ export function mapAgentAuditEntry(dto: AgentAuditEntryDto): AgentAuditEntry {
     status: dto.status === "ERROR" ? "ERROR" : "OK",
     summary: dto.summary ?? null,
     createdAt: dto.createdAt,
+    // 모르는 출처는 "미상"으로 — 틀린 배지를 다는 쪽보다 배지가 없는 쪽이 낫다
+    origin: AUDIT_ORIGINS.includes(dto.origin as AgentAuditOrigin) ? (dto.origin as AgentAuditOrigin) : null,
+    runId: dto.runId === null || dto.runId === undefined ? null : String(dto.runId),
   };
 }
 
@@ -258,6 +268,7 @@ function mapPersona(dto: AgentOfficePersonaDto): AgentOfficePersona {
     lastActivity: dto.lastActivity ? mapAgentAuditEntry(dto.lastActivity) : null,
     todayCostUsd: money(dto.todayCostUsd) ?? 0,
     avatarConfig: avatarConfigOf(dto.avatarConfig),
+    presence: dto.presence === "EXTERNAL" ? "EXTERNAL" : null,
   };
 }
 

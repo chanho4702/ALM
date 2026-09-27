@@ -14,6 +14,7 @@ import {
   officeSummaryText,
   personaAccessibleName,
   personaState,
+  personaStateText,
   sortPersonas,
   subjectJosa,
   todayReportCount,
@@ -53,6 +54,8 @@ const activity = (summary: string | null, tool = "update_issue") => ({
   status: "OK" as const,
   summary,
   createdAt: "2026-09-26T00:00:00Z",
+  origin: null,
+  runId: null,
 });
 
 function summary(over: Partial<AgentRunSummary>): AgentRunSummary {
@@ -178,6 +181,45 @@ describe("상태 파생(스펙 §4.1)", () => {
     expect(personaAccessibleName(p)).toBe("매니저봇, 매니저, 작업 중, 매니저 보고 프로젝트 전반 — 말 걸기");
     const retro = persona({ currentRun: run("RUNNING", { type: "RETRO", issueKey: "PROJECT-1" }) });
     expect(bubbleText(retro)?.line1).toBe("회고 회의");
+  });
+});
+
+describe("원격 접속(AGP-63)", () => {
+  const external = (over = {}) => ({ ...activity("projectId=1 (검색어 생략)", "search_issues"), origin: "EXTERNAL" as const, ...over });
+
+  it("상태 우선순위 — 비활성 > 활성 run > presence EXTERNAL > 유휴", () => {
+    expect(personaState(persona({ presence: "EXTERNAL" }))).toBe("REMOTE");
+    expect(personaState(persona({ presence: "EXTERNAL", currentRun: run("RUNNING") }))).toBe("RUNNING");
+    expect(personaState(persona({ presence: "EXTERNAL", currentRun: run("QUEUED") }))).toBe("QUEUED");
+    expect(personaState(persona({ presence: "EXTERNAL", active: false }))).toBe("INACTIVE");
+    expect(personaState(persona({ presence: null }))).toBe("IDLE");
+    // 구 백엔드 — 필드 자체가 없다
+    expect(personaState(persona())).toBe("IDLE");
+  });
+
+  it("말풍선 1행 '원격 작업 중' · 2행 최근 활동 도구 라벨(가림 여부와 무관, 모르는 도구는 도구명), 활동 없으면 1행만", () => {
+    expect(bubbleText(persona({ presence: "EXTERNAL", lastActivity: external() }))).toEqual({
+      line1: "원격 작업 중",
+      prefix: null,
+      issueKey: null,
+      line2: "이슈 검색",
+    });
+    expect(bubbleText(persona({ presence: "EXTERNAL", lastActivity: external({ tool: "update_issue", summary: "ALM-6 체크리스트" }) }))?.line2).toBe("이슈 수정");
+    expect(bubbleText(persona({ presence: "EXTERNAL", lastActivity: external({ tool: "brand_new_tool" }) }))?.line2).toBe("brand_new_tool");
+    expect(bubbleText(persona({ presence: "EXTERNAL" }))).toEqual({ line1: "원격 작업 중", prefix: null, issueKey: null, line2: null });
+    // run이 있으면 run 말풍선이 이긴다
+    expect(bubbleText(persona({ presence: "EXTERNAL", currentRun: run("RUNNING"), lastActivity: external() }))?.line1).toBe("ALM-123");
+  });
+
+  it("접근 이름·상태 텍스트 — '원격 접속 중 — 외부 MCP' + 최근 활동 원문, 요약에 원격 접속 수", () => {
+    expect(personaStateText("REMOTE")).toBe("원격 접속 중 — 외부 MCP");
+    expect(personaStateText("IDLE")).toBe("휴식 중");
+    expect(personaAccessibleName(persona({ presence: "EXTERNAL", lastActivity: external() }))).toBe(
+      "백엔드봇, 백엔드, 원격 접속 중 — 외부 MCP, 최근 활동: projectId=1 (검색어 생략) — 말 걸기",
+    );
+    expect(
+      officeSummaryText([persona({ presence: "EXTERNAL" }), persona({ id: "2" }), persona({ id: "3", currentRun: run("RUNNING") })]),
+    ).toBe("AI 팀원 3명 — 작업 중 1, 원격 접속 중 1, 휴식 중 1");
   });
 });
 

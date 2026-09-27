@@ -7,7 +7,7 @@ import { agentMeetingRunName, type AgentPersonaState } from "../components/Agent
 import type { AgentMeetingType } from "../store/types";
 import { relTime } from "../components/time";
 import { fnv1a32 } from "./pixel";
-import { isTerminal, linkableIssueKey, personaState, PROJECT_WIDE_LABEL, subjectJosa } from "./officeModel";
+import { isTerminal, linkableIssueKey, personaState, PROJECT_WIDE_LABEL, subjectJosa, toolLabel } from "./officeModel";
 
 /** 표정(§4.6) — 깜빡임은 평소 표정의 장식이라 대사가 고르지 않는다 */
 export type Mood = "NORMAL" | "THINKING" | "HAPPY" | "TROUBLED";
@@ -68,23 +68,9 @@ export function roleHabit(persona: Pick<AgentOfficePersona, "id" | "role">, utte
 const withHabit = (habit: string | null, sentences: string[]) =>
   habit && sentences.length > 0 ? [`${habit} ${sentences[0]}`, ...sentences.slice(1)] : sentences;
 
-// ── 도구 라벨(말풍선과 같은 계열) ──
+// ── 도구 라벨(말풍선과 같은 표 — officeModel) ──
 
-const TOOL_LABEL: Record<string, string> = {
-  report_progress: "진행 보고",
-  add_comment: "코멘트 작성",
-  create_issue: "이슈 생성",
-  update_issue: "이슈 수정",
-  get_issue: "이슈 조회",
-  create_page: "문서 작성",
-  update_page: "문서 수정",
-  search_issues: "이슈 검색",
-  find_pages: "문서 검색",
-  link_pr: "PR 연결",
-  create_pr: "PR 생성",
-};
-
-export const toolLabel = (tool: string) => TOOL_LABEL[tool] ?? tool;
+export { toolLabel };
 
 /** `{키}` — 실이슈 키, 합성 키 회의는 "프로젝트 전반", 이슈 없음은 null */
 function keyText(run: { type: AgentRunSummary["type"]; issueKey: string | null }): string | null {
@@ -126,6 +112,8 @@ export interface StatusAnswer extends Utterance {
 }
 
 export const STATUS_LOADING = say("잠깐만요, 확인해 볼게요…", "THINKING");
+/** 원격 접속(AGP-63) — 워커 실행이 아니라 사람이 연결한 외부 MCP로 일하는 중 */
+export const REMOTE_STATUS = "지금 밖에서 원격으로 작업 중이에요 — 외부 MCP로 연결돼 있어요.";
 
 const sameLocalDay = (iso: string, now: number) => new Date(iso).toDateString() === new Date(now).toDateString();
 
@@ -175,6 +163,8 @@ export function statusAnswer(
     sentences.push(at(key, "에서 막혔어요…", "막혔어요…"), "사람이 확인해 줘야 해요.");
     mood = "TROUBLED";
     context = "RUN_DETAIL";
+  } else if (state === "REMOTE") {
+    sentences.push(REMOTE_STATUS);
   } else {
     sentences.push("지금은 쉬는 중이에요.");
     const n = finishedToday(persona.id, activity, recentRuns, now);
@@ -182,7 +172,8 @@ export function statusAnswer(
     mood = "HAPPY";
   }
 
-  const latest = activity?.todayAudits[0];
+  // 원격 접속은 활동 조회가 늦어도 사무실 스냅샷의 최근 활동(5분 이내)으로 꼬리를 단다
+  const latest = activity?.todayAudits[0] ?? (state === "REMOTE" ? persona.lastActivity : null);
   if (latest) {
     const label = toolLabel(latest.tool);
     const minutes = (now - Date.parse(latest.createdAt)) / 60_000;

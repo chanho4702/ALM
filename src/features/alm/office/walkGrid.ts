@@ -29,13 +29,14 @@ export const cellOf = (i: number): { x0: number; y0: number } => ({ x0: 64 * (i 
 /** 유휴 자리(휴게 구역) — 3열 */
 export const idleSpot = (i: number): { x: number; y: number } => ({ x: 270 + 24 * (i % 3), y: 52 + 32 * Math.floor(i / 3) });
 
-/** 아바타 좌상단(아트 픽셀) — 앉음은 자기 책상, 대기열은 책상 옆, 유휴는 휴게 구역의 고정 자리(k = i) */
+/** 아바타 좌상단(아트 픽셀) — 앉음(원격 접속 포함)은 자기 책상, 대기열은 책상 옆, 유휴는 휴게 구역의 고정 자리(k = i) */
 export function avatarPosition(state: AgentPersonaState, i: number): { x: number; y: number } | null {
   const { x0, y0 } = cellOf(i);
   switch (state) {
     case "RUNNING":
     case "WAITING_APPROVAL":
     case "BLOCKED":
+    case "REMOTE":
       return { x: x0 + 16, y: y0 };
     case "QUEUED":
       return { x: x0 + 44, y: y0 + 10 };

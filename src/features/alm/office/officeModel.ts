@@ -22,6 +22,7 @@ import { statusKind, typeLevel } from "../components/labels";
 import type { MicroGlyph } from "./pixel";
 import {
   agentMeetingRunName,
+  AGENT_REMOTE_DETAIL,
   AGENT_ROLE_LABEL,
   AGENT_STATUS_LABEL,
   type AgentPersonaState,
@@ -60,10 +61,19 @@ export function sortPersonas(personas: readonly AgentOfficePersona[]): AgentOffi
   });
 }
 
-/** 페르소나 상태 — 비활성 > 활성 run 상태 > 유휴 */
+/**
+ * 페르소나 상태 — 비활성 > 활성 run 상태 > 원격 접속(외부 MCP, AGP-63) > 유휴.
+ * 서버는 활성 run이 있으면 presence를 null로 주지만, 둘 다 와도 run이 이긴다(낙관적 run 덮어쓰기 포함).
+ */
 export function personaState(persona: AgentOfficePersona): AgentPersonaState {
   if (!persona.active) return "INACTIVE";
-  return persona.currentRun?.status ?? "IDLE";
+  if (persona.currentRun) return persona.currentRun.status;
+  return persona.presence === "EXTERNAL" ? "REMOTE" : "IDLE";
+}
+
+/** 상태 라벨 — 원격 접속은 부연을 붙인다("원격 접속 중 — 외부 MCP"). 접근 이름·팀 카드 공용 */
+export function personaStateText(state: AgentPersonaState): string {
+  return state === "REMOTE" ? `${AGENT_STATUS_LABEL.REMOTE} — ${AGENT_REMOTE_DETAIL}` : AGENT_STATUS_LABEL[state];
 }
 
 export function isTerminal(status: AgentRunStatus): boolean {
@@ -104,12 +114,21 @@ const TOOL_LABEL: Record<string, string> = {
   report_progress: "진행 보고",
   add_comment: "코멘트 작성",
   create_issue: "이슈 생성",
+  update_issue: "이슈 수정",
+  get_issue: "이슈 조회",
   create_page: "문서 작성",
   update_page: "문서 수정",
   search_issues: "이슈 검색",
   find_pages: "문서 검색",
   link_pr: "PR 연결",
+  create_pr: "PR 생성",
 };
+
+/** 도구의 한글 라벨 — 모르는 도구는 도구명(말풍선·대화 대사 공용) */
+export const toolLabel = (tool: string) => TOOL_LABEL[tool] ?? tool;
+
+/** 원격 접속 말풍선 1행 */
+export const REMOTE_BUBBLE = "원격 작업 중";
 
 /**
  * 말풍선 2행 — 가림 표지는 좁은 말풍선에서 잘리면 "run=12 (본문 생…"처럼 깨진 문구가 되므로
@@ -119,7 +138,7 @@ export function bubbleActivity(persona: AgentOfficePersona): string | null {
   const text = activityText(persona);
   const last = persona.lastActivity;
   if (!text || !last) return text;
-  return isRedactedSummary(text) ? (TOOL_LABEL[last.tool] ?? last.tool) : text;
+  return isRedactedSummary(text) ? toolLabel(last.tool) : text;
 }
 
 export interface BubbleText {
@@ -136,9 +155,13 @@ const STATE_PREFIX: Partial<Record<AgentPersonaState, string>> = {
   BLOCKED: "차단됨",
 };
 
-/** 말풍선 문구(스펙 §4.1). 유휴·비활성은 말풍선 없음 */
+/** 말풍선 문구(스펙 §4.1). 유휴·비활성은 말풍선 없음. 원격 접속은 "원격 작업 중" / 최근 활동 도구 라벨(AGP-63) */
 export function bubbleText(persona: AgentOfficePersona): BubbleText | null {
   const state = personaState(persona);
+  if (state === "REMOTE") {
+    const tool = persona.lastActivity?.tool;
+    return { line1: REMOTE_BUBBLE, prefix: null, issueKey: null, line2: tool ? toolLabel(tool) : null };
+  }
   const run = persona.currentRun;
   if (!run || state === "IDLE" || state === "INACTIVE") return null;
   if (isProjectWideMeeting(run)) {
@@ -163,7 +186,7 @@ export function bubbleText(persona: AgentOfficePersona): BubbleText | null {
  */
 export function personaAccessibleName(persona: AgentOfficePersona, meetingName: string | null = null): string {
   const state = personaState(persona);
-  const parts = [persona.name, AGENT_ROLE_LABEL[persona.role], AGENT_STATUS_LABEL[state]];
+  const parts = [persona.name, AGENT_ROLE_LABEL[persona.role], personaStateText(state)];
   const run = persona.currentRun;
   if (run && state !== "INACTIVE") {
     if (isProjectWideMeeting(run)) parts.push(`${meetingLabel(run.type)} ${PROJECT_WIDE_LABEL}`);
@@ -186,6 +209,7 @@ export function officeCounts(personas: readonly AgentOfficePersona[]): OfficeCou
     QUEUED: 0,
     WAITING_APPROVAL: 0,
     BLOCKED: 0,
+    REMOTE: 0,
     IDLE: 0,
     INACTIVE: 0,
   };
@@ -193,7 +217,15 @@ export function officeCounts(personas: readonly AgentOfficePersona[]): OfficeCou
   return { total: personas.length, byState };
 }
 
-const SUMMARY_ORDER: readonly AgentPersonaState[] = ["RUNNING", "QUEUED", "WAITING_APPROVAL", "BLOCKED", "IDLE", "INACTIVE"];
+const SUMMARY_ORDER: readonly AgentPersonaState[] = [
+  "RUNNING",
+  "QUEUED",
+  "WAITING_APPROVAL",
+  "BLOCKED",
+  "REMOTE",
+  "IDLE",
+  "INACTIVE",
+];
 
 /**
  * 캔버스 첫 요소의 시각 숨김 요약 — "AI 팀원 6명 — 작업 중 2, 대기열 1, …"(0인 상태는 뺀다).

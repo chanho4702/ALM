@@ -114,6 +114,45 @@ describe("agent-service 경계 매퍼", () => {
   });
 });
 
+describe("원격 접속·감사 출처(AGP-63)", () => {
+  const audit = (over: Record<string, unknown>) => ({ id: 1, tool: "get_issue", status: "OK", summary: null, createdAt: "2026-09-27T01:00:00Z", ...over });
+
+  it("presence EXTERNAL만 인정 — 구 백엔드(필드 없음)·null·모르는 값은 null", () => {
+    const withPresence = (presence: unknown) =>
+      mapAgentOffice({ personas: [{ ...OFFICE_DTO.personas[1], presence } as never] }).personas[0].presence;
+    expect(withPresence("EXTERNAL")).toBe("EXTERNAL");
+    expect(withPresence(null)).toBeNull();
+    expect(withPresence("WORKER")).toBeNull();
+    expect(mapAgentOffice(OFFICE_DTO).personas[1].presence).toBeNull();
+  });
+
+  it("감사 origin·runId — long id → string, 출처 미상(과거 기록·구 백엔드·모르는 값)은 null", () => {
+    const activity = mapAgentPersonaActivity({
+      personaId: 5,
+      runs: [],
+      todayAudits: [
+        audit({ id: 1, origin: "WORKER", runId: 9001 }),
+        audit({ id: 2, origin: "EXTERNAL", runId: null }),
+        audit({ id: 3, origin: "SYSTEM" }),
+        audit({ id: 4, origin: null }),
+        audit({ id: 5 }),
+        audit({ id: 6, origin: "HUMAN", runId: 3 }),
+      ],
+      todayCostUsd: 0,
+    });
+    expect(activity.todayAudits.map((a) => [a.origin, a.runId])).toEqual([
+      ["WORKER", "9001"],
+      ["EXTERNAL", null],
+      ["SYSTEM", null],
+      [null, null],
+      [null, null],
+      [null, "3"],
+    ]);
+    // office lastActivity도 같은 매퍼 — 구 백엔드 응답은 출처 없음
+    expect(mapAgentOffice(OFFICE_DTO).personas[0].lastActivity).toMatchObject({ origin: null, runId: null });
+  });
+});
+
 describe("REST 어댑터 — AI 사무실", () => {
   it("office는 프로젝트 id를 숫자로 붙여 조회하고 매핑한다", async () => {
     const spy = vi

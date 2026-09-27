@@ -141,7 +141,7 @@ export interface BotWalkRequest {
 type Pose = "seat" | "slump" | "stand" | "seatFar" | "seatBack";
 
 function poseOf(state: AgentPersonaState): Pose | null {
-  if (state === "RUNNING" || state === "WAITING_APPROVAL") return "seat";
+  if (state === "RUNNING" || state === "WAITING_APPROVAL" || state === "REMOTE") return "seat";
   if (state === "BLOCKED") return "slump";
   if (state === "QUEUED" || state === "IDLE") return "stand";
   return null;
@@ -344,8 +344,23 @@ function Bob({ name, x, y, ms, phase }: { name: "ALERT" | "ZZ" | "HOURGLASS"; x:
   );
 }
 
+/** 원격 접속 신호(AGP-63) — 바깥 전파가 켜졌다 꺼지는 2프레임(프레임 B는 바깥 전파 없음). reduced-motion이면 A 정지 */
+function RemoteSignal({ x, y, phase }: { x: number; y: number; phase: number }) {
+  return (
+    <g className="office-fx" data-overlay="remote">
+      <Loop
+        ms={1200}
+        phase={phase}
+        a={<PixelSprite paths={spritePaths("REMOTE_SIGNAL_A", "ovl")} x={x} y={y} />}
+        b={<PixelSprite paths={spritePaths("REMOTE_SIGNAL_B", "ovl")} x={x} y={y} />}
+      />
+    </g>
+  );
+}
+
 function StateOverlay({ state, index }: { state: AgentPersonaState; index: number }) {
   const { x0, y0 } = cellOf(index);
+  if (state === "REMOTE") return <RemoteSignal x={x0 + 31} y={y0 + 2} phase={index} />;
   if (state === "WAITING_APPROVAL") return <Bob name="ALERT" x={x0 + 31} y={y0} ms={800} phase={index} />;
   if (state === "BLOCKED") return <Bob name="ZZ" x={x0 + 30} y={y0} ms={1400} phase={index} />;
   if (state === "QUEUED") return <Bob name="HOURGLASS" x={x0 + 56} y={y0 + 2} ms={1000} phase={index} />;
@@ -509,6 +524,7 @@ function useBotWalk(request: BotWalkRequest | null, target: { x: number; y: numb
 /**
  * 디렉터 스냅샷(P3e §5.2) — 말 걸기 대상은 산책·작업 이펙트·미니 말풍선에서 뺀다(P3g §7.2). 대상이 산책 중이었으면
  * idleIds에서 빠지므로 디렉터가 즉시 걷어 유휴 자리로 돌린다. 선택·hover 중인 봇은 새 산책을 시작하지 않는다.
+ * 원격 접속(REMOTE, AGP-63)은 책상에 앉아 있으니 산책 대상이 아니고, 워커 run이 아니라 작업 이펙트도 없다.
  */
 export function ambienceSnapshot({
   personas,
@@ -1012,7 +1028,7 @@ function PersonaHtml({
         style={vars({ "--x": x0 + 24, "--y": y0 + 33 })}
         aria-hidden="true"
       >
-        {state === "INACTIVE" ? `${persona.name} · 비활성` : persona.name}
+        {state === "INACTIVE" ? `${persona.name} · 비활성` : state === "REMOTE" ? `${persona.name} · 원격` : persona.name}
         {showEmoji ? <span className="office-nameplate-emoji" aria-hidden="true">{persona.emoji}</span> : null}
       </span>
       {seat && hovered ? (

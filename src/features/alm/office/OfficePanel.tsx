@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate } from "react-router";
 import { Badge, Banner, Button, Lozenge, Spinner, Tabs } from "@chanho/react";
-import { ExternalLink, FileText, History, Keyboard, MessageCircle, Users, UsersRound, Wrench, X } from "lucide-react";
+import { ExternalLink, FileText, History, Keyboard, Laptop, MessageCircle, Users, UsersRound, Wrench, X } from "lucide-react";
 import type {
   AgentActiveMeeting,
+  AgentAuditEntry,
   AgentBoardPost,
   AgentOfficePersona,
   AgentPersonaActivity,
@@ -16,6 +17,8 @@ import {
   AGENT_RUN_TRIGGER_LABEL,
   AGENT_MEETING_TYPE_LABEL,
   AGENT_RUN_TYPE_LABEL,
+  AgentAuditOriginGlyph,
+  auditOriginLabel,
   AgentMeetingTypeGlyph,
   AgentRoleGlyph,
   AgentRunStatusLozenge,
@@ -444,6 +447,11 @@ function PersonaActivity({
               실행 상세
             </Button>
           </>
+        ) : state === "REMOTE" ? (
+          <p className="office-panel-remote">
+            <Laptop size={14} aria-hidden />
+            워커 실행 없이 외부 MCP로 원격 작업 중입니다
+          </p>
         ) : (
           <p className="office-panel-empty">지금 진행 중인 작업이 없습니다</p>
         )}
@@ -462,7 +470,7 @@ function PersonaActivity({
         </div>
       ) : activity ? (
         <>
-          <TodayAudits activity={activity} />
+          <TodayAudits activity={activity} links={links} />
           <Section title="최근 실행" count={activity.runs.length}>
             {activity.runs.length === 0 ? (
               <p className="office-panel-empty">아직 실행 기록이 없습니다</p>
@@ -494,8 +502,28 @@ function PersonaActivity({
   );
 }
 
+/**
+ * 감사 출처 배지(AGP-63) — 워커는 run 번호(있으면 실행 상세 링크), 외부 MCP·시스템은 배지만, 출처 미상(과거 기록)은 없음.
+ */
+function AuditOrigin({ entry, links }: { entry: AgentAuditEntry; links: OfficeLinks }) {
+  const { origin, runId } = entry;
+  if (!origin) return null;
+  if (origin === "WORKER" && runId) {
+    return (
+      <Link className="office-audit-origin is-link" to={links.run(runId)} aria-label={`${auditOriginLabel(origin, runId)} — 실행 상세`}>
+        <AgentAuditOriginGlyph origin={origin} runId={runId} />
+      </Link>
+    );
+  }
+  return (
+    <span className="office-audit-origin">
+      <AgentAuditOriginGlyph origin={origin} runId={runId} />
+    </span>
+  );
+}
+
 /** "오늘 한 일" — 오늘 감사(≤50, 최신 먼저). 요약은 서버가 가린 문구일 수 있다 */
-function TodayAudits({ activity }: { activity: AgentPersonaActivity }) {
+function TodayAudits({ activity, links }: { activity: AgentPersonaActivity; links: OfficeLinks }) {
   const [expanded, setExpanded] = useState(false);
   const rows = activity.todayAudits;
   const shown = expanded ? rows : rows.slice(0, 10);
@@ -513,6 +541,7 @@ function TodayAudits({ activity }: { activity: AgentPersonaActivity }) {
                   <Wrench size={12} aria-hidden />
                   {a.tool}
                 </span>
+                <AuditOrigin entry={a} links={links} />
                 <span className="office-audit-summary" title={a.summary ?? undefined}>
                   {a.summary ?? ""}
                   {a.status === "ERROR" ? <span className="office-audit-error"> · 오류</span> : null}

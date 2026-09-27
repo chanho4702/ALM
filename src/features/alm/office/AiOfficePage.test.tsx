@@ -69,35 +69,40 @@ describe("AI 사무실 진입점 — useAiTeamActive일 때만 탭", () => {
 });
 
 describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
-  it("6상태가 버튼 접근 이름·말풍선·오버레이로 구분된다", async () => {
+  it("6상태(운영봇 = 원격 접속, AGP-63)가 버튼 접근 이름·말풍선·오버레이로 구분된다", async () => {
     await withoutMeeting();
     const { container } = renderApp(OFFICE_PATH);
     // 로딩 자리표시(같은 이름의 region)가 실제 캔버스로 바뀐 뒤에 region을 잡는다
     await screen.findByRole("button", { name: /^기획봇, 기획, 작업 중, 이슈 ALM-4, 최근 활동: ALM-4 인수 조건 보완/ });
     const stage = screen.getByRole("region", { name: "AI 사무실 평면도" });
 
-    expect(within(stage).getByText("AI 팀원 6명 — 작업 중 2, 대기열 1, 승인 대기 1, 차단됨 1, 휴식 중 1")).toBeInTheDocument();
+    expect(within(stage).getByText("AI 팀원 6명 — 작업 중 2, 대기열 1, 승인 대기 1, 차단됨 1, 원격 접속 중 1")).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^디자인봇, 디자인, 대기열, 이슈 ALM-2 — / })).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^프론트봇, 프론트엔드, 승인 대기, 이슈 ALM-3/ })).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^백엔드봇, 백엔드, 차단됨, 이슈 ALM-5 — / })).toBeInTheDocument();
-    expect(within(stage).getByRole("button", { name: "운영봇, 운영, 휴식 중 — 말 걸기" })).toBeInTheDocument();
+    expect(
+      within(stage).getByRole("button", {
+        name: "운영봇, 운영, 원격 접속 중 — 외부 MCP, 최근 활동: projectId=1 (검색어 생략) — 말 걸기",
+      }),
+    ).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^리뷰봇, 리뷰, 작업 중, 이슈 ALM-1/ })).toBeInTheDocument();
 
-    // 말풍선 — 작업 중=이슈키+활동, 리뷰=접두, 대기열·차단=접두만(2행 없음), 유휴=없음
+    // 말풍선 — 작업 중=이슈키+활동, 리뷰=접두, 대기열·차단=접두만(2행 없음), 원격 접속="원격 작업 중"+도구 라벨
     expect(screen.getByTestId("office-bubble-101")).toHaveTextContent("ALM-4ALM-4 인수 조건 보완");
     // 리뷰봇 최근 활동은 서버 가림 표지("run=9006 (본문 생략)") — 말풍선은 도구 라벨로
     expect(screen.getByTestId("office-bubble-106")).toHaveTextContent(/^리뷰 · ALM-1진행 보고$/);
     expect(screen.getByTestId("office-bubble-102")).toHaveTextContent(/^대기열 · ALM-2$/);
     expect(screen.getByTestId("office-bubble-104")).toHaveTextContent(/^차단됨 · ALM-5$/);
-    expect(screen.queryByTestId("office-bubble-105")).not.toBeInTheDocument();
+    expect(screen.getByTestId("office-bubble-105")).toHaveTextContent(/^원격 작업 중이슈 검색$/);
 
-    // 도트 오버레이 — ❗(승인 대기)·Zz(차단)·⌛(대기열) 각 1개
+    // 도트 오버레이 — ❗(승인 대기)·Zz(차단)·⌛(대기열)·신호(원격 접속) 각 1개
     expect(container.querySelectorAll('[data-overlay="alert"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-overlay="zz"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-overlay="hourglass"]')).toHaveLength(1);
-    // 서기(대기열·유휴) 2명, 앉음 3명, 엎드림 1명
-    expect(container.querySelectorAll('.office-avatar[data-pose="stand"]')).toHaveLength(2);
-    expect(container.querySelectorAll('.office-avatar[data-pose="seat"]')).toHaveLength(3);
+    expect(container.querySelectorAll('[data-overlay="remote"]')).toHaveLength(1);
+    // 서기(대기열) 1명, 앉음(작업 중 2·승인 대기·원격 접속) 4명, 엎드림 1명
+    expect(container.querySelectorAll('.office-avatar[data-pose="stand"]')).toHaveLength(1);
+    expect(container.querySelectorAll('.office-avatar[data-pose="seat"]')).toHaveLength(4);
     expect(container.querySelectorAll('.office-avatar[data-pose="slump"]')).toHaveLength(1);
 
     // ❗는 승인 인박스로 가는 별도 링크
@@ -464,9 +469,10 @@ describe("개인 오피스 패널", () => {
   it("다른 봇과 대화해 '개인 오피스 열기'를 누르면 패널 내용만 바뀌고, 닫기 버튼으로도 닫힌다", async () => {
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
-    const idle = await openPanelViaDialog(user, await screen.findByRole("button", { name: /^운영봇, 운영, 휴식 중/ }), "운영봇");
-    expect(within(idle).getByText("지금 진행 중인 작업이 없습니다")).toBeInTheDocument();
-    expect(await within(idle).findByText("오늘 기록된 활동이 없습니다")).toBeInTheDocument();
+    // 운영봇은 원격 접속(AGP-63) — 워커 run이 없어 현재 작업 대신 원격 안내, 오늘 한 일은 외부 MCP 활동
+    const remote = await openPanelViaDialog(user, await screen.findByRole("button", { name: /^운영봇, 운영, 원격 접속 중/ }), "운영봇");
+    expect(within(remote).getByText("워커 실행 없이 외부 MCP로 원격 작업 중입니다")).toBeInTheDocument();
+    expect(await within(remote).findByRole("heading", { name: /오늘 한 일/ })).toBeInTheDocument();
 
     const waiting = await openPanelViaDialog(user, screen.getByRole("button", { name: /^프론트봇, 프론트엔드, 승인 대기/ }), "프론트봇");
     expect(within(waiting).getByText("사람의 승인을 기다리고 있습니다.")).toBeInTheDocument();
@@ -492,7 +498,7 @@ describe("팀 카드 토글", () => {
     const frontend = cards.find((c) => within(c).queryByRole("heading", { name: "프론트봇" }))!;
     expect(within(frontend).getByRole("button", { name: "승인 인박스" })).toBeInTheDocument();
     const ops = cards.find((c) => within(c).queryByRole("heading", { name: "운영봇" }))!;
-    expect(within(ops).getByText("진행 중인 작업 없음")).toBeInTheDocument();
+    expect(within(ops).getByText("원격 접속 중 — 외부 MCP")).toBeInTheDocument();
 
     await user.click(within(ops).getByRole("button", { name: "운영봇 개인 오피스 열기" }));
     expect(await screen.findByRole("complementary", { name: "운영봇" })).toBeInTheDocument();

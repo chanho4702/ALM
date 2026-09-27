@@ -1059,11 +1059,44 @@
   list-style: none;
 }
 
+/* 출처 배지(AGP-63)가 있는 행만 칸이 하나 늘어난다 — 행마다 독립이라 flex(요약이 남은 폭을 갖고 말줄임) */
 .office-audit {
-  display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr);
+  display: flex;
   align-items: center;
   gap: var(--chanho-space-100);
+}
+
+.office-audit-time,
+.office-audit-tool,
+.office-audit-origin {
+  flex: none;
+}
+
+.office-audit-summary {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.office-audit-origin {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  white-space: nowrap;
+}
+
+.office-audit-origin.is-link {
+  color: var(--chanho-color-text-link);
+}
+
+.office-audit-origin.is-link:hover {
+  color: var(--chanho-color-text-link-hovered);
+}
+
+.office-panel-remote {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
 }
 
 .office-audit-time {
@@ -1500,6 +1533,11 @@ button.office-attendee:focus-visible {
 
 .ai-team-card-meeting {
   font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 원격 접속(AGP-63) — 워커 실행이 없으니 이슈 줄 대신 연결 경로를 말한다 */
+.ai-team-card-remote {
   color: var(--chanho-color-text-subtle);
 }
 

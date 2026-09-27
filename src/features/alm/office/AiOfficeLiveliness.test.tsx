@@ -66,7 +66,8 @@ describe("회의실 — 착석·예외(목업: 기획봇 진행 착수/계획 �
     const designer = within(room).getByRole("button", { name: /^디자인봇, .*회의 중 — 착수\/계획 회의/ });
     expect(designer).toHaveAttribute("data-seat", "far");
     expect(designer).not.toHaveAttribute("data-host");
-    expect(within(room).getByRole("button", { name: /^운영봇, 운영, 휴식 중, 회의 중 — 착수\/계획 회의/ })).toHaveAttribute(
+    // 운영봇은 원격 접속 중(AGP-63)이지만 회의 참석이 위치를 이긴다 — 상태 라벨만 원격 접속
+    expect(within(room).getByRole("button", { name: /^운영봇, 운영, 원격 접속 중 — 외부 MCP, .*회의 중 — 착수\/계획 회의/ })).toHaveAttribute(
       "data-seat",
       "far",
     );
@@ -102,7 +103,7 @@ describe("회의실 — 착석·예외(목업: 기획봇 진행 착수/계획 �
     expect(container.querySelectorAll(".office-postit")).toHaveLength(0);
     expect(container.querySelector(".office-meeting-sign")).toHaveTextContent(/^회의실$/);
     expect(within(room).getByRole("button", { name: "회의실 — 진행 중인 회의 없음" })).toBeInTheDocument();
-    expect(within(room).getByText("AI 팀원 6명 — 작업 중 2, 대기열 1, 승인 대기 1, 차단됨 1, 휴식 중 1")).toBeInTheDocument();
+    expect(within(room).getByText("AI 팀원 6명 — 작업 중 2, 대기열 1, 승인 대기 1, 차단됨 1, 원격 접속 중 1")).toBeInTheDocument();
   });
 
   it("9번째 참석자부터는 테이블 아래 입석", async () => {

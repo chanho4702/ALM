@@ -49,9 +49,16 @@ function reduceMotion() {
   });
 }
 
-async function withoutMeeting() {
+/**
+ * 회의 없음 + 원격 접속 없음 — P3g 흐름은 "휴식 중 운영봇"(유휴 자리에 서 있는 봇) 기준이라 목업의 원격 접속(AGP-63)과
+ * 그 외부 MCP 최근 활동을 걷어 낸다. 원격 접속 운영봇은 AiOfficeRemote.test가 본다.
+ */
+async function quietOffice() {
   const base = await store.fetchOffice("p1");
-  return vi.spyOn(store, "fetchOffice").mockImplementation(async () => ({ ...(await base), activeMeeting: null }));
+  const personas = base.personas.map((p) =>
+    p.presence ? { ...p, presence: null, lastActivity: p.lastActivity?.origin === "EXTERNAL" ? null : p.lastActivity } : p,
+  );
+  return vi.spyOn(store, "fetchOffice").mockImplementation(async () => ({ ...base, personas, activeMeeting: null }));
 }
 
 beforeEach(() => {
@@ -91,7 +98,7 @@ describe("말 걸기 — 봇 클릭은 걸어가서 대화(P3g §2.4·§3)", () 
   beforeEach(reduceMotion);
 
   it("유휴 봇: 발 타일 아래에서 위를 보고 서고(반걸음 정렬), 모달 장면 + 인사 + 기본 메뉴 5개. '잘 가'로 닫히면 봇 버튼으로 포커스", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     const { container } = renderApp(OFFICE_PATH);
     const opener = await screen.findByRole("button", { name: /^운영봇, 운영, 휴식 중 — 말 걸기$/ });
@@ -131,7 +138,7 @@ describe("말 걸기 — 봇 클릭은 걸어가서 대화(P3g §2.4·§3)", () 
 
   it("책상 봇은 책상 오른쪽 통로에서 왼쪽 보기, 회의 참석 봇은 회의실 문 앞에서 오른쪽 보기 + 회의 인사", async () => {
     const user = userEvent.setup();
-    const spy = await withoutMeeting();
+    const spy = await quietOffice();
     const { container, unmount } = renderApp(OFFICE_PATH);
     const desk = await talkTo(user, /^기획봇, 기획, 작업 중/, "기획봇");
     const avatar = () => container.querySelector<SVGGElement>(".office-user")!;
@@ -145,9 +152,9 @@ describe("말 걸기 — 봇 클릭은 걸어가서 대화(P3g §2.4·§3)", () 
     unmount();
     spy.mockRestore();
 
-    // 목업 회의: 운영봇은 회의실 좌석 → 문 앞 (21, 9)(방 높이 192 — 문 줄 8·9의 아래 줄)
+    // 목업 회의: 운영봇(원격 접속 중이어도 회의 참석이 위치를 이긴다)은 회의실 좌석 → 문 앞 (21, 9)(방 높이 192 — 문 줄 8·9의 아래 줄)
     const again = renderApp(OFFICE_PATH);
-    const meeting = await talkTo(user, /^운영봇, 운영, 휴식 중, 회의 중/, "운영봇");
+    const meeting = await talkTo(user, /^운영봇, 운영, 원격 접속 중 — 외부 MCP, 최근 활동: .+, 회의 중/, "운영봇");
     const user2 = again.container.querySelector<SVGGElement>(".office-user")!;
     expect(user2.getAttribute("data-facing")).toBe("right");
     expect(user2.style.getPropertyValue("--ux")).toBe(String(16 * 21));
@@ -157,7 +164,7 @@ describe("말 걸기 — 봇 클릭은 걸어가서 대화(P3g §2.4·§3)", () 
   });
 
   it("팀 카드 '말 걸기' — 사무실 뷰로 바꾸고 그 봇에게 걸어가 대화한다", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     renderApp(`${OFFICE_PATH}?view=team`);
     const cards = await screen.findAllByRole("article");
@@ -170,7 +177,7 @@ describe("말 걸기 — 봇 클릭은 걸어가서 대화(P3g §2.4·§3)", () 
 
 describe("다가가기·타자 연출(실제 시간)", () => {
   it("다가가는 동안 대상 머리 위 💬 + 말풍선 숨김, 바닥 클릭은 말 걸기 취소(핀 이동), 같은 봇 두 번 = 건너뛰기, 타자는 Enter로 즉시 완성", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     const { container } = renderApp(OFFICE_PATH);
     const planner = await screen.findByRole("button", { name: /^기획봇, 기획, 작업 중/ });
@@ -206,7 +213,7 @@ describe("'지금 뭐 해?'(§5.2)", () => {
   beforeEach(reduceMotion);
 
   it("데이터 즉답 + 승인 대기면 메뉴 맨 위 '승인 인박스 열기' → 장면을 닫고 게이트 인박스, 답은 장면 종료 때 기록(STATUS)", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const save = vi.spyOn(store, "savePersonaDialog");
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
@@ -227,7 +234,7 @@ describe("지시하기(§5.3)", () => {
   beforeEach(reduceMotion);
 
   it("현재 이슈에 사람 명의 코멘트 — 확인 단계에 '다음 단계부터 반영' 안내, 본문 머리말, 성공 대사 + DIRECTIVE 기록", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const add = vi.spyOn(store, "addComment");
     const save = vi.spyOn(store, "savePersonaDialog");
     const user = userEvent.setup();
@@ -258,7 +265,7 @@ describe("지시하기(§5.3)", () => {
   });
 
   it("맡은 이슈가 없으면 '현재 이슈'는 흐림 + 이유, '새 작업으로 맡기기'는 지시문을 들고 이슈 고르기로. 코멘트 403은 곤란 대사", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
     const dialog = await talkTo(user, /^운영봇, 운영, 휴식 중/, "운영봇");
@@ -277,7 +284,7 @@ describe("지시하기(§5.3)", () => {
   });
 
   it("코멘트 권한 없음(403) → '이 이슈엔 코멘트를 남길 권한이 없대요.'", async () => {
-    await withoutMeeting();
+    await quietOffice();
     vi.spyOn(store, "addComment").mockRejectedValue(new ApiError(403, "권한이 없습니다."));
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
@@ -308,7 +315,7 @@ describe("이 이슈 맡아줘(§5.4)", () => {
   }
 
   it("createAgentRun 본문(모델 센티널은 생략) — 서버 응답 전에는 봇이 움직이지 않고, 성공하면 장면이 닫힌 뒤 봇이 대기열 자리로", async () => {
-    await withoutMeeting();
+    await quietOffice();
     let resolve!: (run: AgentRunSummary) => void;
     const create = vi.spyOn(store, "createAgentRun").mockImplementation(
       () =>
@@ -347,7 +354,7 @@ describe("이 이슈 맡아줘(§5.4)", () => {
   });
 
   it("모델을 고르면 본문에 싣고, 409는 '이미 누가 잡고 있어요' + 입력 유지", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const create = vi.spyOn(store, "createAgentRun");
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
@@ -371,7 +378,7 @@ describe("그냥 얘기하자(§5.5)", () => {
   beforeEach(reduceMotion);
 
   it("성공 — 사람 발화는 즉시, 봇 답은 live로, 세션 유지. 작업 요청이면 메뉴에 '지시하기로 전하기'(마지막 말을 채움)", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const chat = vi.spyOn(store, "sendPersonaChat");
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
@@ -397,7 +404,7 @@ describe("그냥 얘기하자(§5.5)", () => {
 
   it("수다 꺼짐(features.chat=false)은 선택지를 흐리지 않고 봇이 안내, 429·409·503은 대사로 번역", async () => {
     store.__setAgentMockScenario({ chat: false });
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
     const dialog = await talkTo(user, /^운영봇, 운영, 휴식 중/, "운영봇");
@@ -409,7 +416,7 @@ describe("그냥 얘기하자(§5.5)", () => {
   });
 
   it("오류 번역 — 429 잠깐 쉬기(수다 유지) · 409 모두 멈춤(메뉴로) · 503 꺼짐 · 그 밖은 입력 되돌림", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     const office = await store.fetchOffice("p1");
     vi.spyOn(store, "fetchOffice").mockResolvedValue({ ...office, activeMeeting: null, features: { chat: true } });
@@ -443,7 +450,7 @@ describe("권한(§5.7)", () => {
   beforeEach(reduceMotion);
 
   it("canManage=false면 지시하기·맡아줘가 흐림(aria-disabled + 이유), 골라도 흐름 대신 봇이 이유를 말한다", async () => {
-    await withoutMeeting();
+    await quietOffice();
     store.__setAgentMockScenario({ canManage: false });
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
@@ -464,7 +471,7 @@ describe("대화 기록(§6)", () => {
   beforeEach(reduceMotion);
 
   it("장면 백로그 = 이전 기록 + 이번 장면(오늘 만났으면 '또 오셨네요!'), Esc는 백로그만 닫는다", async () => {
-    await withoutMeeting();
+    await quietOffice();
     await store.savePersonaDialog("101", [
       { speaker: "USER", kind: "DIRECTIVE", text: "문구 그대로", issueKey: "ALM-4", commentId: "77" },
     ]);
@@ -485,7 +492,7 @@ describe("대화 기록(§6)", () => {
   });
 
   it("개인 오피스 '대화 기록' 탭 — 서버 기록 날짜 묶음, 구 백엔드(404)면 메모리 폴백 + 안내", async () => {
-    await withoutMeeting();
+    await quietOffice();
     store.__setAgentMockScenario({ dialogApi: false });
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
@@ -506,7 +513,7 @@ describe("키보드·포커스(§2.6·§8.2)", () => {
   beforeEach(reduceMotion);
 
   it("'나'는 방향키로 한 칸(막힌 쪽은 보기만), 구역이 바뀔 때만 알림, Enter로 옆 팀원과 대화 — 닫히면 '나'로 포커스", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     const { container } = renderApp(OFFICE_PATH);
     const me = await screen.findByRole("button", { name: /^나 — 입구\. 방향키로 이동, Enter로 옆 팀원에게 말 걸기$/ });
@@ -530,7 +537,7 @@ describe("키보드·포커스(§2.6·§8.2)", () => {
   });
 
   it("모달 포커스 트랩(끝에서 처음으로) · Esc 계층(폼 → 메뉴, 메뉴 → 잘 가) · 입력 중이면 끝내기 확인", async () => {
-    await withoutMeeting();
+    await quietOffice();
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
     const dialog = await talkTo(user, /^운영봇, 운영, 휴식 중/, "운영봇");

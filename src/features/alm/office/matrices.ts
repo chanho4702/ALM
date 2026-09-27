@@ -280,6 +280,33 @@ export const MAGNIFIER: readonly string[] = [
   ".......KK",
 ];
 
+/**
+ * REMOTE_SIGNAL_A — 9×8, 원격 접속(외부 MCP, AGP-63). 전파 두 겹(glass) + 가운데 점(hi) — 계열 `ovl`.
+ * 머리 오른쪽 위(❗ 자리)에 두고, 프레임 B(바깥 전파 꺼짐)와 번갈아 "송수신" 깜빡임을 낸다.
+ */
+export const REMOTE_SIGNAL_A: readonly string[] = [
+  "..KKKKK..",
+  ".KGGGGGK.",
+  "KGKKKKKGK",
+  "KK.KKK.KK",
+  "..KGGGK..",
+  "...KKK...",
+  "...KHK...",
+  "...KKK...",
+];
+
+/** REMOTE_SIGNAL_B — 9×8, 바깥 전파가 꺼진 프레임(reduced-motion에선 보이지 않는다) — 계열 `ovl` */
+export const REMOTE_SIGNAL_B: readonly string[] = [
+  ".........",
+  ".........",
+  ".........",
+  "...KKK...",
+  "..KGGGK..",
+  "...KKK...",
+  "...KHK...",
+  "...KKK...",
+];
+
 /** RED_MARK — 7×7 */
 export const RED_MARK: readonly string[] = [
   ".KKKKK.",

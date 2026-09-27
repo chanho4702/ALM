@@ -2429,7 +2429,7 @@ function baseOfficePersonas(now: number): AgentOfficePersona[] {
     {
       id: "101", slug: "planner-bot", name: "기획봇", emoji: "📝", role: "PLANNER", active: true,
       currentRun: { id: "9001", status: "RUNNING", issueKey: "ALM-4", type: "TASK", trigger: "SCHEDULER", attempt: 1, model: "claude-sonnet-5", startedAt: ago(now, 14) },
-      lastActivity: { id: "70011", tool: "update_issue", status: "OK", summary: "ALM-4 인수 조건 보완", createdAt: ago(now, 1) },
+      lastActivity: { id: "70011", tool: "update_issue", status: "OK", summary: "ALM-4 인수 조건 보완", createdAt: ago(now, 1), origin: "WORKER", runId: "9001" },
       todayCostUsd: 0.42,
     },
     {
@@ -2441,7 +2441,7 @@ function baseOfficePersonas(now: number): AgentOfficePersona[] {
     {
       id: "103", slug: "frontend-bot", name: "프론트봇", emoji: "🖥️", role: "FRONTEND", active: true,
       currentRun: { id: "9003", status: "WAITING_APPROVAL", issueKey: "ALM-3", type: "TASK", trigger: "SCHEDULER", attempt: 2, model: "claude-sonnet-5", startedAt: ago(now, 32) },
-      lastActivity: { id: "70031", tool: "create_pr", status: "OK", summary: "PR #41 생성 — 이슈 상세 모달", createdAt: ago(now, 3) },
+      lastActivity: { id: "70031", tool: "create_pr", status: "OK", summary: "PR #41 생성 — 이슈 상세 모달", createdAt: ago(now, 3), origin: "WORKER", runId: "9003" },
       todayCostUsd: 0.77,
     },
     {
@@ -2451,15 +2451,17 @@ function baseOfficePersonas(now: number): AgentOfficePersona[] {
       todayCostUsd: 1.05,
     },
     {
+      // 원격 접속(AGP-63) — 워커 run 없이 사람이 발급한 페르소나 토큰으로 외부 Claude Code가 붙어 일하는 중
       id: "105", slug: "ops-bot", name: "운영봇", emoji: "⛑️", role: "OPS", active: true,
       currentRun: null,
-      lastActivity: null,
+      presence: "EXTERNAL",
+      lastActivity: { id: "70051", tool: "search_issues", status: "OK", summary: "projectId=1 (검색어 생략)", createdAt: ago(now, 2), origin: "EXTERNAL", runId: null },
       todayCostUsd: 0,
     },
     {
       id: "106", slug: "reviewer-bot", name: "리뷰봇", emoji: "🔍", role: "REVIEWER", active: true,
       currentRun: { id: "9006", status: "RUNNING", issueKey: "ALM-1", type: "REVIEW", trigger: "SCHEDULER", attempt: 1, model: "claude-opus-5-5", startedAt: ago(now, 6) },
-      lastActivity: { id: "70061", tool: "report_progress", status: "OK", summary: "run=9006 (본문 생략)", createdAt: ago(now, 2) },
+      lastActivity: { id: "70061", tool: "report_progress", status: "OK", summary: "run=9006 (본문 생략)", createdAt: ago(now, 2), origin: "WORKER", runId: "9006" },
       todayCostUsd: 0.31,
     },
   ];
@@ -2561,14 +2563,23 @@ export async function fetchPersonaActivity(personaId: string): Promise<AgentPers
       parentRunId: null,
     });
   }
+  const runId = persona.currentRun?.id ?? null;
+  // 출처(AGP-63): 워커 run 감사 + 출처 기록 전 과거 감사(null) / 원격 접속은 외부 MCP·시스템·과거 감사
   const todayAudits: AgentAuditEntry[] = persona.currentRun
     ? [
         ...(persona.lastActivity ? [persona.lastActivity] : []),
-        { id: `${personaId}-a2`, tool: "search_issues", status: "OK", summary: "projectId=1 (검색어 생략)", createdAt: ago(now, 8) },
-        { id: `${personaId}-a3`, tool: "get_issue", status: "OK", summary: persona.currentRun.issueKey ?? "이슈", createdAt: ago(now, 12) },
-        { id: `${personaId}-a4`, tool: "add_comment", status: "ERROR", summary: `${persona.currentRun.issueKey ?? "ALM-1"} (본문 생략)`, createdAt: ago(now, 40) },
+        { id: `${personaId}-a2`, tool: "search_issues", status: "OK", summary: "projectId=1 (검색어 생략)", createdAt: ago(now, 8), origin: "WORKER", runId },
+        { id: `${personaId}-a3`, tool: "get_issue", status: "OK", summary: persona.currentRun.issueKey ?? "이슈", createdAt: ago(now, 12), origin: "WORKER", runId },
+        { id: `${personaId}-a4`, tool: "add_comment", status: "ERROR", summary: `${persona.currentRun.issueKey ?? "ALM-1"} (본문 생략)`, createdAt: ago(now, 40), origin: null, runId: null },
       ]
-    : [];
+    : persona.presence === "EXTERNAL"
+      ? [
+          ...(persona.lastActivity ? [persona.lastActivity] : []),
+          { id: `${personaId}-a2`, tool: "get_issue", status: "OK", summary: "ALM-6", createdAt: ago(now, 4), origin: "EXTERNAL", runId: null },
+          { id: `${personaId}-a3`, tool: "report_progress", status: "OK", summary: "토큰 사용 기록", createdAt: ago(now, 30), origin: "SYSTEM", runId: null },
+          { id: `${personaId}-a4`, tool: "update_issue", status: "OK", summary: "ALM-6 배포 체크리스트", createdAt: ago(now, 55), origin: null, runId: null },
+        ]
+      : [];
   return { personaId, runs, todayAudits, todayCostUsd: persona.todayCostUsd };
 }
 

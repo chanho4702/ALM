@@ -827,6 +827,9 @@ export interface AgentCurrentRun {
   startedAt: string | null;
 }
 
+/** 감사 출처(AGP-63) — 내부 워커 run / 사람이 발급한 페르소나 토큰으로 붙은 외부 MCP / 시스템 */
+export type AgentAuditOrigin = "WORKER" | "EXTERNAL" | "SYSTEM";
+
 /** 도구 호출 감사 한 건 — summary는 서버가 본문을 가린 값("(본문 생략)" 등)일 수 있다 */
 export interface AgentAuditEntry {
   id: string;
@@ -834,7 +837,14 @@ export interface AgentAuditEntry {
   status: "OK" | "ERROR";
   summary: string | null;
   createdAt: string;
+  /** null = 출처 기록 전의 과거 감사(구 백엔드 포함) — 배지를 달지 않는다 */
+  origin: AgentAuditOrigin | null;
+  /** 워커 run의 감사면 그 run id */
+  runId: string | null;
 }
+
+/** 활성 run 없이 최근 5분 안에 외부 MCP 활동이 있으면 "EXTERNAL"(AGP-63) */
+export type AgentPresence = "EXTERNAL";
 
 export interface AgentOfficePersona {
   id: string;
@@ -849,6 +859,8 @@ export interface AgentOfficePersona {
   todayCostUsd: number;
   /** 렌더용 외형(AGP-62) — 구 백엔드는 필드가 없다(= 기본 외형) */
   avatarConfig?: string | null;
+  /** 원격 접속(AGP-63) — 활성 run이 있으면 서버가 null로 준다. 구 백엔드는 필드가 없다(= null) */
+  presence?: AgentPresence | null;
 }
 
 export interface AgentRunSummary {
