@@ -2,24 +2,37 @@ import { useEffect, useState } from "react";
 import type { AgentPermissions } from "../store/types";
 import { fetchAgentPermissions } from "../store/jiraStore";
 
-// 프로젝트별로 세션당 한 번만 조회한다(useAiTeamActive와 같은 캐시 정책) — 버튼 노출 힌트라 폴링하지 않는다.
-const cached = new Map<string, AgentPermissions>();
+// 프로젝트별 캐시 — 버튼 노출 힌트라 폴링하지 않는다. 허용(canManage=true)은 세션 동안 유지하지만 거부는 60초만 둔다:
+// 조회 API는 org 판정 불가도 200 canManage=false로 접으므로 진짜 거부와 순간 장애를 구분할 수 없고, 장애 한 번에
+// 세션 내내 관리 버튼이 닫히면 안 된다(서버도 판정 실패를 캐시하지 않는다).
+const DENY_TTL_MS = 60_000;
+const cached = new Map<string, { value: AgentPermissions; at: number }>();
 const pending = new Map<string, Promise<AgentPermissions>>();
+
+function cachedValue(projectId: string): AgentPermissions | null {
+  const hit = cached.get(projectId);
+  if (!hit) return null;
+  if (!hit.value.canManage && Date.now() - hit.at > DENY_TTL_MS) {
+    cached.delete(projectId);
+    return null;
+  }
+  return hit.value;
+}
 
 const DENIED: AgentPermissions = { canManage: false, isGlobalAdmin: false };
 
 function loadAgentPermissions(projectId: string): Promise<AgentPermissions> {
-  const hit = cached.get(projectId);
+  const hit = cachedValue(projectId);
   if (hit) return Promise.resolve(hit);
   let inflight = pending.get(projectId);
   if (!inflight) {
     inflight = fetchAgentPermissions(projectId)
-      .catch(() => DENIED)
       .then((permissions) => {
-        cached.set(projectId, permissions);
-        pending.delete(projectId);
+        cached.set(projectId, { value: permissions, at: Date.now() });
         return permissions;
-      });
+      })
+      .catch(() => DENIED)
+      .finally(() => pending.delete(projectId));
     pending.set(projectId, inflight);
   }
   return inflight;
@@ -37,13 +50,13 @@ export interface AgentPermissionsState extends AgentPermissions {
  */
 export function useAgentPermissions(projectId: string): AgentPermissionsState {
   const [state, setState] = useState<AgentPermissionsState>(() => {
-    const hit = cached.get(projectId);
+    const hit = cachedValue(projectId);
     return hit ? { ...hit, loaded: true } : { ...DENIED, loaded: false };
   });
 
   useEffect(() => {
     let cancelled = false;
-    const hit = cached.get(projectId);
+    const hit = cachedValue(projectId);
     setState(hit ? { ...hit, loaded: true } : { ...DENIED, loaded: false });
     void loadAgentPermissions(projectId).then((permissions) => {
       if (!cancelled) setState({ ...permissions, loaded: true });
