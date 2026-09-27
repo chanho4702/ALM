@@ -55,6 +55,8 @@ import type {
   AgentPermissions,
   AgentRunCreateInput,
   AgentPersonaInput,
+  AgentPersonaDetail,
+  AgentPersonaPatch,
   AgentProjectCredential,
   AgentTeamPersona,
   AgentToken,
@@ -2510,7 +2512,11 @@ function mockActiveMeeting(now: number, projectId: string): AgentActiveMeeting |
 }
 
 function mockOffice(now: number, projectId = "p1"): AgentOffice {
-  const personas = baseOfficePersonas(now);
+  // 설정 화면에서 고친 이름·이모지·외형이 사무실에도 보이게(서버는 같은 persona 행을 읽는다)
+  const personas = baseOfficePersonas(now).map((p) => {
+    const team = teamState.personas.find((t) => t.id === p.id);
+    return team ? { ...p, name: team.name, emoji: team.emoji, avatarConfig: team.avatarConfig ?? null } : p;
+  });
   const recentRuns = baseRecentRuns(now);
   applyAgentOverrides(personas, recentRuns);
   const personaOfRun = new Map(mockAllRuns(now).map((r) => [r.id, r.personaId]));
@@ -2836,8 +2842,17 @@ interface MockCredential {
   updatedAt: string;
 }
 
+/** 상세 API에만 있는 편집 필드(목록에는 싣지 않는다 — 누구나 보는 표면) */
+interface MockPersonaDetail {
+  voicePrompt: string | null;
+  defaultModel: string | null;
+  skills: string | null;
+}
+
 interface AgentTeamMockState {
   personas: AgentTeamPersona[];
+  /** 페르소나 id → 편집 필드 */
+  details: Map<string, MockPersonaDetail>;
   tokens: AgentToken[];
   /** 프로젝트 id → 프로젝트 키 */
   projectKeys: Map<string, MockCredential>;
@@ -2858,6 +2873,15 @@ interface AgentTeamMockState {
   chatSeq: number;
 }
 
+/**
+ * 목업 외형(AGP-62) — 커스텀된 직원이 한 방에 섞인 장면을 목업에서도 본다. 디자인봇 = 긴 머리·적갈·아이보리 셔츠·빨간 테 안경,
+ * 백엔드봇 = 곱슬·볼터치. 나머지는 설정 없음(기본 외형).
+ */
+const MOCK_AVATARS: Record<string, string> = {
+  "designer-bot": '{"v":1,"skinTone":"e","hairStyle":"long","hairColor":"4","shirtColor":"ivory","accessory":"glasses","showEmoji":1}',
+  "backend-bot": '{"v":1,"skinTone":"f","hairStyle":"curly","hairColor":"7","accessory":"blush"}',
+};
+
 function freshTeamState(): AgentTeamMockState {
   const now = Date.now();
   // 사무실 목업 6인과 같은 사람들 — 앞의 넷은 ALM(p1) 전용, 운영·리뷰는 전사 공용
@@ -2869,9 +2893,21 @@ function freshTeamState(): AgentTeamMockState {
     role: p.role,
     active: p.active,
     projectId: p.role === "OPS" || p.role === "REVIEWER" ? null : "p1",
+    avatarConfig: MOCK_AVATARS[p.slug] ?? null,
   }));
   return {
     personas,
+    details: new Map([
+      ["102", { voicePrompt: "밝고 다정하게, 시안 근거를 먼저 말한다", defaultModel: null, skills: null }],
+      [
+        "103",
+        {
+          voicePrompt: "짧고 단정하게",
+          defaultModel: "claude-sonnet-5",
+          skills: "# 프론트봇 — 디자인시스템으로 화면을 짓는다\n\n## 잘하는 것\n- React 19 + DS 컴포넌트\n",
+        },
+      ],
+    ]),
     tokens: [
       { id: "31", label: "Claude Desktop — 프론트봇", personaSlug: "frontend-bot", createdAt: ago(now, 60 * 24 * 3), expiresAt: null, lastUsedAt: ago(now, 40), revoked: false },
       { id: "30", label: "예전 노트북", personaSlug: "planner-bot", createdAt: ago(now, 60 * 24 * 20), expiresAt: null, lastUsedAt: null, revoked: true },
@@ -2990,8 +3026,10 @@ export async function createAgentPersona(input: AgentPersonaInput): Promise<Agen
     role: input.role,
     active: true,
     projectId: input.projectId,
+    avatarConfig: null,
   };
   teamState.personas.push(persona);
+  teamState.details.set(persona.id, { voicePrompt: input.voicePrompt?.trim() || null, defaultModel: null, skills: null });
   return clone(persona);
 }
 
@@ -3001,6 +3039,95 @@ export async function setAgentPersonaActive(personaId: string, active: boolean):
   requireManagePersona(persona);
   persona.active = active;
   return clone(persona);
+}
+
+// ── 직원 편집(목업, AGP-62) — 검증·거부 문구는 agent-service PersonaUpdateRequest·PersonaService·AvatarConfigValidator ──
+
+const MOCK_MODEL_ID = /^[A-Za-z0-9._:@/[\]-]{1,60}$/;
+const AVATAR_KEYS: ReadonlySet<string> = new Set(["v", "skinTone", "hairStyle", "hairColor", "shirtColor", "accessory", "showEmoji"]);
+const AVATAR_CONFIG_MAX_BYTES = 1024;
+const SKILLS_MAX = 8000;
+
+function mockEditablePersona(personaId: string): AgentTeamPersona {
+  const persona = teamState.personas.find((p) => p.id === personaId);
+  if (!persona) throw new ApiError(404, `페르소나를 찾을 수 없습니다: ${personaId}`);
+  try {
+    requireManagePersona(persona);
+  } catch {
+    throw new ApiError(403, AGENT_FORBIDDEN);
+  }
+  return persona;
+}
+
+function mockDetail(persona: AgentTeamPersona): AgentPersonaDetail {
+  const d = teamState.details.get(persona.id) ?? { voicePrompt: null, defaultModel: null, skills: null };
+  return { ...clone(persona), avatarConfig: persona.avatarConfig ?? null, ...d };
+}
+
+/** 서버 AvatarConfigValidator.normalize 미러 — 형태만 검증하고 공백 없는 JSON으로 정규화 */
+function normalizeMockAvatar(text: string): string {
+  const bytes = (value: string) => new TextEncoder().encode(value).length;
+  if (bytes(text) > AVATAR_CONFIG_MAX_BYTES) throw new ApiError(400, `avatarConfig는 ${AVATAR_CONFIG_MAX_BYTES}바이트 이하여야 합니다`);
+  let node: unknown;
+  try {
+    node = JSON.parse(text);
+  } catch {
+    throw new ApiError(400, "avatarConfig는 JSON 객체 문자열이어야 합니다");
+  }
+  if (!node || typeof node !== "object" || Array.isArray(node)) throw new ApiError(400, "avatarConfig는 JSON 객체여야 합니다");
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    if (!AVATAR_KEYS.has(key)) {
+      throw new ApiError(400, `avatarConfig에 허용되지 않은 키가 있습니다 — 허용: ${[...AVATAR_KEYS].sort().join(", ")}`);
+    }
+    if (key === "showEmoji") {
+      if (value !== 0 && value !== 1) throw new ApiError(400, "avatarConfig showEmoji는 숫자 0 또는 1이어야 합니다");
+    } else if (typeof value !== "string" && typeof value !== "number") {
+      throw new ApiError(400, `avatarConfig 값은 문자열 또는 숫자여야 합니다: ${key}`);
+    }
+  }
+  const normalized = JSON.stringify(node);
+  if (bytes(normalized) > AVATAR_CONFIG_MAX_BYTES) throw new ApiError(400, `avatarConfig는 ${AVATAR_CONFIG_MAX_BYTES}바이트 이하여야 합니다`);
+  return normalized;
+}
+
+/** 편집 다이얼로그 프리필 — 관리자 전용(공용 직원은 전역 관리자만), 아니면 403 */
+export async function fetchAgentPersonaDetail(personaId: string): Promise<AgentPersonaDetail> {
+  return mockDetail(mockEditablePersona(personaId));
+}
+
+/** 생략 = 그대로, 빈 문자열(공백뿐 포함) = 지움, name은 지울 수 없다 — 검증을 전부 통과해야 한 필드라도 바뀐다 */
+export async function updateAgentPersona(personaId: string, patch: AgentPersonaPatch): Promise<AgentPersonaDetail> {
+  if (patch.name !== undefined && patch.name.length > 80) throw new ApiError(400, "name은 80자 이하여야 합니다");
+  if (patch.emoji !== undefined && patch.emoji.length > 16) throw new ApiError(400, "emoji는 16자 이하여야 합니다");
+  if (patch.defaultModel !== undefined && patch.defaultModel.length > 60) {
+    throw new ApiError(400, "defaultModel은 60자 이하여야 합니다");
+  }
+  if (patch.skills !== undefined && patch.skills.length > SKILLS_MAX) {
+    throw new ApiError(400, `skills는 ${SKILLS_MAX}자 이하여야 합니다`);
+  }
+  const persona = mockEditablePersona(personaId);
+  const text = (value: string | undefined): string | null | undefined => (value === undefined ? undefined : value.trim() || null);
+  const name = text(patch.name);
+  if (name === null) throw new ApiError(400, "name은 비울 수 없습니다");
+  const defaultModel = text(patch.defaultModel);
+  if (defaultModel && !MOCK_MODEL_ID.test(defaultModel)) {
+    throw new ApiError(400, "defaultModel은 영문·숫자와 . _ : @ / [ ] - 만 쓸 수 있습니다(60자 이하)");
+  }
+  const avatar =
+    patch.avatarConfig === undefined ? undefined : patch.avatarConfig.trim() ? normalizeMockAvatar(patch.avatarConfig) : null;
+  const emoji = text(patch.emoji);
+  const voicePrompt = text(patch.voicePrompt);
+  const skills = text(patch.skills);
+
+  const detail = teamState.details.get(persona.id) ?? { voicePrompt: null, defaultModel: null, skills: null };
+  if (name !== undefined) persona.name = name;
+  if (emoji !== undefined) persona.emoji = emoji;
+  if (avatar !== undefined) persona.avatarConfig = avatar;
+  if (voicePrompt !== undefined) detail.voicePrompt = voicePrompt;
+  if (defaultModel !== undefined) detail.defaultModel = defaultModel;
+  if (skills !== undefined) detail.skills = skills;
+  teamState.details.set(persona.id, detail);
+  return mockDetail(persona);
 }
 
 export async function listAgentTokens(projectId: string): Promise<AgentToken[]> {

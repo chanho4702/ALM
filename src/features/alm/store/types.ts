@@ -705,6 +705,32 @@ export interface AgentTeamPersona {
   role: AgentRole;
   active: boolean;
   projectId: string | null;
+  /** 렌더용 외형(AGP-62) — 버전드 JSON 문자열 원문. 해석은 office `parseAvatarConfig`, 없으면 기본 외형 */
+  avatarConfig?: string | null;
+}
+
+/**
+ * `GET /api/agent/personas/{id}`(관리자 전용 — canManagePersona) — 편집 다이얼로그 프리필. 목록 필드 + 편집 필드.
+ * 미설정 필드는 null.
+ */
+export interface AgentPersonaDetail extends AgentTeamPersona {
+  avatarConfig: string | null;
+  voicePrompt: string | null;
+  defaultModel: string | null;
+  skills: string | null;
+}
+
+/**
+ * `PATCH /api/agent/personas/{id}` 본문 — 전부 선택. 생략 = 그대로, 빈 문자열 = 지움(avatarConfig ""= 기본 외형),
+ * name은 지울 수 없다(400).
+ */
+export interface AgentPersonaPatch {
+  name?: string;
+  emoji?: string;
+  voicePrompt?: string;
+  defaultModel?: string;
+  skills?: string;
+  avatarConfig?: string;
 }
 
 /** `POST /api/agent/personas` — 프로젝트 관리자는 projectId=현재 프로젝트가 필수 */
@@ -821,6 +847,8 @@ export interface AgentOfficePersona {
   /** 5분 이내 활동만 온다 — 없으면 null(말풍선 2행 생략) */
   lastActivity: AgentAuditEntry | null;
   todayCostUsd: number;
+  /** 렌더용 외형(AGP-62) — 구 백엔드는 필드가 없다(= 기본 외형) */
+  avatarConfig?: string | null;
 }
 
 export interface AgentRunSummary {

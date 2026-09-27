@@ -30,6 +30,7 @@ import {
   ROOM_W,
 } from "./pixel";
 import { PixelSprite } from "./PixelSprite";
+import { personaLook } from "./avatarConfig";
 import {
   bubbleText,
   coffeeCopy,
@@ -167,7 +168,8 @@ function Loop({ ms, phase, a, b }: { ms: number; phase: number; a: ReactNode; b:
 }
 
 function StandingFrames({ persona, index }: { persona: AgentOfficePersona; index: number }) {
-  const frame = (f: AvatarFrame) => <PixelSprite paths={avatarPaths(persona.role, f)} />;
+  const look = personaLook(persona);
+  const frame = (f: AvatarFrame) => <PixelSprite paths={avatarPaths(persona.role, f, look)} />;
   return (
     <>
       <path className="px-shadow" d="M2 22h12v2h-12z" />
@@ -178,7 +180,8 @@ function StandingFrames({ persona, index }: { persona: AgentOfficePersona; index
 
 /** 산책 프레임(P3e §4.1) — 걷기 2프레임 250ms, 커피 머신 앞 뒷모습 정지, 복귀 뒤 컵 든 채 숨쉬기 */
 function StrollFrames({ persona, stroll }: { persona: AgentOfficePersona; stroll: Stroll }) {
-  const frame = (f: AvatarFrame) => <PixelSprite paths={avatarPaths(persona.role, f)} />;
+  const look = personaLook(persona);
+  const frame = (f: AvatarFrame) => <PixelSprite paths={avatarPaths(persona.role, f, look)} />;
   const cup = (dy = 0) => <PixelSprite paths={spritePaths("CUP", "item")} x={12} y={14 + dy} />;
   if (!stroll.walking && stroll.leg === 3) return frame("back");
   if (!stroll.walking) {
@@ -248,18 +251,19 @@ function Avatar({
     return () => clearTimeout(timer);
   }, [x, y]);
 
+  const look = personaLook(persona);
   const shown: Pose = walking ? "stand" : pose;
   let body: ReactNode;
   if (stroll) body = <StrollFrames persona={persona} stroll={stroll} />;
   else if (shown === "stand") body = <StandingFrames persona={persona} index={index} />;
-  else body = <PixelSprite paths={avatarPaths(persona.role, shown)} />;
+  else body = <PixelSprite paths={avatarPaths(persona.role, shown, look)} />;
   return (
     <g
       className={stroll ? "office-avatar is-strolling" : "office-avatar"}
       data-pose={stroll ? "stroll" : shown}
       data-persona={persona.id}
       style={vars({
-        ...avatarVars(persona.slug, persona.role),
+        ...avatarVars(persona.slug, persona.role, look),
         "--ax": x,
         "--ay": y,
         ...(stroll ? { "--walk-ms": stroll.legMs, "--walk-steps": stroll.steps } : {}),
@@ -281,7 +285,7 @@ function DeskSet({ persona, index, away }: { persona: AgentOfficePersona; index:
       className="office-desk"
       data-state={state}
       data-away={away ? "true" : undefined}
-      style={vars(avatarVars(persona.slug, persona.role))}
+      style={vars(avatarVars(persona.slug, persona.role, personaLook(persona)))}
     >
       <PixelSprite paths={spritePaths("CHAIR", "furn")} x={x0 + 17} y={y0 + 6} />
       <PixelSprite paths={spritePaths("DESK", "furn")} x={x0 + 4} y={y0 + 16} />
@@ -987,6 +991,8 @@ function PersonaHtml({
   const pos = seat ?? avatarPosition(state, index);
   const tailX = (state === "QUEUED" ? x0 + 52 : x0 + 24) - (x0 + 2);
   const label = personaAccessibleName(persona, seat ? meeting : null);
+  // 명판 이모지(AGP-62 §2.6) — 직원별로 켠다. 명패 자체가 aria-hidden이라 접근 이름은 그대로(이름·상태)
+  const showEmoji = Boolean(persona.emoji) && personaLook(persona).showEmoji;
   const hoverProps = {
     onPointerEnter: () => onHover(persona.id),
     onPointerLeave: () => onHover(null),
@@ -1007,6 +1013,7 @@ function PersonaHtml({
         aria-hidden="true"
       >
         {state === "INACTIVE" ? `${persona.name} · 비활성` : persona.name}
+        {showEmoji ? <span className="office-nameplate-emoji" aria-hidden="true">{persona.emoji}</span> : null}
       </span>
       {seat && hovered ? (
         <span

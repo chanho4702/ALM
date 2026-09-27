@@ -26,6 +26,7 @@ import type {
   AgentPermissions,
   AgentPersona,
   AgentPersonaActivity,
+  AgentPersonaDetail,
   AgentProjectCredential,
   AgentRole,
   AgentRunStatus,
@@ -68,6 +69,8 @@ export interface AgentOfficePersonaDto {
   currentRun: AgentCurrentRunDto | null;
   lastActivity: AgentAuditEntryDto | null;
   todayCostUsd: number | string | null;
+  /** AGP-62 — JSON 문자열(구 백엔드는 없음) */
+  avatarConfig?: unknown;
 }
 
 export interface AgentRunSummaryDto {
@@ -254,6 +257,7 @@ function mapPersona(dto: AgentOfficePersonaDto): AgentOfficePersona {
     currentRun: dto.currentRun ? mapCurrentRun(dto.currentRun) : null,
     lastActivity: dto.lastActivity ? mapAgentAuditEntry(dto.lastActivity) : null,
     todayCostUsd: money(dto.todayCostUsd) ?? 0,
+    avatarConfig: avatarConfigOf(dto.avatarConfig),
   };
 }
 
@@ -398,6 +402,15 @@ export interface AgentTeamPersonaDto {
   emoji?: string | null;
   active: boolean;
   projectId?: Id | null;
+  /** AGP-62 — JSON 문자열(구 백엔드는 없음) */
+  avatarConfig?: unknown;
+}
+
+/** `GET/PATCH /api/agent/personas/{id}` 응답(PersonaDetailResponse) — 목록 필드 + 편집 필드 */
+export interface AgentPersonaDetailDto extends AgentTeamPersonaDto {
+  voicePrompt?: string | null;
+  defaultModel?: string | null;
+  skills?: string | null;
 }
 
 export interface AgentTokenDto {
@@ -436,6 +449,22 @@ const CREDENTIAL_SCOPES: readonly AgentCredentialScope[] = ["PROJECT", "PLATFORM
 const optId = (value: Id | null | undefined): string | null =>
   value === null || value === undefined ? null : String(value);
 
+/**
+ * avatarConfig 원문 — 계약은 JSON 문자열|null이지만, 객체로 온(직렬화 설정이 다른) 응답도 문자열로 되돌려 둔다.
+ * 그 밖의 타입·빈 문자열은 null(= 기본 외형). 값 해석·검증은 office `parseAvatarConfig`가 한다.
+ */
+function avatarConfigOf(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() ? value : null;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /** 판정 힌트라 모르는 값은 "못 한다"로 접는다 — 버튼이 잘못 열리는 쪽보다 닫히는 쪽이 안전하다 */
 export function mapAgentPermissions(dto: AgentPermissionsDto | null): AgentPermissions {
   return { canManage: dto?.canManage === true, isGlobalAdmin: dto?.isGlobalAdmin === true };
@@ -450,6 +479,17 @@ export function mapAgentTeamPersona(dto: AgentTeamPersonaDto): AgentTeamPersona 
     role: pick(ROLES, dto.role, "FRONTEND"),
     active: dto.active,
     projectId: optId(dto.projectId),
+    avatarConfig: avatarConfigOf(dto.avatarConfig),
+  };
+}
+
+export function mapAgentPersonaDetail(dto: AgentPersonaDetailDto): AgentPersonaDetail {
+  return {
+    ...mapAgentTeamPersona(dto),
+    avatarConfig: avatarConfigOf(dto.avatarConfig),
+    voicePrompt: typeof dto.voicePrompt === "string" ? dto.voicePrompt : null,
+    defaultModel: typeof dto.defaultModel === "string" && dto.defaultModel ? dto.defaultModel : null,
+    skills: typeof dto.skills === "string" ? dto.skills : null,
   };
 }
 

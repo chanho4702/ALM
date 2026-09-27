@@ -6,6 +6,8 @@
  */
 import type { AgentRole } from "../store/types";
 import * as M from "./matrices";
+import * as P from "./avatarParts";
+import type { ExtraAccessory, HairColor, HairStyle, ShirtColor, SkinTone } from "./avatarParts";
 
 export type Family =
   | "char"
@@ -36,7 +38,7 @@ export type Family =
 
 /** 계열별 칠 순서 — 밝은 면 먼저, 외곽선 `K`는 마지막(겹침이 없어 순서는 가독용이다) */
 const PAINT_ORDER: Record<Family, string> = {
-  char: "PpCcSsHhAaGK",
+  char: "PpCcSsHhAaEeGK",
   furn: "WwxyMmOGgFfK",
   ovl: "YyZMRGHK",
   board: "xcdpqRYBCK",
@@ -107,15 +109,18 @@ export function rectPath(x: number, y: number, w: number, h: number): string {
   return `M${x} ${y}h${w}v${h}h-${w}z`;
 }
 
-/** 레이어의 `.`은 아래를 유지하고 나머지 문자는 덮어쓴다(스펙 §2.6-5). dy = 레이어를 아래로 민 행 수 */
-export function overlay(base: Matrix, layer: Matrix, dy = 0): string[] {
+/**
+ * 레이어의 `.`은 아래를 유지하고 나머지 문자는 덮어쓴다(스펙 §2.6-5). dy = 레이어를 아래로 민 행 수.
+ * skinOnly = 아래 칸이 피부(`S`/`s`)일 때만 덮는다(AGP-62 §2.5 — 안경·볼터치가 눈·머리카락을 가리지 않게).
+ */
+export function overlay(base: Matrix, layer: Matrix, dy = 0, skinOnly = false): string[] {
   return base.map((row, y) => {
     const lr = layer[y - dy];
     if (!lr) return row;
     let out = "";
     for (let x = 0; x < row.length; x += 1) {
       const l = lr[x];
-      out += l && l !== "." ? l : row[x];
+      out += l && l !== "." && (!skinOnly || row[x] === "S" || row[x] === "s") ? l : row[x];
     }
     return out;
   });
@@ -130,24 +135,22 @@ export function breathe(frame: Matrix): string[] {
 /** 모니터 ON 프레임 — 이미 매트릭스로 있다 */
 export const MONITOR = { off: M.MONITOR_OFF, onA: M.MONITOR_ON_A, onB: M.MONITOR_ON_B };
 
-/** 도트 시안이 있는 6롤 — 액세서리 매트릭스와 `--office-role-*`·`--office-acc-*` 팔레트가 이 키로만 있다 */
-type DrawnRole = Exclude<AgentRole, "MANAGER">;
-
-const ACC: Record<DrawnRole, Matrix> = {
+const ACC: Record<AgentRole, Matrix> = {
   PLANNER: M.ACC_PLANNER,
   DESIGNER: M.ACC_DESIGNER,
   FRONTEND: M.ACC_FRONTEND,
   BACKEND: M.ACC_BACKEND,
   OPS: M.ACC_OPS,
   REVIEWER: M.ACC_REVIEWER,
+  MANAGER: P.ACC_MANAGER,
 };
 
 /**
- * 그릴 롤 — MANAGER는 전용 도트가 아직 없어 기획 아바타(연필)를 빌려 쓰고, 명판·카드·패널의 롤 라벨("매니저")로
- * 구분한다(D-P3c-5). 시안 밖 값이 와도 매트릭스·팔레트가 비지 않게 기획으로 접는다.
+ * 그릴 롤 — 7롤 모두 전용 도트가 있다(AGP-62 §4, MANAGER = 클립보드). 타입 밖 값(서버 신규 롤)이 와도
+ * 매트릭스·팔레트가 비지 않게 기획으로 접는다(방어 폴백).
  */
-export function drawnRole(role: AgentRole): DrawnRole {
-  return role in ACC ? (role as DrawnRole) : "PLANNER";
+export function drawnRole(role: AgentRole): AgentRole {
+  return role in ACC ? role : "PLANNER";
 }
 
 /**
@@ -168,9 +171,10 @@ export type AvatarFrame =
   | "walkBackB";
 
 /** 뒷모습 액세서리 — 좌우 대칭 모자는 앞모습 레이어 그대로, 기획 연필은 거울, 리뷰 안경은 뒤에서 안 보인다(스펙 부록 B) */
-function backAccessory(role: DrawnRole): Matrix {
+function backAccessory(role: AgentRole): Matrix {
   if (role === "PLANNER") return M.ACC_BACK_PLANNER;
   if (role === "REVIEWER") return [];
+  if (role === "MANAGER") return P.ACC_BACK_MANAGER;
   return ACC[role];
 }
 
@@ -179,33 +183,117 @@ function withLegs(base: Matrix, walk: Matrix): string[] {
   return [...base.slice(0, 18), ...walk.slice(18, 23), ...base.slice(23)];
 }
 
-export function avatarMatrix(role: AgentRole, frame: AvatarFrame): string[] {
+// ── AGP-62 파츠 합성 ─────────────────────────────────────────────
+
+/**
+ * 정규화된 외형(스펙 §5.2 결과) — 색 키는 CSS 변수 이름에만 쓰이고, 모양 키(머리·액세서리)는 매트릭스를 고른다.
+ * shirtColor null = 롤 기본.
+ */
+export interface AvatarLook {
+  skinTone: SkinTone;
+  hairStyle: HairStyle;
+  hairColor: HairColor;
+  shirtColor: ShirtColor | null;
+  accessory: ExtraAccessory;
+  showEmoji: boolean;
+}
+
+/** 머리카락 칸(H/h)을 두피 S로 — 머리 외곽선 K는 그대로 두어 모든 머리 모양이 같은 실루엣을 공유한다(§3.1) */
+function bald(frame: Matrix, lastRow = 11): string[] {
+  return frame.map((row, i) => (i <= lastRow ? row.replace(/[Hh]/g, "S") : row));
+}
+
+/** `short` 머리 레이어 = 원본의 H/h 칸만 — 대머리 + short = 원본(픽셀 동일) */
+function extractHair(frame: Matrix): string[] {
+  return frame.slice(0, 12).map((row) => row.replace(/[^Hh]/g, "."));
+}
+
+const BALD_STAND = bald(M.AVATAR_STAND);
+const BALD_BACK = bald(M.AVATAR_BACK);
+const BALD_SLUMP = bald(M.AVATAR_SEAT_SLUMP, 12);
+const BALD_WALK_A = bald(M.WALK_A);
+const BALD_WALK_B = bald(M.WALK_B);
+
+interface Layers {
+  front: Matrix;
+  back: Matrix;
+}
+
+const HAIR: Record<HairStyle, Layers> = {
+  short: { front: extractHair(M.AVATAR_STAND), back: extractHair(M.AVATAR_BACK) },
+  bob: { front: P.HAIR_BOB_FRONT, back: P.HAIR_BOB_BACK },
+  long: { front: P.HAIR_LONG_FRONT, back: P.HAIR_LONG_BACK },
+  bangs: { front: P.HAIR_BANGS_FRONT, back: P.HAIR_BANGS_BACK },
+  curly: { front: P.HAIR_CURLY_FRONT, back: P.HAIR_CURLY_BACK },
+  ponytail: { front: P.HAIR_PONYTAIL_FRONT, back: P.HAIR_PONYTAIL_BACK },
+  buzz: { front: P.HAIR_BUZZ_FRONT, back: P.HAIR_BUZZ_BACK },
+};
+
+const EXTRA: Record<ExtraAccessory, Layers> = {
+  none: { front: [], back: [] },
+  glasses: { front: P.EXTRA_GLASSES_FRONT, back: P.EXTRA_GLASSES_BACK },
+  scarf: { front: P.EXTRA_SCARF_FRONT, back: P.EXTRA_SCARF_BACK },
+  bowtie: { front: P.EXTRA_BOWTIE_FRONT, back: P.EXTRA_BOWTIE_BACK },
+  cap: { front: P.EXTRA_CAP_FRONT, back: P.EXTRA_CAP_BACK },
+  flower: { front: P.EXTRA_FLOWER_FRONT, back: P.EXTRA_FLOWER_BACK },
+  blush: { front: P.EXTRA_BLUSH_FRONT, back: P.EXTRA_BLUSH_BACK },
+};
+
+/** 추가 액세서리가 롤 표식 자리와 겹치면 그 롤에서 쓸 수 없다(§2.5 가용성 규칙) */
+export function extraAllowed(role: AgentRole, accessory: ExtraAccessory): boolean {
+  const taken = P.ROLE_SLOTS[drawnRole(role)];
+  return !P.EXTRA_SLOTS[accessory].some((slot) => taken.includes(slot));
+}
+
+/** 모양만 — 색은 CSS 변수라 합성·memo 키에 들어가지 않는다 */
+export type AvatarShape = Pick<AvatarLook, "hairStyle" | "accessory">;
+
+const DEFAULT_SHAPE: AvatarShape = { hairStyle: "short", accessory: "none" };
+
+/** 실제로 그릴 모양 — 롤에서 못 쓰는 액세서리는 그리지 않는다(저장값은 건드리지 않음, §5.2-5) */
+function drawnShape(role: AgentRole, shape: AvatarShape | undefined): AvatarShape {
+  if (!shape) return DEFAULT_SHAPE;
+  const hairStyle = shape.hairStyle in HAIR ? shape.hairStyle : "short";
+  const known = shape.accessory in EXTRA ? shape.accessory : "none";
+  const accessory = known !== "none" && extraAllowed(role, known) ? known : "none";
+  return { hairStyle, accessory };
+}
+
+/** 합성 순서(§3.3): 대머리 기본 → 머리 → 추가 액세서리 → 롤 액세서리(항상 맨 위). 모든 레이어에 같은 dy */
+function compose(base: Matrix, view: keyof Layers, dy: number, role: AgentRole, shape: AvatarShape): string[] {
+  let m = overlay(base, HAIR[shape.hairStyle][view], dy);
+  if (shape.accessory !== "none") {
+    m = overlay(m, EXTRA[shape.accessory][view], dy, P.EXTRA_SKIN_ONLY.has(shape.accessory));
+  }
+  return overlay(m, view === "front" ? ACC[role] : backAccessory(role), dy);
+}
+
+export function avatarMatrix(role: AgentRole, frame: AvatarFrame, shape?: AvatarShape): string[] {
   const drawn = drawnRole(role);
-  const acc = ACC[drawn];
-  const accBack = backAccessory(drawn);
+  const s = drawnShape(drawn, shape);
   switch (frame) {
     case "standA":
-      return overlay(M.AVATAR_STAND, acc, 0);
+      return compose(BALD_STAND, "front", 0, drawn, s);
     case "standB":
-      return overlay(breathe(M.AVATAR_STAND), acc, 1);
+      return compose(breathe(BALD_STAND), "front", 1, drawn, s);
     case "seat":
-      return overlay(M.AVATAR_STAND.slice(0, 16), acc, 0);
+      return compose(BALD_STAND.slice(0, 16), "front", 0, drawn, s);
     case "slump":
-      return overlay(M.AVATAR_SEAT_SLUMP, acc, 1);
+      return compose(BALD_SLUMP, "front", 1, drawn, s);
     case "seatFar":
-      return overlay(M.AVATAR_STAND.slice(0, 14), acc, 0);
+      return compose(BALD_STAND.slice(0, 14), "front", 0, drawn, s);
     case "seatBack":
-      return overlay(M.AVATAR_BACK.slice(0, 16), accBack, 0);
+      return compose(BALD_BACK.slice(0, 16), "back", 0, drawn, s);
     case "back":
-      return overlay(M.AVATAR_BACK, accBack, 0);
+      return compose(BALD_BACK, "back", 0, drawn, s);
     case "walkA":
-      return overlay(M.WALK_A, acc, 0);
+      return compose(BALD_WALK_A, "front", 0, drawn, s);
     case "walkB":
-      return overlay(M.WALK_B, acc, 0);
+      return compose(BALD_WALK_B, "front", 0, drawn, s);
     case "walkBackA":
-      return overlay(withLegs(M.AVATAR_BACK, M.WALK_A), accBack, 0);
+      return compose(withLegs(BALD_BACK, M.WALK_A), "back", 0, drawn, s);
     case "walkBackB":
-      return overlay(withLegs(M.AVATAR_BACK, M.WALK_B), accBack, 0);
+      return compose(withLegs(BALD_BACK, M.WALK_B), "back", 0, drawn, s);
   }
 }
 
@@ -242,9 +330,19 @@ function cached(key: string, build: () => PixelPath[]): PixelPath[] {
   return hit;
 }
 
-export function avatarPaths(role: AgentRole, frame: AvatarFrame): PixelPath[] {
+/** memo 키 `av:{role}:{hairStyle}:{accessory}:{frame}` — 방에 있는 직원 × 쓰이는 프레임만 lazy로 만든다(§3.3) */
+export function avatarPaths(role: AgentRole, frame: AvatarFrame, shape?: AvatarShape): PixelPath[] {
   const drawn = drawnRole(role);
-  return cached(`av:${drawn}:${frame}`, () => matrixToPaths(avatarMatrix(drawn, frame), "char"));
+  const s = drawnShape(drawn, shape);
+  return cached(`av:${drawn}:${s.hairStyle}:${s.accessory}:${frame}`, () =>
+    matrixToPaths(avatarMatrix(drawn, frame, s), "char"),
+  );
+}
+
+/** 머리 모양 스와치 썸네일(AGP-62 §6.4) — 앉음 0~12행에 머리 레이어만, 롤 액세서리 없이(16×13) */
+export function hairThumbPaths(hairStyle: HairStyle): PixelPath[] {
+  const style = hairStyle in HAIR ? hairStyle : "short";
+  return cached(`hair-thumb:${style}`, () => matrixToPaths(overlay(BALD_STAND.slice(0, 13), HAIR[style].front), "char"));
 }
 
 /** 이름 붙은 스프라이트(가구·오버레이)의 원점 기준 path — memo */
@@ -397,22 +495,52 @@ export function fnv1a32(text: string): number {
 
 const SKINS = ["a", "b", "c"] as const;
 
-/** 아바타 `<g>`에 꽂는 8개 슬롯 변수(색 hex가 아니라 --office-* 참조) */
-export function avatarVars(slug: string, role: AgentRole): Record<string, string> {
+/**
+ * 설정 없는 직원의 외형 — 피부·머리색은 기존 slug 해시 공식 그대로(3톤·4색). 팔레트가 늘어도 공식을 넓히지 않는다
+ * (넓히면 기존 직원 전원의 얼굴이 하루아침에 바뀐다, §5.1).
+ */
+export function defaultLook(slug: string): AvatarLook {
   const h = fnv1a32(slug);
-  const skin = SKINS[h % 3];
-  const hair = (h >>> 2) % 4;
-  const r = drawnRole(role).toLowerCase();
   return {
-    "--av-skin": `var(--office-skin-${skin})`,
-    "--av-skin2": `var(--office-skin-${skin}2)`,
-    "--av-hair": `var(--office-hair-${hair})`,
-    "--av-hair2": `var(--office-hair-${hair}2)`,
-    "--av-shirt": `var(--office-role-${r})`,
-    "--av-shirt2": `var(--office-role-${r}2)`,
+    skinTone: SKINS[h % 3],
+    hairStyle: "short",
+    hairColor: String((h >>> 2) % 4) as HairColor,
+    shirtColor: null,
+    accessory: "none",
+    showEmoji: false,
+  };
+}
+
+const ROLE_SHIRTS: ReadonlySet<string> = new Set(["planner", "designer", "frontend", "backend", "ops", "reviewer", "manager"]);
+
+/** 셔츠 슬롯 변수 — 롤 기본이면 롤 색, 롤 색 키면 `--office-role-{키}`, 그 외 `--office-shirt-{키}`(§3.4) */
+function shirtVar(role: string, shirt: ShirtColor | null): string {
+  if (!shirt) return `--office-role-${role}`;
+  return ROLE_SHIRTS.has(shirt) ? `--office-role-${shirt}` : `--office-shirt-${shirt}`;
+}
+
+/** 아바타 `<g>`에 꽂는 슬롯 변수(색 hex가 아니라 --office-* 참조) — 8슬롯 + 추가 액세서리 2슬롯(§3.4) */
+export function avatarVars(slug: string, role: AgentRole, look?: AvatarLook): Record<string, string> {
+  const l = look ?? defaultLook(slug);
+  const drawn = drawnRole(role);
+  const r = drawn.toLowerCase();
+  const shirt = shirtVar(r, l.shirtColor);
+  const vars: Record<string, string> = {
+    "--av-skin": `var(--office-skin-${l.skinTone})`,
+    "--av-skin2": `var(--office-skin-${l.skinTone}2)`,
+    "--av-hair": `var(--office-hair-${l.hairColor})`,
+    "--av-hair2": `var(--office-hair-${l.hairColor}2)`,
+    "--av-shirt": `var(${shirt})`,
+    "--av-shirt2": `var(${shirt}2)`,
     "--av-acc": `var(--office-acc-${r})`,
     "--av-acc2": `var(--office-acc-${r}2)`,
   };
+  const accessory = drawnShape(drawn, l).accessory;
+  if (accessory !== "none") {
+    vars["--av-extra"] = `var(--office-extra-${accessory})`;
+    vars["--av-extra2"] = `var(--office-extra-${accessory}2)`;
+  }
+  return vars;
 }
 
 // ── P3g 사람 아바타·대화 장면(AGP-65) ─────────────────────────────
@@ -449,18 +577,27 @@ export function userVars(userId: string | null): Record<string, string> {
 /** 봇 표정(§4.6) — 평소·생각 중·기쁨·곤란 + 깜빡임 */
 export type FaceExpression = "NORMAL" | "THINKING" | "HAPPY" | "TROUBLED" | "BLINK";
 
-const FACES: Record<FaceExpression, Matrix> = {
-  NORMAL: M.FACE_NORMAL,
-  THINKING: M.FACE_THINKING,
-  HAPPY: M.FACE_HAPPY,
-  TROUBLED: M.FACE_TROUBLED,
-  BLINK: M.FACE_BLINK,
+const BALD_FACES: Record<FaceExpression, string[]> = {
+  NORMAL: bald(M.FACE_NORMAL),
+  THINKING: bald(M.FACE_THINKING),
+  HAPPY: bald(M.FACE_HAPPY),
+  TROUBLED: bald(M.FACE_TROUBLED),
+  BLINK: bald(M.FACE_BLINK),
 };
 
-/** 앉음 기본 → 표정 패치 → 롤 액세서리(리뷰 안경은 눈 위에 덮이고 입·효과로 구분된다) */
-export function facePaths(role: AgentRole, expression: FaceExpression): PixelPath[] {
+/** 표정 프레임 — 앉음 기본 + 표정 패치를 서기·앉음과 같은 합성 규칙으로. 리뷰 안경은 눈 위에 덮이고 입·효과로 구분된다 */
+export function faceMatrix(role: AgentRole, expression: FaceExpression, shape?: AvatarShape): string[] {
   const drawn = drawnRole(role);
-  return cached(`face:${drawn}:${expression}`, () => matrixToPaths(overlay(FACES[expression], ACC[drawn], 0), "char"));
+  return compose(BALD_FACES[expression], "front", 0, drawn, drawnShape(drawn, shape));
+}
+
+/** 대화 장면(P3g §4.2)·편집 미리보기가 확대해 그린다 — memo 키 `face:{role}:{hairStyle}:{accessory}:{expression}` */
+export function facePaths(role: AgentRole, expression: FaceExpression, shape?: AvatarShape): PixelPath[] {
+  const drawn = drawnRole(role);
+  const s = drawnShape(drawn, shape);
+  return cached(`face:${drawn}:${s.hairStyle}:${s.accessory}:${expression}`, () =>
+    matrixToPaths(faceMatrix(drawn, expression, s), "char"),
+  );
 }
 
 /** 대화 장면 격자(§4.2) — 156×70 장면 px */

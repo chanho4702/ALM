@@ -114,18 +114,24 @@ describe("피부·머리 배정", () => {
   });
 });
 
-describe("도트 시안 없는 롤 — MANAGER(D-P3c-5)", () => {
-  it("기획 아바타를 빌려 그리고, 팔레트도 기획 변수로 — 빈 매트릭스·정의 안 된 CSS 변수가 없다", () => {
-    expect(drawnRole("MANAGER")).toBe("PLANNER");
+describe("MANAGER 전용 도트(AGP-62 §4 — D-P3c-5 대체)", () => {
+  it("기획 아바타를 빌리지 않는다 — 클립보드 액세서리·보라 셔츠·전용 액세서리 팔레트", () => {
+    expect(drawnRole("MANAGER")).toBe("MANAGER");
     expect(drawnRole("OPS")).toBe("OPS");
-    expect(avatarMatrix("MANAGER", "standA")).toEqual(avatarMatrix("PLANNER", "standA"));
-    expect(avatarPaths("MANAGER", "seat")).toBe(avatarPaths("PLANNER", "seat"));
+    expect(avatarMatrix("MANAGER", "standA")).not.toEqual(avatarMatrix("PLANNER", "standA"));
+    // 클립보드 = 왼쪽 어깨(0~4열, 10~15행)의 종이 A·글줄 a
+    expect(avatarMatrix("MANAGER", "standA")[11].slice(0, 5)).toBe("KAAAK");
+    expect(avatarMatrix("MANAGER", "standA")[12].slice(0, 5)).toBe("KAaaK");
     const v = avatarVars("manager-bot", "MANAGER");
-    expect(v["--av-shirt"]).toBe("var(--office-role-planner)");
-    expect(v["--av-acc2"]).toBe("var(--office-acc-planner2)");
+    expect(v["--av-shirt"]).toBe("var(--office-role-manager)");
+    expect(v["--av-acc2"]).toBe("var(--office-acc-manager2)");
   });
 
-  it("타입 밖 값이 새어 들어와도(서버 신규 롤) 모든 프레임이 그려진다", () => {
+  it("뒷모습은 보드 뒷면이 오른쪽 가장자리(12~15열)로 비친다", () => {
+    expect(avatarMatrix("MANAGER", "back")[12].slice(12)).toBe("KaaK");
+  });
+
+  it("타입 밖 값이 새어 들어와도(서버 신규 롤) 모든 프레임이 그려진다 — 기획으로 접는 방어 폴백만 남는다", () => {
     const odd = "JANITOR" as AgentRole;
     for (const frame of ["standA", "standB", "seat", "slump"] as const) {
       expect(avatarPaths(odd, frame).length).toBeGreaterThan(0);

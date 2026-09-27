@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { AgentRole } from "../store/types";
 import { avatarPaths, avatarVars, spritePaths, type PixelPath } from "./pixel";
+import { parseAvatarConfig } from "./avatarConfig";
 
 /** 원점 기준 path 목록을 정수 좌표로 옮겨 그린다 */
 export function PixelSprite({
@@ -26,12 +27,24 @@ export function PixelSprite({
 /**
  * 패널·팀 카드의 정지 초상 — 앉은 프레임(머리·어깨 16×16)을 SVG viewBox로 키운다.
  * 크기는 CSS(`.office-portrait`)가 정한다 — transform: scale()을 쓰지 않는다(스펙 §2.1).
+ * avatarConfig = 서버 원문(AGP-62) — 내부에서 parse(원문 단위 memo), 없으면 기본 외형.
  */
-export function OfficePortrait({ slug, role, className }: { slug: string; role: AgentRole; className?: string }) {
+export function OfficePortrait({
+  slug,
+  role,
+  avatarConfig,
+  className,
+}: {
+  slug: string;
+  role: AgentRole;
+  avatarConfig?: string | null;
+  className?: string;
+}) {
+  const look = parseAvatarConfig(avatarConfig ?? null, slug);
   return (
     <span className={className ? `office-portrait ${className}` : "office-portrait"} aria-hidden="true">
-      <svg viewBox="0 0 16 16" shapeRendering="crispEdges" focusable="false" style={avatarVars(slug, role) as CSSProperties}>
-        <PixelSprite paths={avatarPaths(role, "seat")} />
+      <svg viewBox="0 0 16 16" shapeRendering="crispEdges" focusable="false" style={avatarVars(slug, role, look) as CSSProperties}>
+        <PixelSprite paths={avatarPaths(role, "seat", look)} />
       </svg>
     </span>
   );

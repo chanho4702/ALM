@@ -273,7 +273,7 @@ function PersonaHead({
   const state = personaState(persona);
   return (
     <header className="office-panel-head">
-      <OfficePortrait slug={persona.slug} role={persona.role} className="is-panel" />
+      <OfficePortrait slug={persona.slug} role={persona.role} avatarConfig={persona.avatarConfig} className="is-panel" />
       <div className="office-panel-id">
         <h2 id="ai-office-panel-title" className="office-panel-title" tabIndex={-1} ref={titleRef}>
           {persona.emoji ? <span aria-hidden="true">{persona.emoji} </span> : null}
@@ -920,7 +920,7 @@ function MeetingBody({
                     className="office-attendee"
                     onClick={(e) => onOpenPersona(p.id, e.currentTarget)}
                   >
-                    <OfficePortrait slug={p.slug} role={p.role} className="is-row" />
+                    <OfficePortrait slug={p.slug} role={p.role} avatarConfig={p.avatarConfig} className="is-row" />
                     <span className="office-attendee-name">{p.name}</span>
                     <AgentRoleGlyph role={p.role} size={12} />
                     {id === meeting.hostPersonaId ? <Badge appearance="brand">진행자</Badge> : null}

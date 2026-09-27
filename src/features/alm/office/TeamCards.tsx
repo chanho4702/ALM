@@ -68,7 +68,7 @@ export function TeamCards({
             style={{ "--card-role": `var(--office-role-${drawnRole(persona.role).toLowerCase()})` } as CSSProperties}
           >
             <div className="ai-team-card-top">
-              <OfficePortrait slug={persona.slug} role={persona.role} className="is-card" />
+              <OfficePortrait slug={persona.slug} role={persona.role} avatarConfig={persona.avatarConfig} className="is-card" />
               <div className="ai-team-card-id">
                 <h3 id={nameId} className="ai-team-card-name">
                   {persona.emoji ? <span aria-hidden="true">{persona.emoji} </span> : null}

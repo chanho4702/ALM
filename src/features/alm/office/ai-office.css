@@ -111,6 +111,46 @@
   --office-role-reviewer2: #a33434;
   --office-acc-reviewer: #2b2233;
   --office-acc-reviewer2: #2b2233;
+  /* AGP-62 피부 */
+  --office-skin-d: #f8dccb;
+  --office-skin-d2: #e2b7a1;
+  --office-skin-e: #ddb47e;
+  --office-skin-e2: #bb915d;
+  --office-skin-f: #a96f48;
+  --office-skin-f2: #875434;
+  /* AGP-62 머리색 */
+  --office-hair-4: #a5482b;
+  --office-hair-42: #7e321c;
+  --office-hair-5: #b9b6c4;
+  --office-hair-52: #8f8c9e;
+  --office-hair-6: #e394b4;
+  --office-hair-62: #c06e90;
+  --office-hair-7: #3e9c95;
+  --office-hair-72: #2a756f;
+  /* AGP-62 MANAGER 롤 + 자유 셔츠 */
+  --office-role-manager: #8a5cc2;
+  --office-role-manager2: #66409a;
+  --office-acc-manager: #fff8e7;
+  --office-acc-manager2: #8a6a4a;
+  --office-shirt-ivory: #ede6d6;
+  --office-shirt-ivory2: #c7bda8;
+  --office-shirt-charcoal: #646a7a;
+  --office-shirt-charcoal2: #4a4f5c;
+  --office-shirt-sky: #7db8e8;
+  --office-shirt-sky2: #5a94c6;
+  /* AGP-62 추가 액세서리 (E / e) */
+  --office-extra-glasses: #cfeaf5;
+  --office-extra-glasses2: #d0453a;
+  --office-extra-scarf: #e0553f;
+  --office-extra-scarf2: #b03a28;
+  --office-extra-bowtie: #ffd84a;
+  --office-extra-bowtie2: #d9a21e;
+  --office-extra-cap: #6fb7e0;
+  --office-extra-cap2: #3f86b5;
+  --office-extra-flower: #f07c8c;
+  --office-extra-flower2: #ffd84a;
+  --office-extra-blush: #f2a0a0;
+  --office-extra-blush2: #e08a8a;
   /* 사람 아바타(P3g §10) — 테마 무관 */
   --office-user-top: #6e7489;
   --office-user-top2: #535870;
@@ -333,6 +373,8 @@
 .px-char-p { fill: var(--office-pants2); }
 .px-char-A { fill: var(--av-acc); }
 .px-char-a { fill: var(--av-acc2); }
+.px-char-E { fill: var(--av-extra); }
+.px-char-e { fill: var(--av-extra2); }
 .px-char-G { fill: var(--office-glass); }
 /* 가구(책상·모니터·의자·소파) */
 .px-furn-K { fill: var(--office-ol); }
@@ -534,6 +576,11 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   pointer-events: none;
+}
+
+/* 명판 이모지(AGP-62 §2.6) — 이름 뒤, 직원별로 켠다 */
+.office-nameplate-emoji {
+  margin-inline-start: var(--chanho-space-50);
 }
 
 .office-nameplate.is-hover {

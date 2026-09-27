@@ -39,6 +39,7 @@ import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { StatusGlyph } from "../components/StatusGlyph";
 import { statusKind, statusName } from "../components/labels";
 import { PixelSprite } from "./PixelSprite";
+import { personaLook } from "./avatarConfig";
 import { PixelChoiceMenu, type ChoiceItem, type PixelChoiceMenuHandle } from "./PixelChoiceMenu";
 import { paginate, useTypewriter } from "./TypewriterText";
 import { DialogLogRow, metToday } from "./DialogLogRows";
@@ -766,6 +767,7 @@ function Conversation({
     return () => clearTimeout(t);
   }, [expression, reduced]);
   const face: FaceExpression = expression === "NORMAL" && blink ? "BLINK" : expression;
+  const look = personaLook(persona);
   const running = persona.currentRun?.status === "RUNNING";
   const speakerName = line?.speaker === "user" ? "나" : name;
   const boxY = chatMode ? 42 : 50;
@@ -815,9 +817,9 @@ function Conversation({
           key={expression === "HAPPY" ? `hop-${line?.id}` : "bot"}
           className={expression === "HAPPY" ? "office-scene-bot is-happy" : "office-scene-bot"}
           data-expression={face}
-          style={vars(avatarVars(persona.slug, persona.role))}
+          style={vars(avatarVars(persona.slug, persona.role, look))}
         >
-          <PixelSprite paths={facePaths(persona.role, face)} x={64} y={22} />
+          <PixelSprite paths={facePaths(persona.role, face, look)} x={64} y={22} />
         </g>
         <PixelSprite paths={spritePaths("TABLE_SMALL", "furn2")} x={44} y={38} />
         {running ? (

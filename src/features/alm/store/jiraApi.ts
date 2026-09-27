@@ -40,6 +40,8 @@ import type {
   AgentPersona,
   AgentOffice,
   AgentPersonaActivity,
+  AgentPersonaDetail,
+  AgentPersonaPatch,
   AgentRunStatus,
   AgentRunSummary,
   AgentGate,
@@ -129,6 +131,7 @@ import {
   mapAgentOffice,
   mapAgentPersona,
   mapAgentPersonaActivity,
+  mapAgentPersonaDetail,
   mapAgentPermissions,
   mapAgentProjectCredential,
   mapAgentRunSummary,
@@ -142,6 +145,7 @@ import {
   type AgentOfficeDto,
   type AgentPermissionsDto,
   type AgentPersonaActivityDto,
+  type AgentPersonaDetailDto,
   type AgentPersonaDto,
   type AgentProjectCredentialDto,
   type AgentRunSummaryDto,
@@ -1159,6 +1163,29 @@ export async function setAgentPersonaActive(personaId: string, active: boolean):
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active }),
+      }),
+    ),
+  );
+}
+
+/** 편집 다이얼로그 프리필(AGP-62) — 관리자 전용(canManagePersona), 아니면 403 ApiError */
+export async function fetchAgentPersonaDetail(personaId: string): Promise<AgentPersonaDetail> {
+  return mapAgentPersonaDetail(
+    await json<AgentPersonaDetailDto>(await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}`)),
+  );
+}
+
+/**
+ * 직원 편집(AGP-62) — 바뀐 필드만 보낸다(생략 = 그대로, 빈 문자열 = 지움). 400/403은 서버 문구를 실은 ApiError.
+ * avatarConfig는 JSON 문자열로 보낸다(서버가 공백 없는 JSON으로 정규화).
+ */
+export async function updateAgentPersona(personaId: string, patch: AgentPersonaPatch): Promise<AgentPersonaDetail> {
+  return mapAgentPersonaDetail(
+    await json<AgentPersonaDetailDto>(
+      await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
       }),
     ),
   );

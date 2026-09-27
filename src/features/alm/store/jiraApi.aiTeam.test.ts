@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
-import { mapAgentPermissions, mapAgentProjectCredential, mapAgentTeamPersona, mapAgentToken } from "./agentMapping";
+import {
+  mapAgentPermissions,
+  mapAgentPersonaDetail,
+  mapAgentProjectCredential,
+  mapAgentTeamPersona,
+  mapAgentToken,
+} from "./agentMapping";
 import {
   createAgentPersona,
   deleteProjectCredential,
   fetchAgentPermissions,
+  fetchAgentPersonaDetail,
   fetchProjectCredential,
   issueAgentToken,
   listAgentTeamPersonas,
@@ -12,7 +19,9 @@ import {
   revokeAgentToken,
   saveProjectCredential,
   setAgentPersonaActive,
+  updateAgentPersona,
 } from "./jiraApi";
+import { ApiError } from "./mapping";
 
 function response(status: number, body?: unknown): Response {
   return new Response(body === undefined ? null : JSON.stringify(body), {
@@ -46,7 +55,16 @@ describe("AI 팀 경계 매퍼(P3f·P3h)", () => {
   it("페르소나 — long id·projectId는 문자열, projectId 없음(구 백엔드)·null은 공용, 모르는 롤은 접는다", () => {
     expect(
       mapAgentTeamPersona({ id: 7, slug: "qa-bot", role: "MANAGER", name: "QA봇", emoji: "", active: true, projectId: 3 }),
-    ).toEqual({ id: "7", slug: "qa-bot", role: "MANAGER", name: "QA봇", emoji: null, active: true, projectId: "3" });
+    ).toEqual({
+      id: "7",
+      slug: "qa-bot",
+      role: "MANAGER",
+      name: "QA봇",
+      emoji: null,
+      active: true,
+      projectId: "3",
+      avatarConfig: null,
+    });
     expect(mapAgentTeamPersona({ id: 8, slug: "ops-bot", role: "OPS", name: "운영봇", active: false }).projectId).toBeNull();
     expect(mapAgentTeamPersona({ id: 9, slug: "x", role: "WIZARD", name: "X", active: true, projectId: null }).role).toBe(
       "FRONTEND",
@@ -183,5 +201,62 @@ describe("AI 팀 REST 어댑터", () => {
     );
     await expect(deleteProjectCredential("3")).resolves.toBeUndefined();
     expect((spy.mock.calls[3][1] as RequestInit).method).toBe("DELETE");
+  });
+});
+
+describe("직원 편집(AGP-62) — 경계 매퍼·REST", () => {
+  const base = { id: 7, slug: "qa-bot", role: "PLANNER", name: "QA봇", active: true, projectId: 3 };
+
+  it("avatarConfig 방어 — 문자열은 그대로, 객체로 오면 문자열로 되돌리고, 빈 값·숫자·배열·없음은 null(= 기본 외형)", () => {
+    expect(mapAgentTeamPersona({ ...base, avatarConfig: '{"v":1,"hairStyle":"bob"}' }).avatarConfig).toBe('{"v":1,"hairStyle":"bob"}');
+    expect(mapAgentTeamPersona({ ...base, avatarConfig: { v: 1, accessory: "cap" } }).avatarConfig).toBe('{"v":1,"accessory":"cap"}');
+    for (const bad of ["", "  ", 42, [1], null, undefined]) {
+      expect(mapAgentTeamPersona({ ...base, avatarConfig: bad }).avatarConfig).toBeNull();
+    }
+  });
+
+  it("상세 — 편집 필드는 문자열만, 빈 defaultModel은 null", () => {
+    expect(mapAgentPersonaDetail({ ...base, avatarConfig: null, voicePrompt: "짧게", defaultModel: "", skills: "# QA" })).toEqual({
+      id: "7",
+      slug: "qa-bot",
+      role: "PLANNER",
+      name: "QA봇",
+      emoji: null,
+      active: true,
+      projectId: "3",
+      avatarConfig: null,
+      voicePrompt: "짧게",
+      defaultModel: null,
+      skills: "# QA",
+    });
+    expect(mapAgentPersonaDetail(base)).toMatchObject({ voicePrompt: null, defaultModel: null, skills: null, avatarConfig: null });
+  });
+
+  it("상세 조회는 GET /api/agent/personas/{id}, 403은 상태를 싣는 ApiError", async () => {
+    const spy = fetchSpy(
+      response(200, { ...base, avatarConfig: '{"v":1}', voicePrompt: null, defaultModel: "claude-sonnet-5", skills: null }),
+      response(403, { error: "접근 권한이 없습니다" }),
+    );
+    await expect(fetchAgentPersonaDetail("7")).resolves.toMatchObject({ id: "7", defaultModel: "claude-sonnet-5", avatarConfig: '{"v":1}' });
+    expect(spy.mock.calls[0][0]).toBe("/api/agent/personas/7");
+    const error = await fetchAgentPersonaDetail("7").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(403);
+    expect((error as ApiError).message).toBe("접근 권한이 없습니다");
+  });
+
+  it("편집은 PATCH /api/agent/personas/{id} — 준 필드만 본문에(avatarConfig는 JSON 문자열), 400 문구를 올린다", async () => {
+    const spy = fetchSpy(
+      response(200, { ...base, name: "QA왕", avatarConfig: '{"v":1,"hairStyle":"bob"}' }),
+      response(400, { error: "name은 비울 수 없습니다" }),
+    );
+    await expect(updateAgentPersona("7", { name: "QA왕", avatarConfig: '{"v":1,"hairStyle":"bob"}' })).resolves.toMatchObject({
+      name: "QA왕",
+      avatarConfig: '{"v":1,"hairStyle":"bob"}',
+    });
+    expect(spy.mock.calls[0][0]).toBe("/api/agent/personas/7");
+    expect((spy.mock.calls[0][1] as RequestInit).method).toBe("PATCH");
+    expect(sentBody(spy)).toEqual({ name: "QA왕", avatarConfig: '{"v":1,"hairStyle":"bob"}' });
+    await expect(updateAgentPersona("7", { name: "" })).rejects.toThrow("name은 비울 수 없습니다");
   });
 });
