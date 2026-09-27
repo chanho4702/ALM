@@ -674,6 +674,94 @@ export interface AgentPersona {
   emoji?: string | null;
 }
 
+// ── AI 팀 설정(agent-service P3f·P3h) — 프로젝트 설정 "AI 팀" 화면 ──
+
+/**
+ * `GET /api/agent/permissions?projectId=` — 버튼 노출 판정 힌트(D-P3f-6). 실제 판정은 각 관리 API가 다시 한다.
+ * canManage = 전역 관리자 OR 그 프로젝트 ADMIN. org 판정 실패는 서버가 canManage=false로 접는다.
+ */
+export interface AgentPermissions {
+  canManage: boolean;
+  isGlobalAdmin: boolean;
+}
+
+/** org-service ResourceKind 중 프로젝트 관리자가 줄 수 있는 둘 — GLOBAL은 전역 관리자 전용이라 이 화면에 없다 */
+export type AgentGrantResourceType = "PROJECT" | "SPACE";
+/** org-service GrantRole — ADMIN ⊃ EDITOR ⊃ COMMENTER ⊃ VIEWER */
+export type AgentGrantRole = "VIEWER" | "COMMENTER" | "EDITOR" | "ADMIN";
+
+export interface AgentGrantInput {
+  resourceType: AgentGrantResourceType;
+  resourceId: string;
+  role: AgentGrantRole;
+}
+
+/** `GET /api/agent/personas` 항목 전체(PersonaResponse) — projectId null이면 전사 공용(전역 관리자만 관리) */
+export interface AgentTeamPersona {
+  id: string;
+  slug: string;
+  name: string;
+  emoji: string | null;
+  role: AgentRole;
+  active: boolean;
+  projectId: string | null;
+}
+
+/** `POST /api/agent/personas` — 프로젝트 관리자는 projectId=현재 프로젝트가 필수 */
+export interface AgentPersonaInput {
+  slug: string;
+  role: AgentRole;
+  name: string;
+  emoji?: string;
+  voicePrompt?: string;
+  projectId: string;
+  grants: AgentGrantInput[];
+}
+
+/** `GET /api/agent/tokens?projectId=` 항목(PatSummaryResponse) — 해시·원문은 없다 */
+export interface AgentToken {
+  id: string;
+  label: string;
+  personaSlug: string;
+  createdAt: string | null;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  revoked: boolean;
+}
+
+/** `POST /api/agent/tokens` 201 — 원문 token은 이 응답에만 온다 */
+export interface AgentTokenIssued {
+  token: string;
+  id: string;
+  label: string;
+  personaSlug: string;
+}
+
+/** 실제로 적용될 키의 출처(D-P3h-3) — 프로젝트 > 전역 > 서버 env > 없음 */
+export type AgentCredentialScope = "PROJECT" | "PLATFORM" | "ENV" | "NONE";
+
+/** `GET/PUT /api/agent/credentials/projects/{projectId}` — 원문 키는 어떤 응답에도 없다 */
+export interface AgentProjectCredential {
+  project: {
+    set: boolean;
+    provider: "ANTHROPIC" | null;
+    /** 키 끝 4자 */
+    keyHint: string | null;
+    updatedBy: string | null;
+    updatedAt: string | null;
+  };
+  effective: {
+    scope: AgentCredentialScope;
+    keyHint: string | null;
+  };
+}
+
+export interface AgentCredentialInput {
+  apiKey: string;
+  /** 저장 전에 저비용 호출로 키를 검증한다(실패 400) */
+  validate: boolean;
+}
+
 export type OrgMemberStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
 
 // ── AI 사무실(agent-service P3a) — `GET /api/agent/office`, `GET /api/agent/personas/{id}/activity` ──

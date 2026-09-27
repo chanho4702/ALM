@@ -7,6 +7,7 @@ import type {
   AgentActiveRunStatus,
   AgentAuditEntry,
   AgentBoardPost,
+  AgentCredentialScope,
   AgentCurrentRun,
   AgentGate,
   AgentGateKind,
@@ -16,13 +17,18 @@ import type {
   AgentOffice,
   AgentOfficePersona,
   AgentPendingGate,
+  AgentPermissions,
   AgentPersona,
   AgentPersonaActivity,
+  AgentProjectCredential,
   AgentRole,
   AgentRunStatus,
   AgentRunSummary,
   AgentRunTrigger,
   AgentRunType,
+  AgentTeamPersona,
+  AgentToken,
+  AgentTokenIssued,
 } from "./types";
 
 type Id = number | string;
@@ -365,4 +371,110 @@ export function mapAgentGate(dto: AgentGateDto): AgentGate {
 
 export function mapAgentPersona(dto: AgentPersonaDto): AgentPersona {
   return { id: String(dto.id), name: dto.name, emoji: dto.emoji || null };
+}
+
+// ── AI 팀 설정(P3f·P3h) ──
+
+export interface AgentPermissionsDto {
+  canManage?: boolean | null;
+  isGlobalAdmin?: boolean | null;
+}
+
+/** PersonaResponse 전체 — projectId는 P3f 이전 백엔드엔 없다(= 공용으로 본다) */
+export interface AgentTeamPersonaDto {
+  id: Id;
+  slug: string;
+  role: string;
+  name: string;
+  emoji?: string | null;
+  active: boolean;
+  projectId?: Id | null;
+}
+
+export interface AgentTokenDto {
+  id: Id;
+  label: string;
+  personaSlug: string;
+  createdAt?: string | null;
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  revoked?: boolean | null;
+}
+
+export interface AgentTokenIssuedDto {
+  token: string;
+  id: Id;
+  label: string;
+  personaSlug: string;
+}
+
+export interface AgentProjectCredentialDto {
+  project?: {
+    set?: boolean | null;
+    provider?: string | null;
+    keyHint?: string | null;
+    updatedBy?: Id | null;
+    updatedAt?: string | null;
+  } | null;
+  effective?: {
+    scope?: string | null;
+    keyHint?: string | null;
+  } | null;
+}
+
+const CREDENTIAL_SCOPES: readonly AgentCredentialScope[] = ["PROJECT", "PLATFORM", "ENV", "NONE"];
+
+const optId = (value: Id | null | undefined): string | null =>
+  value === null || value === undefined ? null : String(value);
+
+/** 판정 힌트라 모르는 값은 "못 한다"로 접는다 — 버튼이 잘못 열리는 쪽보다 닫히는 쪽이 안전하다 */
+export function mapAgentPermissions(dto: AgentPermissionsDto | null): AgentPermissions {
+  return { canManage: dto?.canManage === true, isGlobalAdmin: dto?.isGlobalAdmin === true };
+}
+
+export function mapAgentTeamPersona(dto: AgentTeamPersonaDto): AgentTeamPersona {
+  return {
+    id: String(dto.id),
+    slug: dto.slug,
+    name: dto.name,
+    emoji: dto.emoji || null,
+    role: pick(ROLES, dto.role, "FRONTEND"),
+    active: dto.active,
+    projectId: optId(dto.projectId),
+  };
+}
+
+export function mapAgentToken(dto: AgentTokenDto): AgentToken {
+  return {
+    id: String(dto.id),
+    label: dto.label,
+    personaSlug: dto.personaSlug,
+    createdAt: dto.createdAt ?? null,
+    expiresAt: dto.expiresAt ?? null,
+    lastUsedAt: dto.lastUsedAt ?? null,
+    revoked: dto.revoked === true,
+  };
+}
+
+export function mapAgentTokenIssued(dto: AgentTokenIssuedDto): AgentTokenIssued {
+  return { token: dto.token, id: String(dto.id), label: dto.label, personaSlug: dto.personaSlug };
+}
+
+/** 출처를 모르면 NONE — "키 없음"으로 보이는 쪽이 "키 있음"으로 잘못 안심시키는 쪽보다 낫다 */
+export function mapAgentProjectCredential(dto: AgentProjectCredentialDto | null): AgentProjectCredential {
+  const project = dto?.project ?? null;
+  const set = project?.set === true;
+  return {
+    project: {
+      set,
+      provider: set && project?.provider === "ANTHROPIC" ? "ANTHROPIC" : null,
+      keyHint: set ? (project?.keyHint ?? null) : null,
+      updatedBy: set ? optId(project?.updatedBy) : null,
+      updatedAt: set ? (project?.updatedAt ?? null) : null,
+    },
+    effective: {
+      scope: pick(CREDENTIAL_SCOPES, dto?.effective?.scope, "NONE"),
+      keyHint: dto?.effective?.keyHint ?? null,
+    },
+  };
 }

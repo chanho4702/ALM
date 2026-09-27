@@ -192,13 +192,10 @@ describe("회의실 패널 모드(P3e §2.8)", () => {
     expect(await screen.findByRole("dialog", { name: "회의 소집" })).toBeInTheDocument();
   });
 
-  it("전역 관리자가 아니면 회의실 패널에도 소집 버튼이 없다", async () => {
+  it("이 프로젝트를 관리할 수 없으면 회의실 패널에도 소집 버튼이 없다", async () => {
     const user = userEvent.setup();
     await mockOffice((base) => ({ ...base, activeMeeting: null }));
-    vi.spyOn(store, "getMyOrgProfile").mockResolvedValue({
-      id: "u2", displayName: "일반", email: null, status: "ACTIVE", kind: "HUMAN",
-      globalRoles: [], teams: [], joinedVia: "LEGACY",
-    });
+    store.__setAgentMockScenario({ canManage: false });
     renderApp(OFFICE_PATH);
     const room = await stage();
     await user.click(within(room).getByRole("button", { name: "회의실 — 진행 중인 회의 없음" }));

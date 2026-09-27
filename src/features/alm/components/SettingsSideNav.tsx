@@ -2,6 +2,7 @@ import { ArrowLeft, Settings } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import type { Project } from "../store/types";
 import { useOrgProfile } from "./OrgAccountGate";
+import { useAiTeamActive } from "./useAiTeamActive";
 import { ProjectAvatar } from "./ProjectAvatar";
 
 /**
@@ -20,6 +21,8 @@ export const PROJECT_SETTINGS_SECTIONS = [
   { id: "types", label: "이슈 타입" },
   { id: "fields", label: "필드" },
   { id: "import", label: "가져오기" },
+  // agent-service가 있는 플랫폼에서만 메뉴에 보인다(useAiTeamActive) — URL로 들어와도 화면이 빈 상태를 그린다
+  { id: "ai-team", label: "AI 팀" },
 ] as const;
 
 /**
@@ -81,13 +84,14 @@ export function SettingsSideNav({ projects }: SettingsSideNavProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { isGlobalAdmin } = useOrgProfile();
+  const aiTeamActive = useAiTeamActive();
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/settings(?:\/([^/?]+))?/);
   const project = projectMatch ? projects.find((p) => p.id === projectMatch[1]) : undefined;
   const globalMatch = pathname.match(/^\/settings(?:\/([^/?]+))?/);
 
   const items: ReadonlyArray<{ id: string; label: string; group?: string }> = project
-    ? PROJECT_SETTINGS_SECTIONS
+    ? PROJECT_SETTINGS_SECTIONS.filter((section) => aiTeamActive || section.id !== "ai-team")
     : GLOBAL_SETTINGS_SECTIONS.filter(
         (section) => isGlobalAdmin || !isAdminOnlyGlobalSection(section.id),
       );

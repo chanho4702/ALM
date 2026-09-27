@@ -94,6 +94,20 @@ export const fetchAgentGates = impl.fetchAgentGates;
 export const approveGate = impl.approveGate;
 export const rejectGate = impl.rejectGate;
 export const createMeeting = impl.createMeeting;
+/** AI 팀 설정(P3f·P3h) — 권한 힌트·직원·토큰·프로젝트 LLM 키 */
+export const fetchAgentPermissions = impl.fetchAgentPermissions;
+export const listAgentTeamPersonas = impl.listAgentTeamPersonas;
+export const createAgentPersona = impl.createAgentPersona;
+export const setAgentPersonaActive = impl.setAgentPersonaActive;
+export const listAgentTokens = impl.listAgentTokens;
+export const issueAgentToken = impl.issueAgentToken;
+export const revokeAgentToken = impl.revokeAgentToken;
+export const fetchProjectCredential = impl.fetchProjectCredential;
+export const saveProjectCredential = impl.saveProjectCredential;
+export const deleteProjectCredential = impl.deleteProjectCredential;
+/** 테스트 전용 — 목업의 권한·키 시나리오 전환(REST에는 없다) */
+export const __setAgentMockScenario = mock.__setAgentMockScenario;
+export type { AgentMockScenario } from "./jiraMock";
 export const listIssuesPage = impl.listIssuesPage;
 export const listWatchers = impl.listWatchers;
 export const watchIssue = impl.watchIssue;

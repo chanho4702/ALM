@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchAgentPersonas } from "../store/jiraStore";
+import { __resetAgentPermissionsForTest } from "./useAgentPermissions";
 
 // 세션당 한 번만 조회하고 결과를 캐시한다 — 폴링도, 마운트마다 재조회도 하지 않는다.
 // null = 아직 모름(로드 전), boolean = 확정된 판정.
@@ -66,8 +67,9 @@ export function useAiTeamStatus(): AiTeamStatus {
   return status;
 }
 
-/** 테스트 전용 — 모듈 캐시를 리셋해 각 테스트가 독립적으로 조회하게 한다 */
+/** 테스트 전용 — 모듈 캐시(활성 판정 + 프로젝트별 권한 힌트)를 리셋해 각 테스트가 독립적으로 조회하게 한다 */
 export function __resetAiTeamActiveForTest(): void {
   cached = null;
   pending = null;
+  __resetAgentPermissionsForTest();
 }

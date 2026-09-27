@@ -46,6 +46,13 @@ import type {
   AgentMeetingCreated,
   AgentMeetingInput,
   AgentRole,
+  AgentCredentialInput,
+  AgentPermissions,
+  AgentPersonaInput,
+  AgentProjectCredential,
+  AgentTeamPersona,
+  AgentToken,
+  AgentTokenIssued,
   AuditEntry,
   SystemStats,
   IssueTypeDef,
@@ -531,6 +538,7 @@ function nextId(): string {
 export function __resetForTest(): void {
   cache = null;
   agentState = freshAgentState();
+  teamState = freshTeamState();
 }
 
 /** 저장된 아바타(dataURL)를 붙여 돌려준다 — 없으면 null(화면은 이니셜 아바타로 떨어진다) */
@@ -2802,6 +2810,242 @@ export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeet
     run: { ...run },
     attendees: attendees.map((p) => ({ personaId: p.id, slug: p.slug, name: p.name, role: p.role, emoji: p.emoji })),
   };
+}
+
+// ── AI 팀 설정(목업, P3f·P3h) — 판정·거부 문구는 agent-service AgentAuthz·PersonaCreateRequest를 따른다 ──
+// 기본은 "프로젝트 관리자" 시나리오(canManage=true, 전역 관리자 아님) + 전역 키 설정됨. 테스트는
+// `__setAgentMockScenario`로 권한·키 상태를 바꾼다(키 3상태: 프로젝트 키 / 전역 키 / 없음).
+
+const AGENT_FORBIDDEN_GRANT = "관리하지 않는 자원 권한은 부여할 수 없습니다";
+const AGENT_FORBIDDEN = "접근 권한이 없습니다";
+/** 목업 프로젝트 관리자가 ADMIN인 위키 스페이스 — 회의록 스페이스(5)만 */
+const MOCK_MANAGED_SPACES: readonly string[] = ["5"];
+const SLUG_PATTERN = /^[a-z0-9-]{2,40}$/;
+
+interface MockCredential {
+  keyHint: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+interface AgentTeamMockState {
+  personas: AgentTeamPersona[];
+  tokens: AgentToken[];
+  /** 프로젝트 id → 프로젝트 키 */
+  projectKeys: Map<string, MockCredential>;
+  platformKeyHint: string | null;
+  envKey: boolean;
+  masterKey: boolean;
+  permissions: AgentPermissions;
+  seq: number;
+}
+
+function freshTeamState(): AgentTeamMockState {
+  const now = Date.now();
+  // 사무실 목업 6인과 같은 사람들 — 앞의 넷은 ALM(p1) 전용, 운영·리뷰는 전사 공용
+  const personas: AgentTeamPersona[] = baseOfficePersonas(now).map((p) => ({
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    emoji: p.emoji,
+    role: p.role,
+    active: p.active,
+    projectId: p.role === "OPS" || p.role === "REVIEWER" ? null : "p1",
+  }));
+  return {
+    personas,
+    tokens: [
+      { id: "31", label: "Claude Desktop — 프론트봇", personaSlug: "frontend-bot", createdAt: ago(now, 60 * 24 * 3), expiresAt: null, lastUsedAt: ago(now, 40), revoked: false },
+      { id: "30", label: "예전 노트북", personaSlug: "planner-bot", createdAt: ago(now, 60 * 24 * 20), expiresAt: null, lastUsedAt: null, revoked: true },
+      { id: "29", label: "운영봇 CI", personaSlug: "ops-bot", createdAt: ago(now, 60 * 24 * 9), expiresAt: null, lastUsedAt: null, revoked: false },
+    ],
+    projectKeys: new Map(),
+    platformKeyHint: "1234",
+    envKey: false,
+    masterKey: true,
+    permissions: { canManage: true, isGlobalAdmin: false },
+    seq: 500,
+  };
+}
+
+let teamState: AgentTeamMockState = freshTeamState();
+
+export interface AgentMockScenario {
+  canManage?: boolean;
+  isGlobalAdmin?: boolean;
+  /** 전역 키 끝 4자 — null이면 전역 키 없음 */
+  platformKeyHint?: string | null;
+  /** p1 프로젝트 키 끝 4자 — null이면 프로젝트 키 없음 */
+  projectKeyHint?: string | null;
+  /** 서버 env ANTHROPIC_API_KEY(호환 층) */
+  envKey?: boolean;
+  /** AGENT_CREDENTIAL_MASTER_KEY — false면 저장 503 */
+  masterKey?: boolean;
+}
+
+/** 테스트 전용 — 권한·키 시나리오를 바꾼다(`__resetForTest`가 기본으로 되돌린다) */
+export function __setAgentMockScenario(scenario: AgentMockScenario): void {
+  if (scenario.canManage !== undefined) teamState.permissions.canManage = scenario.canManage;
+  if (scenario.isGlobalAdmin !== undefined) {
+    teamState.permissions.isGlobalAdmin = scenario.isGlobalAdmin;
+    if (scenario.isGlobalAdmin) teamState.permissions.canManage = true;
+  }
+  if (scenario.platformKeyHint !== undefined) teamState.platformKeyHint = scenario.platformKeyHint;
+  if (scenario.projectKeyHint !== undefined) {
+    if (scenario.projectKeyHint === null) teamState.projectKeys.delete("p1");
+    else teamState.projectKeys.set("p1", { keyHint: scenario.projectKeyHint, updatedBy: "u2", updatedAt: ago(Date.now(), 90) });
+  }
+  if (scenario.envKey !== undefined) teamState.envKey = scenario.envKey;
+  if (scenario.masterKey !== undefined) teamState.masterKey = scenario.masterKey;
+}
+
+function requireManage(): void {
+  if (!teamState.permissions.canManage) throw new Error(AGENT_FORBIDDEN);
+}
+
+function mockPersonaBySlug(slug: string): AgentTeamPersona {
+  const persona = teamState.personas.find((p) => p.slug === slug);
+  if (!persona) throw new Error(`페르소나를 찾을 수 없습니다: ${slug}`);
+  return persona;
+}
+
+/** 공용 페르소나(projectId null)는 전역 관리자만 — 프로젝트 페르소나는 그 프로젝트 관리자까지 */
+function requireManagePersona(persona: AgentTeamPersona): void {
+  if (teamState.permissions.isGlobalAdmin) return;
+  if (persona.projectId === null) throw new Error(AGENT_FORBIDDEN);
+  requireManage();
+}
+
+export async function fetchAgentPermissions(projectId?: string): Promise<AgentPermissions> {
+  const { canManage, isGlobalAdmin } = teamState.permissions;
+  return { canManage: projectId ? canManage : isGlobalAdmin, isGlobalAdmin };
+}
+
+export async function listAgentTeamPersonas(): Promise<AgentTeamPersona[]> {
+  return clone(teamState.personas);
+}
+
+export async function createAgentPersona(input: AgentPersonaInput): Promise<AgentTeamPersona> {
+  const slug = input.slug.trim();
+  if (!SLUG_PATTERN.test(slug)) throw new Error("slug는 소문자/숫자/하이픈 2~40자여야 합니다");
+  const name = input.name.trim();
+  if (!name) throw new Error("name은 필수입니다");
+  if (name.length > 80) throw new Error("name은 80자 이하여야 합니다");
+  const emoji = input.emoji?.trim() || null;
+  if (emoji && emoji.length > 16) throw new Error("emoji는 16자 이하여야 합니다");
+  requireManage();
+  if (!teamState.permissions.isGlobalAdmin) {
+    for (const grant of input.grants) {
+      const managed =
+        grant.resourceType === "PROJECT"
+          ? grant.resourceId.trim() === input.projectId
+          : MOCK_MANAGED_SPACES.includes(grant.resourceId.trim());
+      if (!managed) throw new Error(AGENT_FORBIDDEN_GRANT);
+    }
+  }
+  const existing = teamState.personas.find((p) => p.slug === slug);
+  if (existing) {
+    // 기존 슬러그 — 서버처럼 표시 필드만 갱신한다(권한·소속 프로젝트는 그대로)
+    existing.name = name;
+    existing.emoji = emoji;
+    return clone(existing);
+  }
+  const persona: AgentTeamPersona = {
+    id: String(teamState.seq++),
+    slug,
+    name,
+    emoji,
+    role: input.role,
+    active: true,
+    projectId: input.projectId,
+  };
+  teamState.personas.push(persona);
+  return clone(persona);
+}
+
+export async function setAgentPersonaActive(personaId: string, active: boolean): Promise<AgentTeamPersona> {
+  const persona = teamState.personas.find((p) => p.id === personaId);
+  if (!persona) throw new Error(`페르소나를 찾을 수 없습니다: id=${personaId}`);
+  requireManagePersona(persona);
+  persona.active = active;
+  return clone(persona);
+}
+
+export async function listAgentTokens(projectId: string): Promise<AgentToken[]> {
+  requireManage();
+  const slugs = new Set(teamState.personas.filter((p) => p.projectId === projectId).map((p) => p.slug));
+  return clone(teamState.tokens.filter((t) => slugs.has(t.personaSlug)));
+}
+
+export async function issueAgentToken(input: { label: string; personaSlug: string }): Promise<AgentTokenIssued> {
+  const label = input.label.trim();
+  if (!label) throw new Error("label은 필수입니다");
+  if (label.length > 120) throw new Error("label은 120자 이하여야 합니다");
+  requireManagePersona(mockPersonaBySlug(input.personaSlug));
+  const id = String(teamState.seq++);
+  teamState.tokens.unshift({
+    id,
+    label,
+    personaSlug: input.personaSlug,
+    createdAt: new Date().toISOString(),
+    expiresAt: null,
+    lastUsedAt: null,
+    revoked: false,
+  });
+  const secret = crypto.randomUUID().replace(/-/g, "");
+  return { token: `chanho_pat_${secret}`, id, label, personaSlug: input.personaSlug };
+}
+
+export async function revokeAgentToken(tokenId: string): Promise<void> {
+  const token = teamState.tokens.find((t) => t.id === tokenId);
+  if (!token) throw new Error(`토큰을 찾을 수 없습니다: id=${tokenId}`);
+  requireManagePersona(mockPersonaBySlug(token.personaSlug));
+  token.revoked = true;
+}
+
+function mockCredentialView(projectId: string): AgentProjectCredential {
+  const key = teamState.projectKeys.get(projectId) ?? null;
+  const effective: AgentProjectCredential["effective"] = key
+    ? { scope: "PROJECT", keyHint: key.keyHint }
+    : teamState.platformKeyHint
+      ? { scope: "PLATFORM", keyHint: teamState.platformKeyHint }
+      : teamState.envKey
+        ? { scope: "ENV", keyHint: null }
+        : { scope: "NONE", keyHint: null };
+  return {
+    project: key
+      ? { set: true, provider: "ANTHROPIC", keyHint: key.keyHint, updatedBy: key.updatedBy, updatedAt: key.updatedAt }
+      : { set: false, provider: null, keyHint: null, updatedBy: null, updatedAt: null },
+    effective,
+  };
+}
+
+export async function fetchProjectCredential(projectId: string): Promise<AgentProjectCredential> {
+  requireManage();
+  return mockCredentialView(projectId);
+}
+
+export async function saveProjectCredential(
+  projectId: string,
+  input: AgentCredentialInput,
+): Promise<AgentProjectCredential> {
+  requireManage();
+  if (!teamState.masterKey) throw new Error("자격증명 암호화 키(AGENT_CREDENTIAL_MASTER_KEY)가 설정되지 않아 저장할 수 없습니다");
+  const apiKey = input.apiKey.trim();
+  if (!apiKey) throw new Error("apiKey는 필수입니다");
+  // 목업 검증 — 실제 서버는 저비용 호출로 확인한다. 문구에 원문을 싣지 않는다
+  if (input.validate && !apiKey.startsWith("sk-ant-")) throw new Error("API 키 검증에 실패했습니다");
+  teamState.projectKeys.set(projectId, {
+    keyHint: apiKey.slice(-4),
+    updatedBy: CURRENT_USER_ID,
+    updatedAt: new Date().toISOString(),
+  });
+  return mockCredentialView(projectId);
+}
+
+export async function deleteProjectCredential(projectId: string): Promise<void> {
+  requireManage();
+  teamState.projectKeys.delete(projectId);
 }
 
 // ── 페이징 ───────────────────────────────────────────────────

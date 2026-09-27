@@ -243,15 +243,23 @@ describe("실행 상세(AGP-12) — 요약·계보·관리자 액션", () => {
     expect(screen.queryByRole("button", { name: "재개" })).not.toBeInTheDocument();
   });
 
-  it("전역 관리자가 아니면 액션 버튼을 숨긴다", async () => {
-    vi.spyOn(store, "getMyOrgProfile").mockResolvedValue({
-      id: "u2", displayName: "일반", email: null, status: "ACTIVE", kind: "HUMAN",
-      globalRoles: [], teams: [], joinedVia: "LEGACY",
-    });
+  it("이 프로젝트를 관리할 수 없으면(canManage=false) 액션 버튼을 숨긴다", async () => {
+    store.__setAgentMockScenario({ canManage: false });
     renderApp(`${BASE}/runs/9004`);
     await detailLoaded("9004");
     expect(screen.queryByRole("button", { name: "재개" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "실행 취소" })).not.toBeInTheDocument();
+  });
+
+  it("전역 관리자가 아니어도 이 프로젝트 관리자면 재개·취소가 보인다", async () => {
+    vi.spyOn(store, "getMyOrgProfile").mockResolvedValue({
+      id: "u2", displayName: "프로젝트 관리자", email: null, status: "ACTIVE", kind: "HUMAN",
+      globalRoles: [], teams: [], joinedVia: "LEGACY",
+    });
+    renderApp(`${BASE}/runs/9004`);
+    await detailLoaded("9004");
+    expect(await screen.findByRole("button", { name: "재개" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "실행 취소" })).toBeInTheDocument();
   });
 
   it("없는 run id는 찾을 수 없음 + 목록으로", async () => {
@@ -271,6 +279,13 @@ describe("승인 인박스(AGP-13)", () => {
     expect(within(gate).getByRole("link", { name: "ALM-3" })).toBeInTheDocument();
     expect(within(gate).getByText("프론트봇")).toBeInTheDocument();
     expect(within(list).getAllByRole("article")).toHaveLength(1);
+  });
+
+  it("이 프로젝트를 관리할 수 없으면(canManage=false) 승인·거절 버튼이 없다", async () => {
+    store.__setAgentMockScenario({ canManage: false });
+    renderApp(`${BASE}/gates`);
+    const list = await screen.findByRole("list", { name: "승인 요청 목록" });
+    expect(within(list).queryByRole("button", { name: /승인|거절/ })).not.toBeInTheDocument();
   });
 
   it("승인하면 확인 후 결정되고 목록에서 빠진다(재조회)", async () => {

@@ -5086,3 +5086,174 @@ th:last-child > [role="separator"] {
   display: flex;
   gap: var(--chanho-space-100);
 }
+
+/* ── 프로젝트 설정 "AI 팀"(P3f·P3h) — 설정 화면이라 DS 토큰만(초상 썸네일의 도트 팔레트는 ai-office.css) ── */
+.ai-team-note {
+  margin-bottom: var(--chanho-space-200);
+}
+
+.ai-team-note a {
+  color: var(--chanho-color-text-link);
+}
+
+.ai-team-note a:hover {
+  color: var(--chanho-color-text-link-hovered);
+}
+
+.ai-team-subtle {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-team-staff {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-150);
+}
+
+.ai-team-avatar {
+  display: inline-flex;
+}
+
+.ai-team-staff-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-25);
+}
+
+.ai-team-staff-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.ai-team-modal {
+  width: min(640px, calc(100vw - var(--chanho-space-400)));
+}
+
+.ai-team-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.ai-team-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--chanho-space-200);
+}
+
+.ai-team-grants {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ai-team-legend {
+  padding: 0;
+  margin-bottom: var(--chanho-space-50);
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-default);
+}
+
+.ai-team-grant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-100);
+}
+
+.ai-team-error {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-danger);
+}
+
+.ai-team-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.ai-team-token-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-150);
+  margin-bottom: var(--chanho-space-200);
+}
+
+.ai-team-token-reveal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-100);
+}
+
+.ai-team-token-reveal input {
+  font-family: var(--chanho-font-family-mono);
+}
+
+.ai-team-effective {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  padding: var(--chanho-space-200);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-success-subtle);
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-200);
+}
+
+.ai-team-effective > svg {
+  flex-shrink: 0;
+  color: var(--chanho-color-text-success);
+}
+
+.ai-team-effective.is-none {
+  background: var(--chanho-color-background-warning-subtle);
+}
+
+.ai-team-effective.is-none > svg {
+  color: var(--chanho-color-text-warning);
+}
+
+.ai-team-hint {
+  font-family: var(--chanho-font-family-mono);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-team-key-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-300);
+  margin: var(--chanho-space-200) 0;
+}
+
+.ai-team-key-meta dt {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-team-key-meta dd {
+  margin: var(--chanho-space-25) 0 0;
+}
+
+.ai-team-key-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  max-width: 480px;
+}
+
+@media (max-width: 720px) {
+  .ai-team-form-grid,
+  .ai-team-grant-row,
+  .ai-team-token-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

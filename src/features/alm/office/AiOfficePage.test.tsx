@@ -269,15 +269,23 @@ describe("게시판 — 회의록 게시물(AGP-41)", () => {
 });
 
 describe("회의 소집(D-P3b-4)", () => {
-  it("전역 관리자가 아니면 헤더에 소집 버튼이 없다", async () => {
-    vi.spyOn(store, "getMyOrgProfile").mockResolvedValue({
-      id: "u2", displayName: "일반", email: null, status: "ACTIVE", kind: "HUMAN",
-      globalRoles: [], teams: [], joinedVia: "LEGACY",
-    });
+  it("이 프로젝트를 관리할 수 없으면(canManage=false) 헤더에 소집 버튼이 없다", async () => {
+    store.__setAgentMockScenario({ canManage: false });
     renderApp(OFFICE_PATH);
     await screen.findByRole("button", { name: /^기획봇, 기획, 작업 중/ });
     expect(screen.getByRole("button", { name: "실행 기록" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "회의 소집" })).not.toBeInTheDocument();
+  });
+
+  it("전역 관리자가 아니어도 이 프로젝트 관리자(canManage)면 소집 버튼이 보인다 — 판정은 프로젝트 권한", async () => {
+    vi.spyOn(store, "getMyOrgProfile").mockResolvedValue({
+      id: "u2", displayName: "프로젝트 관리자", email: null, status: "ACTIVE", kind: "HUMAN",
+      globalRoles: [], teams: [], joinedVia: "LEGACY",
+    });
+    const permissions = vi.spyOn(store, "fetchAgentPermissions");
+    renderApp(OFFICE_PATH);
+    expect(await screen.findByRole("button", { name: "회의 소집" })).toBeInTheDocument();
+    expect(permissions).toHaveBeenCalledWith("p1");
   });
 
   it("안건 없는 착수/계획은 화면이 막고, 안건을 넣으면 소집 → 성공 토스트 + 사무실 재조회", async () => {

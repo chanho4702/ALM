@@ -44,6 +44,13 @@ import type {
   AgentGate,
   AgentMeetingCreated,
   AgentMeetingInput,
+  AgentCredentialInput,
+  AgentPermissions,
+  AgentPersonaInput,
+  AgentProjectCredential,
+  AgentTeamPersona,
+  AgentToken,
+  AgentTokenIssued,
   AuditEntry,
   SystemStats,
   SettingsBody,
@@ -114,13 +121,23 @@ import {
   mapAgentOffice,
   mapAgentPersona,
   mapAgentPersonaActivity,
+  mapAgentPermissions,
+  mapAgentProjectCredential,
   mapAgentRunSummary,
+  mapAgentTeamPersona,
+  mapAgentToken,
+  mapAgentTokenIssued,
   type AgentGateDto,
   type AgentMeetingCreatedDto,
   type AgentOfficeDto,
+  type AgentPermissionsDto,
   type AgentPersonaActivityDto,
   type AgentPersonaDto,
+  type AgentProjectCredentialDto,
   type AgentRunSummaryDto,
+  type AgentTeamPersonaDto,
+  type AgentTokenDto,
+  type AgentTokenIssuedDto,
 } from "./agentMapping";
 
 async function json<T>(response: Response): Promise<T> {
@@ -1074,6 +1091,121 @@ export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeet
         body: JSON.stringify(body),
       }),
     ),
+  );
+}
+
+// ── AI 팀 설정(P3f AGP-64·P3h AGP-66) — 관리 행위는 전역 관리자 또는 그 프로젝트 ADMIN(서버 판정) ──
+// 권한 없음 403·org 판정 불가 503·검증 실패 400 모두 `{"error"}` 문구 그대로 Error로 올린다(화면이 토스트로).
+
+/**
+ * 버튼 노출 힌트 — 실패(네트워크·5xx·구 백엔드 404)는 "관리 못 함"으로 접는다. 이걸로 화면 전체를 오류로 만들지 않는다
+ * (서버도 org 장애를 canManage=false로 답한다). 실제 판정은 각 관리 API가 다시 한다.
+ */
+export async function fetchAgentPermissions(projectId?: string): Promise<AgentPermissions> {
+  const query = projectId ? `?projectId=${toBackendId(projectId)}` : "";
+  try {
+    const res = await sharedApiFetch(`/api/agent/permissions${query}`);
+    if (!res.ok) return mapAgentPermissions(null);
+    return mapAgentPermissions((await res.json().catch(() => null)) as AgentPermissionsDto | null);
+  } catch {
+    return mapAgentPermissions(null);
+  }
+}
+
+/** 설정 화면용 페르소나 전체 — 진입점 판정(`fetchAgentPersonas`)과 달리 실패를 삼키지 않는다 */
+export async function listAgentTeamPersonas(): Promise<AgentTeamPersona[]> {
+  const body = await json<AgentTeamPersonaDto[] | null>(await sharedApiFetch("/api/agent/personas"));
+  return (body ?? []).map(mapAgentTeamPersona);
+}
+
+/** 기존 슬러그면 서버가 표시 필드만 갱신하고 200(권한 재부여 없음), 새로 만들면 201 — 둘 다 PersonaResponse */
+export async function createAgentPersona(input: AgentPersonaInput): Promise<AgentTeamPersona> {
+  const emoji = input.emoji?.trim();
+  const voicePrompt = input.voicePrompt?.trim();
+  const body = {
+    slug: input.slug.trim(),
+    role: input.role,
+    name: input.name.trim(),
+    ...(emoji ? { emoji } : {}),
+    ...(voicePrompt ? { voicePrompt } : {}),
+    projectId: toBackendId(input.projectId),
+    grants: input.grants.map((g) => ({ resourceType: g.resourceType, resourceId: g.resourceId.trim(), role: g.role })),
+  };
+  return mapAgentTeamPersona(
+    await json<AgentTeamPersonaDto>(
+      await sharedApiFetch("/api/agent/personas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    ),
+  );
+}
+
+export async function setAgentPersonaActive(personaId: string, active: boolean): Promise<AgentTeamPersona> {
+  return mapAgentTeamPersona(
+    await json<AgentTeamPersonaDto>(
+      await sharedApiFetch(`/api/agent/personas/${encodeURIComponent(personaId)}/active`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      }),
+    ),
+  );
+}
+
+/** 그 프로젝트 소속 페르소나의 토큰만(철회된 것 포함) — 공용 페르소나 토큰은 전역 관리 화면 몫 */
+export async function listAgentTokens(projectId: string): Promise<AgentToken[]> {
+  const body = await json<AgentTokenDto[] | null>(
+    await sharedApiFetch(`/api/agent/tokens?projectId=${toBackendId(projectId)}`),
+  );
+  return (body ?? []).map(mapAgentToken);
+}
+
+/** 원문 token은 이 응답에만 있다 — 화면이 한 번 보여 주고 버린다 */
+export async function issueAgentToken(input: { label: string; personaSlug: string }): Promise<AgentTokenIssued> {
+  return mapAgentTokenIssued(
+    await json<AgentTokenIssuedDto>(
+      await sharedApiFetch("/api/agent/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: input.label.trim(), personaSlug: input.personaSlug }),
+      }),
+    ),
+  );
+}
+
+export async function revokeAgentToken(tokenId: string): Promise<void> {
+  await json<null>(await sharedApiFetch(`/api/agent/tokens/${encodeURIComponent(tokenId)}`, { method: "DELETE" }));
+}
+
+export async function fetchProjectCredential(projectId: string): Promise<AgentProjectCredential> {
+  return mapAgentProjectCredential(
+    await json<AgentProjectCredentialDto>(
+      await sharedApiFetch(`/api/agent/credentials/projects/${toBackendId(projectId)}`),
+    ),
+  );
+}
+
+/** 마스터 키 미설정 503·검증 실패 400 — 문구에 원문 키는 없다(서버 계약) */
+export async function saveProjectCredential(
+  projectId: string,
+  input: AgentCredentialInput,
+): Promise<AgentProjectCredential> {
+  return mapAgentProjectCredential(
+    await json<AgentProjectCredentialDto>(
+      await sharedApiFetch(`/api/agent/credentials/projects/${toBackendId(projectId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "ANTHROPIC", apiKey: input.apiKey, validate: input.validate }),
+      }),
+    ),
+  );
+}
+
+export async function deleteProjectCredential(projectId: string): Promise<void> {
+  await json<null>(
+    await sharedApiFetch(`/api/agent/credentials/projects/${toBackendId(projectId)}`, { method: "DELETE" }),
   );
 }
 

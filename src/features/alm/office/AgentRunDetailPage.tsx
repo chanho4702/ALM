@@ -13,7 +13,7 @@ import {
 } from "../components/AgentGlyphs";
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
-import { useOrgProfile } from "../components/OrgAccountGate";
+import { useAgentPermissions } from "../components/useAgentPermissions";
 import { canCancel, canResume, personaDisplay, runLineage } from "./runModel";
 import { linkableIssueKey, PROJECT_WIDE_LABEL } from "./officeModel";
 import {
@@ -28,7 +28,8 @@ import { usePolledLoad } from "./usePolledLoad";
 /**
  * 실행 상세(P3a AGP-12) — `/projects/:projectId/ai-office/runs/:runId`. 상세 전용 API가 없어 목록 요약에서
  * 찾는다(요약 필드 전부 + 계보). 서버가 주지 않는 에러 로그·산출물 링크는 그리지 않는다.
- * 관리자 액션(취소·재개)은 전역 관리자(`isGlobalAdmin`)에게만 보이고, 최종 판정은 서버(403·409 → 토스트).
+ * 관리자 액션(취소·재개)은 이 프로젝트를 관리할 수 있는 사람(`canManage` — 전역 관리자 또는 프로젝트 ADMIN)에게만
+ * 보이고, 최종 판정은 서버가 run의 프로젝트로 다시 한다(403·409 → 토스트).
  */
 export default function AgentRunDetailPage() {
   return (
@@ -59,7 +60,7 @@ function AgentRunDetail() {
   const { projectId = "", runId = "" } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isGlobalAdmin } = useOrgProfile();
+  const { canManage } = useAgentPermissions(projectId);
   const personas = usePersonaDirectory();
   const loadRuns = useCallback(() => fetchAgentRuns(), []);
   const load = usePolledLoad(loadRuns);
@@ -96,8 +97,8 @@ function AgentRunDetail() {
     const persona = personaDisplay(personas, run.personaId);
     const lineage = runLineage(runs, run);
     const duration = durationText(run);
-    const showCancel = isGlobalAdmin && canCancel(run.status);
-    const showResume = isGlobalAdmin && canResume(run.status);
+    const showCancel = canManage && canCancel(run.status);
+    const showResume = canManage && canResume(run.status);
     content = (
       <div className="agent-run-detail">
         <div className="agent-run-detail-head">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import {
@@ -9,6 +9,7 @@ import {
   Lozenge,
   Modal,
   Select,
+  Spinner,
   Switch,
   TextArea,
   TextField,
@@ -74,6 +75,9 @@ import {
   typeAppearance,
   typeName,
 } from "../components/labels";
+
+/** AI 팀 구획은 사무실 초상 에셋을 끌고 오므로 따로 쪼갠다 — 그 구획을 여는 사람만 받는다 */
+const AiTeamSettings = lazy(() => import("../office/AiTeamSettings"));
 
 export interface ProjectSettingsPageProps {
   projects: Project[];
@@ -638,6 +642,17 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         {section === "workflow" ? workflow : null}
         {section === "types" ? types : null}
         {section === "fields" ? fields : null}
+        {section === "ai-team" ? (
+          <Suspense
+            fallback={
+              <div className="board-loading">
+                <Spinner size="large" label="AI 팀 불러오는 중" />
+              </div>
+            }
+          >
+            <AiTeamSettings projectId={project.id} users={users} />
+          </Suspense>
+        ) : null}
         {section === "import" && resolved ? (
           <JiraImportPanel
             projectId={project.id}

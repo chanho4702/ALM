@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import type { AgentOffice } from "../store/types";
 import { useAiTeamStatus } from "../components/useAiTeamActive";
-import { useOrgProfile } from "../components/OrgAccountGate";
+import { useAgentPermissions } from "../components/useAgentPermissions";
 import { useIssueModal } from "../components/useIssueModal";
 import { relTimeFine } from "../components/time";
 import { OfficeCanvas } from "./OfficeCanvas";
@@ -96,7 +96,7 @@ function AiOffice({ projectId }: { projectId: string }) {
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   const data = useOfficeData(projectId, panel?.kind === "persona" ? panel.id : null);
   const { issueModal } = useIssueModal(() => undefined);
-  const { isGlobalAdmin } = useOrgProfile();
+  const { canManage } = useAgentPermissions(projectId);
   const [conveneOpen, setConveneOpen] = useState(false);
   const [note, setNote] = useState("");
   const goalsData = useEpicGoals(projectId, panel?.kind === "board");
@@ -198,8 +198,8 @@ function AiOffice({ projectId }: { projectId: string }) {
           승인 인박스
           {pending > 0 ? <Badge appearance="danger">{pending}</Badge> : null}
         </Button>
-        {/* 회의 소집은 예산을 쓰는 행위라 서버도 ADMIN만 받는다 — 버튼도 전역 관리자에게만 */}
-        {isGlobalAdmin ? (
+        {/* 회의 소집은 예산을 쓰는 행위라 서버도 관리자(전역 또는 이 프로젝트 ADMIN)만 받는다 — 버튼도 그들에게만 */}
+        {canManage ? (
           <Button
             variant="ghost"
             size="small"
@@ -244,7 +244,7 @@ function AiOffice({ projectId }: { projectId: string }) {
                   onRetry={data.refresh}
                   onOpenPersona={openPersona}
                   onOpenBoard={openBoard}
-                  onConvene={isGlobalAdmin ? () => setConveneOpen(true) : undefined}
+                  onConvene={canManage ? () => setConveneOpen(true) : undefined}
                 />
               )
             : null
@@ -318,7 +318,7 @@ function AiOffice({ projectId }: { projectId: string }) {
         {note}
       </div>
       {issueModal}
-      {isGlobalAdmin ? (
+      {canManage ? (
         <MeetingConveneModal
           projectId={projectId}
           personas={personas}

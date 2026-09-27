@@ -7,7 +7,7 @@ import { approveGate, fetchAgentGates, fetchAgentRuns, rejectGate } from "../sto
 import { AGENT_GATE_KIND_LABEL, AgentGateKindGlyph, AgentRunStatusLozenge } from "../components/AgentGlyphs";
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
-import { useOrgProfile } from "../components/OrgAccountGate";
+import { useAgentPermissions } from "../components/useAgentPermissions";
 import { gatesForPersona, personaDisplay } from "./runModel";
 import {
   AiTeamGate,
@@ -53,7 +53,7 @@ function DecisionLozenge({ decision }: { decision: AgentGateDecision | null }) {
 /**
  * 승인 인박스(P3a AGP-13) — `/projects/:projectId/ai-office/gates`. 기본은 결정 전 게이트 전부,
  * 토글하면 최근 50건(결정 포함 — 서버가 주는 대로). `?persona=`는 게이트의 run → personaId로 거른다
- * (사무실 ❗·팀 카드 "승인 인박스" 링크가 넘긴다). 승인·거절은 전역 관리자에게만 보이고 서버가 최종 판정한다.
+ * (사무실 ❗·팀 카드 "승인 인박스" 링크가 넘긴다). 승인·거절은 이 프로젝트 관리자(전역 관리자 포함)에게만 보이고 서버가 최종 판정한다.
  * 서버가 거절 사유를 받지 않아 사유 입력은 두지 않는다.
  */
 export default function AgentGatesPage() {
@@ -67,7 +67,7 @@ export default function AgentGatesPage() {
 function AgentGates() {
   const { projectId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isGlobalAdmin } = useOrgProfile();
+  const { canManage } = useAgentPermissions(projectId);
   const personas = usePersonaDirectory();
   const { issueModal } = useIssueModal(() => undefined);
 
@@ -219,7 +219,7 @@ function AgentGates() {
                         </span>
                       ) : null}
                     </p>
-                    {isGlobalAdmin && gate.decision === null ? (
+                    {canManage && gate.decision === null ? (
                       <div className="agent-gate-actions">
                         <Button
                           variant="primary"

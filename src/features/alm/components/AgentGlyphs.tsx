@@ -148,6 +148,12 @@ export function AgentRunStatusLozenge({ status }: { status: AgentRunStatus }) {
   );
 }
 
+/** 롤 아이콘만(장식) — Select 옵션처럼 옆에 라벨 텍스트가 따로 있는 자리 */
+export function AgentRoleIcon({ role, size = 14 }: { role: AgentRole; size?: 12 | 14 | 16 }) {
+  const Icon = ROLES[role].icon;
+  return <Icon size={size} aria-hidden />;
+}
+
 /** 롤 — 아이콘 + 한국어 라벨(색만으로 롤을 말하지 않는다) */
 export function AgentRoleGlyph({ role, size = 14 }: { role: AgentRole; size?: 12 | 14 | 16 }) {
   const def = ROLES[role];
