@@ -9,8 +9,12 @@ import {
   breathe,
   drawnRole,
   fnv1a32,
+  backgroundPaths,
+  backgroundTopPaths,
   matrixToPaths,
+  microBubblePaths,
   overlay,
+  roomFurniturePaths,
   roomGeometry,
 } from "./pixel";
 
@@ -78,8 +82,8 @@ describe("프레임 합성", () => {
 });
 
 describe("방 크기(스펙 §1.4)", () => {
-  it("6명은 기본 352×192", () => {
-    expect(roomGeometry(6)).toEqual({ width: 352, height: 192, rugHeight: 96 });
+  it("6명은 기본 464×192 — P3e §1.1 정정: 오른쪽 7타일 회의실(칸막이 4 + 108)", () => {
+    expect(roomGeometry(6)).toEqual({ width: 464, height: 192, rugHeight: 96 });
   });
 
   it("7~8명은 유휴 자리 3행이 되어 공식대로 208로 늘어난다(스펙 확장 공식이 정본)", () => {
@@ -127,5 +131,46 @@ describe("도트 시안 없는 롤 — MANAGER(D-P3c-5)", () => {
       expect(avatarPaths(odd, frame).length).toBeGreaterThan(0);
     }
     expect(avatarVars("odd", odd)["--av-shirt"]).toBe("var(--office-role-planner)");
+  });
+});
+
+describe("P3e 프레임·배경", () => {
+  it("회의실 좌석 — 먼 쪽 정면은 14행(테이블이 14~15행을 가린다), 가까운 쪽 뒷모습은 16행", () => {
+    expect(avatarMatrix("PLANNER", "seatFar")).toHaveLength(14);
+    expect(avatarMatrix("PLANNER", "seatBack")).toHaveLength(16);
+    expect(avatarMatrix("PLANNER", "back")).toHaveLength(24);
+  });
+
+  it("걷기 — 다리 행(18~22)만 바뀌고 몸통은 서기·뒷모습 그대로", () => {
+    const walk = avatarMatrix("OPS", "walkA");
+    expect(walk.slice(0, 18)).toEqual(avatarMatrix("OPS", "standA").slice(0, 18));
+    expect(walk.slice(18, 23)).toEqual(M.WALK_A.slice(18, 23));
+    const back = avatarMatrix("OPS", "walkBackB");
+    expect(back.slice(0, 18)).toEqual(avatarMatrix("OPS", "back").slice(0, 18));
+    expect(back.slice(18, 23)).toEqual(M.WALK_B.slice(18, 23));
+  });
+
+  it("뒷모습 액세서리 — 기획 연필은 거울 레이어, 리뷰 안경은 안 보인다", () => {
+    expect(avatarMatrix("REVIEWER", "seatBack")).toEqual(M.AVATAR_BACK.slice(0, 16));
+    expect(avatarMatrix("PLANNER", "back")[6][1]).toBe("A");
+  });
+
+  it("미니 말풍선 — 틀 위에 글리프를 (2,1)부터 덮는다", () => {
+    const paths = microBubblePaths("BULB");
+    expect(paths.map((p) => p.cls)).toEqual(expect.arrayContaining(["px-mb-B", "px-mb-Y", "px-mb-K"]));
+    expect(microBubblePaths("BULB")).toBe(paths);
+  });
+
+  it("회의실 카펫은 타일 22열부터, 창은 유리(바닥 쪽)와 틀(위쪽)로 나뉜다, 칸막이 4줄", () => {
+    const geo = roomGeometry(6);
+    const bottom = backgroundPaths(geo).map((p) => p.cls);
+    expect(bottom).toEqual(expect.arrayContaining(["px-carpet-a", "px-carpet-b", "px-window-k"]));
+    expect(bottom).not.toContain("px-window-K");
+    expect(backgroundTopPaths().map((p) => p.cls)).toContain("px-window-K");
+    expect(backgroundTopPaths().map((p) => p.cls)).not.toContain("px-window-k");
+    const carpet = backgroundPaths(geo).find((p) => p.cls === "px-carpet-a")!.d;
+    expect(carpet.startsWith("M352 32")).toBe(true);
+    const furniture = roomFurniturePaths(geo).map((p) => p.cls);
+    expect(furniture).toEqual(expect.arrayContaining(["px-part-ol", "px-part-hi", "px-part-glass"]));
   });
 });

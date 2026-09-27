@@ -2,12 +2,26 @@ import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router";
 import { Button } from "@chanho/react";
 import { Clock, Coins, FileText, Inbox } from "lucide-react";
-import type { AgentOfficePersona, AgentRunSummary } from "../store/types";
-import { AGENT_RUN_TYPE_LABEL, AgentRoleGlyph, AgentStatusLozenge } from "../components/AgentGlyphs";
+import type { AgentActiveMeeting, AgentOfficePersona, AgentRunSummary } from "../store/types";
+import {
+  AGENT_MEETING_TYPE_LABEL,
+  AGENT_RUN_TYPE_LABEL,
+  AgentMeetingTypeIcon,
+  AgentRoleGlyph,
+  AgentStatusLozenge,
+} from "../components/AgentGlyphs";
 import { relTime } from "../components/time";
 import { OfficePortrait } from "./PixelSprite";
 import { drawnRole } from "./pixel";
-import { activityText, formatUsd, linkableIssueKey, personaState, PROJECT_WIDE_LABEL } from "./officeModel";
+import {
+  activityText,
+  formatUsd,
+  linkableIssueKey,
+  meetingAgendaText,
+  personaState,
+  PROJECT_WIDE_LABEL,
+  type MeetingSeat,
+} from "./officeModel";
 import type { OfficeLinks } from "./OfficePanel";
 
 /**
@@ -16,12 +30,17 @@ import type { OfficeLinks } from "./OfficePanel";
  */
 export function TeamCards({
   personas,
+  activeMeeting,
+  seats,
   finished,
   selectedId,
   links,
   onOpenPersona,
 }: {
   personas: readonly AgentOfficePersona[];
+  /** 회의실에 앉은 참석자는 "회의 중" 줄이 붙는다(P3e §2.9 — 캔버스의 텍스트 동등성) */
+  activeMeeting: AgentActiveMeeting | null;
+  seats: ReadonlyMap<string, MeetingSeat>;
   /** 종결 run(최신 먼저) — "마지막 작업" 표기용 */
   finished: readonly AgentRunSummary[];
   selectedId: string | null;
@@ -59,6 +78,12 @@ export function TeamCards({
               </div>
             </div>
 
+            {activeMeeting && seats.has(persona.id) ? (
+              <p className="ai-team-card-issue ai-team-card-meeting">
+                <AgentMeetingTypeIcon type={activeMeeting.type} />
+                회의 중 · {AGENT_MEETING_TYPE_LABEL[activeMeeting.type]} · {meetingAgendaText(activeMeeting)}
+              </p>
+            ) : null}
             <p className="ai-team-card-issue">
               <FileText size={14} aria-hidden />
               {run ? <span className="ai-team-card-kind">{AGENT_RUN_TYPE_LABEL[run.type]} · </span> : null}

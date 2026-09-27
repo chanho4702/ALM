@@ -32,6 +32,7 @@ import type {
   WorkflowStatus,
   AgentPersona,
   AgentAuditEntry,
+  AgentActiveMeeting,
   AgentOffice,
   AgentOfficePersona,
   AgentPendingGate,
@@ -2468,6 +2469,31 @@ function baseBoardPosts(now: number, projectId: string): AgentBoardPost[] {
   ];
 }
 
+/**
+ * 진행 중 착수/계획 회의(P3e) — 기획봇 진행, 디자인봇(대기열)·운영봇(휴식)이 회의실로 가고, 프론트봇은 승인 대기라
+ * 책상에 남는다(스펙 §2.2 규칙 2) — 목업 한 장면에서 착석·예외를 함께 본다. run 목록·상세에도 같은 run이 있다.
+ */
+const MOCK_MEETING_RUN_ID = "9007";
+
+function baseMeetingRun(now: number): AgentRunSummary {
+  return mockRun(now, MOCK_MEETING_RUN_ID, "101", "RUNNING", "ALM-4", 12, null, { type: "MEETING", trigger: "USER" });
+}
+
+function mockActiveMeeting(now: number, projectId: string): AgentActiveMeeting | null {
+  const run = withOverride(baseMeetingRun(now));
+  if (run.status !== "RUNNING") return null;
+  return {
+    runId: run.id,
+    type: "MEETING",
+    status: run.status,
+    issueKey: run.issueKey,
+    projectId,
+    hostPersonaId: "101",
+    attendeePersonaIds: ["101", "102", "105", "103"],
+    startedAt: run.startedAt,
+  };
+}
+
 function mockOffice(now: number, projectId = "p1"): AgentOffice {
   const personas = baseOfficePersonas(now);
   const recentRuns = baseRecentRuns(now);
@@ -2491,6 +2517,7 @@ function mockOffice(now: number, projectId = "p1"): AgentOffice {
     },
     generatedAt: new Date(now).toISOString(),
     boardPosts: baseBoardPosts(now, projectId),
+    activeMeeting: mockActiveMeeting(now, projectId),
   };
 }
 
@@ -2606,7 +2633,7 @@ function mockAllRuns(now: number): AgentRunSummary[] {
       parentRunId: cur.id === "9006" ? "8985" : null,
     });
   }
-  for (const run of [...baseRecentRuns(now), ...mockRunHistory(now)]) {
+  for (const run of [baseMeetingRun(now), ...baseRecentRuns(now), ...mockRunHistory(now)]) {
     if (!byId.has(run.id)) byId.set(run.id, run);
   }
   for (const run of agentState.added) byId.set(run.id, run);

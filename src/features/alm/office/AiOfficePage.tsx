@@ -23,12 +23,15 @@ import { useIssueModal } from "../components/useIssueModal";
 import { relTimeFine } from "../components/time";
 import { OfficeCanvas } from "./OfficeCanvas";
 import { MeetingConveneModal } from "./MeetingConveneModal";
-import { OfficePanel, type OfficeLinks, type PanelTarget } from "./OfficePanel";
+import { OfficePanel, type GoalsView, type OfficeLinks, type PanelTarget } from "./OfficePanel";
 import { TeamCards } from "./TeamCards";
 import { useOfficeData, type OfficeData } from "./useOfficeData";
+import { useEpicGoals } from "./useEpicGoals";
 import {
+  epicGoals,
   finishedRuns,
   formatUsd,
+  meetingSeats,
   officeCounts,
   sortPersonas,
   todayCostTotal,
@@ -36,13 +39,17 @@ import {
 } from "./officeModel";
 import "./ai-office.css";
 
-/** 패널을 밀어내기(도킹)로 둘 최소 본문 폭 — 그보다 좁으면 캔버스 위에 뜬다(스펙 §1.6) */
-const DOCK_MIN_WIDTH = 1100;
+/**
+ * 패널을 밀어내기(도킹)로 둘 최소 본문 폭 — 그보다 좁으면 캔버스 위에 뜬다(스펙 §1.6, P3e §1.1 정정:
+ * 380 패널 + 24 gap + 928 k=2 방 + 32 패딩 + 2 테두리 = 1366 → 1380)
+ */
+const DOCK_MIN_WIDTH = 1380;
+const NO_BUDGET = { monthlyCapUsd: null, platformMonthToDateUsd: 0, killSwitch: false } as const;
 /** "마지막 갱신"이 이만큼 지나면 경고색 */
 const STALE_AFTER_MS = 30_000;
 
 type View = "office" | "team";
-type PanelState = { kind: "persona"; id: string } | { kind: "board" } | null;
+type PanelState = { kind: "persona"; id: string } | { kind: "board" } | { kind: "meeting" } | null;
 
 /**
  * AI 사무실(P3a AGP-39·40·11) — `/projects/:projectId/ai-office`. 라우트 lazy 청크라
@@ -91,6 +98,11 @@ function AiOffice({ projectId }: { projectId: string }) {
   const { issueModal } = useIssueModal(() => undefined);
   const { isGlobalAdmin } = useOrgProfile();
   const [conveneOpen, setConveneOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const goalsData = useEpicGoals(projectId, panel?.kind === "board");
+  useEffect(() => {
+    if (data.announcement) setNote(data.announcement);
+  }, [data.announcement]);
 
   const base = `/projects/${projectId}/ai-office`;
   const links: OfficeLinks = useMemo(
@@ -111,10 +123,23 @@ function AiOffice({ projectId }: { projectId: string }) {
   const personas = useMemo(() => sortPersonas(office?.personas ?? []), [office]);
   const personaById = useMemo(() => new Map(personas.map((p) => [p.id, p])), [personas]);
   const finished = useMemo(() => finishedRuns(office?.recentRuns ?? []), [office]);
+  const activeMeeting = office?.activeMeeting ?? null;
+  const seats = useMemo(() => meetingSeats(activeMeeting, personas), [activeMeeting, personas]);
+  const goals = useMemo(
+    () => (goalsData.loaded ? epicGoals(goalsData.issues, goalsData.types, goalsData.statuses, personas) : []),
+    [goalsData.loaded, goalsData.issues, goalsData.types, goalsData.statuses, personas],
+  );
+  const goalsView: GoalsView = {
+    status: goalsData.status,
+    goals,
+    statuses: goalsData.statuses,
+    types: goalsData.types,
+    retry: goalsData.retry,
+  };
 
   const panelTarget: PanelTarget | null =
-    panel?.kind === "board"
-      ? { kind: "board" }
+    panel?.kind === "board" || panel?.kind === "meeting"
+      ? { kind: panel.kind }
       : panel?.kind === "persona" && personaById.get(panel.id)
         ? { kind: "persona", persona: personaById.get(panel.id)! }
         : null;
@@ -126,6 +151,10 @@ function AiOffice({ projectId }: { projectId: string }) {
   const openBoard = useCallback((el: HTMLElement) => {
     setOpener(el);
     setPanel({ kind: "board" });
+  }, []);
+  const openMeeting = useCallback((el: HTMLElement) => {
+    setOpener(el);
+    setPanel({ kind: "meeting" });
   }, []);
   const closePanel = useCallback(() => {
     // 연 요소가 폴링으로 바뀌었으면(유휴→책상 등) 같은 페르소나를 가리키는 현재 버튼으로 돌아간다
@@ -209,8 +238,13 @@ function AiOffice({ projectId }: { projectId: string }) {
                   activityStatus={data.activityStatus}
                   links={links}
                   docked={docked}
+                  meeting={activeMeeting}
+                  goals={goalsView}
                   onClose={closePanel}
                   onRetry={data.refresh}
+                  onOpenPersona={openPersona}
+                  onOpenBoard={openBoard}
+                  onConvene={isGlobalAdmin ? () => setConveneOpen(true) : undefined}
                 />
               )
             : null
@@ -219,18 +253,27 @@ function AiOffice({ projectId }: { projectId: string }) {
         {which === "office" ? (
           <OfficeCanvas
             personas={personas}
+            activeMeeting={activeMeeting}
+            seats={seats}
+            budget={office?.budget ?? NO_BUDGET}
             gatesHref={links.gates}
             selectedId={panel?.kind === "persona" ? panel.id : null}
             boardOpen={panel?.kind === "board"}
+            meetingOpen={panel?.kind === "meeting"}
             boardCount={finished.length}
             postCount={office?.boardPosts.length ?? 0}
+            goalCount={goalsData.loaded ? goals.filter((g) => g.kind !== "complete").length : null}
             todayReports={todayReportCount(office?.recentRuns ?? [])}
             onOpenPersona={openPersona}
             onOpenBoard={openBoard}
+            onOpenMeeting={openMeeting}
+            onAnnounce={setNote}
           />
         ) : (
           <TeamCards
             personas={personas}
+            activeMeeting={activeMeeting}
+            seats={seats}
             finished={finished}
             selectedId={panel?.kind === "persona" ? panel.id : null}
             links={links}
@@ -272,7 +315,7 @@ function AiOffice({ projectId }: { projectId: string }) {
         ]}
       />
       <div className="ai-office-sr" aria-live="polite">
-        {data.announcement}
+        {note}
       </div>
       {issueModal}
       {isGlobalAdmin ? (

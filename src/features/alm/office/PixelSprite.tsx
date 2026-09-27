@@ -37,6 +37,17 @@ export function OfficePortrait({ slug, role, className }: { slug: string; role: 
   );
 }
 
+/** 회의실 모드 초상(P3e §2.8) — 화이트보드 가운데 32×22 크롭(회의 중이면 차트가 그려진 판) */
+export function WhiteboardPortrait({ active }: { active: boolean }) {
+  return (
+    <span className="office-portrait is-board" aria-hidden="true">
+      <svg viewBox="8 0 32 22" shapeRendering="crispEdges" focusable="false">
+        <PixelSprite paths={spritePaths(active ? "WHITEBOARD_ACTIVE" : "WHITEBOARD_IDLE", "wb")} />
+      </svg>
+    </span>
+  );
+}
+
 /** 게시판 모드 초상 — BOARD 가운데 32×22 크롭 */
 export function BoardPortrait() {
   return (

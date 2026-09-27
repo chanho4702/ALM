@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { AgentOffice, AgentOfficePersona, AgentRunSummary } from "../store/types";
+import type { AgentActiveMeeting, AgentOffice, AgentOfficePersona, AgentRunSummary, Issue } from "../store/types";
 import {
   bubbleText,
+  coffeeCopy,
+  epicGoals,
   isRedactedSummary,
   finishedRuns,
+  meetingRoomAccessibleName,
+  meetingSeats,
+  meetingSignText,
+  pickWeighted,
+  progressCells,
   officeSummaryText,
   personaAccessibleName,
   personaState,
@@ -236,6 +243,7 @@ describe("요약·라이브 알림", () => {
       budget: { monthlyCapUsd: null, platformMonthToDateUsd: 0, killSwitch: false },
       generatedAt: "",
       boardPosts: [],
+      activeMeeting: null,
     });
     const before = office([persona({ id: "1", currentRun: run("RUNNING") }), persona({ id: "2", name: "운영봇" })]);
     const after = office([
@@ -254,5 +262,191 @@ describe("요약·라이브 알림", () => {
     expect(subjectJosa("백엔드봇")).toBe("이");
     expect(subjectJosa("리뷰어")).toBe("가");
     expect(subjectJosa("bot")).toBe("가");
+  });
+});
+
+// ── P3e ─────────────────────────────────────────────────────────
+
+function meeting(over: Partial<AgentActiveMeeting> = {}): AgentActiveMeeting {
+  return {
+    runId: "700",
+    type: "MEETING",
+    status: "RUNNING",
+    issueKey: "ALM-4",
+    projectId: "1",
+    hostPersonaId: "7",
+    attendeePersonaIds: ["7", "1", "2", "3"],
+    startedAt: "2026-09-27T03:00:00Z",
+    ...over,
+  };
+}
+
+/** 정렬된 팀 — 1 기획 · 2 디자인 · 3 프론트 · … 7 매니저 */
+const team = (n: number) =>
+  Array.from({ length: n }, (_, i) => persona({ id: String(i + 1), slug: `bot-${i + 1}`, name: `봇${i + 1}` }));
+
+describe("회의실 좌석(P3e §2.2·§2.3)", () => {
+  it("진행자가 상석(먼 쪽 가운데), 나머지는 정렬 순으로 먼 1 → 먼 3 → 가까운 1", () => {
+    const seats = meetingSeats(meeting(), team(7));
+    expect(seats.get("7")).toEqual({ side: "far", x: 402, y: 84, host: true });
+    expect(seats.get("1")).toEqual({ side: "far", x: 382, y: 84, host: false });
+    expect(seats.get("2")).toEqual({ side: "far", x: 422, y: 84, host: false });
+    expect(seats.get("3")).toEqual({ side: "near", x: 402, y: 112, host: false });
+    expect(seats.has("4")).toBe(false);
+  });
+
+  it("회의가 아닌 자기 run이 승인 대기·차단이면 책상에 남는다 — 회의 run 자체의 상태는 해당 없음", () => {
+    const people = team(4).map((p) =>
+      p.id === "2"
+        ? { ...p, currentRun: run("WAITING_APPROVAL") }
+        : p.id === "3"
+          ? { ...p, currentRun: run("BLOCKED") }
+          : p.id === "1"
+            ? { ...p, currentRun: run("WAITING_APPROVAL", { id: "700", type: "MEETING" }) }
+            : p,
+    );
+    const seats = meetingSeats(meeting({ hostPersonaId: "1", attendeePersonaIds: ["1", "2", "3", "4"] }), people);
+    expect([...seats.keys()]).toEqual(["1", "4"]);
+  });
+
+  it("비활성·명단 밖 id는 좌석이 없고, 진행자가 못 앉으면 금테 상석은 비워 둔다", () => {
+    const people = team(3).map((p) => (p.id === "1" ? { ...p, active: false } : p));
+    const seats = meetingSeats(meeting({ hostPersonaId: "1", attendeePersonaIds: ["1", "2", "3", "99"] }), people);
+    expect(seats.has("1")).toBe(false);
+    expect(seats.get("2")).toMatchObject({ side: "far", x: 382, host: false });
+    expect(seats.get("3")).toMatchObject({ side: "far", x: 422 });
+  });
+
+  it("8석이 차면 9번째부터 입석(테이블 아래 5열)", () => {
+    const people = team(11);
+    const seats = meetingSeats(
+      meeting({ hostPersonaId: "1", attendeePersonaIds: people.map((p) => p.id) }),
+      people,
+    );
+    expect([...seats.values()].filter((s) => s.side !== "stand")).toHaveLength(8);
+    expect(seats.get("9")).toEqual({ side: "stand", x: 362, y: 140, host: false });
+    expect(seats.get("11")).toEqual({ side: "stand", x: 402, y: 140, host: false });
+  });
+
+  it("회의가 없으면 좌석도 없다", () => {
+    expect(meetingSeats(null, team(3)).size).toBe(0);
+  });
+});
+
+describe("회의실 문구(P3e §2.4·§2.7)", () => {
+  const now = Date.parse("2026-09-27T03:12:30Z");
+
+  it("표찰 — 회의 중 '{이름} · n분째', 1분 미만 '방금', 없으면 '회의실'", () => {
+    expect(meetingSignText(meeting(), now)).toBe("착수/계획 회의 · 12분째");
+    expect(meetingSignText(meeting({ startedAt: "2026-09-27T03:12:00Z" }), now)).toBe("착수/계획 회의 · 방금");
+    expect(meetingSignText(meeting({ type: "MANAGER" }), now)).toBe("매니저 보고 · 12분째");
+    expect(meetingSignText(null, now)).toBe("회의실");
+  });
+
+  it("회의실 버튼 접근 이름 — 안건 합성 키는 '프로젝트 전반'", () => {
+    expect(meetingRoomAccessibleName(meeting(), now)).toBe(
+      "회의실 — 착수/계획 회의 진행 중, 안건 ALM-4, 참석 4명, 12분째",
+    );
+    expect(meetingRoomAccessibleName(meeting({ type: "RETRO", issueKey: "PROJECT-1" }), now)).toBe(
+      "회의실 — 회고 회의 진행 중, 안건 프로젝트 전반, 참석 4명, 12분째",
+    );
+    expect(meetingRoomAccessibleName(null, now)).toBe("회의실 — 진행 중인 회의 없음");
+  });
+
+  it("좌석 버튼 접근 이름 끝에 '회의 중 — {회의 이름}', 캔버스 요약 끝에 '회의 중 n'", () => {
+    expect(personaAccessibleName(persona(), "착수/계획 회의")).toBe(
+      "백엔드봇, 백엔드, 휴식 중, 회의 중 — 착수/계획 회의 — 개인 오피스 열기",
+    );
+    expect(officeSummaryText([persona(), persona({ id: "2" })], 2)).toBe("AI 팀원 2명 — 휴식 중 2, 회의 중 2");
+  });
+
+  it("회의 시작·종료를 한 번씩 알린다(받침 판정 조사)", () => {
+    const office = (activeMeeting: AgentActiveMeeting | null): AgentOffice => ({
+      personas: [],
+      recentRuns: [],
+      pendingGateCount: 0,
+      pendingGates: [],
+      budget: { monthlyCapUsd: null, platformMonthToDateUsd: 0, killSwitch: false },
+      generatedAt: "",
+      boardPosts: [],
+      activeMeeting,
+    });
+    expect(transitionAnnouncements(office(null), office(meeting()))).toEqual([
+      "착수/계획 회의가 시작됐습니다 — 참석 4명",
+    ]);
+    expect(transitionAnnouncements(office(meeting()), office(meeting()))).toEqual([]);
+    expect(transitionAnnouncements(office(meeting({ type: "RETRO" })), office(null))).toEqual(["회고 회의가 끝났습니다"]);
+  });
+});
+
+describe("가중치 뽑기·커피 카피", () => {
+  it("rng 구간에 따라 가중치대로 고른다", () => {
+    const items = [
+      { value: "a", weight: 1 },
+      { value: "b", weight: 3 },
+    ];
+    expect(pickWeighted(items, () => 0)).toBe("a");
+    expect(pickWeighted(items, () => 0.24)).toBe("a");
+    expect(pickWeighted(items, () => 0.26)).toBe("b");
+    expect(pickWeighted([], () => 0.5)).toBeNull();
+  });
+
+  it("킬 스위치 > 이달 상한 90% > 오늘 비용 구간", () => {
+    const budget = { monthlyCapUsd: 50, platformMonthToDateUsd: 10, killSwitch: false };
+    expect(coffeeCopy(0, budget)).toBe("아직 한 잔도 안 마셨어요");
+    expect(coffeeCopy(0.5, budget)).toBe("가볍게 한 잔");
+    expect(coffeeCopy(2.73, budget)).toBe("적당히 마시는 중");
+    expect(coffeeCopy(5, budget)).toBe("오늘은 카페인 과다!");
+    expect(coffeeCopy(2, { ...budget, platformMonthToDateUsd: 45 })).toBe("이달 원두가 거의 떨어졌어요");
+    expect(coffeeCopy(2, { ...budget, killSwitch: true })).toBe("커피 머신 전원이 꺼져 있어요 (킬 스위치)");
+  });
+});
+
+describe("게시판 목표(P3e §3)", () => {
+  const issue = (over: Partial<Issue>): Issue =>
+    ({ id: over.key, projectId: "p1", title: over.key, type: "task", status: "todo", parentId: null, ...over }) as Issue;
+
+  it("에픽별 모든 자손 기준 n/m, 지금 붙은 AI 수, 진행 중 → 할 일 → 완료 정렬", () => {
+    const issues = [
+      issue({ key: "ALM-10", type: "epic", status: "todo" }),
+      issue({ key: "ALM-11", type: "epic", status: "inprogress" }),
+      issue({ key: "ALM-12", type: "epic", status: "done" }),
+      issue({ key: "ALM-20", parentId: "ALM-11", status: "done" }),
+      issue({ key: "ALM-21", parentId: "ALM-11", status: "inprogress" }),
+      issue({ key: "ALM-22", parentId: "ALM-21", type: "subtask", status: "done" }),
+      issue({ key: "ALM-30", parentId: "ALM-12", status: "done" }),
+    ];
+    const workers = [
+      persona({ id: "1", currentRun: run("RUNNING", { issueKey: "ALM-22" }) }),
+      persona({ id: "2", currentRun: run("RUNNING", { issueKey: "ALM-11" }) }),
+      persona({ id: "3", active: false, currentRun: run("RUNNING", { issueKey: "ALM-20" }) }),
+    ];
+    const goals = epicGoals(issues, undefined, undefined, workers);
+    expect(goals.map((g) => g.issue.key)).toEqual(["ALM-11", "ALM-10", "ALM-12"]);
+    expect(goals[0]).toMatchObject({ kind: "active", done: 2, total: 3 });
+    expect(goals[0].workers.map((p) => p.id)).toEqual(["1", "2"]);
+    expect(goals[1]).toMatchObject({ kind: "new", done: 0, total: 0 });
+    expect(goals[2]).toMatchObject({ kind: "complete", done: 1, total: 1 });
+  });
+
+  it("에픽 타입이 없으면 하위가 있는 최상위 이슈가 목표 — 순환 부모에도 멈춘다", () => {
+    const issues = [
+      issue({ key: "ALM-1", status: "todo" }),
+      issue({ key: "ALM-2", parentId: "ALM-1", status: "done" }),
+      issue({ key: "ALM-3", parentId: "ALM-4" }),
+      issue({ key: "ALM-4", parentId: "ALM-3" }),
+      issue({ key: "ALM-5" }),
+    ];
+    const goals = epicGoals(issues, [], undefined, []);
+    expect(goals.map((g) => [g.issue.key, g.done, g.total])).toEqual([["ALM-1", 1, 1]]);
+  });
+
+  it("도트 진행바 — 10칸, 시작했으면 최소 1칸·덜 끝났으면 최대 9칸", () => {
+    expect(progressCells(0, 4)).toBe(0);
+    expect(progressCells(7, 12)).toBe(6);
+    expect(progressCells(1, 100)).toBe(1);
+    expect(progressCells(99, 100)).toBe(9);
+    expect(progressCells(5, 5)).toBe(10);
+    expect(progressCells(0, 0)).toBe(0);
   });
 });

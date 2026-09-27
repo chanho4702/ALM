@@ -792,6 +792,22 @@ export interface AgentOffice {
   generatedAt: string;
   /** 게시판 — 회의록이 보고된 완료 회의 run 최신 5건. 구 백엔드 응답이면 빈 배열 */
   boardPosts: AgentBoardPost[];
+  /** 진행 중(RUNNING) 회의 계열 run(P3e) — 대기·차단 회의·회의 없음·구 백엔드 응답이면 null */
+  activeMeeting: AgentActiveMeeting | null;
+}
+
+/** 사무실 회의실에 앉힐 진행 중 회의(P3e). 매니저 보고는 매니저 1명 */
+export interface AgentActiveMeeting {
+  runId: string;
+  type: AgentMeetingType;
+  status: AgentRunStatus;
+  /** 안건 이슈 키 — 안건 이슈 없는 회의면 서버 합성 키 `PROJECT-<projectId>` */
+  issueKey: string | null;
+  projectId: string;
+  hostPersonaId: string;
+  /** 진행자 먼저 */
+  attendeePersonaIds: string[];
+  startedAt: string | null;
 }
 
 /**

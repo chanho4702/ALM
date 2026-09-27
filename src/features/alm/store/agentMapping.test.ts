@@ -313,4 +313,28 @@ describe("게시판·회의 소집(P3b)", () => {
       "이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=3",
     );
   });
+
+  it("진행 중 회의(P3e) — 구 백엔드(필드 없음)·null은 회의 없음, id는 문자열, 진행자는 hostPersonaId를 명단 맨 앞으로", () => {
+    expect(mapAgentOffice(OFFICE_DTO).activeMeeting).toBeNull();
+    expect(mapAgentOffice({ ...OFFICE_DTO, activeMeeting: null }).activeMeeting).toBeNull();
+    const meeting = {
+      runId: 9300, type: "MEETING", status: "RUNNING", issueKey: "ALM-4", projectId: 3,
+      hostPersonaId: 107, attendeePersonaIds: [101, 107, 102, 101], startedAt: "2026-09-27T03:00:00Z",
+    };
+    expect(mapAgentOffice({ ...OFFICE_DTO, activeMeeting: meeting }).activeMeeting).toEqual({
+      runId: "9300", type: "MEETING", status: "RUNNING", issueKey: "ALM-4", projectId: "3",
+      hostPersonaId: "107", attendeePersonaIds: ["107", "101", "102"], startedAt: "2026-09-27T03:00:00Z",
+    });
+    // 진행자 필드가 비면 명단 첫 사람, 둘 다 없으면 앉힐 사람이 없어 회의 없음
+    expect(mapAgentOffice({ ...OFFICE_DTO, activeMeeting: { ...meeting, hostPersonaId: null } }).activeMeeting)
+      .toMatchObject({ hostPersonaId: "101", attendeePersonaIds: ["101", "107", "102"] });
+    expect(
+      mapAgentOffice({ ...OFFICE_DTO, activeMeeting: { ...meeting, hostPersonaId: null, attendeePersonaIds: [] } }).activeMeeting,
+    ).toBeNull();
+    // 매니저 보고 — 1인, 모르는 종류는 착수/계획으로 접는다
+    expect(
+      mapAgentOffice({ ...OFFICE_DTO, activeMeeting: { ...meeting, type: "MANAGER", attendeePersonaIds: null } }).activeMeeting,
+    ).toMatchObject({ type: "MANAGER", attendeePersonaIds: ["107"] });
+    expect(mapAgentOffice({ ...OFFICE_DTO, activeMeeting: { ...meeting, type: "PARTY" } }).activeMeeting?.type).toBe("MEETING");
+  });
 });

@@ -58,6 +58,17 @@
   --office-bubble-fg: #2b2233;
   --office-focus: #2b2233;
   --office-frame: #3a3145;
+  /* P3e — 회의실 카펫·창밖 구름 */
+  --office-carpet: #b9c7d6;
+  --office-carpet2: #a3b3c5;
+  --office-cloud: #ffffff;
+  --office-cloud2: #ddf1f8;
+
+  /* 사무실 고양이(P3e) — 테마 무관 */
+  --office-cat: #e89a4a;
+  --office-cat2: #c0762e;
+  --office-cat-belly: #fff8e7;
+  --office-cat-nose: #e3a7a0;
 
   /* 캐릭터 팔레트 — 테마 무관(사람 색은 밤에도 같다) */
   --office-skin-a: #f2c9a0;
@@ -148,6 +159,11 @@
   --office-bubble-fg: #2b2233;
   --office-focus: #ffe066;
   --office-frame: #5b5270;
+  --office-carpet: #2f3a52;
+  --office-carpet2: #27314a;
+  /* 구름은 다크에서 쓰지 않지만 쌍 규칙상 같은 값으로 둔다 */
+  --office-cloud: #ffffff;
+  --office-cloud2: #ddf1f8;
 }
 
 /* ── 공용 ─────────────────────────────────────────────────── */
@@ -277,7 +293,7 @@
 
 .ai-office-room.is-placeholder {
   --k: 2;
-  --room-w: 352;
+  --room-w: 464;
   --room-h: 192;
   display: grid;
   place-items: center;
@@ -371,6 +387,81 @@
 .px-rug-fill { fill: var(--office-rug); }
 .px-rug-line { fill: var(--office-rug2); }
 .px-shadow { fill: var(--office-shadow); }
+/* P3e 계열(스펙 §7 · sprites_p3e.py FAMILIES 정본) — 회의실 가구 */
+.px-furn2-K { fill: var(--office-ol); }
+.px-furn2-W { fill: var(--office-wood1); }
+.px-furn2-w { fill: var(--office-wood2); }
+.px-furn2-x { fill: var(--office-wood2); }
+.px-furn2-y { fill: var(--office-wood3); }
+.px-furn2-M { fill: var(--office-metal2); }
+.px-furn2-m { fill: var(--office-metal1); }
+.px-furn2-F { fill: var(--office-fabric); }
+.px-furn2-f { fill: var(--office-fabric2); }
+.px-furn2-A { fill: var(--office-alert); }
+.px-furn2-p { fill: var(--office-paper); }
+.px-furn2-q { fill: var(--office-paper2); }
+.px-furn2-c { fill: var(--office-wood3); }
+/* 화이트보드·램프·포스트잇·카펫 */
+.px-wb-K { fill: var(--office-ol); }
+.px-wb-m { fill: var(--office-metal1); }
+.px-wb-M { fill: var(--office-metal2); }
+.px-wb-H { fill: var(--office-hi); }
+.px-wb-F { fill: var(--office-fabric2); }
+.px-wb-R { fill: var(--office-red); }
+.px-wb-Y { fill: var(--office-alert2); }
+.px-wb-L { fill: var(--office-leaf2); }
+.px-lamp-K { fill: var(--office-ol); }
+.px-lamp-R { fill: var(--office-red); }
+.px-lamp-H { fill: var(--office-hi); }
+.px-lamp-m { fill: var(--office-metal2); }
+.px-lamp-M { fill: var(--office-metal2); }
+.px-note-K { fill: var(--office-ol); }
+.px-note-Y { fill: var(--office-alert); }
+.px-note-y { fill: var(--office-alert2); }
+.px-carpet-a { fill: var(--office-carpet); }
+.px-carpet-b { fill: var(--office-carpet2); }
+/* 유리 칸막이(사각형 4줄) */
+.px-part-ol { fill: var(--office-ol); }
+.px-part-hi { fill: var(--office-hi); }
+.px-part-glass { fill: var(--office-glass); }
+/* 미니 말풍선·퍼프·작업 이펙트·컵·김·하늘 */
+.px-mb-K { fill: var(--office-ol); }
+.px-mb-B { fill: var(--office-bubble-bg); }
+.px-mb-Y { fill: var(--office-alert); }
+.px-mb-H { fill: var(--office-hi); }
+.px-mb-M { fill: var(--office-metal2); }
+.px-mb-L { fill: var(--office-leaf2); }
+.px-mb-R { fill: var(--office-red); }
+.px-mb-F { fill: var(--office-fabric); }
+.px-mb-p { fill: var(--office-paper); }
+.px-mb-G { fill: var(--office-glass); }
+.px-puff-K { fill: var(--office-ol); }
+.px-puff-B { fill: var(--office-bubble-bg); }
+.px-fx-K { fill: var(--office-ol); }
+.px-fx-G { fill: var(--office-glass); }
+.px-fx-H { fill: var(--office-hi); }
+.px-fx-Y { fill: var(--office-alert); }
+.px-fx-M { fill: var(--office-metal2); }
+.px-fx-F { fill: var(--office-fabric); }
+.px-item-K { fill: var(--office-ol); }
+.px-item-c { fill: var(--office-wood3); }
+.px-item-p { fill: var(--office-paper); }
+.px-item-H { fill: var(--office-hi); }
+.px-sky-W { fill: var(--office-cloud); }
+.px-sky-w { fill: var(--office-cloud2); }
+.px-sky-q { fill: var(--office-sky2); }
+.px-sky-H { fill: var(--office-hi); }
+/* 고양이 */
+.px-cat-K { fill: var(--office-ol); }
+.px-cat-O { fill: var(--office-cat); }
+.px-cat-o { fill: var(--office-cat2); }
+.px-cat-W { fill: var(--office-cat-belly); }
+.px-cat-P { fill: var(--office-cat-nose); }
+
+/* 킬 스위치 — 커피 머신 전원등이 꺼진다(§4.2) */
+.ai-office-room.is-killed .px-coffee-R {
+  fill: var(--office-metal2);
+}
 
 /* ── 아바타 이동·들림 ─────────────────────────────────────── */
 .office-avatar {
@@ -524,7 +615,10 @@
 /* ── 클릭 대상(투명 버튼) ─────────────────────────────────── */
 .office-hit,
 .office-hit-alert,
-.office-hit-board {
+.office-hit-board,
+.office-hit-meeting,
+.office-hit-coffee,
+.office-hit-cat {
   position: absolute;
   z-index: 1;
   left: calc(var(--x) * var(--k) * 1px);
@@ -540,10 +634,217 @@
 
 .office-hit:focus-visible,
 .office-hit-alert:focus-visible,
-.office-hit-board:focus-visible {
+.office-hit-board:focus-visible,
+.office-hit-meeting:focus-visible,
+.office-hit-coffee:focus-visible,
+.office-hit-cat:focus-visible {
   z-index: 3;
   outline: 2px solid var(--office-focus);
   outline-offset: 2px;
+}
+
+/* 회의실 버튼은 좌석 버튼 아래 — 좌석을 누르면 그 사람이 열린다(§2.7) */
+.office-hit-meeting {
+  z-index: 0;
+}
+
+/* ── P3e 회의실 표찰·좌석 임시 명패·커피 팝·고양이 말풍선 ───── */
+.office-meeting-sign {
+  max-width: calc(80 * var(--k) * 1px);
+}
+
+.office-meeting-sign.is-live {
+  background: var(--office-alert);
+  color: var(--office-ol);
+}
+
+/* 좌석 hover·focus 때만 머리 위에 띄우는 명패 — 아래 끝이 --y */
+.office-nameplate.is-above {
+  z-index: 4;
+  transform: translate(-50%, -100%);
+}
+
+.office-pop {
+  position: absolute;
+  z-index: 4;
+  right: calc((var(--room-w) - var(--right)) * var(--k) * 1px);
+  top: calc(var(--y) * var(--k) * 1px + 4px);
+  max-width: calc(96 * var(--k) * 1px);
+  width: max-content;
+  pointer-events: none;
+}
+
+.ai-office-room.is-animated .office-pop,
+.ai-office-room.is-animated .office-cat-bubble {
+  animation: office-fade-in var(--chanho-transition-base);
+}
+
+/* 꼬리가 위 — 커피 머신(x 336)을 가리킨다 */
+.office-pop::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% - 1px);
+  right: calc((var(--right) - var(--tail)) * var(--k) * 1px - 3px);
+  width: 6px;
+  height: 4px;
+  background: var(--office-ol);
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% 100%, 0 100%, 0 2px, 2px 2px);
+}
+
+.office-cat-bubble {
+  z-index: 3;
+}
+
+/* ── P3e 장식 애니 — transform·opacity만(§5.1) ─────────────── */
+/* 산책 구간 — 거리/16초, 2ap당 한 계단 */
+.ai-office-room.is-animated .office-avatar.is-strolling {
+  transition: transform calc(var(--walk-ms) * 1ms) steps(var(--walk-steps), end);
+}
+
+/* 미니 말풍선 한 개 2000ms — 0~160 퍼프, 160~1840 말풍선(420ms마다 2ap 위로), 1840~2000 퍼프 */
+.office-mb.is-far {
+  animation: office-mb-rise-far 2000ms steps(1, end) forwards;
+}
+
+.office-mb.is-near {
+  animation: office-mb-rise-near 2000ms steps(1, end) forwards;
+}
+
+.office-mb-puff {
+  animation: office-mb-puff 2000ms steps(1, end) forwards;
+}
+
+.office-mb-body {
+  animation: office-mb-body 2000ms steps(1, end) forwards;
+}
+
+@keyframes office-mb-rise-far {
+  0% { transform: translateY(0); }
+  29% { transform: translateY(-2px); }
+  50% { transform: translateY(-4px); }
+  71% { transform: translateY(-6px); }
+  92%,
+  100% { transform: translateY(-8px); }
+}
+
+@keyframes office-mb-rise-near {
+  0% { transform: translateY(0); }
+  29% { transform: translateY(-2px); }
+  50%,
+  100% { transform: translateY(-4px); }
+}
+
+@keyframes office-mb-puff {
+  0% { opacity: 1; }
+  8% { opacity: 0; }
+  92%,
+  100% { opacity: 1; }
+}
+
+@keyframes office-mb-body {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  92%,
+  100% { opacity: 0; }
+}
+
+/* 작업 이펙트 — 400ms마다 1ap 통통 */
+.office-work-fx {
+  animation: office-bob 800ms steps(1, end) infinite;
+}
+
+@keyframes office-bob {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+/* 식물 흔들림 — 긴 주기 안에서 흔들 프레임을 짧게 두 번(§4.3) */
+.office-plant-b {
+  opacity: 0;
+  animation: office-sway var(--sway) steps(1, end) infinite;
+}
+
+.office-plant-a {
+  animation: office-sway-base var(--sway) steps(1, end) infinite;
+}
+
+@keyframes office-sway {
+  0%, 100% { opacity: 0; }
+  1% { opacity: 1; }
+  2.5% { opacity: 0; }
+  4% { opacity: 1; }
+  5.5% { opacity: 0; }
+}
+
+@keyframes office-sway-base {
+  0%, 100% { opacity: 1; }
+  1% { opacity: 0; }
+  2.5% { opacity: 1; }
+  4% { opacity: 0; }
+  5.5% { opacity: 1; }
+}
+
+/* 창밖 — 라이트 구름(48s, 2ap씩) / 다크 별똥별(71s·97s 중 600ms만) */
+.office-sky-night {
+  display: none;
+}
+
+[data-theme="dark"] .ai-office .office-sky-day {
+  display: none;
+}
+
+[data-theme="dark"] .ai-office .office-sky-night {
+  display: inline;
+}
+
+.office-cloud {
+  animation: office-cloud 48s steps(21, end) infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes office-cloud {
+  from { transform: translateX(0); }
+  to { transform: translateX(42px); }
+}
+
+.office-meteor {
+  opacity: 0;
+  animation: office-meteor var(--period) linear infinite;
+}
+
+@keyframes office-meteor {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+    animation-timing-function: steps(6, end);
+  }
+  0.85% {
+    opacity: 1;
+    transform: translate(-10px, 6px);
+    animation-timing-function: steps(1, end);
+  }
+  0.86%,
+  100% {
+    opacity: 0;
+    transform: translate(-10px, 6px);
+  }
+}
+
+/* 커피 머신 앞에서 화면 한 번 깜빡(200ms × 2) */
+.ai-office-room.is-brewing .px-coffee-G {
+  animation: office-blink-once 600ms steps(1, end) 1;
+}
+
+@keyframes office-blink-once {
+  0% { opacity: 1; }
+  33% { opacity: 0; }
+  66%, 100% { opacity: 1; }
+}
+
+/* 화면 밖이면 CSS 루프도 멈춘다(§5.3) */
+.ai-office-room.is-offscreen *,
+.ai-office-room.is-offscreen *::before {
+  animation-play-state: paused !important;
 }
 
 .office-board-badge {
@@ -933,6 +1234,36 @@
   .ai-office-refresh.is-spinning svg {
     animation: none;
   }
+
+  /* P3e(§5.4) — 식물 기본 프레임, 구름은 한 자리에 정지, 별똥별 숨김, 팝은 즉시 */
+  .office-mb,
+  .office-mb-puff,
+  .office-mb-body,
+  .office-work-fx,
+  .office-plant-a,
+  .office-plant-b,
+  .office-cloud,
+  .ai-office-room.is-brewing .px-coffee-G,
+  .ai-office-room.is-animated .office-pop,
+  .ai-office-room.is-animated .office-cat-bubble {
+    animation: none;
+  }
+
+  .office-plant-b {
+    opacity: 0;
+  }
+
+  .office-cloud {
+    transform: translateX(calc(var(--still) * 1px));
+  }
+
+  .office-meteor {
+    display: none;
+  }
+
+  .ai-office-room.is-animated .office-avatar.is-strolling {
+    transition: none;
+  }
 }
 
 /* 본문 링크(이슈 키 등) — DS 링크 색 */
@@ -966,6 +1297,152 @@
   display: inline-flex;
   align-items: center;
   gap: var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* ── 게시판 "지금 만드는 것"(P3e §3) ──────────────────────── */
+.office-goal-list,
+.office-attendee-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.office-goal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.office-goal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--chanho-space-100);
+}
+
+.office-goal-title {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.office-goal-status {
+  flex-shrink: 0;
+}
+
+.office-goal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding-left: calc(var(--chanho-space-100) + 16px);
+}
+
+.office-goal-count {
+  font-size: var(--chanho-font-size-75);
+}
+
+.office-goal-workers {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  margin: 0;
+  padding-left: calc(var(--chanho-space-100) + 16px);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-goal-loading {
+  display: flex;
+  padding: var(--chanho-space-100) 0;
+}
+
+/* 도트 진행바 — 칸 8px·간격 2px·테두리 2px·안쪽 여백 2px = 106px, 2px 계단 노치(§3.3 예외 상수) */
+.office-pixel-progress {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 2px solid var(--office-ol);
+  background: var(--office-paper2);
+  clip-path: polygon(
+    0 2px,
+    2px 2px,
+    2px 0,
+    calc(100% - 2px) 0,
+    calc(100% - 2px) 2px,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    2px calc(100% - 2px),
+    0 calc(100% - 2px)
+  );
+}
+
+.office-pixel-progress i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  background: var(--office-paper2);
+}
+
+.office-pixel-progress i.is-filled {
+  background: var(--office-leaf2);
+}
+
+/* ── 회의실 패널 참석자(P3e §2.8) ───────────────────────────── */
+.office-attendee {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  width: 100%;
+  margin: 0;
+  padding: var(--chanho-space-75) var(--chanho-space-100);
+  border: 0;
+  border-radius: var(--chanho-radius-medium);
+  background: transparent;
+  color: var(--chanho-color-text-default);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.office-attendee:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+button.office-attendee:focus-visible {
+  outline: none;
+  box-shadow: var(--chanho-focus-ring);
+}
+
+.office-attendee.is-inactive {
+  cursor: default;
+  color: var(--chanho-color-text-subtle);
+}
+
+.office-attendee-name {
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.office-portrait.is-row {
+  width: 32px;
+  height: 32px;
+  border-width: 2px;
+  box-shadow: none;
+}
+
+.ai-team-card-meeting {
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
 }

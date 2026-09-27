@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate } from "react-router";
-import { Banner, Button, Spinner } from "@chanho/react";
-import { ExternalLink, FileText, History, Wrench, X } from "lucide-react";
-import type { AgentBoardPost, AgentOfficePersona, AgentPersonaActivity, AgentRunSummary } from "../store/types";
+import { Badge, Banner, Button, Lozenge, Spinner } from "@chanho/react";
+import { ExternalLink, FileText, History, Keyboard, Users, UsersRound, Wrench, X } from "lucide-react";
+import type {
+  AgentActiveMeeting,
+  AgentBoardPost,
+  AgentOfficePersona,
+  AgentPersonaActivity,
+  AgentRunSummary,
+  IssueTypeDef,
+  WorkflowStatus,
+} from "../store/types";
 import {
   AGENT_RUN_STATUS_LABEL,
   AGENT_RUN_TRIGGER_LABEL,
@@ -11,12 +19,25 @@ import {
   AgentMeetingTypeGlyph,
   AgentRoleGlyph,
   AgentRunStatusLozenge,
+  AgentRunTypeGlyph,
   AgentStatusLozenge,
 } from "../components/AgentGlyphs";
+import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
+import { StatusGlyph } from "../components/StatusGlyph";
+import { statusAppearance, statusName } from "../components/labels";
 import { formatClock, formatDateTime, relTime } from "../components/time";
 import type { LoadStatus } from "./useOfficeData";
-import { BoardPortrait, OfficePortrait } from "./PixelSprite";
-import { linkableIssueKey, personaState, PROJECT_WIDE_LABEL } from "./officeModel";
+import { BoardPortrait, OfficePortrait, WhiteboardPortrait } from "./PixelSprite";
+import { PixelProgress } from "./PixelProgress";
+import {
+  deskStayState,
+  linkableIssueKey,
+  meetingElapsedMinutes,
+  meetingRunStatus,
+  personaState,
+  PROJECT_WIDE_LABEL,
+  type EpicGoal,
+} from "./officeModel";
 
 export interface OfficeLinks {
   gates: string;
@@ -26,7 +47,19 @@ export interface OfficeLinks {
   issue: (key: string) => string;
 }
 
-export type PanelTarget = { kind: "persona"; persona: AgentOfficePersona } | { kind: "board" };
+export type PanelTarget = { kind: "persona"; persona: AgentOfficePersona } | { kind: "board" } | { kind: "meeting" };
+
+/** 게시판 "지금 만드는 것" 섹션 입력(P3e §3) — 목표는 페이지가 `epicGoals`로 만든다 */
+export interface GoalsView {
+  status: "idle" | "loading" | "ready" | "error";
+  goals: EpicGoal[];
+  statuses: WorkflowStatus[];
+  types: IssueTypeDef[];
+  retry: () => void;
+}
+
+/** 목표 기본 표시 수 — 완료 아닌 것 5개 + 접기(§3.4) */
+const GOALS_SHOWN = 5;
 
 const RUN_TYPE_LABEL = AGENT_RUN_TYPE_LABEL;
 const TRIGGER_LABEL = AGENT_RUN_TRIGGER_LABEL;
@@ -66,8 +99,13 @@ export function OfficePanel({
   activityStatus,
   links,
   docked,
+  meeting,
+  goals,
   onClose,
   onRetry,
+  onOpenPersona,
+  onOpenBoard,
+  onConvene,
 }: {
   target: PanelTarget;
   personaNames: Map<string, AgentOfficePersona>;
@@ -77,11 +115,17 @@ export function OfficePanel({
   activityStatus: LoadStatus | "idle";
   links: OfficeLinks;
   docked: boolean;
+  meeting: AgentActiveMeeting | null;
+  goals: GoalsView;
   onClose: () => void;
   onRetry: () => void;
+  onOpenPersona: (id: string, opener: HTMLElement) => void;
+  onOpenBoard: (opener: HTMLElement) => void;
+  /** 회의 소집 모달 열기 — 소집 권한(전역 관리자)이 없으면 없음 */
+  onConvene?: () => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const targetKey = target.kind === "board" ? "board" : target.persona.id;
+  const targetKey = target.kind === "persona" ? target.persona.id : target.kind;
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -110,12 +154,24 @@ export function OfficePanel({
           onClose={onClose}
           onRetry={onRetry}
         />
+      ) : target.kind === "meeting" ? (
+        <MeetingBody
+          meeting={meeting}
+          personaNames={personaNames}
+          links={links}
+          titleRef={titleRef}
+          onClose={onClose}
+          onOpenPersona={onOpenPersona}
+          onOpenBoard={onOpenBoard}
+          onConvene={onConvene}
+        />
       ) : (
         <BoardBody
           posts={boardPosts}
           runs={recentFinished}
           personaNames={personaNames}
           links={links}
+          goals={goals}
           titleRef={titleRef}
           onClose={onClose}
         />
@@ -308,6 +364,7 @@ function BoardBody({
   runs,
   personaNames,
   links,
+  goals,
   titleRef,
   onClose,
 }: {
@@ -315,6 +372,7 @@ function BoardBody({
   runs: AgentRunSummary[];
   personaNames: Map<string, AgentOfficePersona>;
   links: OfficeLinks;
+  goals: GoalsView;
   titleRef: RefObject<HTMLHeadingElement | null>;
   onClose: () => void;
 }) {
@@ -326,10 +384,11 @@ function BoardBody({
           <h2 id="ai-office-panel-title" className="office-panel-title" tabIndex={-1} ref={titleRef}>
             게시판
           </h2>
-          <span className="office-panel-role">회의록 · 최근 작업 보고서</span>
+          <span className="office-panel-role">개발 목표 · 회의록 · 최근 작업 보고서</span>
         </div>
         <CloseButton onClose={onClose} label="게시판 닫기" />
       </header>
+      <GoalsSection goals={goals} links={links} />
       <Section title="회의록" count={posts.length}>
         {posts.length === 0 ? (
           <p className="office-panel-empty">아직 게시물이 없습니다</p>
@@ -439,4 +498,286 @@ function IssueCell({
     );
   }
   return <span className={className}>{run.issueKey ? PROJECT_WIDE_LABEL : "—"}</span>;
+}
+
+/**
+ * 게시판 맨 위 "지금 만드는 것"(P3e §3.2) — 에픽별 제목·상태·도트 진행바·"n/m 완료"·지금 붙어 있는 AI 수.
+ * 로딩·오류는 이 섹션 자리에서만(나머지 섹션은 즉시 표시).
+ */
+function GoalsSection({ goals, links }: { goals: GoalsView; links: OfficeLinks }) {
+  const [openMore, setOpenMore] = useState(false);
+  const [openDone, setOpenDone] = useState(false);
+  const pending = goals.goals.filter((g) => g.kind !== "complete");
+  const done = goals.goals.filter((g) => g.kind === "complete");
+  const shownPending = openMore ? pending : pending.slice(0, GOALS_SHOWN);
+  const rows = openDone ? [...shownPending, ...done] : shownPending;
+
+  let body: ReactNode;
+  if (goals.status === "error" && goals.goals.length === 0) {
+    body = (
+      <div className="office-panel-error">
+        <p role="alert">목표를 불러오지 못했습니다</p>
+        <Button variant="secondary" size="small" onClick={goals.retry}>
+          다시 시도
+        </Button>
+      </div>
+    );
+  } else if (goals.status !== "ready" && goals.goals.length === 0) {
+    body = (
+      <div className="office-goal-loading">
+        <Spinner size="small" label="목표를 불러오는 중" />
+      </div>
+    );
+  } else if (goals.goals.length === 0) {
+    body = <p className="office-panel-empty">아직 목표(에픽)가 없습니다</p>;
+  } else {
+    body = (
+      <>
+        <ul className="office-goal-list" aria-label="개발 목표">
+          {rows.map((goal) => (
+            <GoalRow key={goal.issue.id} goal={goal} goals={goals} links={links} />
+          ))}
+        </ul>
+        {!openMore && pending.length > GOALS_SHOWN ? (
+          <Button variant="ghost" size="small" onClick={() => setOpenMore(true)}>
+            목표 {pending.length - GOALS_SHOWN}개 더 보기
+          </Button>
+        ) : null}
+        {!openDone && done.length > 0 ? (
+          <Button variant="ghost" size="small" onClick={() => setOpenDone(true)}>
+            완료된 목표 {done.length}개 더 보기
+          </Button>
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <Section title="지금 만드는 것" count={goals.status === "ready" || goals.goals.length > 0 ? goals.goals.length : undefined}>
+      {body}
+    </Section>
+  );
+}
+
+function GoalRow({ goal, goals, links }: { goal: EpicGoal; goals: GoalsView; links: OfficeLinks }) {
+  const { issue } = goal;
+  const workerNames = goal.workers.map((p) => p.name).join(", ");
+  return (
+    <li className="office-goal" data-testid={`office-goal-${issue.key}`}>
+      <div className="office-goal-head">
+        <IssueTypeGlyph type={issue.type} types={goals.types} />
+        <Link to={links.issue(issue.key)} className="office-goal-title">
+          {issue.title}
+        </Link>
+        <span className="status-cell office-goal-status">
+          <StatusGlyph status={issue.status} statuses={goals.statuses} variant="icon" />
+          <Lozenge appearance={statusAppearance(goals.statuses, issue.status)}>
+            {statusName(goals.statuses, issue.status)}
+          </Lozenge>
+        </span>
+      </div>
+      <div className="office-goal-meta">
+        <span className="office-run-key">{issue.key}</span>
+        {goal.total > 0 ? (
+          <>
+            <PixelProgress done={goal.done} total={goal.total} label={`${issue.title} 진행`} />
+            <span className="office-goal-count">
+              {goal.done}/{goal.total} 완료
+            </span>
+          </>
+        ) : (
+          <span className="office-panel-empty office-goal-count">하위 이슈 없음</span>
+        )}
+      </div>
+      {goal.workers.length > 0 ? (
+        <p className="office-goal-workers" title={workerNames}>
+          <Keyboard size={12} aria-hidden />
+          AI {goal.workers.length}명 작업 중
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * 회의실 모드(P3e §2.8) — 종류·안건·진행자·경과·참석자·실행 상세·회의록. 회의 없음이면 안내 + (권한 있으면) 회의 소집.
+ * 열려 있는 동안 회의가 끝나면 내용만 "회의 없음"으로 바뀐다(패널을 닫지 않는다).
+ */
+function MeetingBody({
+  meeting,
+  personaNames,
+  links,
+  titleRef,
+  onClose,
+  onOpenPersona,
+  onOpenBoard,
+  onConvene,
+}: {
+  meeting: AgentActiveMeeting | null;
+  personaNames: Map<string, AgentOfficePersona>;
+  links: OfficeLinks;
+  titleRef: RefObject<HTMLHeadingElement | null>;
+  onClose: () => void;
+  onOpenPersona: (id: string, opener: HTMLElement) => void;
+  onOpenBoard: (opener: HTMLElement) => void;
+  onConvene?: () => void;
+}) {
+  const navigate = useNavigate();
+  const personas = [...personaNames.values()];
+  const host = meeting ? personaNames.get(meeting.hostPersonaId) : undefined;
+  const status = meeting ? meetingRunStatus(meeting, personas) : null;
+  const minutes = meeting ? meetingElapsedMinutes(meeting.startedAt, Date.now()) : null;
+  const hostRun = meeting && host?.currentRun?.id === meeting.runId ? host.currentRun : null;
+  const agendaKey = meeting ? linkableIssueKey(meeting) : null;
+
+  return (
+    <>
+      <header className="office-panel-head">
+        <WhiteboardPortrait active={meeting !== null} />
+        <div className="office-panel-id">
+          <h2 id="ai-office-panel-title" className="office-panel-title" tabIndex={-1} ref={titleRef}>
+            회의실
+          </h2>
+          <span className="office-panel-role">
+            {meeting ? <AgentRunTypeGlyph type={meeting.type} size={12} /> : "진행 중인 회의 없음"}
+          </span>
+          {meeting && status ? (
+            status === "WAITING_APPROVAL" || status === "BLOCKED" ? (
+              <AgentRunStatusLozenge status={status} />
+            ) : (
+              <Lozenge appearance="info" className="agent-lozenge is-info">
+                <Users size={12} aria-hidden />
+                {minutes === null ? "진행 중" : minutes < 1 ? "진행 중 방금" : `진행 중 ${minutes}분`}
+              </Lozenge>
+            )
+          ) : null}
+        </div>
+        <CloseButton onClose={onClose} label="회의실 닫기" />
+      </header>
+
+      <Section title="진행 중인 회의">
+        {meeting ? (
+          <>
+            <dl className="office-panel-dl">
+              <dt>종류</dt>
+              <dd>
+                <span className="status-cell">
+                  <AgentRunTypeGlyph type={meeting.type} size={12} />
+                  {hostRun ? ` · ${TRIGGER_LABEL[hostRun.trigger]}` : ""}
+                </span>
+              </dd>
+              <dt>안건</dt>
+              <dd>
+                {agendaKey ? (
+                  <Link to={links.issue(agendaKey)} className="office-run-key">
+                    {agendaKey}
+                  </Link>
+                ) : (
+                  PROJECT_WIDE_LABEL
+                )}
+              </dd>
+              <dt>진행자</dt>
+              <dd>
+                {host ? (
+                  <span className="status-cell">
+                    <AgentRoleGlyph role={host.role} size={12} />
+                    <span>{host.name}</span>
+                  </span>
+                ) : (
+                  `페르소나 #${meeting.hostPersonaId}`
+                )}
+              </dd>
+              <dt>시작</dt>
+              <dd>
+                {meeting.startedAt ? (
+                  <span title={formatDateTime(meeting.startedAt)}>
+                    {relTime(meeting.startedAt)} ({formatClock(meeting.startedAt)})
+                  </span>
+                ) : (
+                  "아직 시작 전"
+                )}
+              </dd>
+            </dl>
+            <div>
+              <Button
+                variant="secondary"
+                size="small"
+                iconBefore={<History size={14} aria-hidden />}
+                onClick={() => navigate(links.run(meeting.runId))}
+              >
+                실행 상세
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="office-panel-empty">지금 진행 중인 회의가 없습니다</p>
+            {onConvene ? (
+              <div>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  iconBefore={<UsersRound size={14} aria-hidden />}
+                  onClick={onConvene}
+                >
+                  회의 소집
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </Section>
+
+      {meeting ? (
+        <Section title="참석자" count={meeting.attendeePersonaIds.length}>
+          <ul className="office-attendee-list" aria-label="참석자">
+            {meeting.attendeePersonaIds.map((id) => {
+              const p = personaNames.get(id);
+              if (!p || !p.active) {
+                return (
+                  <li key={id} className="office-attendee is-inactive">
+                    <span>{p?.name ?? `페르소나 #${id}`}</span>
+                    <span className="office-panel-empty">· 비활성</span>
+                  </li>
+                );
+              }
+              const stay = deskStayState(p, meeting);
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    className="office-attendee"
+                    onClick={(e) => onOpenPersona(p.id, e.currentTarget)}
+                  >
+                    <OfficePortrait slug={p.slug} role={p.role} className="is-row" />
+                    <span className="office-attendee-name">{p.name}</span>
+                    <AgentRoleGlyph role={p.role} size={12} />
+                    {id === meeting.hostPersonaId ? <Badge appearance="brand">진행자</Badge> : null}
+                    {stay ? (
+                      <span className="status-cell">
+                        <AgentStatusLozenge state={stay} />
+                        <span className="office-panel-empty">· 자리에 있음</span>
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      ) : null}
+
+      <Section title="회의록">
+        <div>
+          <Button
+            variant="ghost"
+            size="small"
+            iconBefore={<FileText size={14} aria-hidden />}
+            onClick={(e) => onOpenBoard(e.currentTarget)}
+          >
+            게시판에서 회의록 보기
+          </Button>
+        </div>
+      </Section>
+    </>
+  );
 }

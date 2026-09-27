@@ -27,6 +27,12 @@ function renderApp(path: string) {
 
 const OFFICE_PATH = "/projects/p1/ai-office";
 
+/** P3a 상태 매핑만 보는 테스트 — 목업의 진행 중 회의(P3e)를 빼서 전원이 자기 자리에 있게 한다 */
+async function withoutMeeting() {
+  const base = await store.fetchOffice("p1");
+  return vi.spyOn(store, "fetchOffice").mockResolvedValue({ ...base, activeMeeting: null });
+}
+
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
@@ -64,6 +70,7 @@ describe("AI 사무실 진입점 — useAiTeamActive일 때만 탭", () => {
 
 describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
   it("6상태가 버튼 접근 이름·말풍선·오버레이로 구분된다", async () => {
+    await withoutMeeting();
     const { container } = renderApp(OFFICE_PATH);
     // 로딩 자리표시(같은 이름의 region)가 실제 캔버스로 바뀐 뒤에 region을 잡는다
     await screen.findByRole("button", { name: /^기획봇, 기획, 작업 중, 이슈 ALM-4, 최근 활동: ALM-4 인수 조건 보완/ });
@@ -113,6 +120,7 @@ describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
     const base = await store.fetchOffice("p1");
     vi.spyOn(store, "fetchOffice").mockResolvedValue({
       ...base,
+      activeMeeting: null,
       personas: base.personas.map((p) => ({ ...p, lastActivity: null })),
     });
     renderApp(OFFICE_PATH);
@@ -543,6 +551,7 @@ describe("안건 이슈 없는 회의 run — 합성 키 가드", () => {
     const base = await store.fetchOffice("p1");
     vi.spyOn(store, "fetchOffice").mockResolvedValue({
       ...base,
+      activeMeeting: null,
       personas: base.personas.map((p) =>
         p.id === "101"
           ? { ...p, currentRun: { ...p.currentRun!, type: "RETRO", issueKey: "PROJECT-1" }, lastActivity: null }

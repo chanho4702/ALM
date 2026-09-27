@@ -3,6 +3,7 @@
  * 서버 long id → string, BigDecimal(숫자 또는 문자열로 올 수 있음) → number, 모르는 enum은 안전한 값으로 접는다.
  */
 import type {
+  AgentActiveMeeting,
   AgentActiveRunStatus,
   AgentAuditEntry,
   AgentBoardPost,
@@ -136,6 +137,19 @@ export interface AgentOfficeDto {
   generatedAt?: string | null;
   /** P3b 이전 백엔드는 이 필드가 없다 */
   boardPosts?: AgentBoardPostDto[] | null;
+  /** P3e 이전 백엔드는 이 필드가 없다 */
+  activeMeeting?: AgentActiveMeetingDto | null;
+}
+
+export interface AgentActiveMeetingDto {
+  runId: Id;
+  type: string;
+  status: string;
+  issueKey: string | null;
+  projectId: Id;
+  hostPersonaId: Id | null;
+  attendeePersonaIds?: Id[] | null;
+  startedAt: string | null;
 }
 
 export interface AgentPersonaActivityDto {
@@ -290,6 +304,27 @@ export function mapAgentMeetingCreated(dto: AgentMeetingCreatedDto): AgentMeetin
   };
 }
 
+/**
+ * 진행 중 회의 — 진행자는 `hostPersonaId`가 정본이고 명단 맨 앞에 오게 다시 세운다(중복 제거).
+ * 진행자도 참석자도 없으면 앉힐 사람이 없으니 회의 없음(null)으로 접는다.
+ */
+export function mapAgentActiveMeeting(dto: AgentActiveMeetingDto | null | undefined): AgentActiveMeeting | null {
+  if (!dto) return null;
+  const listed = (dto.attendeePersonaIds ?? []).map(String);
+  const host = dto.hostPersonaId === null || dto.hostPersonaId === undefined ? listed[0] : String(dto.hostPersonaId);
+  if (!host) return null;
+  return {
+    runId: String(dto.runId),
+    type: pick(MEETING_TYPES, dto.type, "MEETING"),
+    status: pick(RUN_STATUSES, dto.status, "RUNNING"),
+    issueKey: dto.issueKey ?? null,
+    projectId: String(dto.projectId),
+    hostPersonaId: host,
+    attendeePersonaIds: [host, ...listed.filter((id, i) => id !== host && listed.indexOf(id) === i)],
+    startedAt: dto.startedAt ?? null,
+  };
+}
+
 export function mapAgentOffice(dto: AgentOfficeDto): AgentOffice {
   return {
     personas: (dto.personas ?? []).map(mapPersona),
@@ -303,6 +338,7 @@ export function mapAgentOffice(dto: AgentOfficeDto): AgentOffice {
     },
     generatedAt: dto.generatedAt ?? new Date().toISOString(),
     boardPosts: (dto.boardPosts ?? []).map(mapAgentBoardPost),
+    activeMeeting: mapAgentActiveMeeting(dto.activeMeeting),
   };
 }
 

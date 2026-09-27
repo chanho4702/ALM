@@ -106,7 +106,8 @@ describe("실행 기록(AGP-12) — 목록·필터", () => {
   it("기본은 이 프로젝트(ALM) run만, 열마다 아이콘+텍스트 값", async () => {
     renderApp(`${BASE}/runs`);
     const table = await runsTable();
-    expect(screen.getByText("11건")).toBeInTheDocument();
+    // 진행 중 착수/계획 회의 run(9007, P3e 목업)까지 12건
+    expect(screen.getByText("12건")).toBeInTheDocument();
     expect(within(table).queryByText("WEB-2")).not.toBeInTheDocument();
 
     const row = within(table).getByRole("link", { name: "실행 #9006 상세" }).closest("tr")!;
@@ -132,10 +133,10 @@ describe("실행 기록(AGP-12) — 목록·필터", () => {
 
     await user.click(screen.getByRole("combobox", { name: "상태" }));
     await user.click(await screen.findByRole("option", { name: "활성" }));
-    expect(screen.getByText("5건")).toBeInTheDocument();
+    expect(screen.getByText("6건")).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("group=active");
     const active = await runsTable();
-    expect(dataRows(active)).toHaveLength(5);
+    expect(dataRows(active)).toHaveLength(6);
     expect(within(active).queryByText("완료")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("combobox", { name: "상태" }));

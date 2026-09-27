@@ -1,40 +1,76 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router";
 import { Badge } from "@chanho/react";
-import type { AgentOfficePersona } from "../store/types";
+import type { AgentActiveMeeting, AgentBudget, AgentOfficePersona } from "../store/types";
 import type { AgentPersonaState } from "../components/AgentGlyphs";
 import {
   avatarPaths,
   avatarVars,
   backgroundPaths,
+  backgroundTopPaths,
+  microBubblePaths,
+  plantSpots,
+  roomFurniturePaths,
   roomGeometry,
   spritePaths,
+  WINDOWS,
   type AvatarFrame,
   ROOM_W,
 } from "./pixel";
 import { PixelSprite } from "./PixelSprite";
-import { bubbleText, officeSummaryText, personaAccessibleName, personaState } from "./officeModel";
+import {
+  bubbleText,
+  coffeeCopy,
+  FAR_SEATS_X,
+  formatUsd,
+  meetingName,
+  meetingRoomAccessibleName,
+  meetingRunStatus,
+  meetingSignText,
+  NEAR_SEATS_X,
+  officeSummaryText,
+  personaAccessibleName,
+  personaState,
+  todayCostTotal,
+  type MeetingSeat,
+} from "./officeModel";
+import { useOfficeAmbience, type AmbienceSnapshot, type Stroll } from "./useOfficeAmbience";
 
 /** 자리 이동 시간 — CSS `transition: transform 640ms steps(8)`과 같은 값 */
 const WALK_MS = 640;
 /** 페르소나마다 루프 위상을 흩는 간격 */
 const PHASE_STEP_MS = 170;
+/** 사무실 고양이(P3e §4.6) — 사용자 채택(2026-09-27). false면 에셋만 남기고 그리지 않는다 */
+export const OFFICE_CAT = true;
+/** 커피 팝·고양이 반응이 떠 있는 시간 */
+const COFFEE_POP_MS = 5000;
+const CAT_AWAKE_MS = 2000;
 
 export interface OfficeCanvasProps {
   /** 정렬된 페르소나(스펙 §1.5) — 인덱스가 책상·유휴 자리를 고정한다 */
   personas: readonly AgentOfficePersona[];
+  /** 진행 중 회의와 그 좌석(`meetingSeats`) — 팀 카드와 같은 파생을 쓴다 */
+  activeMeeting: AgentActiveMeeting | null;
+  seats: ReadonlyMap<string, MeetingSeat>;
+  budget: AgentBudget;
   gatesHref: string;
   selectedId: string | null;
   boardOpen: boolean;
+  meetingOpen: boolean;
   boardCount: number;
   /** 게시판 회의록 게시물 수 */
   postCount: number;
+  /** 진행 중 목표(에픽) 수 — 게시판을 한 번도 열지 않아 모르면 null */
+  goalCount: number | null;
   todayReports: number;
   onOpenPersona: (id: string, opener: HTMLElement) => void;
   onOpenBoard: (opener: HTMLElement) => void;
+  onOpenMeeting: (opener: HTMLElement) => void;
+  /** 클릭 반응(커피값·고양이)을 라이브 영역으로 */
+  onAnnounce: (text: string) => void;
 }
 
-type Pose = "seat" | "slump" | "stand";
+type Pose = "seat" | "slump" | "stand" | "seatFar" | "seatBack";
 
 interface Seat {
   x0: number;
@@ -50,6 +86,8 @@ function poseOf(state: AgentPersonaState): Pose | null {
   return null;
 }
 
+const idleSpot = (i: number) => ({ x: 270 + 24 * (i % 3), y: 52 + 32 * Math.floor(i / 3) });
+
 /** 아바타 좌상단(아트 픽셀) — 앉음은 자기 책상, 대기열은 책상 옆, 유휴는 휴게 구역의 고정 자리(k = i) */
 function avatarPosition(state: AgentPersonaState, i: number): { x: number; y: number } | null {
   const { x0, y0 } = cellOf(i);
@@ -61,11 +99,13 @@ function avatarPosition(state: AgentPersonaState, i: number): { x: number; y: nu
     case "QUEUED":
       return { x: x0 + 44, y: y0 + 10 };
     case "IDLE":
-      return { x: 270 + 24 * (i % 3), y: 52 + 32 * Math.floor(i / 3) };
+      return idleSpot(i);
     default:
       return null;
   }
 }
+
+const seatPose = (seat: MeetingSeat): Pose => (seat.side === "far" ? "seatFar" : seat.side === "near" ? "seatBack" : "stand");
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
 
@@ -95,9 +135,48 @@ function StandingFrames({ persona, index }: { persona: AgentOfficePersona; index
   );
 }
 
+/** 산책 프레임(P3e §4.1) — 걷기 2프레임 250ms, 커피 머신 앞 뒷모습 정지, 복귀 뒤 컵 든 채 숨쉬기 */
+function StrollFrames({ persona, stroll }: { persona: AgentOfficePersona; stroll: Stroll }) {
+  const frame = (f: AvatarFrame) => <PixelSprite paths={avatarPaths(persona.role, f)} />;
+  const cup = (dy = 0) => <PixelSprite paths={spritePaths("CUP", "item")} x={12} y={14 + dy} />;
+  if (!stroll.walking && stroll.leg === 3) return frame("back");
+  if (!stroll.walking) {
+    return (
+      <>
+        <path className="px-shadow" d="M2 22h12v2h-12z" />
+        <Loop
+          ms={1200}
+          phase={0}
+          a={
+            <>
+              {frame("standA")}
+              {cup()}
+            </>
+          }
+          b={
+            <>
+              {frame("standB")}
+              {cup(1)}
+            </>
+          }
+        />
+      </>
+    );
+  }
+  const back = stroll.facing === "back";
+  return (
+    <>
+      <path className="px-shadow" d="M2 22h12v2h-12z" />
+      <Loop ms={250} phase={0} a={frame(back ? "walkBackA" : "walkA")} b={frame(back ? "walkBackB" : "walkB")} />
+      {stroll.cup ? cup() : null}
+    </>
+  );
+}
+
 /**
  * 페르소나 한 명의 아바타 — 폴링마다 다시 마운트하지 않는다(루프 리셋 방지). 자리가 바뀌면
  * transform 전이로 8계단 걸어가고, 걷는 동안은 서기 프레임, 도착하면 상태 프레임으로 바꾼다.
+ * 산책 중에는 구간마다 거리/16초 전이(2ap당 한 계단)로 걷는다 — 취소되면 지금 좌표에서 새 목표로 8계단.
  */
 function Avatar({
   persona,
@@ -106,6 +185,7 @@ function Avatar({
   x,
   y,
   hovered,
+  stroll,
 }: {
   persona: AgentOfficePersona;
   index: number;
@@ -113,6 +193,7 @@ function Avatar({
   x: number;
   y: number;
   hovered: boolean;
+  stroll: Stroll | null;
 }) {
   const [walking, setWalking] = useState(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -127,25 +208,29 @@ function Avatar({
   }, [x, y]);
 
   const shown: Pose = walking ? "stand" : pose;
+  let body: ReactNode;
+  if (stroll) body = <StrollFrames persona={persona} stroll={stroll} />;
+  else if (shown === "stand") body = <StandingFrames persona={persona} index={index} />;
+  else body = <PixelSprite paths={avatarPaths(persona.role, shown)} />;
   return (
     <g
-      className="office-avatar"
-      data-pose={shown}
-      style={vars({ ...avatarVars(persona.slug, persona.role), "--ax": x, "--ay": y })}
+      className={stroll ? "office-avatar is-strolling" : "office-avatar"}
+      data-pose={stroll ? "stroll" : shown}
+      data-persona={persona.id}
+      style={vars({
+        ...avatarVars(persona.slug, persona.role),
+        "--ax": x,
+        "--ay": y,
+        ...(stroll ? { "--walk-ms": stroll.legMs, "--walk-steps": stroll.steps } : {}),
+      })}
     >
-      <g className={hovered ? "office-avatar-lift is-hover" : "office-avatar-lift"}>
-        {shown === "stand" ? (
-          <StandingFrames persona={persona} index={index} />
-        ) : (
-          <PixelSprite paths={avatarPaths(persona.role, shown === "slump" ? "slump" : "seat")} />
-        )}
-      </g>
+      <g className={hovered ? "office-avatar-lift is-hover" : "office-avatar-lift"}>{body}</g>
     </g>
   );
 }
 
-/** 책상 세트(의자·책상·모니터·손·돋보기·빨간 표식) — 셀 원점 기준 */
-function DeskSet({ persona, index }: { persona: AgentOfficePersona; index: number }) {
+/** 책상 세트(의자·책상·모니터·손·돋보기·빨간 표식) — 셀 원점 기준. 회의실에 간 사람은 모니터 OFF + 포스트잇 */
+function DeskSet({ persona, index, away }: { persona: AgentOfficePersona; index: number; away: boolean }) {
   const { x0, y0 } = cellOf(index);
   const state = personaState(persona);
   const run = persona.currentRun;
@@ -154,11 +239,12 @@ function DeskSet({ persona, index }: { persona: AgentOfficePersona; index: numbe
     <g
       className="office-desk"
       data-state={state}
+      data-away={away ? "true" : undefined}
       style={vars(avatarVars(persona.slug, persona.role))}
     >
       <PixelSprite paths={spritePaths("CHAIR", "furn")} x={x0 + 17} y={y0 + 6} />
       <PixelSprite paths={spritePaths("DESK", "furn")} x={x0 + 4} y={y0 + 16} />
-      {state === "RUNNING" ? (
+      {state === "RUNNING" && !away ? (
         <Loop
           ms={600}
           phase={index}
@@ -180,7 +266,15 @@ function DeskSet({ persona, index }: { persona: AgentOfficePersona; index: numbe
       ) : (
         <PixelSprite paths={spritePaths("MONITOR_OFF", "furn")} x={x0 + 5} y={y0 + 6} />
       )}
-      {run && run.type === "REVIEW" && state !== "INACTIVE" ? (
+      {away ? (
+        <PixelSprite
+          className="office-postit"
+          paths={spritePaths("POSTIT", "note")}
+          x={x0 + 8}
+          y={y0 + 8}
+        />
+      ) : null}
+      {run && run.type === "REVIEW" && state !== "INACTIVE" && !away ? (
         <PixelSprite
           className="office-fx"
           paths={spritePaths("MAGNIFIER", "ovl")}
@@ -196,20 +290,69 @@ function DeskSet({ persona, index }: { persona: AgentOfficePersona; index: numbe
 }
 
 /** 머리 위 오버레이(❗·Zz·⌛) — 프레임 B는 1ap 위(통통·둥실) */
+function Bob({ name, x, y, ms, phase }: { name: "ALERT" | "ZZ" | "HOURGLASS"; x: number; y: number; ms: number; phase: number }) {
+  const paths = spritePaths(name, "ovl");
+  return (
+    <g className="office-fx" data-overlay={name.toLowerCase()}>
+      <Loop ms={ms} phase={phase} a={<PixelSprite paths={paths} x={x} y={y} />} b={<PixelSprite paths={paths} x={x} y={y - 1} />} />
+    </g>
+  );
+}
+
 function StateOverlay({ state, index }: { state: AgentPersonaState; index: number }) {
   const { x0, y0 } = cellOf(index);
-  const bob = (name: "ALERT" | "ZZ" | "HOURGLASS", x: number, y: number, ms: number) => {
-    const paths = spritePaths(name, "ovl");
-    return (
-      <g className="office-fx" data-overlay={name.toLowerCase()}>
-        <Loop ms={ms} phase={index} a={<PixelSprite paths={paths} x={x} y={y} />} b={<PixelSprite paths={paths} x={x} y={y - 1} />} />
-      </g>
-    );
-  };
-  if (state === "WAITING_APPROVAL") return bob("ALERT", x0 + 31, y0, 800);
-  if (state === "BLOCKED") return bob("ZZ", x0 + 30, y0, 1400);
-  if (state === "QUEUED") return bob("HOURGLASS", x0 + 56, y0 + 2, 1000);
+  if (state === "WAITING_APPROVAL") return <Bob name="ALERT" x={x0 + 31} y={y0} ms={800} phase={index} />;
+  if (state === "BLOCKED") return <Bob name="ZZ" x={x0 + 30} y={y0} ms={1400} phase={index} />;
+  if (state === "QUEUED") return <Bob name="HOURGLASS" x={x0 + 56} y={y0 + 2} ms={1000} phase={index} />;
   return null;
+}
+
+/** 화분 — 기본 프레임과 흔들림 프레임을 겹치고 CSS가 긴 주기 안에서 두 번 짧게 바꾼다(JS 없음, §4.3) */
+function Plant({ x, y, periodS }: { x: number; y: number; periodS: number }) {
+  return (
+    <g className="office-plant" style={vars({ "--sway": `${periodS}s` })}>
+      <PixelSprite className="office-plant-a" paths={spritePaths("PLANT", "plant")} x={x} y={y} />
+      <PixelSprite className="office-plant-b" paths={spritePaths("PLANT_SWAY", "plant")} x={x} y={y} />
+    </g>
+  );
+}
+
+/** 창밖 — 라이트 구름 / 다크 별똥별(유리 영역 clip, 테마 전환은 CSS, §4.4) */
+function Sky({ clipBase }: { clipBase: string }) {
+  return (
+    <>
+      <defs>
+        {WINDOWS.map((w, i) => (
+          <clipPath key={`d${i}`} id={`${clipBase}-day-${i}`}>
+            <rect x={w.x + 2} y={w.y + 2} width={28} height={5} />
+          </clipPath>
+        ))}
+        {WINDOWS.map((w, i) => (
+          <clipPath key={`n${i}`} id={`${clipBase}-night-${i}`}>
+            <rect x={w.x + 2} y={w.y + 2} width={28} height={11} />
+          </clipPath>
+        ))}
+      </defs>
+      <g className="office-sky-day">
+        {WINDOWS.map((w, i) => (
+          <g key={i} clipPath={`url(#${clipBase}-day-${i})`}>
+            <g className="office-cloud" style={vars({ "--delay": i === 0 ? "0s" : "-21s", "--still": i === 0 ? 20 : 30 })}>
+              <PixelSprite paths={spritePaths("CLOUD", "sky")} x={w.x - 12} y={w.y + 2} />
+            </g>
+          </g>
+        ))}
+      </g>
+      <g className="office-sky-night">
+        {WINDOWS.map((w, i) => (
+          <g key={i} clipPath={`url(#${clipBase}-night-${i})`}>
+            <g className="office-meteor" style={vars({ "--period": i === 0 ? "71s" : "97s" })}>
+              <PixelSprite paths={spritePaths("METEOR", "sky")} x={w.x + 12} y={w.y + 2} />
+            </g>
+          </g>
+        ))}
+      </g>
+    </>
+  );
 }
 
 /** 스테이지 폭에 맞춘 정수 배율 k(2~4) — 비정수 배율은 도트가 뭉개진다 */
@@ -234,19 +377,29 @@ function useScale(stage: RefObject<HTMLDivElement | null>): number {
 
 export function OfficeCanvas({
   personas,
+  activeMeeting,
+  seats,
+  budget,
   gatesHref,
   selectedId,
   boardOpen,
+  meetingOpen,
   boardCount,
   postCount,
+  goalCount,
   todayReports,
   onOpenPersona,
   onOpenBoard,
+  onOpenMeeting,
+  onAnnounce,
 }: OfficeCanvasProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const k = useScale(stageRef);
   const geo = roomGeometry(personas.length);
+  const clipBase = `office-sky${useId().replace(/:/g, "")}`;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [coffeeOpen, setCoffeeOpen] = useState(false);
+  const [catAwake, setCatAwake] = useState(0);
   // 첫 렌더는 제자리에 둔다 — 첫 데이터 적용 뒤에만 이동 전이를 켠다(페이지를 열 때 전원이 걸어 들어오지 않게)
   const [animated, setAnimated] = useState(false);
   useEffect(() => {
@@ -254,13 +407,74 @@ export function OfficeCanvas({
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  const runStatus = activeMeeting ? meetingRunStatus(activeMeeting, personas) : null;
+  const meetingPaused = runStatus === "WAITING_APPROVAL" || runStatus === "BLOCKED";
+  const name = activeMeeting ? meetingName(activeMeeting) : null;
+  const host = activeMeeting ? personas.find((p) => p.id === activeMeeting.hostPersonaId) : undefined;
+  const hostSeat = host ? seats.get(host.id) : undefined;
+
+  const snapshot = useMemo<AmbienceSnapshot>(() => {
+    const seated = personas.filter((p) => seats.has(p.id) && seats.get(p.id)!.side !== "stand").map((p) => p.id);
+    return {
+      meeting:
+        activeMeeting && !meetingPaused && seated.length > 0
+          ? { type: activeMeeting.type, hostId: activeMeeting.hostPersonaId, seatedIds: seated }
+          : null,
+      strollCandidates: personas.flatMap((p, i) =>
+        personaState(p) === "IDLE" && !seats.has(p.id) && p.id !== selectedId && p.id !== hoveredId
+          ? [{ id: p.id, ...idleSpot(i) }]
+          : [],
+      ),
+      idleIds: personas.filter((p) => personaState(p) === "IDLE" && !seats.has(p.id)).map((p) => p.id),
+      effectTargets: personas
+        .filter((p) => personaState(p) === "RUNNING" && !seats.has(p.id))
+        .map((p) => ({ id: p.id, attempt: p.currentRun?.attempt ?? 1 })),
+      killSwitch: budget.killSwitch,
+    };
+  }, [personas, seats, activeMeeting, meetingPaused, selectedId, hoveredId, budget.killSwitch]);
+  const ambience = useOfficeAmbience({ snapshot, stageRef });
+
+  const reduced = ambience.reducedMotion;
+  const todayUsd = todayCostTotal(personas);
+  const copy = coffeeCopy(todayUsd, budget);
+
+  useEffect(() => {
+    if (!coffeeOpen) return;
+    const timer = setTimeout(() => setCoffeeOpen(false), COFFEE_POP_MS);
+    return () => clearTimeout(timer);
+  }, [coffeeOpen]);
+  useEffect(() => {
+    if (catAwake === 0) return;
+    const timer = setTimeout(() => setCatAwake(0), CAT_AWAKE_MS);
+    return () => clearTimeout(timer);
+  }, [catAwake]);
+
+  const toggleCoffee = () => {
+    if (!coffeeOpen) onAnnounce(`오늘 커피값 ${formatUsd(todayUsd)} — ${copy}`);
+    setCoffeeOpen(!coffeeOpen);
+  };
+  const pokeCat = () => {
+    const next = catAwake + 1;
+    setCatAwake(next);
+    onAnnounce(`고양이: ${next >= 3 ? "…야옹?" : "야옹"}`);
+  };
+
+  const seatedCount = seats.size;
+  const catFrame = catAwake > 0 ? "CAT_AWAKE" : ambience.catStretch ? "CAT_STRETCH" : null;
+  const roomCls = [
+    "ai-office-room",
+    animated ? "is-animated" : "",
+    ambience.offscreen ? "is-offscreen" : "",
+    budget.killSwitch ? "is-killed" : "",
+    ambience.stroll?.leg === 3 ? "is-brewing" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <section className="ai-office-stage" aria-label="AI 사무실 평면도" ref={stageRef}>
-      <p className="ai-office-sr">{officeSummaryText(personas)}</p>
-      <div
-        className={animated ? "ai-office-room is-animated" : "ai-office-room"}
-        style={vars({ "--room-w": geo.width, "--room-h": geo.height, "--k": k })}
-      >
+      <p className="ai-office-sr">{officeSummaryText(personas, seatedCount)}</p>
+      <div className={roomCls} style={vars({ "--room-w": geo.width, "--room-h": geo.height, "--k": k })}>
         <svg
           viewBox={`0 0 ${geo.width} ${geo.height}`}
           width="100%"
@@ -272,13 +486,58 @@ export function OfficeCanvas({
           {backgroundPaths(geo).map((p, i) => (
             <path key={i} className={p.cls} d={p.d} />
           ))}
-          {personas.map((persona, i) => (
-            <DeskSet key={persona.id} persona={persona} index={i} />
+          <Sky clipBase={clipBase} />
+          {backgroundTopPaths().map((p, i) => (
+            <path key={`t${i}`} className={p.cls} d={p.d} />
           ))}
+          <PixelSprite
+            paths={spritePaths(activeMeeting ? "WHITEBOARD_ACTIVE" : "WHITEBOARD_IDLE", "wb")}
+            x={386}
+            y={3}
+          />
+          <PixelSprite
+            className="office-lamp"
+            paths={spritePaths(activeMeeting ? "MEETING_LAMP_ON" : "MEETING_LAMP_OFF", "lamp")}
+            x={362}
+            y={9}
+          />
+          {plantSpots(geo).map((spot) => (
+            <Plant key={`${spot.x}-${spot.y}`} {...spot} />
+          ))}
+          {roomFurniturePaths(geo).map((p, i) => (
+            <path key={`f${i}`} className={p.cls} d={p.d} />
+          ))}
+          {OFFICE_CAT ? (
+            <g className="office-cat" data-cat={catFrame ?? "sleep"}>
+              {catFrame ? (
+                <PixelSprite paths={spritePaths(catFrame, "cat")} x={285} y={geo.height - 32} />
+              ) : (
+                <Loop
+                  ms={2000}
+                  phase={0}
+                  a={<PixelSprite paths={spritePaths("CAT_SLEEP_A", "cat")} x={285} y={geo.height - 32} />}
+                  b={<PixelSprite paths={spritePaths("CAT_SLEEP_B", "cat")} x={285} y={geo.height - 32} />}
+                />
+              )}
+            </g>
+          ) : null}
+          {personas.map((persona, i) => (
+            <DeskSet key={persona.id} persona={persona} index={i} away={seats.has(persona.id)} />
+          ))}
+          {FAR_SEATS_X.map((sx, slot) =>
+            slot === 2 ? (
+              <PixelSprite key={sx} paths={spritePaths("CHAIR_HOST", "furn2")} x={sx + 1} y={82} />
+            ) : (
+              <PixelSprite key={sx} paths={spritePaths("CHAIR", "furn")} x={sx + 1} y={90} />
+            ),
+          )}
+          <PixelSprite paths={spritePaths("MEETING_TABLE", "furn2")} x={360} y={98} />
           {personas.map((persona, i) => {
+            const seat = seats.get(persona.id);
             const state = personaState(persona);
-            const pose = poseOf(state);
-            const pos = avatarPosition(state, i);
+            const stroll = ambience.stroll?.personaId === persona.id ? ambience.stroll : null;
+            const pose = seat ? seatPose(seat) : poseOf(state);
+            const pos = stroll ?? seat ?? avatarPosition(state, i);
             if (!pose || !pos) return null;
             return (
               <Avatar
@@ -289,20 +548,81 @@ export function OfficeCanvas({
                 x={pos.x}
                 y={pos.y}
                 hovered={hoveredId === persona.id}
+                stroll={stroll}
               />
             );
           })}
-          {personas.map((persona, i) => (
-            <StateOverlay key={persona.id} state={personaState(persona)} index={i} />
+          {NEAR_SEATS_X.map((sx) => (
+            <PixelSprite key={sx} paths={spritePaths("CHAIR_BACK", "furn2")} x={sx + 1} y={124} />
           ))}
+          {ambience.stroll?.leg === 3 ? (
+            <g className="office-steam">
+              <Loop
+                ms={400}
+                phase={0}
+                a={<PixelSprite paths={spritePaths("STEAM_A", "item")} x={333} y={5} />}
+                b={<PixelSprite paths={spritePaths("STEAM_B", "item")} x={333} y={5} />}
+              />
+            </g>
+          ) : null}
+          {personas.map((persona, i) =>
+            seats.has(persona.id) ? null : <StateOverlay key={persona.id} state={personaState(persona)} index={i} />,
+          )}
+          {hostSeat && runStatus === "WAITING_APPROVAL" ? (
+            <Bob name="ALERT" x={hostSeat.x + 4} y={71} ms={800} phase={0} />
+          ) : null}
+          {hostSeat && runStatus === "BLOCKED" ? <Bob name="ZZ" x={hostSeat.x + 4} y={71} ms={1400} phase={0} /> : null}
+          {ambience.effect
+            ? (() => {
+                const i = personas.findIndex((p) => p.id === ambience.effect!.personaId);
+                if (i < 0) return null;
+                const { x0, y0 } = cellOf(i);
+                const fx = ambience.effect;
+                const matrix = fx.kind === "SWEAT" ? "FX_SWEAT" : fx.kind === "BULB" ? "FX_BULB" : "FX_NOTE";
+                return (
+                  <g key={fx.id} className="office-work-fx" data-fx={fx.kind.toLowerCase()}>
+                    <PixelSprite paths={spritePaths(matrix, "fx")} x={x0 + 31} y={y0 + (fx.kind === "SWEAT" ? 4 : 0)} />
+                  </g>
+                );
+              })()
+            : null}
+          {ambience.bubbles.map((b) => {
+            const seat = seats.get(b.personaId);
+            if (!seat || seat.side === "stand") return null;
+            return (
+              <g key={b.id} transform={`translate(${seat.x + 2} ${seat.y - 12})`} data-mb={b.glyph.toLowerCase()}>
+                <g className={seat.side === "far" ? "office-mb is-far" : "office-mb is-near"}>
+                  <PixelSprite className="office-mb-puff" paths={spritePaths("MB_PUFF", "puff")} x={1} y={4} />
+                  <PixelSprite className="office-mb-body" paths={microBubblePaths(b.glyph)} />
+                </g>
+              </g>
+            );
+          })}
+          {reduced && activeMeeting && !meetingPaused && hostSeat && hostSeat.side !== "stand" ? (
+            <g data-mb="still" transform={`translate(${hostSeat.x + 2} ${hostSeat.y - 12})`}>
+              <PixelSprite paths={microBubblePaths("DOTS")} />
+            </g>
+          ) : null}
         </svg>
 
-        <div className="ai-office-layer">
+        <div
+          className="ai-office-layer"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && coffeeOpen) setCoffeeOpen(false);
+          }}
+          onClickCapture={(e) => {
+            if (coffeeOpen && !(e.target as HTMLElement).closest(".office-hit-coffee")) setCoffeeOpen(false);
+          }}
+        >
           <button
             type="button"
             className="office-hit-board"
             style={vars({ "--x": 258, "--y": 4, "--w": 64, "--h": 22 })}
-            aria-label={`게시판 — 회의록 ${postCount}건, 최근 작업 보고서 ${boardCount}건`}
+            aria-label={
+              goalCount === null
+                ? `게시판 — 회의록 ${postCount}건, 최근 작업 보고서 ${boardCount}건`
+                : `게시판 — 진행 중 목표 ${goalCount}개, 회의록 ${postCount}건, 최근 작업 보고서 ${boardCount}건`
+            }
             aria-controls="ai-office-panel"
             aria-expanded={boardOpen}
             onClick={(e) => onOpenBoard(e.currentTarget)}
@@ -315,11 +635,48 @@ export function OfficeCanvas({
             </span>
           ) : null}
 
+          <button
+            type="button"
+            className="office-hit-meeting"
+            style={vars({ "--x": 356, "--y": 32, "--w": 108, "--h": 101 })}
+            aria-label={meetingRoomAccessibleName(activeMeeting, Date.now())}
+            aria-controls="ai-office-panel"
+            aria-expanded={meetingOpen}
+            onClick={(e) => onOpenMeeting(e.currentTarget)}
+          />
+          <span
+            className={activeMeeting ? "office-nameplate office-meeting-sign is-live" : "office-nameplate office-meeting-sign"}
+            style={vars({ "--x": 410, "--y": 25 })}
+            aria-hidden="true"
+          >
+            {meetingSignText(activeMeeting, Date.now())}
+          </span>
+
+          <button
+            type="button"
+            className="office-hit-coffee"
+            style={vars({ "--x": 326, "--y": 10, "--w": 20, "--h": 24 })}
+            aria-label={`커피 머신 — 오늘 AI 비용 ${formatUsd(todayUsd)}`}
+            aria-expanded={coffeeOpen}
+            onClick={toggleCoffee}
+          />
+          {coffeeOpen ? (
+            <div className="office-pop" data-testid="office-coffee-pop" style={vars({ "--right": 348, "--y": 35, "--tail": 336 })} aria-hidden="true">
+              <div className="office-bubble-box">
+                <span className="office-bubble-line">오늘 커피값 {formatUsd(todayUsd)}</span>
+                <span className="office-bubble-line">{copy}</span>
+              </div>
+            </div>
+          ) : null}
+
           {personas.map((persona, i) => (
             <PersonaHtml
               key={persona.id}
               persona={persona}
               index={i}
+              seat={seats.get(persona.id) ?? null}
+              meetingName={name}
+              hostAlert={persona.id === host?.id && hostSeat && runStatus === "WAITING_APPROVAL" ? hostSeat : null}
               selected={selectedId === persona.id}
               hovered={hoveredId === persona.id}
               gatesHref={gatesHref}
@@ -327,6 +684,30 @@ export function OfficeCanvas({
               onHover={setHoveredId}
             />
           ))}
+
+          {OFFICE_CAT ? (
+            <>
+              <button
+                type="button"
+                className="office-hit-cat"
+                style={vars({ "--x": 283, "--y": geo.height - 32, "--w": 20, "--h": 12 })}
+                aria-label="사무실 고양이"
+                onClick={pokeCat}
+              />
+              {catAwake > 0 ? (
+                <div
+                  className="office-bubble office-cat-bubble"
+                  data-testid="office-cat-bubble"
+                  style={vars({ "--x": 283, "--y": geo.height - 32, "--tail": 8 })}
+                  aria-hidden="true"
+                >
+                  <div className="office-bubble-box">
+                    <span className="office-bubble-line">{catAwake >= 3 ? "…야옹?" : "야옹"}</span>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </div>
     </section>
@@ -337,6 +718,9 @@ export function OfficeCanvas({
 function PersonaHtml({
   persona,
   index,
+  seat,
+  meetingName: meeting,
+  hostAlert,
   selected,
   hovered,
   gatesHref,
@@ -345,6 +729,11 @@ function PersonaHtml({
 }: {
   persona: AgentOfficePersona;
   index: number;
+  /** 회의실 좌석 — 있으면 버튼은 좌석 쪽 하나, 빈 책상은 포인터 전용 */
+  seat: MeetingSeat | null;
+  meetingName: string | null;
+  /** 회의 run이 승인 대기면 진행자 좌석 위 ❗ 링크 */
+  hostAlert: MeetingSeat | null;
   selected: boolean;
   hovered: boolean;
   gatesHref: string;
@@ -353,16 +742,22 @@ function PersonaHtml({
 }) {
   const { x0, y0 } = cellOf(index);
   const state = personaState(persona);
-  const bubble = bubbleText(persona);
+  const bubble = seat ? null : bubbleText(persona);
   const standing = state === "QUEUED" || state === "IDLE";
-  const pos = avatarPosition(state, index);
+  const pos = seat ?? avatarPosition(state, index);
   const tailX = (state === "QUEUED" ? x0 + 52 : x0 + 24) - (x0 + 2);
-  const label = personaAccessibleName(persona);
+  const label = personaAccessibleName(persona, seat ? meeting : null);
   const hoverProps = {
     onPointerEnter: () => onHover(persona.id),
     onPointerLeave: () => onHover(null),
   };
   const deskBox = vars({ "--x": x0 + 4, "--y": y0 - 1, "--w": 40, "--h": 42 });
+  const movable = seat !== null || standing;
+  const hitBox = seat
+    ? vars({ "--x": seat.x - 2, "--y": seat.y, "--w": 20, "--h": seat.side === "stand" ? 24 : 16 })
+    : pos
+      ? vars({ "--x": pos.x - 2, "--y": pos.y, "--w": 20, "--h": 24 })
+      : deskBox;
 
   return (
     <>
@@ -373,6 +768,16 @@ function PersonaHtml({
       >
         {state === "INACTIVE" ? `${persona.name} · 비활성` : persona.name}
       </span>
+      {seat && hovered ? (
+        <span
+          className="office-nameplate is-above"
+          data-testid={`office-seat-plate-${persona.id}`}
+          style={vars({ "--x": seat.x + 8, "--y": seat.y - 1 })}
+          aria-hidden="true"
+        >
+          {persona.name}
+        </span>
+      ) : null}
       {bubble ? (
         <div
           className="office-bubble"
@@ -394,7 +799,7 @@ function PersonaHtml({
         </div>
       ) : null}
 
-      {standing && pos ? (
+      {movable && pos ? (
         <>
           {/* 탭 순서 중복 방지 — 빈 책상은 포인터 전용 영역, 버튼은 아바타가 있는 쪽 하나 */}
           <div
@@ -408,12 +813,16 @@ function PersonaHtml({
           <button
             type="button"
             className={selected ? "office-hit is-selected" : "office-hit"}
-            style={vars({ "--x": pos.x - 2, "--y": pos.y, "--w": 20, "--h": 24 })}
+            style={hitBox}
             aria-label={label}
             aria-controls="ai-office-panel"
             aria-expanded={selected}
             data-state={state}
+            data-seat={seat ? seat.side : undefined}
+            data-host={seat?.host ? "true" : undefined}
             onClick={(e) => onOpen(persona.id, e.currentTarget)}
+            onFocus={seat ? () => onHover(persona.id) : undefined}
+            onBlur={seat ? () => onHover(null) : undefined}
             {...hoverProps}
           />
         </>
@@ -431,12 +840,20 @@ function PersonaHtml({
         />
       )}
 
-      {state === "WAITING_APPROVAL" ? (
+      {state === "WAITING_APPROVAL" && !seat ? (
         <Link
           className="office-hit-alert"
           to={`${gatesHref}?persona=${encodeURIComponent(persona.id)}`}
           style={vars({ "--x": x0 + 29, "--y": y0 - 2, "--w": 12, "--h": 15 })}
           aria-label={`${persona.name}의 승인 대기 — 승인 인박스 열기`}
+        />
+      ) : null}
+      {hostAlert ? (
+        <Link
+          className="office-hit-alert"
+          to={`${gatesHref}?persona=${encodeURIComponent(persona.id)}`}
+          style={vars({ "--x": hostAlert.x + 2, "--y": 69, "--w": 12, "--h": 15 })}
+          aria-label={`${persona.name}의 회의 승인 대기 — 승인 인박스 열기`}
         />
       ) : null}
     </>
