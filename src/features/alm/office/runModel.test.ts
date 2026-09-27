@@ -59,6 +59,13 @@ describe("runModel — 필터", () => {
   it("프로젝트 범위는 접두어가 맞는 run만(이슈 없는 run 제외), 전체면 모두", () => {
     expect(filterRuns(runs, { group: "all", projectKey: "ALM" }).map((r) => r.id)).toEqual(["1", "2", "5"]);
     expect(filterRuns(runs, { group: "all", projectKey: null })).toHaveLength(5);
+    // 안건 이슈 없는 회의(합성 키)는 라우트 projectId와 정확히 같을 때만 이 프로젝트 run
+    const wide = [
+      { ...runs[0], id: "w1", type: "RETRO" as const, issueKey: "PROJECT-3" },
+      { ...runs[0], id: "w2", type: "RETRO" as const, issueKey: "PROJECT-4" },
+    ];
+    expect(filterRuns(wide, { group: "all", projectKey: "ALM", projectId: "3" }).map((r) => r.id)).toEqual(["w1"]);
+    expect(filterRuns(wide, { group: "all", projectKey: "ALM" })).toHaveLength(0);
   });
 
   it("활성 = 끝나지 않은 run(BLOCKED 포함), 종결 = DONE·FAILED·CANCELLED", () => {

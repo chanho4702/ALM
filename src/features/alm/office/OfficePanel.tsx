@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate } from "react-router";
 import { Banner, Button, Spinner } from "@chanho/react";
-import { FileText, History, Wrench, X } from "lucide-react";
+import { ExternalLink, FileText, History, Wrench, X } from "lucide-react";
 import type { AgentBoardPost, AgentOfficePersona, AgentPersonaActivity, AgentRunSummary } from "../store/types";
 import {
   AGENT_RUN_STATUS_LABEL,
@@ -16,7 +16,7 @@ import {
 import { formatClock, formatDateTime, relTime } from "../components/time";
 import type { LoadStatus } from "./useOfficeData";
 import { BoardPortrait, OfficePortrait } from "./PixelSprite";
-import { personaState } from "./officeModel";
+import { linkableIssueKey, personaState, PROJECT_WIDE_LABEL } from "./officeModel";
 
 export interface OfficeLinks {
   gates: string;
@@ -181,7 +181,9 @@ function PersonaBody({
             {run.status === "BLOCKED" ? <Banner variant="danger">차단됨 — 다음 조치가 필요합니다.</Banner> : null}
             <dl className="office-panel-dl">
               <dt>이슈</dt>
-              <dd>{run.issueKey ? <Link to={links.issue(run.issueKey)}>{run.issueKey}</Link> : "—"}</dd>
+              <dd>
+                <IssueCell run={run} links={links} />
+              </dd>
               <dt>종류</dt>
               <dd>
                 {RUN_TYPE_LABEL[run.type]} · {TRIGGER_LABEL[run.trigger]}
@@ -243,10 +245,10 @@ function PersonaBody({
                     <Link
                       className="office-run-row"
                       to={links.run(r.id)}
-                      aria-label={`${AGENT_RUN_STATUS_LABEL[r.status]} ${r.issueKey ?? "이슈 없음"} ${RUN_TYPE_LABEL[r.type]} — 실행 상세`}
+                      aria-label={`${AGENT_RUN_STATUS_LABEL[r.status]} ${runKeyText(r, "이슈 없음")} ${RUN_TYPE_LABEL[r.type]} — 실행 상세`}
                     >
                       <AgentRunStatusLozenge status={r.status} />
-                      <span className="office-run-key">{r.issueKey ?? "—"}</span>
+                      <span className="office-run-key">{runKeyText(r, "—")}</span>
                       <span>{RUN_TYPE_LABEL[r.type]}</span>
                       <span className="office-run-meta">
                         {r.startedAt ? relTime(r.startedAt) : "시작 전"}
@@ -353,13 +355,7 @@ function BoardBody({
                     {persona ? <AgentRoleGlyph role={persona.role} size={12} /> : null}
                     <span>{persona?.name ?? `페르소나 #${r.personaId}`}</span>
                   </span>
-                  {r.issueKey ? (
-                    <Link to={links.issue(r.issueKey)} className="office-run-key">
-                      {r.issueKey}
-                    </Link>
-                  ) : (
-                    <span className="office-run-key">—</span>
-                  )}
+                  <IssueCell run={r} links={links} className="office-run-key" />
                   <span className="office-run-meta" title={r.endedAt ? formatDateTime(r.endedAt) : undefined}>
                     {r.endedAt ? relTime(r.endedAt) : ""}
                   </span>
@@ -374,8 +370,9 @@ function BoardBody({
 }
 
 /**
- * 게시물 한 줄 — 종류·안건·회의록·시각. 서버가 위키 페이지 id만 주고 스페이스 id를 주지 않는데, 위키 라우트는
- * `/spaces/:spaceId/pages/:pageId`뿐이고 모르는 스페이스는 "찾을 수 없음"이 된다 — 그래서 회의록은 링크 없이 라벨만 둔다.
+ * 게시물 한 줄 — 종류·안건·회의록·시각. 회의록은 위키(`/wiki/spaces/:spaceId/pages/:pageId`)를 새 탭으로 연다
+ * (AGP-54 가이드 진입점과 같은 방식 — 같은 오리진의 다른 앱). 위키에는 스페이스 없이 페이지로 가는 라우트가 없어서,
+ * spaceId가 없으면(구 백엔드·회의록 스페이스 미설정) 링크 없이 라벨만 둔다.
  */
 function BoardPostRow({ post, links }: { post: AgentBoardPost; links: OfficeLinks }) {
   return (
@@ -392,13 +389,54 @@ function BoardPostRow({ post, links }: { post: AgentBoardPost; links: OfficeLink
       ) : (
         <span className="office-board-agenda">프로젝트 전반</span>
       )}
-      <span className="office-board-doc" title={`위키 페이지 #${post.pageId}`}>
-        <FileText size={12} aria-hidden />
-        회의록
-      </span>
+      {post.spaceId ? (
+        <a
+          className="office-board-doc"
+          href={`/wiki/spaces/${encodeURIComponent(post.spaceId)}/pages/${encodeURIComponent(post.pageId)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${AGENT_MEETING_TYPE_LABEL[post.type]} 회의록 — 위키에서 열기(새 탭)`}
+        >
+          <FileText size={12} aria-hidden />
+          회의록
+          <ExternalLink size={12} aria-hidden />
+        </a>
+      ) : (
+        <span className="office-board-doc" title={`위키 페이지 #${post.pageId}`}>
+          <FileText size={12} aria-hidden />
+          회의록
+        </span>
+      )}
       <span className="office-run-meta" title={formatDateTime(post.endedAt)}>
         {relTime(post.endedAt)}
       </span>
     </li>
   );
+}
+
+/** run 목록 행 텍스트용 키 — 안건 이슈 없는 회의는 "프로젝트 전반" */
+function runKeyText(run: Pick<AgentRunSummary, "type" | "issueKey">, empty: string): string {
+  if (run.issueKey && !linkableIssueKey(run)) return PROJECT_WIDE_LABEL;
+  return run.issueKey ?? empty;
+}
+
+/** 이슈 칸 — 실이슈는 전역 이슈 모달 링크, 합성 키 회의는 "프로젝트 전반", 없으면 "—" */
+function IssueCell({
+  run,
+  links,
+  className,
+}: {
+  run: Pick<AgentRunSummary, "type" | "issueKey">;
+  links: OfficeLinks;
+  className?: string;
+}) {
+  const key = linkableIssueKey(run);
+  if (key) {
+    return (
+      <Link to={links.issue(key)} className={className}>
+        {key}
+      </Link>
+    );
+  }
+  return <span className={className}>{run.issueKey ? PROJECT_WIDE_LABEL : "—"}</span>;
 }

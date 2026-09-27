@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "./apiClient";
-import { mapAgentGate, mapAgentOffice, mapAgentPersonaActivity, mapAgentRunSummary } from "./agentMapping";
+import {
+  isProjectWideMeeting,
+  mapAgentGate,
+  mapAgentOffice,
+  mapAgentPersonaActivity,
+  mapAgentRunSummary,
+  projectWideIssueKey,
+} from "./agentMapping";
 import {
   approveGate,
   cancelRun,
@@ -223,17 +230,29 @@ describe("게시판·회의 소집(P3b)", () => {
     const office = mapAgentOffice({
       ...OFFICE_DTO,
       boardPosts: [
-        { runId: 31, type: "RETRO", issueKey: "PROJECT-3", projectId: 3, pageId: 47, endedAt: "2026-09-27T01:00:00Z" },
-        { runId: 30, type: "ESCALATION", issueKey: "ALM-5", projectId: 3, pageId: 46, endedAt: "2026-09-27T00:00:00Z" },
+        { runId: 31, type: "RETRO", issueKey: "PROJECT-3", projectId: 3, pageId: 47, spaceId: 5, endedAt: "2026-09-27T01:00:00Z" },
+        { runId: 30, type: "ESCALATION", issueKey: "ALM-5", projectId: 3, pageId: 46, spaceId: null, endedAt: "2026-09-27T00:00:00Z" },
         // 다른 프로젝트 번호의 PROJECT- 키는 합성 키가 아니다 — 실제 이슈 키로 둔다
         { runId: 29, type: "PLANNING", issueKey: "PROJECT-7", projectId: 3, pageId: 45, endedAt: "2026-09-26T00:00:00Z" },
       ],
     });
     expect(office.boardPosts).toEqual([
-      { runId: "31", type: "RETRO", agendaIssueKey: null, projectId: "3", pageId: "47", endedAt: "2026-09-27T01:00:00Z" },
-      { runId: "30", type: "ESCALATION", agendaIssueKey: "ALM-5", projectId: "3", pageId: "46", endedAt: "2026-09-27T00:00:00Z" },
-      { runId: "29", type: "MEETING", agendaIssueKey: "PROJECT-7", projectId: "3", pageId: "45", endedAt: "2026-09-26T00:00:00Z" },
+      { runId: "31", type: "RETRO", agendaIssueKey: null, projectId: "3", pageId: "47", spaceId: "5", endedAt: "2026-09-27T01:00:00Z" },
+      { runId: "30", type: "ESCALATION", agendaIssueKey: "ALM-5", projectId: "3", pageId: "46", spaceId: null, endedAt: "2026-09-27T00:00:00Z" },
+      // spaceId 필드가 없는 구 백엔드 → null(라벨만)
+      { runId: "29", type: "MEETING", agendaIssueKey: "PROJECT-7", projectId: "3", pageId: "45", spaceId: null, endedAt: "2026-09-26T00:00:00Z" },
     ]);
+  });
+
+  it("합성 키 판정 — 회의 종류 && PROJECT-<숫자>만(run 요약엔 projectId가 없어 번호 대조는 못 한다)", () => {
+    expect(isProjectWideMeeting({ type: "RETRO", issueKey: "PROJECT-3" })).toBe(true);
+    expect(isProjectWideMeeting({ type: "MEETING", issueKey: "ALM-4" })).toBe(false);
+    expect(isProjectWideMeeting({ type: "ESCALATION", issueKey: null })).toBe(false);
+    // TASK·REVIEW는 키가 같은 모양이어도 실제 이슈
+    expect(isProjectWideMeeting({ type: "TASK", issueKey: "PROJECT-3" })).toBe(false);
+    expect(isProjectWideMeeting({ type: "MEETING", issueKey: "PROJECT-X1" })).toBe(false);
+    expect(projectWideIssueKey("12")).toBe("PROJECT-12");
+    expect(projectWideIssueKey("p1")).toBe("PROJECT-1");
   });
 
   it("run 요약의 회의 종류(MEETING·RETRO·ESCALATION)를 작업으로 접지 않는다", () => {

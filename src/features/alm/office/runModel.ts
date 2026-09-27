@@ -3,6 +3,7 @@
  * 액션 노출 규칙은 agent-service(Run.CANCELLABLE, RunResumeService.RESUMABLE)와 같다 — 서버가 최종 판정(409).
  */
 import type { AgentGate, AgentPersona, AgentRunStatus, AgentRunSummary } from "../store/types";
+import { isProjectWideMeeting, projectWideIssueKey } from "../store/agentMapping";
 import { isTerminal } from "./officeModel";
 
 export type RunGroup = "all" | "active" | "finished";
@@ -35,11 +36,20 @@ export function inProject(issueKey: string | null, projectKey: string | null): b
   return issueProjectKey(issueKey)?.toUpperCase() === projectKey.toUpperCase();
 }
 
+/**
+ * 안건 이슈 없는 회의 run은 이슈키가 합성 키 `PROJECT-<projectId>`라 접두어로는 어느 프로젝트에도 안 걸린다 —
+ * 라우트의 projectId(서버 id와 같은 값)와 그 합성 키가 정확히 같으면 이 프로젝트 run으로 본다.
+ */
 export function filterRuns(
   runs: readonly AgentRunSummary[],
-  { group, projectKey }: { group: RunGroup; projectKey: string | null },
+  { group, projectKey, projectId }: { group: RunGroup; projectKey: string | null; projectId?: string },
 ): AgentRunSummary[] {
-  return runs.filter((r) => inGroup(r.status, group) && inProject(r.issueKey, projectKey));
+  const wideKey = projectId ? projectWideIssueKey(projectId) : null;
+  return runs.filter(
+    (r) =>
+      inGroup(r.status, group) &&
+      (inProject(r.issueKey, projectKey) || (projectKey !== null && isProjectWideMeeting(r) && r.issueKey === wideKey)),
+  );
 }
 
 /** 최신 먼저 — 시작 시각(없으면 대기열이라 가장 최근 취급), 같으면 id 큰 것 */

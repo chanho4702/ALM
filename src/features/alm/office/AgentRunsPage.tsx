@@ -12,6 +12,7 @@ import {
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
 import { filterRuns, personaDisplay, sortRunsNewestFirst, type RunGroup } from "./runModel";
+import { linkableIssueKey, PROJECT_WIDE_LABEL } from "./officeModel";
 import {
   AiTeamGate,
   SupervisionBody,
@@ -75,9 +76,9 @@ function AgentRuns() {
   const rows = useMemo(
     () =>
       sortRunsNewestFirst(
-        filterRuns(load.data ?? [], { group, projectKey: scopeAll ? null : projectKey }),
+        filterRuns(load.data ?? [], { group, projectKey: scopeAll ? null : projectKey, projectId }),
       ),
-    [load.data, group, scopeAll, projectKey],
+    [load.data, group, scopeAll, projectKey, projectId],
   );
 
   const columns: TableColumn<AgentRunSummary>[] = [
@@ -95,12 +96,12 @@ function AgentRuns() {
       key: "issueKey",
       header: "이슈",
       render: (run) =>
-        run.issueKey ? (
-          <Link className="agent-sup-issue" to={issueHref(run.issueKey)}>
+        linkableIssueKey(run) ? (
+          <Link className="agent-sup-issue" to={issueHref(run.issueKey!)}>
             {run.issueKey}
           </Link>
         ) : (
-          <span className="agent-sup-subtle">이슈 없음</span>
+          <span className="agent-sup-subtle">{run.issueKey ? PROJECT_WIDE_LABEL : "이슈 없음"}</span>
         ),
     },
     {

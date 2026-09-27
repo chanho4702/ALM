@@ -81,6 +81,16 @@ describe("상태 파생(스펙 §4.1)", () => {
       line2: "설명 보완",
     });
     expect(bubbleText(persona({ currentRun: run("RUNNING", { type: "REVIEW" }) }))?.line1).toBe("리뷰 · ALM-123");
+    // 안건 이슈 없는 회의 — 합성 키 대신 회의 라벨(상태 접두는 유지), 이슈키 칸은 비운다
+    expect(bubbleText(persona({ currentRun: run("RUNNING", { type: "MEETING", issueKey: "PROJECT-1" }) }))).toEqual({
+      line1: "착수/계획 회의",
+      prefix: null,
+      issueKey: null,
+      line2: null,
+    });
+    expect(bubbleText(persona({ currentRun: run("QUEUED", { type: "RETRO", issueKey: "PROJECT-1" }) }))?.line1).toBe(
+      "대기열 · 회고 회의",
+    );
     expect(bubbleText(persona({ currentRun: run("QUEUED"), lastActivity: act }))).toEqual({
       line1: "대기열 · ALM-123",
       prefix: "대기열",

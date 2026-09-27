@@ -6,7 +6,7 @@ import type { AgentOfficePersona, AgentRunSummary } from "../store/types";
 import { AGENT_RUN_TYPE_LABEL, AgentRoleGlyph, AgentStatusLozenge } from "../components/AgentGlyphs";
 import { relTime } from "../components/time";
 import { OfficePortrait } from "./PixelSprite";
-import { activityText, formatUsd, personaState } from "./officeModel";
+import { activityText, formatUsd, linkableIssueKey, personaState, PROJECT_WIDE_LABEL } from "./officeModel";
 import type { OfficeLinks } from "./OfficePanel";
 
 /**
@@ -61,8 +61,10 @@ export function TeamCards({
             <p className="ai-team-card-issue">
               <FileText size={14} aria-hidden />
               {run ? <span className="ai-team-card-kind">{AGENT_RUN_TYPE_LABEL[run.type]} · </span> : null}
-              {run?.issueKey ? (
-                <Link to={links.issue(run.issueKey)}>{run.issueKey}</Link>
+              {run && linkableIssueKey(run) ? (
+                <Link to={links.issue(run.issueKey!)}>{run.issueKey}</Link>
+              ) : run?.issueKey ? (
+                <span className="ai-team-card-subtle">{PROJECT_WIDE_LABEL}</span>
               ) : run ? (
                 <span className="ai-team-card-subtle">이슈 없음</span>
               ) : (

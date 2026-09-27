@@ -349,3 +349,26 @@ describe("팀 카드 — 현재 run 종류 표기(캔버스 돋보기와 등가)
     expect(within(ops).queryByText(/작업 ·|리뷰 ·/)).not.toBeInTheDocument();
   });
 });
+
+describe("안건 이슈 없는 회의 run — 목록·상세", () => {
+  it("목록 — 이 프로젝트 범위에 나오고, 이슈 칸은 링크 없이 '프로젝트 전반'", async () => {
+    const { run } = await store.createMeeting({ type: "RETRO", projectId: "p1" });
+    renderApp(`${BASE}/runs`);
+    const table = await runsTable();
+    const row = within(table).getByRole("link", { name: `실행 #${run.id} 상세` }).closest("tr")!;
+    expect(within(row).getByText("프로젝트 전반")).toBeInTheDocument();
+    expect(within(row).getByText("회고")).toBeInTheDocument();
+    expect(within(row).queryByRole("link", { name: /PROJECT-/ })).not.toBeInTheDocument();
+    expect(table).not.toHaveTextContent("PROJECT-1");
+  });
+
+  it("상세 — 이슈 칸 '프로젝트 전반', 같은 키 타임라인(한 이슈의 시도)은 없다", async () => {
+    const { run } = await store.createMeeting({ type: "RETRO", projectId: "p1" });
+    renderApp(`${BASE}/runs/${run.id}`);
+    const summary = await detailLoaded(run.id);
+    expect(within(summary).getByText("프로젝트 전반")).toBeInTheDocument();
+    expect(within(summary).queryByRole("link", { name: /PROJECT-/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: /실행 타임라인/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/PROJECT-1/)).not.toBeInTheDocument();
+  });
+});

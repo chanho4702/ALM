@@ -70,6 +70,7 @@ import { CURRENT_USER_ID } from "../../../mock/users";
 import { createSeedData } from "../../../mock/seed";
 import { ISSUE_FIELD_IDS, ISSUE_FIELD_NAMES, WORKFLOW_ANY_NODE } from "./types";
 import type { IssueQuery } from "./searchQuery";
+import { projectWideIssueKey } from "./agentMapping";
 import { getTemplate } from "./projectTemplates";
 import type { ProjectTemplateId } from "./projectTemplates";
 import { extractMentionIds, htmlToText, newMentionIds } from "./richText";
@@ -2457,12 +2458,12 @@ function baseRecentRuns(now: number): AgentRunSummary[] {
   ];
 }
 
-/** 게시판 목업 — 회고(안건 이슈 없음)·착수/계획·에스컬레이션 각 1건, 최신 먼저 */
+/** 게시판 목업 — 회고(안건 이슈 없음)·착수/계획·에스컬레이션 각 1건, 최신 먼저. 회의록 스페이스는 5 */
 function baseBoardPosts(now: number, projectId: string): AgentBoardPost[] {
   return [
-    { runId: "8995", type: "RETRO", agendaIssueKey: null, projectId, pageId: "312", endedAt: ago(now, 25) },
-    { runId: "8994", type: "MEETING", agendaIssueKey: "ALM-4", projectId, pageId: "308", endedAt: ago(now, 190) },
-    { runId: "8993", type: "ESCALATION", agendaIssueKey: "ALM-5", projectId, pageId: "305", endedAt: ago(now, 60 * 26) },
+    { runId: "8995", type: "RETRO", agendaIssueKey: null, projectId, pageId: "312", spaceId: "5", endedAt: ago(now, 25) },
+    { runId: "8994", type: "MEETING", agendaIssueKey: "ALM-4", projectId, pageId: "308", spaceId: "5", endedAt: ago(now, 190) },
+    { runId: "8993", type: "ESCALATION", agendaIssueKey: "ALM-5", projectId, pageId: "305", spaceId: "5", endedAt: ago(now, 60 * 26) },
   ];
 }
 
@@ -2734,7 +2735,7 @@ export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeet
   const attendees = mockMeetingAttendees(input, now);
   if (attendees.length === 0) throw new Error(`${input.type} 회의에 참석할 활성 페르소나가 없습니다`);
 
-  let issueKey = `PROJECT-${input.projectId}`;
+  let issueKey = projectWideIssueKey(input.projectId);
   if (issueKeyInput) {
     const issue = load().issues.find((i) => i.key === issueKeyInput.toUpperCase());
     if (!issue) throw new Error(`이슈를 찾을 수 없습니다: ${issueKeyInput}`);

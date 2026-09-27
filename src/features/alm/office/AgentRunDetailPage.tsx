@@ -15,6 +15,7 @@ import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
 import { useOrgProfile } from "../components/OrgAccountGate";
 import { canCancel, canResume, personaDisplay, runLineage } from "./runModel";
+import { linkableIssueKey, PROJECT_WIDE_LABEL } from "./officeModel";
 import {
   AiTeamGate,
   SupervisionBody,
@@ -164,12 +165,12 @@ function AgentRunDetail() {
           <div>
             <dt>이슈</dt>
             <dd>
-              {run.issueKey ? (
-                <Link className="agent-sup-issue" to={issueHref(run.issueKey)}>
+              {linkableIssueKey(run) ? (
+                <Link className="agent-sup-issue" to={issueHref(run.issueKey!)}>
                   {run.issueKey}
                 </Link>
               ) : (
-                <span className="agent-sup-subtle">이슈 없음</span>
+                <span className="agent-sup-subtle">{run.issueKey ? PROJECT_WIDE_LABEL : "이슈 없음"}</span>
               )}
             </dd>
           </div>
@@ -261,7 +262,8 @@ function AgentRunDetail() {
             </div>
           </dl>
 
-          {run.issueKey ? (
+          {/* 합성 키가 같은 run은 같은 프로젝트의 서로 다른 회의다 — "한 이슈의 시도" 타임라인이 아니다 */}
+          {linkableIssueKey(run) ? (
             <>
               <h4 className="agent-sup-minor">{`${run.issueKey}의 실행 — 시도 순`}</h4>
               <ol className="agent-run-timeline" aria-label={`${run.issueKey} 실행 타임라인`}>

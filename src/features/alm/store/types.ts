@@ -792,7 +792,6 @@ export interface AgentOffice {
 
 /**
  * 게시판 게시물(P3b D-P3b-7). 제목은 서버가 위키를 조회하지 않아 없다 — 화면은 종류 라벨 + 시각으로 그린다.
- * 위키 페이지는 id만 온다(스페이스 id 없음).
  */
 export interface AgentBoardPost {
   runId: string;
@@ -801,6 +800,8 @@ export interface AgentBoardPost {
   agendaIssueKey: string | null;
   projectId: string;
   pageId: string;
+  /** 회의록 스페이스(서버 설정값) — 구 백엔드이거나 미설정이면 null: 위키 링크 없이 라벨만 */
+  spaceId: string | null;
   endedAt: string;
 }
 

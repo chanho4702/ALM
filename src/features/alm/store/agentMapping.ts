@@ -106,6 +106,8 @@ export interface AgentBoardPostDto {
   issueKey: string;
   projectId: Id;
   pageId: Id;
+  /** 구 백엔드는 이 필드가 없다 */
+  spaceId?: Id | null;
   endedAt: string;
 }
 
@@ -239,6 +241,26 @@ function mapGate(dto: AgentPendingGateDto): AgentPendingGate {
   };
 }
 
+const PROJECT_WIDE_KEY = /^PROJECT-\d+$/;
+
+/**
+ * 안건 이슈 없는 회의 run인가 — 서버가 issueKey 자리에 합성 키 `PROJECT-<projectId>`를 넣는다(ALM에 없는 이슈).
+ * run 요약·현재 run에는 projectId가 없어 게시판 매퍼처럼 "정확히 그 프로젝트 번호"로 대조할 수 없다. 그래서
+ * 회의 종류 && `PROJECT-<숫자>` 형태로 완화한다. 한계: 프로젝트 키가 "PROJECT"인 ALM 프로젝트의 실제 이슈를 안건으로 연
+ * 회의는 여기서 "프로젝트 전반"으로 잘못 보인다(TASK·REVIEW run은 해당 없음).
+ */
+export function isProjectWideMeeting(run: { type: AgentRunType; issueKey: string | null }): boolean {
+  return MEETING_TYPES.includes(run.type as AgentMeetingType) && !!run.issueKey && PROJECT_WIDE_KEY.test(run.issueKey);
+}
+
+/**
+ * 그 프로젝트의 합성 키. 서버 id는 숫자라 그대로이고, 목업 프로젝트 id("p1")는 숫자만 남긴다 — 목업이 같은 함수로 키를
+ * 만들어 `isProjectWideMeeting`의 `PROJECT-<숫자>` 규칙과 run 목록의 프로젝트 범위가 목업에서도 성립한다.
+ */
+export function projectWideIssueKey(projectId: string): string {
+  return `PROJECT-${projectId.replace(/\D/g, "")}`;
+}
+
 /** 합성 키(`PROJECT-<projectId>`)는 ALM에 없는 이슈다 — 화면이 이슈 링크를 걸지 않게 여기서 null로 접는다 */
 export function mapAgentBoardPost(dto: AgentBoardPostDto): AgentBoardPost {
   const projectId = String(dto.projectId);
@@ -248,6 +270,7 @@ export function mapAgentBoardPost(dto: AgentBoardPostDto): AgentBoardPost {
     agendaIssueKey: !dto.issueKey || dto.issueKey === `PROJECT-${projectId}` ? null : dto.issueKey,
     projectId,
     pageId: String(dto.pageId),
+    spaceId: dto.spaceId === null || dto.spaceId === undefined ? null : String(dto.spaceId),
     endedAt: dto.endedAt,
   };
 }

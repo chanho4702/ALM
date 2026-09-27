@@ -3,13 +3,32 @@
  * 캔버스·팀 카드·패널이 같은 파생을 써서 세 뷰가 같은 사실을 말하게 한다.
  */
 import type {
+  AgentMeetingType,
   AgentOffice,
   AgentOfficePersona,
   AgentRole,
   AgentRunStatus,
   AgentRunSummary,
+  AgentRunType,
 } from "../store/types";
-import { AGENT_ROLE_LABEL, AGENT_STATUS_LABEL, type AgentPersonaState } from "../components/AgentGlyphs";
+import { isProjectWideMeeting } from "../store/agentMapping";
+import {
+  AGENT_MEETING_TYPE_LABEL,
+  AGENT_ROLE_LABEL,
+  AGENT_STATUS_LABEL,
+  type AgentPersonaState,
+} from "../components/AgentGlyphs";
+
+/** 안건 이슈 없는 회의 run의 안건 표기 — 이슈 링크 대신 */
+export const PROJECT_WIDE_LABEL = "프로젝트 전반";
+
+/** 이슈 링크를 걸 수 있는 키 — 안건 이슈 없는 회의(합성 키 `PROJECT-<id>`)면 null. 판정은 `isProjectWideMeeting` 한 곳 */
+export function linkableIssueKey(run: { type: AgentRunType; issueKey: string | null }): string | null {
+  return isProjectWideMeeting(run) ? null : run.issueKey;
+}
+
+/** "회고 회의" — 회의 run의 종류 라벨 */
+const meetingLabel = (type: AgentRunType) => `${AGENT_MEETING_TYPE_LABEL[type as AgentMeetingType]} 회의`;
 
 export const ROLE_ORDER: readonly AgentRole[] = ["PLANNER", "DESIGNER", "FRONTEND", "BACKEND", "OPS", "REVIEWER"];
 
@@ -108,6 +127,13 @@ export function bubbleText(persona: AgentOfficePersona): BubbleText | null {
   const state = personaState(persona);
   const run = persona.currentRun;
   if (!run || state === "IDLE" || state === "INACTIVE") return null;
+  if (isProjectWideMeeting(run)) {
+    // 합성 키는 이슈가 아니다 — 1행은 회의 라벨(상태 접두가 있으면 앞에)
+    const statePrefix = state === "RUNNING" ? null : (STATE_PREFIX[state] ?? null);
+    const label = meetingLabel(run.type);
+    const activity = state === "RUNNING" || state === "WAITING_APPROVAL" ? bubbleActivity(persona) : null;
+    return { line1: statePrefix ? `${statePrefix} · ${label}` : label, prefix: statePrefix, issueKey: null, line2: activity };
+  }
   const key = run.issueKey;
   let prefix: string | null;
   if (state === "RUNNING") prefix = run.type === "REVIEW" ? (key ? "리뷰" : "리뷰 중") : key ? null : "작업 중";
@@ -121,7 +147,11 @@ export function bubbleText(persona: AgentOfficePersona): BubbleText | null {
 export function personaAccessibleName(persona: AgentOfficePersona): string {
   const state = personaState(persona);
   const parts = [persona.name, AGENT_ROLE_LABEL[persona.role], AGENT_STATUS_LABEL[state]];
-  if (persona.currentRun?.issueKey && state !== "INACTIVE") parts.push(`이슈 ${persona.currentRun.issueKey}`);
+  const run = persona.currentRun;
+  if (run && state !== "INACTIVE") {
+    if (isProjectWideMeeting(run)) parts.push(`${meetingLabel(run.type)} ${PROJECT_WIDE_LABEL}`);
+    else if (run.issueKey) parts.push(`이슈 ${run.issueKey}`);
+  }
   const activity = state === "INACTIVE" ? null : activityText(persona);
   if (activity) parts.push(`최근 활동: ${activity}`);
   return `${parts.join(", ")} — 개인 오피스 열기`;
@@ -162,7 +192,8 @@ export function transitionAnnouncements(prev: AgentOffice | null, next: AgentOff
   for (const p of next.personas) {
     const now = personaState(p);
     if (before.get(p.id) === now || !before.has(p.id)) continue;
-    const key = p.currentRun?.issueKey ? ` (${p.currentRun.issueKey})` : "";
+    const linkable = p.currentRun ? linkableIssueKey(p.currentRun) : null;
+    const key = linkable ? ` (${linkable})` : "";
     if (now === "WAITING_APPROVAL") out.push(`${p.name}${subjectJosa(p.name)} 승인을 기다립니다${key}`);
     if (now === "BLOCKED") out.push(`${p.name}${subjectJosa(p.name)} 차단됐습니다${key}`);
   }

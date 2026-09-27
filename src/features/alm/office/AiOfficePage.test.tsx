@@ -156,7 +156,7 @@ describe("게시판 — BLOCKED run 중복 방지", () => {
 });
 
 describe("게시판 — 회의록 게시물(AGP-41)", () => {
-  it("종류(아이콘+텍스트)·안건·회의록·시각 — 합성 키 회의는 '프로젝트 전반'이고 이슈 링크가 없다", async () => {
+  it("종류(아이콘+텍스트)·안건·회의록·시각 — 합성 키 회의는 '프로젝트 전반'이고 안건 이슈 링크가 없다", async () => {
     const user = userEvent.setup();
     renderApp(OFFICE_PATH);
     await user.click(await screen.findByRole("button", { name: /^게시판 — 회의록 3건/ }));
@@ -170,7 +170,7 @@ describe("게시판 — 회의록 게시물(AGP-41)", () => {
     expect(retro).toHaveTextContent("프로젝트 전반");
     expect(retro).toHaveTextContent("회의록");
     expect(retro).toHaveTextContent("25분 전");
-    expect(within(retro).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(retro).queryByRole("link", { name: /안건/ })).not.toBeInTheDocument();
 
     const planning = within(posts).getByTestId("office-board-post-8994");
     expect(planning).toHaveTextContent("착수/계획");
@@ -182,7 +182,29 @@ describe("게시판 — 회의록 게시물(AGP-41)", () => {
     const escalation = within(posts).getByTestId("office-board-post-8993");
     expect(escalation).toHaveTextContent("에스컬레이션");
     expect(within(escalation).getByRole("link", { name: "에스컬레이션 안건 ALM-5" })).toBeInTheDocument();
-    // 회의록은 스페이스 id가 없어 위키 링크를 걸지 않는다 — 게시물 링크는 안건 이슈 2개뿐
+    // 회의록 — 위키 페이지를 새 탭으로(AGP-54 진입점과 같은 방식)
+    const minutes = within(retro).getByRole("link", { name: "회고 회의록 — 위키에서 열기(새 탭)" });
+    expect(minutes).toHaveAttribute("href", "/wiki/spaces/5/pages/312");
+    expect(minutes).toHaveAttribute("target", "_blank");
+    expect(minutes).toHaveAttribute("rel", "noopener noreferrer");
+    // 안건 이슈 링크 2 + 회의록 링크 3
+    expect(within(posts).getAllByRole("link")).toHaveLength(5);
+  });
+
+  it("spaceId가 없으면(구 백엔드·스페이스 미설정) 회의록은 링크 없이 라벨만", async () => {
+    const user = userEvent.setup();
+    const base = await store.fetchOffice("p1");
+    vi.spyOn(store, "fetchOffice").mockResolvedValue({
+      ...base,
+      boardPosts: base.boardPosts.map((p) => ({ ...p, spaceId: null })),
+    });
+    renderApp(OFFICE_PATH);
+    await user.click(await screen.findByRole("button", { name: /^게시판 — 회의록 3건/ }));
+    const posts = within(await screen.findByRole("complementary", { name: "게시판" })).getByRole("list", {
+      name: "회의록 게시물",
+    });
+    expect(within(posts).queryByRole("link", { name: /회의록/ })).not.toBeInTheDocument();
+    expect(within(posts).getAllByText("회의록")).toHaveLength(3);
     expect(within(posts).getAllByRole("link")).toHaveLength(2);
   });
 
@@ -287,7 +309,7 @@ describe("회의 소집 목업 — 서버 규칙 미러", () => {
       "이슈를 찾을 수 없습니다: NOPE-1",
     );
     const retro = await store.createMeeting({ type: "RETRO", projectId: "p1" });
-    expect(retro.run).toMatchObject({ type: "RETRO", status: "QUEUED", trigger: "USER", issueKey: "PROJECT-p1" });
+    expect(retro.run).toMatchObject({ type: "RETRO", status: "QUEUED", trigger: "USER", issueKey: "PROJECT-1" });
     expect(retro.attendees).toHaveLength(6);
     await expect(store.createMeeting({ type: "RETRO", projectId: "p1" })).rejects.toThrow(
       "이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=p1",
@@ -435,5 +457,29 @@ describe("폴링 — 10초, 탭이 숨으면 멈춤", () => {
       await vi.advanceTimersByTimeAsync(OFFICE_POLL_MS);
     });
     expect(result.current.stale).toBe(false);
+  });
+});
+
+describe("안건 이슈 없는 회의 run — 합성 키 가드", () => {
+  it("말풍선은 회의 라벨, 접근 이름은 '프로젝트 전반', 개인 오피스 현재 작업은 이슈 링크 없음", async () => {
+    const user = userEvent.setup();
+    const base = await store.fetchOffice("p1");
+    vi.spyOn(store, "fetchOffice").mockResolvedValue({
+      ...base,
+      personas: base.personas.map((p) =>
+        p.id === "101"
+          ? { ...p, currentRun: { ...p.currentRun!, type: "RETRO", issueKey: "PROJECT-1" }, lastActivity: null }
+          : p,
+      ),
+    });
+    renderApp(OFFICE_PATH);
+    const avatar = await screen.findByRole("button", { name: /^기획봇, 기획, 작업 중, 회고 회의 프로젝트 전반 — / });
+    expect(screen.getByTestId("office-bubble-101")).toHaveTextContent(/^회고 회의$/);
+    expect(screen.queryByText("PROJECT-1")).not.toBeInTheDocument();
+
+    await user.click(avatar);
+    const panel = await screen.findByRole("complementary", { name: "기획봇" });
+    expect(within(panel).getByText("프로젝트 전반")).toBeInTheDocument();
+    expect(within(panel).queryByRole("link", { name: "PROJECT-1" })).not.toBeInTheDocument();
   });
 });
