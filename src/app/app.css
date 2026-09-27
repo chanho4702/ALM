@@ -5132,6 +5132,197 @@ th:last-child > [role="separator"] {
   width: min(640px, calc(100vw - var(--chanho-space-400)));
 }
 
+/* ── 직원 편집 다이얼로그(AGP-62 §6) — 도트 색은 .ai-office 스코프의 --office-*, 나머지는 토큰만 ── */
+.ai-team-modal.is-editor {
+  width: min(880px, calc(100vw - var(--chanho-space-400)));
+}
+
+/* 240px = 미리보기 192 + 액자·여백(레이아웃 상수) */
+.ai-avatar-editor {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--chanho-space-300);
+}
+
+.ai-avatar-editor-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  min-width: 0;
+}
+
+.ai-avatar-stage {
+  box-sizing: content-box;
+  width: 192px;
+  height: 192px;
+  border: 4px solid var(--office-ol);
+  box-shadow: inset 0 0 0 2px var(--office-hi);
+  background: var(--office-floor1);
+}
+
+.ai-avatar-stage svg {
+  display: block;
+  width: 192px;
+  height: 192px;
+  image-rendering: pixelated;
+}
+
+.ai-avatar-caption {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-avatar-plate-row {
+  margin: 0;
+}
+
+.ai-avatar-plate.office-nameplate {
+  position: static;
+  transform: none;
+  max-width: 100%;
+}
+
+.ai-avatar-editor .ai-avatar-modes {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 8장 = 4열 × 2행(각 32px, 2배) */
+.ai-avatar-strip {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  justify-content: center;
+  gap: var(--chanho-space-50) var(--chanho-space-100);
+}
+
+.ai-avatar-strip-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+}
+
+.ai-avatar-strip-item svg,
+.ai-avatar-dot,
+.ai-avatar-thumb {
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.ai-avatar-strip-item figcaption {
+  font-size: var(--chanho-font-size-50);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--chanho-space-100);
+}
+
+.ai-avatar-editor-body {
+  min-width: 0;
+  max-height: min(60vh, 560px);
+  overflow-y: auto;
+  scroll-padding-block: var(--chanho-space-200);
+}
+
+.ai-avatar-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  padding-block: var(--chanho-space-150);
+}
+
+.ai-avatar-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ai-avatar-editor .ai-avatar-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--chanho-space-75) var(--chanho-space-150);
+}
+
+.ai-avatar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+}
+
+.ai-avatar-dot-ol {
+  fill: var(--office-ol);
+}
+
+.ai-avatar-dot-main {
+  fill: var(--sw);
+}
+
+.ai-avatar-dot-shade {
+  fill: var(--sw2);
+}
+
+.ai-avatar-dot-stack {
+  position: relative;
+  display: inline-flex;
+}
+
+.ai-avatar-dot-badge {
+  position: absolute;
+  right: calc(var(--chanho-space-75) * -1);
+  bottom: calc(var(--chanho-space-50) * -1);
+  display: inline-flex;
+  color: var(--chanho-color-text-default);
+  background: var(--chanho-color-background-surface-overlay);
+  border-radius: var(--chanho-radius-small);
+}
+
+.ai-avatar-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.ai-avatar-skills {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.ai-avatar-counter {
+  margin: 0;
+  align-self: flex-end;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.ai-avatar-counter.is-warning {
+  color: var(--chanho-color-text-warning);
+}
+
+@media (max-width: 720px) {
+  .ai-avatar-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-avatar-strip {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    justify-content: flex-start;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
 .ai-team-form {
   display: flex;
   flex-direction: column;

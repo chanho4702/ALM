@@ -97,13 +97,17 @@ describe("AI 팀 설정 — 직원", () => {
     expect(within(planner).getByText("기획")).toBeInTheDocument();
     expect(within(planner).getByRole("switch", { name: "기획봇 활성" })).toBeChecked();
     // 기획봇 토큰은 철회된 1개뿐 → 0
-    await waitFor(() => expect(within(planner).getAllByRole("cell").at(-1)).toHaveTextContent("0"));
-    expect(within(rowOf(table, "프론트봇")).getAllByRole("cell").at(-1)).toHaveTextContent("1");
+    // 토큰 열 다음이 작업(편집) 열(AGP-62)
+    await waitFor(() => expect(within(planner).getAllByRole("cell").at(-2)).toHaveTextContent("0"));
+    expect(within(rowOf(table, "프론트봇")).getAllByRole("cell").at(-2)).toHaveTextContent("1");
+    expect(within(planner).getByRole("button", { name: "기획봇 편집" })).toBeInTheDocument();
 
     const ops = rowOf(table, "운영봇");
     expect(within(ops).getByText("공용")).toBeInTheDocument();
     expect(within(ops).queryByRole("switch")).not.toBeInTheDocument();
-    expect(within(ops).getAllByRole("cell").at(-1)).toHaveTextContent("—");
+    expect(within(ops).getAllByRole("cell").at(-2)).toHaveTextContent("—");
+    // 공용 직원은 이 화면에서 편집할 수 없다
+    expect(within(ops).queryByRole("button", { name: /편집/ })).not.toBeInTheDocument();
     // 이 프로젝트 직원이 공용보다 먼저
     const names = within(table).getAllByRole("row").slice(1).map((r) => r.textContent ?? "");
     expect(names.findIndex((t) => t.includes("운영봇"))).toBeGreaterThan(names.findIndex((t) => t.includes("백엔드봇")));
@@ -144,6 +148,12 @@ describe("AI 팀 설정 — 직원", () => {
       grants: [{ resourceType: "PROJECT", resourceId: "p1", role: "EDITOR" }],
     });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "직원 추가" })).not.toBeInTheDocument());
+    // 만들면 곧바로 그 직원의 편집 다이얼로그가 외형 탭으로 열린다(AGP-62 §6.1) — 건너뛰면 기본 외형
+    const editor = await screen.findByRole("dialog", { name: "QA봇 편집" });
+    expect(within(editor).getByText(/직원을 만들었습니다. 외형과 능력을 설정해 보세요/)).toBeInTheDocument();
+    expect(within(editor).getByRole("tab", { name: "외형" })).toHaveAttribute("aria-selected", "true");
+    await user.click(within(editor).getByRole("button", { name: "취소" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "QA봇 편집" })).not.toBeInTheDocument());
     const row = rowOf(await staffTable(), "QA봇");
     expect(within(row).getByText("매니저")).toBeInTheDocument();
     expect(within(row).queryByText("공용")).not.toBeInTheDocument();

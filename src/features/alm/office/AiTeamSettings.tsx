@@ -61,6 +61,7 @@ import { useAgentPermissions } from "../components/useAgentPermissions";
 import { formatDateTime, relTime } from "../components/time";
 import { OfficePortrait } from "./PixelSprite";
 import { useConfirmedAction } from "./SupervisionFrame";
+import { PersonaEditorDialog } from "./PersonaEditorDialog";
 // 초상 팔레트(`--office-*`)만 쓴다 — 이 화면은 설정 청크에서도 지연 로드라 사무실을 안 여는 사람은 받지 않는다
 import "./ai-office.css";
 
@@ -211,7 +212,7 @@ function AiTeamBody({ projectId, users }: AiTeamSettingsProps) {
 function PersonaAvatar({ persona }: { persona: AgentTeamPersona }) {
   return (
     <span className="ai-office ai-team-avatar">
-      <OfficePortrait slug={persona.slug} role={persona.role} className="is-row" />
+      <OfficePortrait slug={persona.slug} role={persona.role} avatarConfig={persona.avatarConfig} className="is-row" />
     </span>
   );
 }
@@ -255,6 +256,8 @@ function StaffSection({
   onChanged: () => Promise<void>;
 }) {
   const [adding, setAdding] = useState(false);
+  /** 편집 중인 직원 — 추가 직후 자동으로 열리면 created=true(안내 배너) */
+  const [editing, setEditing] = useState<{ persona: AgentTeamPersona; created: boolean } | null>(null);
   const action = useConfirmedAction(onChanged);
 
   const tokenCount = (persona: AgentTeamPersona): ReactNode => {
@@ -308,6 +311,7 @@ function StaffSection({
               { key: "role", header: "롤" },
               { key: "active", header: "상태" },
               { key: "tokens", header: "토큰", align: "right" },
+              { key: "actions", header: "", ariaLabel: "작업" },
             ]}
             rows={team.map((persona) => {
               const shared = persona.projectId === null;
@@ -339,6 +343,18 @@ function StaffSection({
                     <ActiveLozenge active={persona.active} />
                   ),
                 tokens: tokenCount(persona),
+                actions:
+                  canManage && !shared ? (
+                    <Button
+                      variant="subtle"
+                      size="small"
+                      iconBefore={<Pencil size={14} aria-hidden />}
+                      aria-label={`${persona.name} 편집`}
+                      onClick={() => setEditing({ persona, created: false })}
+                    >
+                      편집
+                    </Button>
+                  ) : null,
               };
             })}
           />
@@ -352,8 +368,22 @@ function StaffSection({
           projectId={projectId}
           open={adding}
           onOpenChange={setAdding}
-          onCreated={() => {
+          onCreated={(persona) => {
             setAdding(false);
+            void onChanged();
+            // 추가 모달을 닫고 곧바로 그 직원의 편집 다이얼로그를 연다(외형 탭, AGP-62 §6.1)
+            setEditing({ persona, created: true });
+          }}
+        />
+      ) : null}
+      {editing ? (
+        <PersonaEditorDialog
+          key={editing.persona.id}
+          persona={editing.persona}
+          justCreated={editing.created}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
             void onChanged();
           }}
         />
