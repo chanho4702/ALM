@@ -18,9 +18,9 @@ export const RUNNER_JAR_URL = "https://github.com/chanho4702/agent-service/relea
 
 const RUNNER_NAME_MAX = 80;
 
-/** 러너 실행 명령 — 서버 주소는 지금 보고 있는 플랫폼(nginx 앞단) */
+/** 러너 실행 명령(PowerShell) — 서버 주소는 지금 보고 있는 플랫폼(nginx 앞단). 토큰은 env로(명령행 인자는 다른 프로세스 목록에 보인다 — 러너도 경고한다) */
 export function runnerCommand(token: string, origin: string = window.location.origin): string {
-  return `java -jar agent-runner.jar --server ${origin} --token ${token}`;
+  return `$env:RUNNER_TOKEN="${token}"; java -jar agent-runner.jar --server ${origin}`;
 }
 
 /** Radio 값 — "기본값 따름"은 저장값 null. Radix Radio도 빈 문자열 값을 쓰지 않는다 */

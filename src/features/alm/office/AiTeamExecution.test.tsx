@@ -160,7 +160,8 @@ describe("러너 카드", () => {
     expect(field.value).toMatch(/^agr_/);
     const secret = field.value;
     const command = within(dialog).getByLabelText("실행 명령");
-    expect(command).toHaveTextContent(`java -jar agent-runner.jar --server ${window.location.origin} --token ${secret}`);
+    expect(command).toHaveTextContent(`$env:RUNNER_TOKEN="${secret}"; java -jar agent-runner.jar --server ${window.location.origin}`);
+    expect(command).not.toHaveTextContent("--token");
     expect(runnerCommand(secret)).toBe(command.textContent);
     expect(within(dialog).getByRole("link", { name: "agent-runner.jar 내려받기" })).toHaveAttribute("href", RUNNER_JAR_URL);
     expect(within(dialog).getByText("Java 24 이상")).toBeInTheDocument();
