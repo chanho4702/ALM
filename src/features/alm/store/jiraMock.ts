@@ -61,6 +61,12 @@ import type {
   AgentTeamPersona,
   AgentToken,
   AgentTokenIssued,
+  AgentTokenIssueInput,
+  AgentExecutionSite,
+  AgentExecutionSiteSetting,
+  AgentRunner,
+  AgentRunnerInput,
+  AgentRunnerIssued,
   AuditEntry,
   SystemStats,
   IssueTypeDef,
@@ -2434,7 +2440,8 @@ function baseOfficePersonas(now: number): AgentOfficePersona[] {
     },
     {
       id: "102", slug: "designer-bot", name: "디자인봇", emoji: "🎨", role: "DESIGNER", active: true,
-      currentRun: { id: "9002", status: "QUEUED", issueKey: "ALM-2", type: "TASK", trigger: "USER", attempt: 1, model: null, startedAt: null },
+      // 서버 실행 대기(P4a) — 목업 배포는 인프로세스가 꺼져 있고 플랫폼 러너가 오프라인이라 "서버 러너 대기"
+      currentRun: { id: "9002", status: "QUEUED", issueKey: "ALM-2", type: "TASK", trigger: "USER", attempt: 1, model: null, startedAt: null, executionSite: "SERVER" },
       lastActivity: null,
       todayCostUsd: 0.18,
     },
@@ -2460,7 +2467,8 @@ function baseOfficePersonas(now: number): AgentOfficePersona[] {
     },
     {
       id: "106", slug: "reviewer-bot", name: "리뷰봇", emoji: "🔍", role: "REVIEWER", active: true,
-      currentRun: { id: "9006", status: "RUNNING", issueKey: "ALM-1", type: "REVIEW", trigger: "SCHEDULER", attempt: 1, model: "claude-opus-5-5", startedAt: ago(now, 6) },
+      // 내 PC 러너(P4a) — 모니터에 도트 집, 러너 "chanho 노트북"(41)이 돌리는 중
+      currentRun: { id: "9006", status: "RUNNING", issueKey: "ALM-1", type: "REVIEW", trigger: "SCHEDULER", attempt: 1, model: "claude-opus-5-5", startedAt: ago(now, 6), executionSite: "LOCAL" },
       lastActivity: { id: "70061", tool: "report_progress", status: "OK", summary: "run=9006 (본문 생략)", createdAt: ago(now, 2), origin: "WORKER", runId: "9006" },
       todayCostUsd: 0.31,
     },
@@ -2521,6 +2529,15 @@ function mockOffice(now: number, projectId = "p1"): AgentOffice {
   });
   const recentRuns = baseRecentRuns(now);
   applyAgentOverrides(personas, recentRuns);
+  for (const p of personas) {
+    if (p.currentRun) {
+      const run = p.currentRun;
+      p.currentRun = {
+        ...run,
+        awaitingRunner: run.status === "QUEUED" && mockAwaitingRunner(run.executionSite ?? "SERVER", projectId),
+      };
+    }
+  }
   const personaOfRun = new Map(mockAllRuns(now).map((r) => [r.id, r.personaId]));
   const pendingGates: AgentPendingGate[] = mockGates(now)
     .filter((g) => g.decision === null)
@@ -2560,7 +2577,7 @@ export async function fetchPersonaActivity(personaId: string): Promise<AgentPers
     runs.unshift({
       id: cur.id, issueKey: cur.issueKey, status: cur.status, personaId, attempt: cur.attempt,
       model: cur.model, startedAt: cur.startedAt, endedAt: null, type: cur.type, trigger: cur.trigger,
-      parentRunId: null,
+      parentRunId: null, executionSite: cur.executionSite ?? "SERVER", runnerId: mockRunnerOfRun(cur.id),
     });
   }
   const runId = persona.currentRun?.id ?? null;
@@ -2623,6 +2640,7 @@ function toCurrentRun(run: AgentRunSummary): AgentCurrentRun {
     attempt: run.attempt,
     model: run.model,
     startedAt: run.startedAt,
+    executionSite: run.executionSite ?? "SERVER",
   };
 }
 
@@ -2664,6 +2682,8 @@ function mockAllRuns(now: number): AgentRunSummary[] {
       model: cur.model, startedAt: cur.startedAt, endedAt: null, type: cur.type, trigger: cur.trigger,
       // 리뷰 run의 부모 = 검증 대상 TASK run
       parentRunId: cur.id === "9006" ? "8985" : null,
+      executionSite: cur.executionSite ?? "SERVER",
+      runnerId: mockRunnerOfRun(cur.id),
     });
   }
   for (const run of [baseMeetingRun(now), ...baseRecentRuns(now), ...mockRunHistory(now)]) {
@@ -2828,6 +2848,8 @@ export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeet
     type: input.type,
     trigger: "USER",
     parentRunId: null,
+    executionSite: input.executionSite ?? mockEffectiveSite(input.projectId),
+    runnerId: null,
   };
   agentState.added.push(run);
   agentState.meetings.set(input.projectId, run.id);
@@ -2882,6 +2904,15 @@ interface AgentTeamMockState {
   dialogs: Map<string, AgentDialogEntry[]>;
   /** 수다 세션 발급 번호 */
   chatSeq: number;
+  /** 러너(P4a) — PLATFORM 1 + 프로젝트 p1 LOCAL 3 + 전역 LOCAL 1 */
+  runners: AgentRunner[];
+  /** 프로젝트 id → 저장된 실행 위치(없으면 전역 기본) */
+  executionSites: Map<string, AgentExecutionSite>;
+  defaultSite: AgentExecutionSite;
+  /** false = compose 배포처럼 SERVER run을 PLATFORM 러너가 집는다 */
+  inProcess: boolean;
+  /** false면 실행 위치·러너 API가 404(구 백엔드) */
+  executionApi: boolean;
 }
 
 /**
@@ -2919,10 +2950,13 @@ function freshTeamState(): AgentTeamMockState {
         },
       ],
     ]),
+    // 토큰 위생(P4a D-P4-3b) — 곧 만료(5일 남음)·무기한(V13 이전 발급)·철회·run 토큰(실행용, 시스템 발급)이 섞여 있다
     tokens: [
-      { id: "31", label: "Claude Desktop — 프론트봇", personaSlug: "frontend-bot", createdAt: ago(now, 60 * 24 * 3), expiresAt: null, lastUsedAt: ago(now, 40), revoked: false },
-      { id: "30", label: "예전 노트북", personaSlug: "planner-bot", createdAt: ago(now, 60 * 24 * 20), expiresAt: null, lastUsedAt: null, revoked: true },
-      { id: "29", label: "운영봇 CI", personaSlug: "ops-bot", createdAt: ago(now, 60 * 24 * 9), expiresAt: null, lastUsedAt: null, revoked: false },
+      { id: "33", label: "run:9003", personaSlug: "frontend-bot", createdAt: ago(now, 32), expiresAt: null, lastUsedAt: ago(now, 3), revoked: false, kind: "RUN", noExpiry: false, expiringSoon: false },
+      { id: "32", label: "백엔드봇 CI", personaSlug: "backend-bot", createdAt: ago(now, 60 * 24 * 40), expiresAt: null, lastUsedAt: ago(now, 60 * 5), revoked: false, kind: "HUMAN", noExpiry: true, expiringSoon: false },
+      { id: "31", label: "Claude Desktop — 프론트봇", personaSlug: "frontend-bot", createdAt: ago(now, 60 * 24 * 85), expiresAt: ago(now, -60 * 24 * 5), lastUsedAt: ago(now, 40), revoked: false, kind: "HUMAN", noExpiry: false, expiringSoon: true },
+      { id: "30", label: "예전 노트북", personaSlug: "planner-bot", createdAt: ago(now, 60 * 24 * 20), expiresAt: ago(now, -60 * 24 * 70), lastUsedAt: null, revoked: true, kind: "HUMAN", noExpiry: false, expiringSoon: false },
+      { id: "29", label: "운영봇 CI", personaSlug: "ops-bot", createdAt: ago(now, 60 * 24 * 9), expiresAt: ago(now, -60 * 24 * 81), lastUsedAt: null, revoked: false, kind: "HUMAN", noExpiry: false, expiringSoon: false },
     ],
     projectKeys: new Map(),
     platformKeyHint: "1234",
@@ -2935,6 +2969,34 @@ function freshTeamState(): AgentTeamMockState {
     chatError: null,
     dialogs: new Map(),
     chatSeq: 1,
+    runners: [
+      mockRunnerRow(now, { id: "44", name: "공용 빌드 PC", projectId: null, status: "NEVER_CONNECTED", createdAt: ago(now, 60 * 24 * 2) }),
+      mockRunnerRow(now, { id: "43", name: "예전 PC", status: "REVOKED", createdAt: ago(now, 60 * 24 * 30), revokedAt: ago(now, 60 * 24 * 5), lastHeartbeatAt: ago(now, 60 * 24 * 6), version: "0.1.0", os: "Windows 10", maxConcurrency: 1 }),
+      mockRunnerRow(now, { id: "42", name: "사무실 데스크톱", status: "OFFLINE", createdAt: ago(now, 60 * 24 * 10), lastHeartbeatAt: ago(now, 60 * 3), version: "0.1.0", os: "macOS 16", maxConcurrency: 1 }),
+      mockRunnerRow(now, { id: "41", name: "chanho 노트북", status: "ONLINE", createdAt: ago(now, 60 * 24 * 12), lastHeartbeatAt: ago(now, 0.3), version: "0.1.0", os: "Windows 11", maxConcurrency: 2, currentRunIds: ["9006"] }),
+      mockRunnerRow(now, { id: "40", kind: "PLATFORM", name: "플랫폼 러너", projectId: null, issuedBy: null, status: "OFFLINE", createdAt: ago(now, 60 * 24 * 60), lastHeartbeatAt: ago(now, 12), version: "0.1.0", os: "Linux", maxConcurrency: 2 }),
+    ],
+    executionSites: new Map<string, AgentExecutionSite>([["p1", "LOCAL"]]),
+    defaultSite: "SERVER",
+    inProcess: false,
+    executionApi: true,
+  };
+}
+
+function mockRunnerRow(now: number, row: Partial<AgentRunner> & Pick<AgentRunner, "id" | "name" | "status">): AgentRunner {
+  return {
+    kind: "LOCAL",
+    projectId: "p1",
+    issuedBy: CURRENT_USER_ID,
+    tokenPrefix: `agr_${row.id}9f`,
+    createdAt: new Date(now).toISOString(),
+    revokedAt: null,
+    lastHeartbeatAt: null,
+    version: null,
+    os: null,
+    maxConcurrency: null,
+    currentRunIds: [],
+    ...row,
   };
 }
 
@@ -2957,6 +3019,12 @@ export interface AgentMockScenario {
   dialogApi?: boolean;
   /** 수다 API 강제 실패 상태(409·429·503 등) — null이면 정상 */
   chatError?: number | null;
+  /** false면 실행 위치·러너 API 404(구 백엔드 폴백 확인용) */
+  executionApi?: boolean;
+  /** p1 저장 실행 위치 — null이면 설정 해제(전역 기본) */
+  projectSite?: AgentExecutionSite | null;
+  /** false면 온라인 LOCAL 러너를 전부 오프라인으로 */
+  runnersOnline?: boolean;
 }
 
 /** 테스트 전용 — 권한·키 시나리오를 바꾼다(`__resetForTest`가 기본으로 되돌린다) */
@@ -2976,6 +3044,14 @@ export function __setAgentMockScenario(scenario: AgentMockScenario): void {
   if (scenario.chat !== undefined) teamState.chat = scenario.chat;
   if (scenario.dialogApi !== undefined) teamState.dialogApi = scenario.dialogApi;
   if (scenario.chatError !== undefined) teamState.chatError = scenario.chatError;
+  if (scenario.executionApi !== undefined) teamState.executionApi = scenario.executionApi;
+  if (scenario.projectSite !== undefined) {
+    if (scenario.projectSite === null) teamState.executionSites.delete("p1");
+    else teamState.executionSites.set("p1", scenario.projectSite);
+  }
+  if (scenario.runnersOnline === false) {
+    for (const r of teamState.runners) if (r.kind === "LOCAL" && r.status === "ONLINE") r.status = "OFFLINE";
+  }
 }
 
 function requireManage(): void {
@@ -3147,23 +3223,39 @@ export async function listAgentTokens(projectId: string): Promise<AgentToken[]> 
   return clone(teamState.tokens.filter((t) => slugs.has(t.personaSlug)));
 }
 
-export async function issueAgentToken(input: { label: string; personaSlug: string }): Promise<AgentTokenIssued> {
+/** 만료 검증·거부 문구는 agent-service PatService(D-P4-3b) — 기간과 무기한은 함께 줄 수 없고 무기한은 전역 관리자만 */
+export async function issueAgentToken(input: AgentTokenIssueInput): Promise<AgentTokenIssued> {
   const label = input.label.trim();
-  if (!label) throw new Error("label은 필수입니다");
-  if (label.length > 120) throw new Error("label은 120자 이하여야 합니다");
+  if (!label) throw new ApiError(400, "label은 필수입니다");
+  if (label.length > 120) throw new ApiError(400, "label은 120자 이하여야 합니다");
+  if (input.noExpiry && input.expiresInDays !== undefined) {
+    throw new ApiError(400, "expiresInDays와 noExpiry는 함께 지정할 수 없습니다");
+  }
+  const days = input.expiresInDays ?? 90;
+  if (!input.noExpiry && (!Number.isInteger(days) || days < 1 || days > 365)) {
+    throw new ApiError(400, "expiresInDays는 1~365 사이여야 합니다");
+  }
+  if (input.noExpiry && !teamState.permissions.isGlobalAdmin) {
+    throw new ApiError(403, "무기한 토큰은 전역 관리자만 발급할 수 있습니다");
+  }
   requireManagePersona(mockPersonaBySlug(input.personaSlug));
   const id = String(teamState.seq++);
+  const now = Date.now();
+  const expiresAt = input.noExpiry ? null : new Date(now + days * 24 * 60 * MINUTE).toISOString();
   teamState.tokens.unshift({
     id,
     label,
     personaSlug: input.personaSlug,
-    createdAt: new Date().toISOString(),
-    expiresAt: null,
+    createdAt: new Date(now).toISOString(),
+    expiresAt,
     lastUsedAt: null,
     revoked: false,
+    kind: "HUMAN",
+    noExpiry: input.noExpiry === true,
+    expiringSoon: !input.noExpiry && days <= 7,
   });
   const secret = crypto.randomUUID().replace(/-/g, "");
-  return { token: `chanho_pat_${secret}`, id, label, personaSlug: input.personaSlug };
+  return { token: `agp_${secret}`, id, label, personaSlug: input.personaSlug, expiresAt };
 }
 
 export async function revokeAgentToken(tokenId: string): Promise<void> {
@@ -3218,6 +3310,114 @@ export async function deleteProjectCredential(projectId: string): Promise<void> 
   teamState.projectKeys.delete(projectId);
 }
 
+// ── 실행 위치·러너(목업, P4a AGP-69) — 권한·거부 문구는 agent-service ExecutionSiteController·RunnerService ──
+
+function mockEffectiveSite(projectId: string): AgentExecutionSite {
+  return teamState.executionSites.get(projectId) ?? teamState.defaultSite;
+}
+
+/** run을 돌린(또는 돌리는) 러너 — 목업은 러너의 currentRunIds로 찾는다 */
+function mockRunnerOfRun(runId: string): string | null {
+  return teamState.runners.find((r) => r.currentRunIds.includes(runId))?.id ?? null;
+}
+
+/**
+ * 서버 RunnerAvailability 미러 — LOCAL은 범위(그 프로젝트 + 전역) 안 온라인 LOCAL 러너가 없을 때,
+ * SERVER는 인프로세스가 꺼져 있고 PLATFORM 러너가 온라인이 아닐 때 "러너 대기".
+ */
+function mockAwaitingRunner(site: AgentExecutionSite, projectId: string): boolean {
+  const online = (r: AgentRunner) => r.status === "ONLINE";
+  if (site === "LOCAL") {
+    return !teamState.runners.some(
+      (r) => r.kind === "LOCAL" && (r.projectId === projectId || r.projectId === null) && online(r),
+    );
+  }
+  return !teamState.inProcess && !teamState.runners.some((r) => r.kind === "PLATFORM" && online(r));
+}
+
+function requireExecutionApi(): void {
+  if (!teamState.executionApi) throw new ApiError(404, "찾을 수 없습니다.");
+}
+
+function executionSiteView(projectId: string): AgentExecutionSiteSetting {
+  const site = teamState.executionSites.get(projectId) ?? null;
+  return {
+    projectId,
+    site,
+    effectiveSite: site ?? teamState.defaultSite,
+    defaultSite: teamState.defaultSite,
+    inProcess: teamState.inProcess,
+  };
+}
+
+/** 인증 사용자 누구나 — 구 백엔드(404)면 null */
+export async function fetchExecutionSite(projectId: string): Promise<AgentExecutionSiteSetting | null> {
+  if (!teamState.executionApi) return null;
+  return executionSiteView(projectId);
+}
+
+export async function saveExecutionSite(
+  projectId: string,
+  site: AgentExecutionSite | null,
+): Promise<AgentExecutionSiteSetting> {
+  requireExecutionApi();
+  if (!teamState.permissions.canManage) throw new ApiError(403, AGENT_FORBIDDEN);
+  if (site === null) teamState.executionSites.delete(projectId);
+  else teamState.executionSites.set(projectId, site);
+  return executionSiteView(projectId);
+}
+
+/** 프로젝트 관리자 = 그 프로젝트 + 전역 LOCAL 러너, 전역(projectId 없음) = 전역 관리자만 전체(PLATFORM 포함). 최신 먼저 */
+export async function listAgentRunners(projectId: string | null): Promise<AgentRunner[] | null> {
+  if (!teamState.executionApi) return null;
+  if (projectId === null) {
+    if (!teamState.permissions.isGlobalAdmin) throw new ApiError(403, AGENT_FORBIDDEN);
+    return clone(teamState.runners);
+  }
+  if (!teamState.permissions.canManage) throw new ApiError(403, AGENT_FORBIDDEN);
+  return clone(
+    teamState.runners.filter((r) => r.projectId === projectId || (r.projectId === null && r.kind === "LOCAL")),
+  );
+}
+
+export async function issueAgentRunner(input: AgentRunnerInput): Promise<AgentRunnerIssued> {
+  requireExecutionApi();
+  const name = input.name.trim();
+  if (!name) throw new ApiError(400, "name은 필수입니다");
+  if (name.length > 80) throw new ApiError(400, "name은 80자 이하여야 합니다");
+  if (input.projectId === null ? !teamState.permissions.isGlobalAdmin : !teamState.permissions.canManage) {
+    throw new ApiError(403, AGENT_FORBIDDEN);
+  }
+  const id = String(teamState.seq++);
+  const token = `agr_${crypto.randomUUID().replace(/-/g, "")}`;
+  const now = Date.now();
+  const row = mockRunnerRow(now, {
+    id,
+    name,
+    projectId: input.projectId,
+    status: "NEVER_CONNECTED",
+    tokenPrefix: token.slice(0, 8),
+  });
+  teamState.runners.unshift(row);
+  return { id, kind: "LOCAL", name, projectId: input.projectId, token, tokenPrefix: row.tokenPrefix, createdAt: row.createdAt };
+}
+
+/** 멱등 — PLATFORM은 409(env로만 관리), 전역 러너는 전역 관리자만 */
+export async function revokeAgentRunner(runnerId: string): Promise<void> {
+  requireExecutionApi();
+  const runner = teamState.runners.find((r) => r.id === runnerId);
+  if (!runner) throw new ApiError(404, `러너를 찾을 수 없습니다: id=${runnerId}`);
+  if (runner.kind === "PLATFORM") {
+    throw new ApiError(409, "플랫폼 러너는 철회할 수 없습니다 — AGENT_PLATFORM_RUNNER_TOKEN으로 관리합니다");
+  }
+  const allowed = runner.projectId === null ? teamState.permissions.isGlobalAdmin : teamState.permissions.canManage;
+  if (!allowed) throw new ApiError(403, AGENT_FORBIDDEN);
+  if (runner.revokedAt) return;
+  runner.revokedAt = new Date().toISOString();
+  runner.status = "REVOKED";
+  runner.currentRunIds = [];
+}
+
 // ── AI 사무실 1:1 대화(목업, P3g) — 거부 문구·순서는 agent-service RunService.createUserRun·ChatService·DialogService를 따른다 ──
 
 const CHAT_OFF = "수다 기능이 꺼져 있습니다";
@@ -3255,6 +3455,8 @@ export async function createAgentRun(input: AgentRunCreateInput): Promise<AgentR
     type: "TASK",
     trigger: "USER",
     parentRunId: null,
+    executionSite: input.executionSite ?? mockEffectiveSite(issue.projectId),
+    runnerId: null,
   };
   agentState.added.push(run);
   return { ...run };

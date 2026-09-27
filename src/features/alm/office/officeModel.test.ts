@@ -4,6 +4,8 @@ import {
   bubbleText,
   coffeeCopy,
   epicGoals,
+  isAwaitingRunner,
+  isLocalRun,
   isRedactedSummary,
   finishedRuns,
   meetingRoomAccessibleName,
@@ -11,6 +13,7 @@ import {
   meetingSignText,
   pickWeighted,
   progressCells,
+  runnerWaitText,
   officeSummaryText,
   personaAccessibleName,
   personaState,
@@ -492,5 +495,55 @@ describe("게시판 목표(P3e §3)", () => {
     expect(progressCells(99, 100)).toBe(9);
     expect(progressCells(5, 5)).toBe(10);
     expect(progressCells(0, 0)).toBe(0);
+  });
+});
+
+describe("실행 위치·러너 대기(P4a D-P4-4)", () => {
+  it("러너 대기는 QUEUED의 하위 상태 — 다른 상태에 붙어 와도 무시하고, 상태 우선순위는 그대로", () => {
+    expect(isAwaitingRunner(run("QUEUED", { awaitingRunner: true }))).toBe(true);
+    expect(isAwaitingRunner(run("RUNNING", { awaitingRunner: true }))).toBe(false);
+    expect(isAwaitingRunner(run("QUEUED"))).toBe(false);
+    expect(personaState(persona({ currentRun: run("QUEUED", { awaitingRunner: true }) }))).toBe("QUEUED");
+    expect(personaState(persona({ active: false, currentRun: run("QUEUED", { awaitingRunner: true }) }))).toBe("INACTIVE");
+  });
+
+  it("대기 사유 — 내 PC 러너는 사람이 켜야, 서버는 플랫폼 러너 연결", () => {
+    expect(runnerWaitText(run("QUEUED", { awaitingRunner: true, executionSite: "LOCAL" }))).toBe(
+      "러너 대기 — 내 PC 러너가 켜지면 시작합니다",
+    );
+    expect(runnerWaitText(run("QUEUED", { awaitingRunner: true }))).toBe(
+      "서버 러너 대기 — 플랫폼 러너가 연결되면 시작합니다",
+    );
+    expect(runnerWaitText(run("QUEUED", { executionSite: "LOCAL" }))).toBeNull();
+    expect(runnerWaitText(null)).toBeNull();
+  });
+
+  it("구 백엔드(위치 없음)는 서버 run", () => {
+    expect(isLocalRun(run("RUNNING"))).toBe(false);
+    expect(isLocalRun(run("RUNNING", { executionSite: "LOCAL" }))).toBe(true);
+  });
+
+  it("말풍선 — 러너 대기면 접두가 '러너 대기', 2행이 누가 풀어야 하는지. 회의 run도 같은 접두", () => {
+    expect(bubbleText(persona({ currentRun: run("QUEUED", { awaitingRunner: true, executionSite: "LOCAL" }) }))).toEqual({
+      line1: "러너 대기 · ALM-123",
+      prefix: "러너 대기",
+      issueKey: "ALM-123",
+      line2: "내 PC 러너를 켜 주세요",
+    });
+    expect(
+      bubbleText(persona({ currentRun: run("QUEUED", { awaitingRunner: true, type: "RETRO", issueKey: "PROJECT-1" }) }))?.line1,
+    ).toBe("러너 대기 · 회고 회의");
+    // 대기가 아닌 QUEUED는 기존 그대로
+    expect(bubbleText(persona({ currentRun: run("QUEUED", { executionSite: "LOCAL" }) }))?.line1).toBe("대기열 · ALM-123");
+  });
+
+  it("접근 이름 — 대기 사유 또는 '내 PC 러너에서 실행'을 최근 활동 뒤에", () => {
+    expect(personaAccessibleName(persona({ currentRun: run("RUNNING", { executionSite: "LOCAL" }) }))).toBe(
+      "백엔드봇, 백엔드, 작업 중, 이슈 ALM-123, 내 PC 러너에서 실행 — 말 걸기",
+    );
+    expect(personaAccessibleName(persona({ currentRun: run("QUEUED", { awaitingRunner: true }) }))).toBe(
+      "백엔드봇, 백엔드, 대기열, 이슈 ALM-123, 서버 러너 대기 — 플랫폼 러너가 연결되면 시작합니다 — 말 걸기",
+    );
+    expect(personaAccessibleName(persona({ currentRun: run("RUNNING") }))).toBe("백엔드봇, 백엔드, 작업 중, 이슈 ALM-123 — 말 걸기");
   });
 });

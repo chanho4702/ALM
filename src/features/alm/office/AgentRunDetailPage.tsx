@@ -10,6 +10,7 @@ import {
   AgentRunStatusLozenge,
   AgentRunTriggerGlyph,
   AgentRunTypeGlyph,
+  AgentExecutionSiteGlyph,
 } from "../components/AgentGlyphs";
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
@@ -194,6 +195,13 @@ function AgentRunDetail() {
             <dt>트리거</dt>
             <dd>
               <AgentRunTriggerGlyph trigger={run.trigger} />
+            </dd>
+          </div>
+          <div>
+            <dt>실행 위치</dt>
+            <dd>
+              <AgentExecutionSiteGlyph site={run.executionSite ?? "SERVER"} />
+              {run.runnerId ? <span className="agent-sup-subtle"> · 러너 #{run.runnerId}</span> : null}
             </dd>
           </div>
           <div>

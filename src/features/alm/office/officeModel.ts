@@ -5,6 +5,7 @@
 import type {
   AgentActiveMeeting,
   AgentBudget,
+  AgentCurrentRun,
   AgentMeetingType,
   AgentOffice,
   AgentOfficePersona,
@@ -127,6 +128,38 @@ const TOOL_LABEL: Record<string, string> = {
 /** 도구의 한글 라벨 — 모르는 도구는 도구명(말풍선·대화 대사 공용) */
 export const toolLabel = (tool: string) => TOOL_LABEL[tool] ?? tool;
 
+// ── 실행 위치·러너 대기(P4a D-P4-4) — 상태 우선순위는 그대로, "러너 대기"는 QUEUED의 하위 상태 ──
+
+/** 러너 대기 말풍선 접두 — "대기열" 대신 */
+export const RUNNER_WAIT_PREFIX = "러너 대기";
+
+/** 내 PC 러너에서 도는(또는 돌) run — 모니터에 도트 집. 구 백엔드(필드 없음)는 서버 */
+export function isLocalRun(run: AgentCurrentRun | null | undefined): boolean {
+  return run?.executionSite === "LOCAL";
+}
+
+/** QUEUED이고 집어 갈 러너가 없는가 — 다른 상태에 붙어 와도 무시한다(매퍼와 같은 규칙) */
+export function isAwaitingRunner(run: AgentCurrentRun | null | undefined): boolean {
+  return run?.status === "QUEUED" && run.awaitingRunner === true;
+}
+
+/**
+ * 러너 대기 설명(패널·팀 카드·접근 이름 공용) — 대기가 아니면 null.
+ * LOCAL은 사람이 자기 PC 러너를 켜야 풀리고, SERVER는 플랫폼 러너(운영) 쪽 문제다.
+ */
+export function runnerWaitText(run: AgentCurrentRun | null | undefined): string | null {
+  if (!run || !isAwaitingRunner(run)) return null;
+  return isLocalRun(run)
+    ? "러너 대기 — 내 PC 러너가 켜지면 시작합니다"
+    : "서버 러너 대기 — 플랫폼 러너가 연결되면 시작합니다";
+}
+
+/** 러너 대기 말풍선 2행 — 좁은 말풍선이라 누가 풀어야 하는지만 짧게 */
+function runnerWaitBubble(run: AgentCurrentRun): string | null {
+  if (!isAwaitingRunner(run)) return null;
+  return isLocalRun(run) ? "내 PC 러너를 켜 주세요" : "플랫폼 러너 연결 대기";
+}
+
 /** 원격 접속 말풍선 1행 */
 export const REMOTE_BUBBLE = "원격 작업 중";
 
@@ -166,17 +199,21 @@ export function bubbleText(persona: AgentOfficePersona): BubbleText | null {
   if (!run || state === "IDLE" || state === "INACTIVE") return null;
   if (isProjectWideMeeting(run)) {
     // 합성 키는 이슈가 아니다 — 1행은 회의 라벨(상태 접두가 있으면 앞에)
-    const statePrefix = state === "RUNNING" ? null : (STATE_PREFIX[state] ?? null);
+    const statePrefix =
+      state === "RUNNING" ? null : isAwaitingRunner(run) ? RUNNER_WAIT_PREFIX : (STATE_PREFIX[state] ?? null);
     const label = meetingLabel(run.type);
-    const activity = state === "RUNNING" || state === "WAITING_APPROVAL" ? bubbleActivity(persona) : null;
+    const activity =
+      state === "RUNNING" || state === "WAITING_APPROVAL" ? bubbleActivity(persona) : runnerWaitBubble(run);
     return { line1: statePrefix ? `${statePrefix} · ${label}` : label, prefix: statePrefix, issueKey: null, line2: activity };
   }
   const key = run.issueKey;
   let prefix: string | null;
   if (state === "RUNNING") prefix = run.type === "REVIEW" ? (key ? "리뷰" : "리뷰 중") : key ? null : "작업 중";
+  else if (isAwaitingRunner(run)) prefix = RUNNER_WAIT_PREFIX;
   else prefix = STATE_PREFIX[state] ?? "";
   const line1 = prefix && key ? `${prefix} · ${key}` : (key ?? prefix ?? "");
-  const activity = state === "RUNNING" || state === "WAITING_APPROVAL" ? bubbleActivity(persona) : null;
+  const activity =
+    state === "RUNNING" || state === "WAITING_APPROVAL" ? bubbleActivity(persona) : runnerWaitBubble(run);
   return { line1, prefix, issueKey: key, line2: activity };
 }
 
@@ -194,6 +231,12 @@ export function personaAccessibleName(persona: AgentOfficePersona, meetingName: 
   }
   const activity = state === "INACTIVE" ? null : activityText(persona);
   if (activity) parts.push(`최근 활동: ${activity}`);
+  // 실행 위치(P4a) — 캔버스의 도트 집·러너 대기 말풍선과 같은 사실
+  if (run && state !== "INACTIVE") {
+    const wait = runnerWaitText(run);
+    if (wait) parts.push(wait);
+    else if (isLocalRun(run)) parts.push("내 PC 러너에서 실행");
+  }
   if (meetingName) parts.push(`회의 중 — ${meetingName}`);
   return `${parts.join(", ")} — 말 걸기`;
 }

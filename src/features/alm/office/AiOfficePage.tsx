@@ -650,6 +650,8 @@ function toCurrentRun(run: AgentRunSummary): AgentCurrentRun {
     attempt: run.attempt,
     model: run.model,
     startedAt: run.startedAt,
+    // 러너 대기 여부는 서버만 안다 — 다음 폴링이 채운다
+    executionSite: run.executionSite,
   };
 }
 

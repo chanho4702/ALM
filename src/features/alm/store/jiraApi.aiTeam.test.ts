@@ -71,7 +71,7 @@ describe("AI 팀 경계 매퍼(P3f·P3h)", () => {
     );
   });
 
-  it("토큰 — 빠진 시각은 null, revoked 기본 false", () => {
+  it("토큰 — 빠진 시각은 null, revoked 기본 false, P4a 이전 백엔드(종류·만료 표지 없음)는 사람용·경고 없음", () => {
     expect(mapAgentToken({ id: 31, label: "노트북", personaSlug: "frontend-bot" })).toEqual({
       id: "31",
       label: "노트북",
@@ -80,6 +80,9 @@ describe("AI 팀 경계 매퍼(P3f·P3h)", () => {
       expiresAt: null,
       lastUsedAt: null,
       revoked: false,
+      kind: "HUMAN",
+      noExpiry: false,
+      expiringSoon: false,
     });
   });
 

@@ -744,15 +744,33 @@ export interface AgentPersonaInput {
   grants: AgentGrantInput[];
 }
 
+/** 토큰 종류(D-P4-3b) — HUMAN = 사람이 발급한 직원 토큰, RUN = run마다 시스템이 발급하는 임시 토큰(종료 시 철회) */
+export type AgentTokenKind = "HUMAN" | "RUN";
+
 /** `GET /api/agent/tokens?projectId=` 항목(PatSummaryResponse) — 해시·원문은 없다 */
 export interface AgentToken {
   id: string;
   label: string;
   personaSlug: string;
   createdAt: string | null;
+  /** null = 무기한(또는 구 백엔드) */
   expiresAt: string | null;
   lastUsedAt: string | null;
   revoked: boolean;
+  /** P4a 이전 백엔드는 필드가 없다 — HUMAN으로 본다 */
+  kind: AgentTokenKind;
+  /** 무기한 사람용 토큰 — 화면 "무기한" 경고 */
+  noExpiry: boolean;
+  /** 7일 안 만료 — "곧 만료" 배지 */
+  expiringSoon: boolean;
+}
+
+/** `POST /api/agent/tokens` — 만료는 기간(1~365일, 생략 = 서버 기본 90일) 또는 무기한(전역 관리자만) 중 하나 */
+export interface AgentTokenIssueInput {
+  label: string;
+  personaSlug: string;
+  expiresInDays?: number;
+  noExpiry?: boolean;
 }
 
 /** `POST /api/agent/tokens` 201 — 원문 token은 이 응답에만 온다 */
@@ -761,6 +779,63 @@ export interface AgentTokenIssued {
   id: string;
   label: string;
   personaSlug: string;
+  /** null = 무기한(또는 구 백엔드가 주지 않음) */
+  expiresAt?: string | null;
+}
+
+// ── 실행 위치·러너(P4a AGP-69, D-P4-1·3·4·5) ──
+
+/** SERVER = 서버(24시간, 등록된 LLM API 키 과금) · LOCAL = 사용자 PC 러너(그 PC의 Claude 구독·자기 키) */
+export type AgentExecutionSite = "SERVER" | "LOCAL";
+
+/** `GET/PUT /api/agent/execution-site/projects/{id}` */
+export interface AgentExecutionSiteSetting {
+  projectId: string;
+  /** 저장값 — null이면 전역 기본을 따른다 */
+  site: AgentExecutionSite | null;
+  effectiveSite: AgentExecutionSite;
+  defaultSite: AgentExecutionSite;
+  /** SERVER run을 서비스 프로세스 안에서 돈다(호스트 dev) — false면 PLATFORM 러너가 집는다 */
+  inProcess: boolean;
+}
+
+export type AgentRunnerKind = "PLATFORM" | "LOCAL";
+export type AgentRunnerStatus = "ONLINE" | "OFFLINE" | "NEVER_CONNECTED" | "REVOKED";
+
+/** `GET /api/agent/runners?projectId=` 항목 — 토큰 해시·원문 없음 */
+export interface AgentRunner {
+  id: string;
+  kind: AgentRunnerKind;
+  name: string;
+  /** null = 플랫폼 전역 러너 */
+  projectId: string | null;
+  issuedBy: string | null;
+  tokenPrefix: string | null;
+  createdAt: string | null;
+  revokedAt: string | null;
+  lastHeartbeatAt: string | null;
+  version: string | null;
+  os: string | null;
+  maxConcurrency: number | null;
+  status: AgentRunnerStatus;
+  currentRunIds: string[];
+}
+
+/** `POST /api/agent/runners` 201 — 원문 token(agr_)은 이 응답에만 온다 */
+export interface AgentRunnerIssued {
+  id: string;
+  kind: AgentRunnerKind;
+  name: string;
+  projectId: string | null;
+  token: string;
+  tokenPrefix: string | null;
+  createdAt: string | null;
+}
+
+export interface AgentRunnerInput {
+  name: string;
+  /** null = 플랫폼 전역(전역 관리자만) */
+  projectId: string | null;
 }
 
 /** 실제로 적용될 키의 출처(D-P3h-3) — 프로젝트 > 전역 > 서버 env > 없음 */
@@ -825,6 +900,10 @@ export interface AgentCurrentRun {
   attempt: number;
   model: string | null;
   startedAt: string | null;
+  /** 실행 위치(P4a) — 구 백엔드는 없다(= SERVER) */
+  executionSite?: AgentExecutionSite;
+  /** QUEUED인데 집어 갈 러너가 없다(P4a D-P4-4) — "러너 대기". 구 백엔드는 없다(= false) */
+  awaitingRunner?: boolean;
 }
 
 /** 감사 출처(AGP-63) — 내부 워커 run / 사람이 발급한 페르소나 토큰으로 붙은 외부 MCP / 시스템 */
@@ -875,6 +954,10 @@ export interface AgentRunSummary {
   type: AgentRunType;
   trigger: AgentRunTrigger;
   parentRunId: string | null;
+  /** 실행 위치(P4a) — 구 백엔드는 없다(= SERVER) */
+  executionSite?: AgentExecutionSite;
+  /** 배정·고정 러너 — 인프로세스 run·구 백엔드는 null */
+  runnerId?: string | null;
 }
 
 export type AgentGateKind = "MERGE" | "ESCALATION" | "PLAN";
@@ -939,6 +1022,8 @@ export interface AgentRunCreateInput {
   instruction?: string;
   model?: string;
   personaSlug: string;
+  /** 생략 = 프로젝트 설정(없으면 전역 기본) */
+  executionSite?: AgentExecutionSite;
 }
 
 export type AgentChatMood = "NEUTRAL" | "THINKING" | "HAPPY" | "TROUBLED";
@@ -1027,6 +1112,8 @@ export interface AgentMeetingInput {
   agenda?: string;
   /** 생략하면 서버의 롤 기본 참석 규칙 */
   personaSlugs?: string[];
+  /** 생략 = 프로젝트 설정(없으면 전역 기본) */
+  executionSite?: AgentExecutionSite;
 }
 
 export interface AgentMeetingAttendee {

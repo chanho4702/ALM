@@ -107,6 +107,12 @@ export const revokeAgentToken = impl.revokeAgentToken;
 export const fetchProjectCredential = impl.fetchProjectCredential;
 export const saveProjectCredential = impl.saveProjectCredential;
 export const deleteProjectCredential = impl.deleteProjectCredential;
+/** 실행 위치·러너(P4a AGP-69) — 조회는 구 백엔드면 null(지원 안 함) */
+export const fetchExecutionSite = impl.fetchExecutionSite;
+export const saveExecutionSite = impl.saveExecutionSite;
+export const listAgentRunners = impl.listAgentRunners;
+export const issueAgentRunner = impl.issueAgentRunner;
+export const revokeAgentRunner = impl.revokeAgentRunner;
 /** AI 사무실 1:1 대화(P3g) — USER run·수다·대화 기록 */
 export const createAgentRun = impl.createAgentRun;
 export const sendPersonaChat = impl.sendPersonaChat;

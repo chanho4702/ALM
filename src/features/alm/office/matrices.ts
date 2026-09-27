@@ -307,6 +307,19 @@ export const REMOTE_SIGNAL_B: readonly string[] = [
   "...KKK...",
 ];
 
+/**
+ * HOUSE — 7×6, 내 PC 러너에서 도는 run(P4a D-P4-4). 모니터 화면 안(원점 기준 +3,+2)에 겹쳐 그리는 작은 집 —
+ * 지붕(red)·벽(hi)·문(wood) — 계열 `ovl`. 정지 1프레임이라 reduced-motion에서도 같다.
+ */
+export const HOUSE: readonly string[] = [
+  "...K...",
+  "..KRK..",
+  ".KRRRK.",
+  "KKHHHKK",
+  ".KHMHK.",
+  ".KKKKK.",
+];
+
 /** RED_MARK — 7×7 */
 export const RED_MARK: readonly string[] = [
   ".KKKKK.",

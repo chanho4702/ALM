@@ -7,6 +7,7 @@ import {
   CalendarClock,
   CircleAlert,
   CircleCheck,
+  CircleDashed,
   CircleSlash,
   ClipboardCheck,
   ClipboardList,
@@ -16,6 +17,7 @@ import {
   GitMerge,
   HardHat,
   Hourglass,
+  House,
   Keyboard,
   Laptop,
   Palette,
@@ -24,21 +26,26 @@ import {
   RotateCcw,
   SearchCheck,
   Server,
+  ServerCog,
   Siren,
   TriangleAlert,
   UserRound,
   UsersRound,
+  Wifi,
+  WifiOff,
   Wrench,
 } from "lucide-react";
 import type {
   AgentActiveRunStatus,
   AgentAuditOrigin,
+  AgentExecutionSite,
   AgentGateKind,
   AgentMeetingType,
   AgentRole,
   AgentRunStatus,
   AgentRunTrigger,
   AgentRunType,
+  AgentRunnerStatus,
 } from "../store/types";
 
 /**
@@ -266,5 +273,54 @@ export function AgentAuditOriginGlyph({ origin, runId }: { origin: AgentAuditOri
       <IconComp size={12} aria-hidden />
       {auditOriginLabel(origin, runId)}
     </span>
+  );
+}
+
+// ── 실행 위치·러너(P4a AGP-69) ──
+
+/**
+ * 실행 위치 — 서버(톱니 달린 서버: 롤 "백엔드"의 서버 그림과 구분)/내 PC 러너(집 — 사무실 모니터의 도트 집과 같은 뜻).
+ */
+const EXECUTION_SITES: Record<AgentExecutionSite, { icon: Icon; label: string }> = {
+  SERVER: { icon: ServerCog, label: "서버" },
+  LOCAL: { icon: House, label: "내 PC 러너" },
+};
+
+export const AGENT_EXECUTION_SITE_LABEL: Record<AgentExecutionSite, string> = {
+  SERVER: EXECUTION_SITES.SERVER.label,
+  LOCAL: EXECUTION_SITES.LOCAL.label,
+};
+
+/** 아이콘만(Select·Radio 옵션처럼 라벨이 옆에 따로 있는 자리) */
+export function AgentExecutionSiteIcon({ site, size = 14 }: { site: AgentExecutionSite; size?: 12 | 14 | 16 | 20 }) {
+  const IconComp = EXECUTION_SITES[site].icon;
+  return <IconComp size={size} aria-hidden />;
+}
+
+/** 실행 위치 — 아이콘 + 텍스트 */
+export function AgentExecutionSiteGlyph({ site, size }: { site: AgentExecutionSite; size?: 12 | 14 | 16 }) {
+  return <IconText icon={EXECUTION_SITES[site].icon} label={EXECUTION_SITES[site].label} size={size} />;
+}
+
+const RUNNER_STATES: Record<AgentRunnerStatus, GlyphDef> = {
+  ONLINE: { icon: Wifi, label: "온라인", appearance: "success" },
+  OFFLINE: { icon: WifiOff, label: "오프라인", appearance: "warning" },
+  NEVER_CONNECTED: { icon: CircleDashed, label: "연결 전", appearance: "neutral" },
+  REVOKED: { icon: Ban, label: "철회됨", appearance: "neutral" },
+};
+
+export const AGENT_RUNNER_STATUS_LABEL: Record<AgentRunnerStatus, string> = Object.fromEntries(
+  Object.entries(RUNNER_STATES).map(([k, v]) => [k, v.label]),
+) as Record<AgentRunnerStatus, string>;
+
+/** 러너 상태 Lozenge — 아이콘 + 텍스트(색만으로 온라인을 말하지 않는다) */
+export function AgentRunnerStatusLozenge({ status }: { status: AgentRunnerStatus }) {
+  const def = RUNNER_STATES[status];
+  const IconComp = def.icon;
+  return (
+    <Lozenge appearance={def.appearance} className={`agent-lozenge is-${def.appearance}`}>
+      <IconComp size={12} strokeWidth={2.25} aria-hidden />
+      {def.label}
+    </Lozenge>
   );
 }

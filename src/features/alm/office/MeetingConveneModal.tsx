@@ -8,6 +8,13 @@ import {
   AgentMeetingTypeIcon,
   AgentRoleGlyph,
 } from "../components/AgentGlyphs";
+import {
+  ExecutionSiteSelect,
+  siteOverride,
+  SITE_FOLLOW,
+  useProjectExecutionSite,
+  type ExecutionSiteChoice,
+} from "./ExecutionSiteSelect";
 
 const AGENDA_MAX = 4000;
 const ISSUE_KEY_MAX = 40;
@@ -48,7 +55,10 @@ export function MeetingConveneModal({ projectId, personas, open, onOpenChange, o
   const [agenda, setAgenda] = useState("");
   const [mode, setMode] = useState<AttendeeMode>("auto");
   const [picked, setPicked] = useState<string[]>([]);
+  const [site, setSite] = useState<ExecutionSiteChoice>(SITE_FOLLOW);
   const [submitted, setSubmitted] = useState(false);
+  // 실행 위치 덮어쓰기(P4a) — 모달이 열릴 때만 조회, 구 백엔드면 칸이 없다
+  const siteSetting = useProjectExecutionSite(projectId, open);
   const [busy, setBusy] = useState(false);
 
   const candidates = personas.filter((p) => p.active);
@@ -67,6 +77,7 @@ export function MeetingConveneModal({ projectId, personas, open, onOpenChange, o
     setAgenda("");
     setMode("auto");
     setPicked([]);
+    setSite(SITE_FOLLOW);
     setSubmitted(false);
   };
 
@@ -90,6 +101,7 @@ export function MeetingConveneModal({ projectId, personas, open, onOpenChange, o
         agendaIssueKey: issueKey.trim() || undefined,
         agenda: agenda.trim() || undefined,
         personaSlugs: mode === "pick" ? picked : undefined,
+        executionSite: siteOverride(site),
       });
       toast({
         title: `${agentMeetingRunName(type)}를 소집했습니다`,
@@ -128,6 +140,7 @@ export function MeetingConveneModal({ projectId, personas, open, onOpenChange, o
           }))}
           onValueChange={(v) => setType(v as AgentMeetingType)}
         />
+        <ExecutionSiteSelect setting={siteSetting} value={site} onChange={setSite} />
         <TextField
           label="안건 이슈 키 (선택)"
           value={issueKey}

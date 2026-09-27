@@ -77,7 +77,12 @@ describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
     const stage = screen.getByRole("region", { name: "AI 사무실 평면도" });
 
     expect(within(stage).getByText("AI 팀원 6명 — 작업 중 2, 대기열 1, 승인 대기 1, 차단됨 1, 원격 접속 중 1")).toBeInTheDocument();
-    expect(within(stage).getByRole("button", { name: /^디자인봇, 디자인, 대기열, 이슈 ALM-2 — / })).toBeInTheDocument();
+    // 러너 대기(P4a)는 QUEUED의 하위 상태 — 상태 라벨·요약 수는 그대로 "대기열", 접근 이름 끝에 사유가 붙는다
+    expect(
+      within(stage).getByRole("button", {
+        name: "디자인봇, 디자인, 대기열, 이슈 ALM-2, 서버 러너 대기 — 플랫폼 러너가 연결되면 시작합니다 — 말 걸기",
+      }),
+    ).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^프론트봇, 프론트엔드, 승인 대기, 이슈 ALM-3/ })).toBeInTheDocument();
     expect(within(stage).getByRole("button", { name: /^백엔드봇, 백엔드, 차단됨, 이슈 ALM-5 — / })).toBeInTheDocument();
     expect(
@@ -85,13 +90,14 @@ describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
         name: "운영봇, 운영, 원격 접속 중 — 외부 MCP, 최근 활동: projectId=1 (검색어 생략) — 말 걸기",
       }),
     ).toBeInTheDocument();
-    expect(within(stage).getByRole("button", { name: /^리뷰봇, 리뷰, 작업 중, 이슈 ALM-1/ })).toBeInTheDocument();
+    expect(within(stage).getByRole("button", { name: /^리뷰봇, 리뷰, 작업 중, 이슈 ALM-1, .*, 내 PC 러너에서 실행 — 말 걸기$/ })).toBeInTheDocument();
 
     // 말풍선 — 작업 중=이슈키+활동, 리뷰=접두, 대기열·차단=접두만(2행 없음), 원격 접속="원격 작업 중"+도구 라벨
     expect(screen.getByTestId("office-bubble-101")).toHaveTextContent("ALM-4ALM-4 인수 조건 보완");
     // 리뷰봇 최근 활동은 서버 가림 표지("run=9006 (본문 생략)") — 말풍선은 도구 라벨로
     expect(screen.getByTestId("office-bubble-106")).toHaveTextContent(/^리뷰 · ALM-1진행 보고$/);
-    expect(screen.getByTestId("office-bubble-102")).toHaveTextContent(/^대기열 · ALM-2$/);
+    // 러너 대기 — 접두가 "대기열" 대신 "러너 대기", 2행은 누가 풀어야 하는지
+    expect(screen.getByTestId("office-bubble-102")).toHaveTextContent(/^러너 대기 · ALM-2플랫폼 러너 연결 대기$/);
     expect(screen.getByTestId("office-bubble-104")).toHaveTextContent(/^차단됨 · ALM-5$/);
     expect(screen.getByTestId("office-bubble-105")).toHaveTextContent(/^원격 작업 중이슈 검색$/);
 
@@ -100,6 +106,8 @@ describe("사무실 캔버스 — 상태 매핑(목업 6인)", () => {
     expect(container.querySelectorAll('[data-overlay="zz"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-overlay="hourglass"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-overlay="remote"]')).toHaveLength(1);
+    // 내 PC 러너 run(리뷰봇)만 모니터에 도트 집(P4a D-P4-4)
+    expect(container.querySelectorAll('[data-overlay="house"]')).toHaveLength(1);
     // 서기(대기열) 1명, 앉음(작업 중 2·승인 대기·원격 접속) 4명, 엎드림 1명
     expect(container.querySelectorAll('.office-avatar[data-pose="stand"]')).toHaveLength(1);
     expect(container.querySelectorAll('.office-avatar[data-pose="seat"]')).toHaveLength(4);

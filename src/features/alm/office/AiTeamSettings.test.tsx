@@ -221,7 +221,7 @@ describe("AI 팀 설정 — 토큰", () => {
     const dialog = await screen.findByRole("dialog", { name: "토큰이 발급됐습니다" });
     expect(within(dialog).getByText(/이 창을 닫으면 토큰을 다시 볼 수 없습니다/)).toBeInTheDocument();
     const field = within(dialog).getByLabelText("토큰") as HTMLInputElement;
-    expect(field.value).toMatch(/^chanho_pat_/);
+    expect(field.value).toMatch(/^agp_/);
     const secret = field.value;
     await user.click(within(dialog).getByRole("button", { name: "복사" }));
     expect(await screen.findByText("토큰을 복사했습니다")).toBeInTheDocument();

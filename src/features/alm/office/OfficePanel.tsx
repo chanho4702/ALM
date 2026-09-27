@@ -18,6 +18,7 @@ import {
   AGENT_MEETING_TYPE_LABEL,
   AGENT_RUN_TYPE_LABEL,
   AgentAuditOriginGlyph,
+  AgentExecutionSiteGlyph,
   auditOriginLabel,
   AgentMeetingTypeGlyph,
   AgentRoleGlyph,
@@ -42,6 +43,7 @@ import {
   meetingRunStatus,
   personaState,
   PROJECT_WIDE_LABEL,
+  runnerWaitText,
   type EpicGoal,
 } from "./officeModel";
 
@@ -410,6 +412,7 @@ function PersonaActivity({
               </Banner>
             ) : null}
             {run.status === "BLOCKED" ? <Banner variant="danger">차단됨 — 다음 조치가 필요합니다.</Banner> : null}
+            {runnerWaitText(run) ? <Banner variant="info">{runnerWaitText(run)}</Banner> : null}
             <dl className="office-panel-dl">
               <dt>이슈</dt>
               <dd>
@@ -432,6 +435,10 @@ function PersonaActivity({
                 ) : (
                   "아직 시작 전"
                 )}
+              </dd>
+              <dt>실행 위치</dt>
+              <dd>
+                <AgentExecutionSiteGlyph site={run.executionSite ?? "SERVER"} />
               </dd>
               <dt>시도</dt>
               <dd>{run.attempt}회</dd>

@@ -59,6 +59,12 @@ import type {
   AgentTeamPersona,
   AgentToken,
   AgentTokenIssued,
+  AgentTokenIssueInput,
+  AgentExecutionSite,
+  AgentExecutionSiteSetting,
+  AgentRunner,
+  AgentRunnerInput,
+  AgentRunnerIssued,
   AuditEntry,
   SystemStats,
   SettingsBody,
@@ -138,6 +144,12 @@ import {
   mapAgentTeamPersona,
   mapAgentToken,
   mapAgentTokenIssued,
+  mapAgentExecutionSite,
+  mapAgentRunner,
+  mapAgentRunnerIssued,
+  type AgentExecutionSiteDto,
+  type AgentRunnerDto,
+  type AgentRunnerIssuedDto,
   type AgentChatReplyDto,
   type AgentDialogPageDto,
   type AgentGateDto,
@@ -1096,6 +1108,7 @@ export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeet
     ...(agendaIssueKey ? { agendaIssueKey } : {}),
     ...(agenda ? { agenda } : {}),
     ...(input.personaSlugs && input.personaSlugs.length > 0 ? { personaSlugs: input.personaSlugs } : {}),
+    ...(input.executionSite ? { executionSite: input.executionSite } : {}),
   };
   return mapAgentMeetingCreated(
     await json<AgentMeetingCreatedDto>(
@@ -1199,14 +1212,22 @@ export async function listAgentTokens(projectId: string): Promise<AgentToken[]> 
   return (body ?? []).map(mapAgentToken);
 }
 
-/** 원문 token은 이 응답에만 있다 — 화면이 한 번 보여 주고 버린다 */
-export async function issueAgentToken(input: { label: string; personaSlug: string }): Promise<AgentTokenIssued> {
+/**
+ * 원문 token은 이 응답에만 있다 — 화면이 한 번 보여 주고 버린다. 만료는 기간 또는 무기한 중 하나만 싣는다
+ * (둘 다 생략 = 서버 기본 90일, 둘 다 주면 서버 400). 무기한은 전역 관리자만(아니면 403).
+ */
+export async function issueAgentToken(input: AgentTokenIssueInput): Promise<AgentTokenIssued> {
+  const body = {
+    label: input.label.trim(),
+    personaSlug: input.personaSlug,
+    ...(input.noExpiry ? { noExpiry: true } : input.expiresInDays !== undefined ? { expiresInDays: input.expiresInDays } : {}),
+  };
   return mapAgentTokenIssued(
     await json<AgentTokenIssuedDto>(
       await sharedApiFetch("/api/agent/tokens", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: input.label.trim(), personaSlug: input.personaSlug }),
+        body: JSON.stringify(body),
       }),
     ),
   );
@@ -1246,6 +1267,79 @@ export async function deleteProjectCredential(projectId: string): Promise<void> 
   );
 }
 
+// ── 실행 위치·러너(P4a AGP-69) — P4a 이전 백엔드는 404: 조회는 null("지원 안 함")로 접고 화면이 카드를 안내로 바꾼다 ──
+
+async function orUnsupported<T>(load: () => Promise<T>): Promise<T | null> {
+  try {
+    return await load();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+/** 인증 사용자 누구나 — null = 이 서버에 실행 위치 기능이 없다(구 백엔드) */
+export async function fetchExecutionSite(projectId: string): Promise<AgentExecutionSiteSetting | null> {
+  return orUnsupported(async () =>
+    mapAgentExecutionSite(
+      await json<AgentExecutionSiteDto>(
+        await sharedApiFetch(`/api/agent/execution-site/projects/${toBackendId(projectId)}`),
+      ),
+      projectId,
+    ),
+  );
+}
+
+/** 그 프로젝트 관리자만(403) — null은 설정 해제(전역 기본을 따른다). 이미 만든 run은 바뀌지 않는다 */
+export async function saveExecutionSite(
+  projectId: string,
+  site: AgentExecutionSite | null,
+): Promise<AgentExecutionSiteSetting> {
+  return mapAgentExecutionSite(
+    await json<AgentExecutionSiteDto>(
+      await sharedApiFetch(`/api/agent/execution-site/projects/${toBackendId(projectId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site }),
+      }),
+    ),
+    projectId,
+  );
+}
+
+/**
+ * 러너 목록 — projectId가 있으면 그 프로젝트 관리자(그 프로젝트 + 전역 LOCAL 러너), 없으면 전역 관리자(PLATFORM 포함).
+ * null = 러너 기능이 없는 구 백엔드.
+ */
+export async function listAgentRunners(projectId: string | null): Promise<AgentRunner[] | null> {
+  const query = projectId ? `?projectId=${toBackendId(projectId)}` : "";
+  return orUnsupported(async () => {
+    const body = await json<AgentRunnerDto[] | null>(await sharedApiFetch(`/api/agent/runners${query}`));
+    return (body ?? []).map(mapAgentRunner);
+  });
+}
+
+/** 원문 token(agr_)은 이 응답에만 있다. projectId null(전역 러너)은 전역 관리자만 */
+export async function issueAgentRunner(input: AgentRunnerInput): Promise<AgentRunnerIssued> {
+  return mapAgentRunnerIssued(
+    await json<AgentRunnerIssuedDto>(
+      await sharedApiFetch("/api/agent/runners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: input.name.trim(),
+          projectId: input.projectId === null ? null : toBackendId(input.projectId),
+        }),
+      }),
+    ),
+  );
+}
+
+/** 멱등 204 — PLATFORM 러너는 409(env로만 관리) */
+export async function revokeAgentRunner(runnerId: string): Promise<void> {
+  await json<null>(await sharedApiFetch(`/api/agent/runners/${encodeURIComponent(runnerId)}`, { method: "DELETE" }));
+}
+
 // ── AI 사무실 1:1 대화(P3g AGP-65) — 오류는 상태를 싣는 ApiError로 올린다(화면이 409/429/503을 대사로 번역) ──
 
 /**
@@ -1260,6 +1354,7 @@ export async function createAgentRun(input: AgentRunCreateInput): Promise<AgentR
     ...(instruction ? { instruction } : {}),
     ...(model ? { model } : {}),
     personaSlug: input.personaSlug,
+    ...(input.executionSite ? { executionSite: input.executionSite } : {}),
   };
   return mapAgentRunSummary(
     await json<AgentRunSummaryDto>(

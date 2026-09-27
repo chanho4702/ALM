@@ -16,6 +16,7 @@ import { ClipboardCheck, FastForward, MessageSquare, PanelRight, ScrollText, Sen
 import type {
   AgentBudget,
   AgentDialogEntry,
+  AgentExecutionSiteSetting,
   AgentMeetingType,
   AgentOfficeFeatures,
   AgentOfficePersona,
@@ -55,6 +56,14 @@ import {
   type FaceExpression,
 } from "./pixel";
 import { linkableIssueKey, personaState } from "./officeModel";
+import {
+  executionChoiceText,
+  ExecutionSiteSelect,
+  siteOverride,
+  SITE_FOLLOW,
+  useProjectExecutionSite,
+  type ExecutionSiteChoice,
+} from "./ExecutionSiteSelect";
 import {
   AGENT_MODEL_OPTIONS,
   ASSIGN_ASK,
@@ -377,6 +386,9 @@ function Conversation({
   const [picked, setPicked] = useState<Issue | null>(null);
   const [query, setQuery] = useState("");
   const [model, setModel] = useState(MODEL_DEFAULT);
+  const [site, setSite] = useState<ExecutionSiteChoice>(SITE_FOLLOW);
+  // 실행 위치 덮어쓰기(P4a) — 맡기기 폼을 열 때만 조회한다
+  const siteSetting = useProjectExecutionSite(projectId, mode.kind === "assignPick" || mode.kind === "assignConfirm");
   const [instruction, setInstruction] = useState("");
   const [instructionOpen, setInstructionOpen] = useState(false);
   const [chatText, setChatText] = useState("");
@@ -664,6 +676,7 @@ function Conversation({
         ...(instructionOpen && instruction.trim() ? { instruction: instruction.trim() } : {}),
         ...(model !== MODEL_DEFAULT ? { model } : {}),
         personaSlug: persona.slug,
+        ...(siteOverride(site) ? { executionSite: siteOverride(site) } : {}),
       });
       log.record({ speaker: "USER", kind: "ASSIGN", text: `${picked.key} ${picked.title}`, issueKey: picked.key, runId: run.id }, "now");
       pushScene({ speaker: "USER", kind: "ASSIGN", text: `${picked.key} ${picked.title}`, issueKey: picked.key, runId: run.id, commentId: null });
@@ -950,6 +963,9 @@ function Conversation({
               onPick={setPicked}
               model={model}
               onModel={setModel}
+              siteSetting={siteSetting}
+              site={site}
+              onSite={setSite}
               instruction={instruction}
               onInstruction={setInstruction}
               instructionOpen={instructionOpen}
@@ -967,6 +983,12 @@ function Conversation({
               <dl className="office-form-dl">
                 <dt>모델</dt>
                 <dd>{model === MODEL_DEFAULT ? "기본값(프로젝트 정책)" : model}</dd>
+                {siteSetting ? (
+                  <>
+                    <dt>실행 위치</dt>
+                    <dd>{executionChoiceText(site, siteSetting)}</dd>
+                  </>
+                ) : null}
                 <dt>지시</dt>
                 <dd>{instructionOpen && instruction.trim() ? "붙임" : "없음"}</dd>
               </dl>
@@ -1163,6 +1185,9 @@ function AssignPickForm({
   onPick,
   model,
   onModel,
+  siteSetting,
+  site,
+  onSite,
   instruction,
   onInstruction,
   instructionOpen,
@@ -1179,6 +1204,9 @@ function AssignPickForm({
   onPick: (issue: Issue) => void;
   model: string;
   onModel: (v: string) => void;
+  siteSetting: AgentExecutionSiteSetting | null;
+  site: ExecutionSiteChoice;
+  onSite: (v: ExecutionSiteChoice) => void;
   instruction: string;
   onInstruction: (v: string) => void;
   instructionOpen: boolean;
@@ -1322,6 +1350,7 @@ function AssignPickForm({
           ...AGENT_MODEL_OPTIONS.map((m) => ({ value: m, label: m, icon: <Sparkles size={14} aria-hidden /> })),
         ]}
       />
+      <ExecutionSiteSelect setting={siteSetting} value={site} onChange={onSite} />
       <Button variant="ghost" size="small" aria-expanded={instructionOpen} onClick={() => onInstructionOpen(!instructionOpen)}>
         지시 붙이기
       </Button>

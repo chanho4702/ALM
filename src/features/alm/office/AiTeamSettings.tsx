@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Badge,
   Banner,
@@ -18,9 +18,11 @@ import {
 } from "@chanho/react";
 import {
   BookOpen,
+  CalendarClock,
   Copy,
   Eye,
   FolderKanban,
+  Infinity as InfinityIcon,
   KeyRound,
   MessageSquare,
   Pencil,
@@ -31,6 +33,7 @@ import {
   Trash2,
   TriangleAlert,
   UserPlus,
+  Workflow,
 } from "lucide-react";
 import type {
   AgentCredentialScope,
@@ -42,6 +45,7 @@ import type {
   AgentTeamPersona,
   AgentToken,
   AgentTokenIssued,
+  AgentTokenIssueInput,
   User,
 } from "../store/types";
 import {
@@ -58,10 +62,12 @@ import {
 import { AGENT_ROLE_LABEL, AgentRoleGlyph, AgentRoleIcon } from "../components/AgentGlyphs";
 import { useAiTeamStatus } from "../components/useAiTeamActive";
 import { useAgentPermissions } from "../components/useAgentPermissions";
-import { formatDateTime, relTime } from "../components/time";
+import { formatDate } from "../components/time";
 import { OfficePortrait } from "./PixelSprite";
 import { useConfirmedAction } from "./SupervisionFrame";
 import { PersonaEditorDialog } from "./PersonaEditorDialog";
+import { errorText, LoadState, useLoad, When, type Load } from "./aiTeamShared";
+import { ExecutionSection } from "./AiTeamExecution";
 // 초상 팔레트(`--office-*`)만 쓴다 — 이 화면은 설정 청크에서도 지연 로드라 사무실을 안 여는 사람은 받지 않는다
 import "./ai-office.css";
 
@@ -102,39 +108,19 @@ const SLUG_PATTERN = /^[a-z0-9-]{2,40}$/;
 /** Select 빈 문자열 금지(DS 함정) — 발급 대상 미선택 센티널 */
 const NO_PERSONA = "none";
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/** 직원 토큰 만료(D-P4-3b) — 기간 프리셋(기본 90일)·직접 입력·무기한(전역 관리자만). Select 빈 문자열 금지 → 문자열 값 */
+type ExpiryChoice = "30" | "90" | "180" | "365" | "custom" | "none";
+const EXPIRY_PRESETS: readonly ExpiryChoice[] = ["30", "90", "180", "365"];
+const EXPIRY_DEFAULT: ExpiryChoice = "90";
+const EXPIRY_MIN = 1;
+const EXPIRY_MAX = 365;
 
-/** 서버가 준 시각이 없거나 깨졌으면 "—" — "Invalid Date"를 그리지 않는다 */
-function When({ iso }: { iso: string | null }) {
-  if (!iso || Number.isNaN(Date.parse(iso))) return <span className="ai-team-subtle">—</span>;
-  return (
-    <time dateTime={iso} title={formatDateTime(iso)}>
-      {relTime(iso)}
-    </time>
-  );
-}
-
-type Load<T> = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; data: T };
-
-/** 한 번 조회 + 수동 재조회. 프로젝트가 바뀌면 늦게 온 이전 응답을 버린다 */
-function useLoad<T>(loader: (() => Promise<T>) | null): [Load<T>, () => Promise<void>] {
-  const [state, setState] = useState<Load<T>>({ status: "loading" });
-  const generation = useRef(0);
-  const reload = useCallback(async () => {
-    if (!loader) return;
-    const mine = ++generation.current;
-    try {
-      const data = await loader();
-      if (mine === generation.current) setState({ status: "ready", data });
-    } catch (error) {
-      if (mine === generation.current) setState({ status: "error", error: errorText(error) });
-    }
-  }, [loader]);
-  useEffect(() => {
-    setState({ status: "loading" });
-    void reload();
-  }, [reload]);
-  return [state, reload];
+/** 직접 입력 값 검증 — 1~365 정수만 */
+function customDaysError(text: string): string | undefined {
+  const n = Number(text.trim());
+  return text.trim() && Number.isInteger(n) && n >= EXPIRY_MIN && n <= EXPIRY_MAX
+    ? undefined
+    : `${EXPIRY_MIN}~${EXPIRY_MAX}일 사이 정수로 입력하세요`;
 }
 
 export interface AiTeamSettingsProps {
@@ -195,8 +181,15 @@ function AiTeamBody({ projectId, users }: AiTeamSettingsProps) {
         onRetry={reloadPersonas}
         onChanged={reloadPersonas}
       />
+      <ExecutionSection
+        projectId={projectId}
+        canManage={canManage}
+        loaded={permissions.loaded}
+        isGlobalAdmin={permissions.loaded && permissions.isGlobalAdmin}
+      />
       <TokenSection
         canManage={canManage}
+        isGlobalAdmin={permissions.loaded && permissions.isGlobalAdmin}
         loaded={permissions.loaded}
         load={tokens}
         personas={own}
@@ -215,25 +208,6 @@ function PersonaAvatar({ persona }: { persona: AgentTeamPersona }) {
       <OfficePortrait slug={persona.slug} role={persona.role} avatarConfig={persona.avatarConfig} className="is-row" />
     </span>
   );
-}
-
-function LoadState({ load, label, errorTitle, onRetry }: {
-  load: Load<unknown>;
-  label: string;
-  errorTitle: string;
-  onRetry: () => void;
-}) {
-  if (load.status === "loading") return <Spinner label={label} />;
-  if (load.status === "error") {
-    return (
-      <EmptyState
-        title={errorTitle}
-        description={`agent-service 연결을 확인하세요 — ${load.error}`}
-        primaryAction={{ label: "다시 시도", onClick: onRetry }}
-      />
-    );
-  }
-  return null;
 }
 
 // ── 직원 ─────────────────────────────────────────────────────
@@ -262,7 +236,8 @@ function StaffSection({
 
   const tokenCount = (persona: AgentTeamPersona): ReactNode => {
     if (persona.projectId === null || tokens === null) return <span className="ai-team-subtle">—</span>;
-    return tokens.filter((t) => t.personaSlug === persona.slug && !t.revoked).length;
+    // 사람이 발급한 토큰만 센다 — run 토큰은 실행마다 생겼다 사라진다
+    return tokens.filter((t) => t.personaSlug === persona.slug && !t.revoked && t.kind === "HUMAN").length;
   };
 
   const requestToggle = (persona: AgentTeamPersona, next: boolean) =>
@@ -613,6 +588,7 @@ function AddPersonaModal({
 
 function TokenSection({
   canManage,
+  isGlobalAdmin,
   loaded,
   load,
   personas,
@@ -620,6 +596,7 @@ function TokenSection({
   onChanged,
 }: {
   canManage: boolean;
+  isGlobalAdmin: boolean;
   loaded: boolean;
   load: Load<AgentToken[]>;
   personas: AgentTeamPersona[];
@@ -629,22 +606,37 @@ function TokenSection({
   const toast = useToast();
   const [personaSlug, setPersonaSlug] = useState(NO_PERSONA);
   const [label, setLabel] = useState("");
+  const [expiry, setExpiry] = useState<ExpiryChoice>(EXPIRY_DEFAULT);
+  const [customDays, setCustomDays] = useState("");
   const [issuing, setIssuing] = useState(false);
   const [issued, setIssued] = useState<AgentTokenIssued | null>(null);
   const action = useConfirmedAction(onChanged);
 
+  // 무기한은 전역 관리자만 고를 수 있다 — 권한이 없어지면(판정 갱신) 기본값으로 되돌린다
+  useEffect(() => {
+    if (expiry === "none" && !isGlobalAdmin) setExpiry(EXPIRY_DEFAULT);
+  }, [expiry, isGlobalAdmin]);
+
   const personaName = (slug: string) => personas.find((p) => p.slug === slug)?.name ?? `@${slug}`;
   const selectedPersona = personaSlug === NO_PERSONA ? null : personaSlug;
-  const canIssue = selectedPersona !== null && label.trim().length > 0 && !issuing;
+  const daysError = expiry === "custom" ? customDaysError(customDays) : undefined;
+  const canIssue = selectedPersona !== null && label.trim().length > 0 && !daysError && !issuing;
+
+  const expiryInput = (): Pick<AgentTokenIssueInput, "expiresInDays" | "noExpiry"> => {
+    if (expiry === "none") return { noExpiry: true };
+    return { expiresInDays: expiry === "custom" ? Number(customDays.trim()) : Number(expiry) };
+  };
 
   const issue = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedPersona || !canIssue) return;
     setIssuing(true);
     try {
-      const result = await issueAgentToken({ label: label.trim(), personaSlug: selectedPersona });
+      const result = await issueAgentToken({ label: label.trim(), personaSlug: selectedPersona, ...expiryInput() });
       setIssued(result);
       setLabel("");
+      setExpiry(EXPIRY_DEFAULT);
+      setCustomDays("");
       await onChanged();
     } catch (error) {
       toast({ title: "토큰을 발급하지 못했습니다", description: errorText(error), appearance: "danger" });
@@ -689,10 +681,44 @@ function TokenSection({
             maxLength={LABEL_MAX}
             onChange={(e) => setLabel(e.target.value)}
           />
+          <Select
+            label="만료"
+            value={expiry}
+            options={[
+              ...EXPIRY_PRESETS.map((d) => ({
+                value: d,
+                label: d === EXPIRY_DEFAULT ? `${d}일 (기본)` : `${d}일`,
+                icon: <CalendarClock size={14} aria-hidden />,
+              })),
+              { value: "custom", label: "직접 입력", icon: <Pencil size={14} aria-hidden /> },
+              ...(isGlobalAdmin
+                ? [{ value: "none", label: "무기한", icon: <InfinityIcon size={14} aria-hidden /> }]
+                : []),
+            ]}
+            onValueChange={(v) => setExpiry(v as ExpiryChoice)}
+          />
+          {expiry === "custom" ? (
+            <TextField
+              label="만료 일수"
+              type="number"
+              inputMode="numeric"
+              min={EXPIRY_MIN}
+              max={EXPIRY_MAX}
+              placeholder="1~365"
+              value={customDays}
+              error={customDays ? daysError : undefined}
+              onChange={(e) => setCustomDays(e.target.value)}
+            />
+          ) : null}
           <Button type="submit" iconBefore={<KeyRound size={16} aria-hidden />} disabled={!canIssue}>
             발급
           </Button>
         </form>
+        {expiry === "none" ? (
+          <Banner variant="warning">
+            무기한 토큰은 철회하기 전까지 계속 유효합니다. 새어 나가면 누구든 이 직원으로 접속할 수 있으니, 꼭 필요할 때만 쓰세요.
+          </Banner>
+        ) : null}
         {load.data.length === 0 ? (
           <p className="ai-team-subtle">발급한 토큰이 없습니다.</p>
         ) : (
@@ -702,15 +728,27 @@ function TokenSection({
               { key: "label", header: "이름" },
               { key: "persona", header: "직원" },
               { key: "created", header: "발급" },
+              { key: "expires", header: "만료" },
               { key: "used", header: "마지막 사용" },
               { key: "state", header: "상태" },
               { key: "actions", header: "", ariaLabel: "작업" },
             ]}
-            rows={load.data.map((token) => ({
+            rows={sortTokens(load.data).map((token) => ({
               id: token.id,
-              label: token.label,
+              label:
+                token.kind === "RUN" ? (
+                  <span className="ai-team-staff-name">
+                    {token.label}
+                    <Badge>
+                      <Workflow size={12} aria-hidden /> 실행용
+                    </Badge>
+                  </span>
+                ) : (
+                  token.label
+                ),
               persona: personaName(token.personaSlug),
               created: <When iso={token.createdAt} />,
+              expires: <TokenExpiry token={token} />,
               used: <When iso={token.lastUsedAt} />,
               state: token.revoked ? (
                 <Lozenge appearance="neutral" className="agent-lozenge">
@@ -723,7 +761,8 @@ function TokenSection({
                   사용 가능
                 </Lozenge>
               ),
-              actions: token.revoked ? null : (
+              // run 토큰은 실행이 끝나면 서버가 철회한다 — 손으로 철회하면 돌던 워커가 끊긴다(취소는 실행 상세에서)
+              actions: token.revoked || token.kind === "RUN" ? null : (
                 <Button
                   variant="subtle"
                   size="small"
@@ -768,6 +807,40 @@ function TokenSection({
   );
 }
 
+/** 사람이 발급한 토큰 먼저(원래 순서 유지), run 토큰은 뒤로 */
+function sortTokens(tokens: readonly AgentToken[]): AgentToken[] {
+  return [...tokens.filter((t) => t.kind === "HUMAN"), ...tokens.filter((t) => t.kind === "RUN")];
+}
+
+/**
+ * 만료 칸(D-P4-3b) — 날짜 + "곧 만료"(7일 안) 배지, 무기한 사람용 토큰은 경고 배지, run 토큰은 "실행 끝나면 철회".
+ * 철회된 토큰에는 경고를 달지 않는다(이미 못 쓴다).
+ */
+function TokenExpiry({ token }: { token: AgentToken }) {
+  if (token.kind === "RUN") return <span className="ai-team-subtle">실행 끝나면 철회</span>;
+  if (token.noExpiry) {
+    return token.revoked ? (
+      <span className="ai-team-subtle">무기한</span>
+    ) : (
+      <Lozenge appearance="warning" className="agent-lozenge">
+        <TriangleAlert size={12} aria-hidden />
+        무기한
+      </Lozenge>
+    );
+  }
+  if (!token.expiresAt || Number.isNaN(Date.parse(token.expiresAt))) return <span className="ai-team-subtle">—</span>;
+  return (
+    <span className="ai-team-expiry">
+      <time dateTime={token.expiresAt}>{formatDate(token.expiresAt)}</time>
+      {token.expiringSoon && !token.revoked ? (
+        <Lozenge appearance="warning" className="agent-lozenge">
+          <CalendarClock size={12} aria-hidden />곧 만료
+        </Lozenge>
+      ) : null}
+    </span>
+  );
+}
+
 function IssuedToken({ issued, personaName, onClose }: { issued: AgentTokenIssued; personaName: string; onClose: () => void }) {
   const toast = useToast();
   const copy = async () => {
@@ -784,7 +857,8 @@ function IssuedToken({ issued, personaName, onClose }: { issued: AgentTokenIssue
         이 창을 닫으면 토큰을 다시 볼 수 없습니다. 지금 안전한 곳에 복사해 두세요.
       </Banner>
       <p className="admin-scheme-note">
-        {personaName} · {issued.label}
+        {personaName} · {issued.label} ·{" "}
+        {issued.expiresAt ? `${formatDate(issued.expiresAt)}까지` : issued.expiresAt === null ? "무기한" : "만료일은 목록에서 확인"}
       </p>
       <div className="ai-team-token-reveal">
         <TextField label="토큰" value={issued.token} readOnly onFocus={(e) => e.currentTarget.select()} />

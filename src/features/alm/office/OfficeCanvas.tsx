@@ -36,6 +36,8 @@ import {
   coffeeCopy,
   FAR_SEATS_X,
   formatUsd,
+  isAwaitingRunner,
+  isLocalRun,
   meetingName,
   meetingRoomAccessibleName,
   meetingRunStatus,
@@ -311,6 +313,12 @@ function DeskSet({ persona, index, away }: { persona: AgentOfficePersona; index:
       ) : (
         <PixelSprite paths={spritePaths("MONITOR_OFF", "furn")} x={x0 + 5} y={y0 + 6} />
       )}
+      {isLocalRun(run) && !isAwaitingRunner(run) && state !== "INACTIVE" && !away ? (
+        // 내 PC 러너 run(P4a D-P4-4) — 모니터 화면 위 작은 도트 집. 정지 1프레임. 러너 대기 중엔 아직 어디서도 안 도니 말풍선만
+        <g className="office-fx" data-overlay="house">
+          <PixelSprite paths={spritePaths("HOUSE", "ovl")} x={x0 + 8} y={y0 + 8} />
+        </g>
+      ) : null}
       {away ? (
         <PixelSprite
           className="office-postit"

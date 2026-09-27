@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router";
 import { Button } from "@chanho/react";
-import { Clock, Coins, FileText, Inbox, Laptop, MessageCircle } from "lucide-react";
+import { Clock, Coins, FileText, Hourglass, House, Inbox, Laptop, MessageCircle } from "lucide-react";
 import type { AgentActiveMeeting, AgentOfficePersona, AgentRunSummary } from "../store/types";
 import {
   AGENT_MEETING_TYPE_LABEL,
@@ -16,11 +16,13 @@ import { drawnRole } from "./pixel";
 import {
   activityText,
   formatUsd,
+  isLocalRun,
   linkableIssueKey,
   meetingAgendaText,
   personaState,
   personaStateText,
   PROJECT_WIDE_LABEL,
+  runnerWaitText,
   type MeetingSeat,
 } from "./officeModel";
 import type { OfficeLinks } from "./OfficePanel";
@@ -59,6 +61,7 @@ export function TeamCards({
         const run = state === "INACTIVE" ? null : persona.currentRun;
         const activity = state === "INACTIVE" ? null : activityText(persona);
         const last = finished.find((r) => r.personaId === persona.id && r.endedAt);
+        const runnerWait = runnerWaitText(run);
         const nameId = `card-${persona.id}-name`;
         const selected = selectedId === persona.id;
         return (
@@ -108,6 +111,17 @@ export function TeamCards({
                 )}
               </p>
             )}
+            {runnerWait ? (
+              <p className="ai-team-card-issue ai-team-card-runner-wait">
+                <Hourglass size={14} aria-hidden />
+                {runnerWait}
+              </p>
+            ) : run && isLocalRun(run) ? (
+              <p className="ai-team-card-issue">
+                <House size={14} aria-hidden />
+                내 PC 러너에서 실행
+              </p>
+            ) : null}
             {activity ? (
               <p className="ai-team-card-activity" title={activity}>
                 {activity}

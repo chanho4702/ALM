@@ -5372,10 +5372,128 @@ th:last-child > [role="separator"] {
 
 .ai-team-token-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.8fr) auto;
   align-items: end;
   gap: var(--chanho-space-150);
   margin-bottom: var(--chanho-space-200);
+}
+
+/* 만료 "직접 입력"이면 일수 칸이 하나 더 — 버튼은 끝에 그대로 */
+.ai-team-token-form:has(input[type="number"]) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.6fr) auto;
+}
+
+.ai-team-expiry {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-75);
+}
+
+/* ── 실행 위치·러너(P4a AGP-69) ── */
+.ai-team-site-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.ai-team-effective.is-site {
+  background: var(--chanho-color-background-info-subtle);
+}
+
+.ai-team-effective.is-site > svg {
+  color: var(--chanho-color-text-info);
+}
+
+.ai-team-site-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.ai-team-site-option {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--chanho-space-25);
+}
+
+.ai-team-site-title {
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.ai-team-runner-name {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--chanho-space-25);
+}
+
+.ai-team-runner-runs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-100);
+}
+
+.ai-team-runner-runs a,
+.ai-team-download {
+  color: var(--chanho-color-text-link);
+}
+
+.ai-team-runner-runs a:hover,
+.ai-team-download:hover {
+  color: var(--chanho-color-text-link-hovered);
+}
+
+.ai-team-download {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+}
+
+.ai-team-runner-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+.ai-team-runner-setup .ai-team-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  margin: 0;
+}
+
+.ai-team-runner-steps,
+.ai-team-runner-reqs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding-left: var(--chanho-space-300);
+}
+
+.ai-team-runner-reqs code {
+  font-family: var(--chanho-font-family-mono);
+}
+
+.ai-team-command-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--chanho-space-100);
+  margin-top: var(--chanho-space-75);
+}
+
+.ai-team-command {
+  margin: 0;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-default);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .ai-team-token-reveal {
@@ -5444,7 +5562,9 @@ th:last-child > [role="separator"] {
 @media (max-width: 720px) {
   .ai-team-form-grid,
   .ai-team-grant-row,
-  .ai-team-token-form {
+  .ai-team-token-form,
+  .ai-team-token-form:has(input[type="number"]),
+  .ai-team-command-row {
     grid-template-columns: minmax(0, 1fr);
   }
 }

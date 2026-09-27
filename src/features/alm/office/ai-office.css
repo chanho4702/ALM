@@ -1541,6 +1541,19 @@ button.office-attendee:focus-visible {
   color: var(--chanho-color-text-subtle);
 }
 
+/* 러너 대기(P4a) — 사람이 러너를 켜야 풀리는 대기라 경고색 텍스트(아이콘 + 문구). 문구가 길어 줄바꿈 없이 아이콘 옆에서 감싼다 */
+.ai-team-card-runner-wait {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-warning);
+}
+
+.ai-team-card-runner-wait > svg {
+  flex-shrink: 0;
+  margin-top: var(--chanho-space-25);
+}
+
 /* ── 회의 소집 모달(P3b) — 캔버스 밖이라 DS 토큰만, 픽셀 스타일 없음 ───────── */
 .meeting-convene-form {
   display: flex;

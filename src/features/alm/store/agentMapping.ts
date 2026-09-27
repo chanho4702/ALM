@@ -12,6 +12,8 @@ import type {
   AgentChatReply,
   AgentCredentialScope,
   AgentCurrentRun,
+  AgentExecutionSite,
+  AgentExecutionSiteSetting,
   AgentDialogEntry,
   AgentDialogKind,
   AgentDialogPage,
@@ -34,6 +36,9 @@ import type {
   AgentRunSummary,
   AgentRunTrigger,
   AgentRunType,
+  AgentRunner,
+  AgentRunnerIssued,
+  AgentRunnerStatus,
   AgentTeamPersona,
   AgentToken,
   AgentTokenIssued,
@@ -61,6 +66,9 @@ export interface AgentCurrentRunDto {
   attempt: number;
   model: string | null;
   startedAt: string | null;
+  /** P4a — 구 백엔드는 없다 */
+  executionSite?: string | null;
+  awaitingRunner?: boolean | null;
 }
 
 export interface AgentOfficePersonaDto {
@@ -91,6 +99,9 @@ export interface AgentRunSummaryDto {
   type?: string | null;
   trigger?: string | null;
   parentRunId?: Id | null;
+  /** P4a — 구 백엔드는 없다 */
+  executionSite?: string | null;
+  runnerId?: Id | null;
 }
 
 export interface AgentPendingGateDto {
@@ -211,6 +222,8 @@ function money(value: number | string | null | undefined): number | null {
 const RUN_TYPES: readonly AgentRunType[] = ["TASK", "REVIEW", ...MEETING_TYPES];
 const runType = (value: unknown): AgentRunType => pick(RUN_TYPES, value, "TASK");
 const runTrigger = (value: unknown): AgentRunTrigger => (value === "USER" ? "USER" : "SCHEDULER");
+/** 모르는 값·구 백엔드(필드 없음)는 SERVER — P4a 이전 run은 전부 서버에서 돌았다 */
+export const executionSiteOf = (value: unknown): AgentExecutionSite => (value === "LOCAL" ? "LOCAL" : "SERVER");
 
 export function mapAgentAuditEntry(dto: AgentAuditEntryDto): AgentAuditEntry {
   return {
@@ -237,6 +250,9 @@ function mapCurrentRun(dto: AgentCurrentRunDto): AgentCurrentRun | null {
     attempt: dto.attempt,
     model: dto.model ?? null,
     startedAt: dto.startedAt ?? null,
+    executionSite: executionSiteOf(dto.executionSite),
+    // "러너 대기"는 QUEUED의 하위 상태 — 다른 상태에 붙어 오면 무시한다
+    awaitingRunner: dto.status === "QUEUED" && dto.awaitingRunner === true,
   };
 }
 
@@ -253,6 +269,8 @@ export function mapAgentRunSummary(dto: AgentRunSummaryDto): AgentRunSummary {
     type: runType(dto.type),
     trigger: runTrigger(dto.trigger),
     parentRunId: dto.parentRunId === null || dto.parentRunId === undefined ? null : String(dto.parentRunId),
+    executionSite: executionSiteOf(dto.executionSite),
+    runnerId: dto.runnerId === null || dto.runnerId === undefined ? null : String(dto.runnerId),
   };
 }
 
@@ -432,6 +450,10 @@ export interface AgentTokenDto {
   expiresAt?: string | null;
   lastUsedAt?: string | null;
   revoked?: boolean | null;
+  /** P4a(D-P4-3b) — 구 백엔드는 없다 */
+  kind?: string | null;
+  noExpiry?: boolean | null;
+  expiringSoon?: boolean | null;
 }
 
 export interface AgentTokenIssuedDto {
@@ -439,6 +461,7 @@ export interface AgentTokenIssuedDto {
   id: Id;
   label: string;
   personaSlug: string;
+  expiresAt?: string | null;
 }
 
 export interface AgentProjectCredentialDto {
@@ -513,11 +536,118 @@ export function mapAgentToken(dto: AgentTokenDto): AgentToken {
     expiresAt: dto.expiresAt ?? null,
     lastUsedAt: dto.lastUsedAt ?? null,
     revoked: dto.revoked === true,
+    kind: dto.kind === "RUN" ? "RUN" : "HUMAN",
+    noExpiry: dto.noExpiry === true,
+    expiringSoon: dto.expiringSoon === true,
   };
 }
 
 export function mapAgentTokenIssued(dto: AgentTokenIssuedDto): AgentTokenIssued {
-  return { token: dto.token, id: String(dto.id), label: dto.label, personaSlug: dto.personaSlug };
+  return {
+    token: dto.token,
+    id: String(dto.id),
+    label: dto.label,
+    personaSlug: dto.personaSlug,
+    // 필드가 없으면(구 백엔드) 비워 둔다 — null은 "무기한"이라는 뜻이라 섞지 않는다
+    ...(dto.expiresAt !== undefined ? { expiresAt: dto.expiresAt } : {}),
+  };
+}
+
+// ── 실행 위치·러너(P4a AGP-69) ──
+
+export interface AgentExecutionSiteDto {
+  projectId?: Id | null;
+  site?: string | null;
+  effectiveSite?: string | null;
+  defaultSite?: string | null;
+  inProcess?: boolean | null;
+}
+
+const optSite = (value: unknown): AgentExecutionSite | null =>
+  value === "SERVER" || value === "LOCAL" ? value : null;
+
+/** projectId는 요청한 값으로 채운다(응답에 없어도 화면이 어느 프로젝트 것인지 안다) */
+export function mapAgentExecutionSite(dto: AgentExecutionSiteDto | null, projectId: string): AgentExecutionSiteSetting {
+  const site = optSite(dto?.site);
+  const defaultSite = executionSiteOf(dto?.defaultSite);
+  return {
+    projectId: dto?.projectId === null || dto?.projectId === undefined ? projectId : String(dto.projectId),
+    site,
+    effectiveSite: optSite(dto?.effectiveSite) ?? site ?? defaultSite,
+    defaultSite,
+    inProcess: dto?.inProcess === true,
+  };
+}
+
+export interface AgentRunnerDto {
+  id: Id;
+  kind?: string | null;
+  name?: string | null;
+  projectId?: Id | null;
+  issuedBy?: Id | null;
+  tokenPrefix?: string | null;
+  createdAt?: string | null;
+  revokedAt?: string | null;
+  lastHeartbeatAt?: string | null;
+  version?: string | null;
+  os?: string | null;
+  maxConcurrency?: number | null;
+  status?: string | null;
+  currentRunIds?: Id[] | null;
+}
+
+export interface AgentRunnerIssuedDto {
+  id: Id;
+  kind?: string | null;
+  name?: string | null;
+  projectId?: Id | null;
+  token: string;
+  tokenPrefix?: string | null;
+  createdAt?: string | null;
+}
+
+const RUNNER_STATUSES: readonly AgentRunnerStatus[] = ["ONLINE", "OFFLINE", "NEVER_CONNECTED", "REVOKED"];
+
+/**
+ * 상태를 모르면 철회 시각·heartbeat로 다시 판정한다 — 모르는 값을 ONLINE으로 보여 "켜져 있다"고 안심시키지 않는다
+ * (heartbeat가 있으면 OFFLINE, 없으면 NEVER_CONNECTED).
+ */
+function runnerStatus(dto: AgentRunnerDto): AgentRunnerStatus {
+  if (dto.revokedAt) return "REVOKED";
+  if (RUNNER_STATUSES.includes(dto.status as AgentRunnerStatus)) return dto.status as AgentRunnerStatus;
+  return dto.lastHeartbeatAt ? "OFFLINE" : "NEVER_CONNECTED";
+}
+
+export function mapAgentRunner(dto: AgentRunnerDto): AgentRunner {
+  const concurrency = typeof dto.maxConcurrency === "number" && Number.isFinite(dto.maxConcurrency) ? dto.maxConcurrency : null;
+  return {
+    id: String(dto.id),
+    kind: dto.kind === "PLATFORM" ? "PLATFORM" : "LOCAL",
+    name: dto.name?.trim() || `러너 #${dto.id}`,
+    projectId: optId(dto.projectId),
+    issuedBy: optId(dto.issuedBy),
+    tokenPrefix: dto.tokenPrefix || null,
+    createdAt: dto.createdAt ?? null,
+    revokedAt: dto.revokedAt ?? null,
+    lastHeartbeatAt: dto.lastHeartbeatAt ?? null,
+    version: dto.version || null,
+    os: dto.os || null,
+    maxConcurrency: concurrency,
+    status: runnerStatus(dto),
+    currentRunIds: (dto.currentRunIds ?? []).map(String),
+  };
+}
+
+export function mapAgentRunnerIssued(dto: AgentRunnerIssuedDto): AgentRunnerIssued {
+  return {
+    id: String(dto.id),
+    kind: dto.kind === "PLATFORM" ? "PLATFORM" : "LOCAL",
+    name: dto.name?.trim() || `러너 #${dto.id}`,
+    projectId: optId(dto.projectId),
+    token: dto.token,
+    tokenPrefix: dto.tokenPrefix || null,
+    createdAt: dto.createdAt ?? null,
+  };
 }
 
 /** 출처를 모르면 NONE — "키 없음"으로 보이는 쪽이 "키 있음"으로 잘못 안심시키는 쪽보다 낫다 */
