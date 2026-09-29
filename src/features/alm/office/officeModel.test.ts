@@ -290,6 +290,7 @@ describe("요약·라이브 알림", () => {
       boardPosts: [],
       activeMeeting: null,
       features: { chat: false },
+      reviewReady: true,
     });
     const before = office([persona({ id: "1", currentRun: run("RUNNING") }), persona({ id: "2", name: "운영봇" })]);
     const after = office([
@@ -417,6 +418,7 @@ describe("회의실 문구(P3e §2.4·§2.7)", () => {
       boardPosts: [],
       activeMeeting,
       features: { chat: false },
+      reviewReady: true,
     });
     expect(transitionAnnouncements(office(null), office(meeting()))).toEqual([
       "착수/계획 회의가 시작됐습니다 — 참석 4명",

@@ -160,6 +160,19 @@ function runnerWaitBubble(run: AgentCurrentRun): string | null {
   return isLocalRun(run) ? "내 PC 러너를 켜 주세요" : "플랫폼 러너 연결 대기";
 }
 
+/**
+ * 워커에게 아직 전달되지 않은 사람 지시 수(P4b AGP-67) — 실행 중(RUNNING) run에서만 센다(전달은 도구 호출 때 일어난다).
+ * 구 백엔드(필드 없음)는 0.
+ */
+export function pendingDirectives(run: AgentCurrentRun | null | undefined): number {
+  return run?.status === "RUNNING" ? (run.pendingDirectiveCount ?? 0) : 0;
+}
+
+/** 실행 중 지시 API가 있는 서버인가 — 사무실 응답의 현재 run에 `pendingDirectiveCount`가 실려 오면 있다 */
+export function supportsLiveDirective(run: AgentCurrentRun | null | undefined): boolean {
+  return run?.pendingDirectiveCount !== undefined;
+}
+
 /** 원격 접속 말풍선 1행 */
 export const REMOTE_BUBBLE = "원격 작업 중";
 
@@ -236,6 +249,9 @@ export function personaAccessibleName(persona: AgentOfficePersona, meetingName: 
     const wait = runnerWaitText(run);
     if (wait) parts.push(wait);
     else if (isLocalRun(run)) parts.push("내 PC 러너에서 실행");
+    // 책상 위 편지 표식과 같은 사실
+    const pending = pendingDirectives(run);
+    if (pending > 0) parts.push(`전달 대기 중인 사람 지시 ${pending}건`);
   }
   if (meetingName) parts.push(`회의 중 — ${meetingName}`);
   return `${parts.join(", ")} — 말 걸기`;

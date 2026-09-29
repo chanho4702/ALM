@@ -13,6 +13,7 @@ import {
   OctagonX,
   Power,
   RefreshCw,
+  TriangleAlert,
   UsersRound,
   Wallet,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { useAgentPermissions } from "../components/useAgentPermissions";
 import { useIssueModal } from "../components/useIssueModal";
 import { relTimeFine } from "../components/time";
 import { OfficeCanvas } from "./OfficeCanvas";
+import { REVIEWER_ANCHOR } from "./AiTeamReviewer";
 import { MeetingConveneModal } from "./MeetingConveneModal";
 import { OfficePanel, type GoalsView, type OfficeLinks, type PanelTarget } from "./OfficePanel";
 import { TeamCards } from "./TeamCards";
@@ -446,6 +448,19 @@ function AiOffice({ projectId }: { projectId: string }) {
   const body = (which: View) => (
     <div className="ai-office-view">
       <div className="ai-office-links">
+        {office && !office.reviewReady ? (
+          // P4b D-P4b-1 — 리뷰어가 해석되지 않으면 TASK가 done으로 못 간다. 설정의 리뷰어 카드로 바로 보낸다
+          <Link
+            className="ai-office-review-warn"
+            to={`/projects/${projectId}/settings/ai-team#${REVIEWER_ANCHOR}`}
+            aria-label="리뷰어 없음 — 완료 불가. AI 팀 설정에서 리뷰어 지정"
+          >
+            <Lozenge appearance="warning" className="agent-lozenge is-warning">
+              <TriangleAlert size={12} strokeWidth={2.25} aria-hidden />
+              리뷰어 없음 — 완료 불가
+            </Lozenge>
+          </Link>
+        ) : null}
         <Button
           variant="ghost"
           size="small"

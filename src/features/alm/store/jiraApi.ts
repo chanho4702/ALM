@@ -65,6 +65,8 @@ import type {
   AgentRunner,
   AgentRunnerInput,
   AgentRunnerIssued,
+  AgentReviewSetting,
+  AgentRunDirective,
   AuditEntry,
   SystemStats,
   SettingsBody,
@@ -147,6 +149,11 @@ import {
   mapAgentExecutionSite,
   mapAgentRunner,
   mapAgentRunnerIssued,
+  mapAgentReviewSetting,
+  mapAgentRunDirective,
+  mapAgentRunDirectives,
+  type AgentReviewSettingDto,
+  type AgentRunDirectiveDto,
   type AgentExecutionSiteDto,
   type AgentRunnerDto,
   type AgentRunnerIssuedDto,
@@ -1338,6 +1345,69 @@ export async function issueAgentRunner(input: AgentRunnerInput): Promise<AgentRu
 /** 멱등 204 — PLATFORM 러너는 409(env로만 관리) */
 export async function revokeAgentRunner(runnerId: string): Promise<void> {
   await json<null>(await sharedApiFetch(`/api/agent/runners/${encodeURIComponent(runnerId)}`, { method: "DELETE" }));
+}
+
+// ── 리뷰어 지정(P4b D-P4b-1, AGP-59) — P4b 이전 백엔드는 404: 조회는 null("지원 안 함") ──
+// 400(REVIEWER 롤·활성·범위 위반)·403은 `{"error"}` 문구 그대로 Error로 올린다(화면이 토스트로).
+
+/** 인증 사용자 누구나 — 유효 리뷰어와 출처. null = 이 서버에 리뷰어 지정 기능이 없다 */
+export async function fetchReviewSetting(projectId: string): Promise<AgentReviewSetting | null> {
+  return orUnsupported(async () =>
+    mapAgentReviewSetting(
+      await json<AgentReviewSettingDto>(
+        await sharedApiFetch(`/api/agent/review-settings/projects/${toBackendId(projectId)}`),
+      ),
+    ),
+  );
+}
+
+/** 그 프로젝트 관리자만 — 그 프로젝트 소속 또는 공용의 활성 REVIEWER만(아니면 400) */
+export async function saveReviewSetting(projectId: string, personaId: string): Promise<AgentReviewSetting> {
+  return mapAgentReviewSetting(
+    await json<AgentReviewSettingDto>(
+      await sharedApiFetch(`/api/agent/review-settings/projects/${toBackendId(projectId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personaId: toBackendId(personaId) }),
+      }),
+    ),
+  );
+}
+
+/** 지정 해제(204, 멱등) — 다음 단계(전역·서버 설정·자동)로 내려간다. 화면은 다시 조회해 유효 리뷰어를 받는다 */
+export async function clearReviewSetting(projectId: string): Promise<void> {
+  await json<null>(
+    await sharedApiFetch(`/api/agent/review-settings/projects/${toBackendId(projectId)}`, { method: "DELETE" }),
+  );
+}
+
+// ── 실행 중 지시(P4b D-P4b-5, AGP-67) — 워커의 다음 도구 결과 끝에 붙어 전달된다 ──
+
+/** 인증 사용자 누구나(본문은 관리자에게만) — null = 지시 기능이 없는 구 백엔드(404) */
+export async function fetchRunDirectives(runId: string): Promise<AgentRunDirective[] | null> {
+  return orUnsupported(async () =>
+    mapAgentRunDirectives(
+      await json<AgentRunDirectiveDto[] | null>(
+        await sharedApiFetch(`/api/agent/runs/${encodeURIComponent(runId)}/directives`),
+      ),
+    ),
+  );
+}
+
+/**
+ * run 프로젝트 관리자만(403) — RUNNING이 아니면 409, 빈 본문·2000자 초과 400. 404는 구 백엔드이거나 run이 없다는 뜻이라
+ * 상태를 싣는 ApiError 그대로 올린다(화면이 코멘트로 폴백).
+ */
+export async function sendRunDirective(runId: string, text: string): Promise<AgentRunDirective> {
+  return mapAgentRunDirective(
+    await json<AgentRunDirectiveDto>(
+      await sharedApiFetch(`/api/agent/runs/${encodeURIComponent(runId)}/directives`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.trim() }),
+      }),
+    ),
+  );
 }
 
 // ── AI 사무실 1:1 대화(P3g AGP-65) — 오류는 상태를 싣는 ApiError로 올린다(화면이 409/429/503을 대사로 번역) ──

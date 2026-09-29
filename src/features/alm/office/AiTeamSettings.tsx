@@ -63,11 +63,11 @@ import { AGENT_ROLE_LABEL, AgentRoleGlyph, AgentRoleIcon } from "../components/A
 import { useAiTeamStatus } from "../components/useAiTeamActive";
 import { useAgentPermissions } from "../components/useAgentPermissions";
 import { formatDate } from "../components/time";
-import { OfficePortrait } from "./PixelSprite";
 import { useConfirmedAction } from "./SupervisionFrame";
 import { PersonaEditorDialog } from "./PersonaEditorDialog";
-import { errorText, LoadState, useLoad, When, type Load } from "./aiTeamShared";
+import { errorText, LoadState, PersonaAvatar, useLoad, When, type Load } from "./aiTeamShared";
 import { ExecutionSection } from "./AiTeamExecution";
+import { ReviewerSection } from "./AiTeamReviewer";
 // 초상 팔레트(`--office-*`)만 쓴다 — 이 화면은 설정 청크에서도 지연 로드라 사무실을 안 여는 사람은 받지 않는다
 import "./ai-office.css";
 
@@ -166,6 +166,14 @@ function AiTeamBody({ projectId, users }: AiTeamSettingsProps) {
         ]
       : [];
   const own = team.filter((p) => p.projectId !== null);
+  /** 직원 추가 모달 — 열려 있으면 미리 고를 롤(리뷰어 카드의 "직원 추가"는 REVIEWER) */
+  const [addRole, setAddRole] = useState<AgentRole | null>(null);
+  /** 직원이 바뀌면(추가·활성 전환) 유효 리뷰어도 바뀔 수 있다 — 리뷰어 카드를 다시 조회하게 */
+  const [staffVersion, setStaffVersion] = useState(0);
+  const onStaffChanged = useCallback(async () => {
+    await reloadPersonas();
+    setStaffVersion((v) => v + 1);
+  }, [reloadPersonas]);
 
   return (
     <div className="project-settings ai-team-settings">
@@ -178,8 +186,18 @@ function AiTeamBody({ projectId, users }: AiTeamSettingsProps) {
         load={personas}
         team={team}
         tokens={tokens.status === "ready" ? tokens.data : null}
+        addRole={addRole}
+        onAddRole={setAddRole}
         onRetry={reloadPersonas}
-        onChanged={reloadPersonas}
+        onChanged={onStaffChanged}
+      />
+      <ReviewerSection
+        projectId={projectId}
+        canManage={canManage}
+        loaded={permissions.loaded}
+        team={personas.status === "ready" ? team : null}
+        version={staffVersion}
+        onAddReviewer={() => setAddRole("REVIEWER")}
       />
       <ExecutionSection
         projectId={projectId}
@@ -201,15 +219,6 @@ function AiTeamBody({ projectId, users }: AiTeamSettingsProps) {
   );
 }
 
-/** 초상 썸네일 — 사무실 도트 초상(롤별 셔츠색) 재사용. `.ai-office`는 팔레트 변수 스코프일 뿐 레이아웃이 없다 */
-function PersonaAvatar({ persona }: { persona: AgentTeamPersona }) {
-  return (
-    <span className="ai-office ai-team-avatar">
-      <OfficePortrait slug={persona.slug} role={persona.role} avatarConfig={persona.avatarConfig} className="is-row" />
-    </span>
-  );
-}
-
 // ── 직원 ─────────────────────────────────────────────────────
 
 function StaffSection({
@@ -218,6 +227,8 @@ function StaffSection({
   load,
   team,
   tokens,
+  addRole,
+  onAddRole,
   onRetry,
   onChanged,
 }: {
@@ -226,10 +237,12 @@ function StaffSection({
   load: Load<AgentTeamPersona[]>;
   team: AgentTeamPersona[];
   tokens: AgentToken[] | null;
+  /** null = 추가 모달 닫힘 */
+  addRole: AgentRole | null;
+  onAddRole: (role: AgentRole | null) => void;
   onRetry: () => Promise<void>;
   onChanged: () => Promise<void>;
 }) {
-  const [adding, setAdding] = useState(false);
   /** 편집 중인 직원 — 추가 직후 자동으로 열리면 created=true(안내 배너) */
   const [editing, setEditing] = useState<{ persona: AgentTeamPersona; created: boolean } | null>(null);
   const action = useConfirmedAction(onChanged);
@@ -265,7 +278,7 @@ function StaffSection({
             variant="subtle"
             size="small"
             iconBefore={<UserPlus size={16} aria-hidden />}
-            onClick={() => setAdding(true)}
+            onClick={() => onAddRole("FRONTEND")}
           >
             직원 추가
           </Button>
@@ -341,10 +354,13 @@ function StaffSection({
       {canManage ? (
         <AddPersonaModal
           projectId={projectId}
-          open={adding}
-          onOpenChange={setAdding}
+          open={addRole !== null}
+          initialRole={addRole ?? "FRONTEND"}
+          onOpenChange={(next) => {
+            if (!next) onAddRole(null);
+          }}
           onCreated={(persona) => {
-            setAdding(false);
+            onAddRole(null);
             void onChanged();
             // 추가 모달을 닫고 곧바로 그 직원의 편집 다이얼로그를 연다(외형 탭, AGP-62 §6.1)
             setEditing({ persona, created: true });
@@ -391,11 +407,14 @@ const grantRow = (grant: AgentGrantInput): GrantRow => ({ key: `grant-${++grantS
 function AddPersonaModal({
   projectId,
   open,
+  initialRole,
   onOpenChange,
   onCreated,
 }: {
   projectId: string;
   open: boolean;
+  /** 열 때 미리 고를 롤 */
+  initialRole: AgentRole;
   onOpenChange: (open: boolean) => void;
   onCreated: (persona: AgentTeamPersona) => void;
 }) {
@@ -414,13 +433,13 @@ function AddPersonaModal({
     if (!open) return;
     setSlug("");
     setName("");
-    setRole("FRONTEND");
+    setRole(initialRole);
     setEmoji("");
     setVoicePrompt("");
     setGrants([grantRow({ resourceType: "PROJECT", resourceId: projectId, role: "EDITOR" })]);
     setTouched(false);
     setSubmitting(false);
-  }, [open, projectId]);
+  }, [open, projectId, initialRole]);
 
   const slugError = !SLUG_PATTERN.test(slug.trim()) ? `소문자·숫자·하이픈 2~${SLUG_MAX}자로 입력하세요` : undefined;
   const nameError = !name.trim() ? "이름을 입력하세요" : undefined;

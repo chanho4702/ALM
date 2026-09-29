@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -32,6 +32,11 @@ async function withoutMeeting() {
   const base = await store.fetchOffice("p1");
   return vi.spyOn(store, "fetchOffice").mockResolvedValue({ ...base, activeMeeting: null });
 }
+
+// 사무실은 라우트 lazy 청크다 — 전체 스위트 병렬 실행에서 첫 테스트가 청크 로드에 findBy 한도를 다 쓰지 않게 미리 받는다
+beforeAll(async () => {
+  await import("./AiOfficePage");
+}, 60_000);
 
 beforeEach(() => {
   localStorage.clear();
@@ -606,7 +611,8 @@ describe("안건 이슈 없는 회의 run — 합성 키 가드", () => {
       activeMeeting: null,
       personas: base.personas.map((p) =>
         p.id === "101"
-          ? { ...p, currentRun: { ...p.currentRun!, type: "RETRO", issueKey: "PROJECT-1" }, lastActivity: null }
+          ? // 전달 대기 지시(P4b 목업 시드)는 이 테스트의 관심사가 아니다 — 접근 이름 끝을 합성 키 표기로 고정
+            { ...p, currentRun: { ...p.currentRun!, type: "RETRO", issueKey: "PROJECT-1", pendingDirectiveCount: 0 }, lastActivity: null }
           : p,
       ),
     });

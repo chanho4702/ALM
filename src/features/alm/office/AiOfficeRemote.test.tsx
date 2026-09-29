@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -55,6 +55,11 @@ async function openPanelViaDialog(user: ReturnType<typeof userEvent.setup>, avat
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), { timeout: 3000 });
   return screen.findByRole("complementary", { name });
 }
+
+// 사무실은 라우트 lazy 청크다 — 전체 스위트 병렬 실행에서 첫 테스트가 청크 로드에 findBy 한도를 다 쓰지 않게 미리 받는다
+beforeAll(async () => {
+  await import("./AiOfficePage");
+}, 60_000);
 
 beforeEach(() => {
   localStorage.clear();

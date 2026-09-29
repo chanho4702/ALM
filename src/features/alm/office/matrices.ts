@@ -320,6 +320,20 @@ export const HOUSE: readonly string[] = [
   ".KKKKK.",
 ];
 
+/**
+ * ENVELOPE — 9×7, 아직 워커에게 전달되지 않은 사람 지시(P4b AGP-67). 책상 위에 놓인 편지 — 봉투(hi)·접힌 선(outline)·
+ * 모서리 알림 점(red) — 계열 `ovl`. 2프레임 통통(프레임 B는 1ap 위)이고 reduced-motion이면 A 정지.
+ */
+export const ENVELOPE: readonly string[] = [
+  "......KKK",
+  "KKKKKKKRK",
+  "KKHHHHKKK",
+  "KHKHHKHK.",
+  "KHHKKHHK.",
+  "KHHHHHHK.",
+  "KKKKKKKK.",
+];
+
 /** RED_MARK — 7×7 */
 export const RED_MARK: readonly string[] = [
   ".KKKKK.",

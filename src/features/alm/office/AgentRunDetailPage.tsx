@@ -25,6 +25,7 @@ import {
   usePersonaDirectory,
 } from "./SupervisionFrame";
 import { usePolledLoad } from "./usePolledLoad";
+import { RunDirectivesSection } from "./RunDirectives";
 
 /**
  * 실행 상세(P3a AGP-12) — `/projects/:projectId/ai-office/runs/:runId`. 상세 전용 API가 없어 목록 요약에서
@@ -224,6 +225,8 @@ function AgentRunDetail() {
             </dd>
           </div>
         </dl>
+
+        <RunDirectivesSection key={run.id} run={run} canManage={canManage} onStale={() => void load.refresh()} />
 
         <section className="agent-run-lineage" aria-labelledby="agent-run-lineage-title">
           <h3 id="agent-run-lineage-title" className="agent-sup-subtitle">

@@ -38,6 +38,7 @@ import {
   formatUsd,
   isAwaitingRunner,
   isLocalRun,
+  pendingDirectives,
   meetingName,
   meetingRoomAccessibleName,
   meetingRunStatus,
@@ -337,6 +338,17 @@ function DeskSet({ persona, index, away }: { persona: AgentOfficePersona; index:
       ) : null}
       {state === "BLOCKED" ? (
         <PixelSprite className="office-fx" paths={spritePaths("RED_MARK", "ovl")} x={x0 + 36} y={y0 + 22} />
+      ) : null}
+      {pendingDirectives(run) > 0 && state !== "INACTIVE" ? (
+        // 전달 대기 사람 지시(P4b AGP-67) — 책상 왼쪽 앞에 놓인 편지. 회의실에 가 있어도 책상에 남는다(아직 안 읽었다)
+        <g className="office-fx" data-overlay="envelope">
+          <Loop
+            ms={1000}
+            phase={index}
+            a={<PixelSprite paths={spritePaths("ENVELOPE", "ovl")} x={x0 + 6} y={y0 + 19} />}
+            b={<PixelSprite paths={spritePaths("ENVELOPE", "ovl")} x={x0 + 6} y={y0 + 18} />}
+          />
+        </g>
       ) : null}
     </g>
   );

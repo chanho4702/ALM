@@ -5,6 +5,7 @@ import {
   Ban,
   Bot,
   CalendarClock,
+  CheckCheck,
   CircleAlert,
   CircleCheck,
   CircleDashed,
@@ -14,12 +15,15 @@ import {
   ClipboardPen,
   Coffee,
   Cog,
+  FolderKanban,
   GitMerge,
+  Globe,
   HardHat,
   Hourglass,
   House,
   Keyboard,
   Laptop,
+  Mail,
   Palette,
   Plug,
   PowerOff,
@@ -28,6 +32,7 @@ import {
   Server,
   ServerCog,
   Siren,
+  Sparkles,
   TriangleAlert,
   UserRound,
   UsersRound,
@@ -41,6 +46,7 @@ import type {
   AgentExecutionSite,
   AgentGateKind,
   AgentMeetingType,
+  AgentReviewerSource,
   AgentRole,
   AgentRunStatus,
   AgentRunTrigger,
@@ -321,6 +327,48 @@ export function AgentRunnerStatusLozenge({ status }: { status: AgentRunnerStatus
     <Lozenge appearance={def.appearance} className={`agent-lozenge is-${def.appearance}`}>
       <IconComp size={12} strokeWidth={2.25} aria-hidden />
       {def.label}
+    </Lozenge>
+  );
+}
+
+// ── 리뷰어 출처·지시 전달(P4b AGP-59·67) ──
+
+/** 유효 리뷰어가 정해진 단계 — 프로젝트 설정 > 전역 설정 > 서버 env > 자동 > 없음 */
+const REVIEWER_SOURCES: Record<AgentReviewerSource, GlyphDef> = {
+  PROJECT: { icon: FolderKanban, label: "프로젝트 지정", appearance: "info" },
+  PLATFORM: { icon: Globe, label: "전역 지정", appearance: "info" },
+  ENV: { icon: Server, label: "서버 설정", appearance: "neutral" },
+  AUTO: { icon: Sparkles, label: "자동 선택", appearance: "neutral" },
+  NONE: { icon: TriangleAlert, label: "없음", appearance: "warning" },
+};
+
+export const AGENT_REVIEWER_SOURCE_LABEL: Record<AgentReviewerSource, string> = Object.fromEntries(
+  Object.entries(REVIEWER_SOURCES).map(([k, v]) => [k, v.label]),
+) as Record<AgentReviewerSource, string>;
+
+/** 리뷰어 출처 Lozenge — 아이콘 + 텍스트 */
+export function AgentReviewerSourceLozenge({ source }: { source: AgentReviewerSource }) {
+  const def = REVIEWER_SOURCES[source];
+  const IconComp = def.icon;
+  return (
+    <Lozenge appearance={def.appearance} className={`agent-lozenge is-${def.appearance}`}>
+      <IconComp size={12} strokeWidth={2.25} aria-hidden />
+      {def.label}
+    </Lozenge>
+  );
+}
+
+/** 실행 중 지시 전달 상태 — 전달 대기(편지)/전달됨(두 번 체크) */
+export function AgentDirectiveDeliveryLozenge({ delivered }: { delivered: boolean }) {
+  return delivered ? (
+    <Lozenge appearance="success" className="agent-lozenge is-success">
+      <CheckCheck size={12} strokeWidth={2.25} aria-hidden />
+      전달됨
+    </Lozenge>
+  ) : (
+    <Lozenge appearance="warning" className="agent-lozenge is-warning">
+      <Mail size={12} strokeWidth={2.25} aria-hidden />
+      전달 대기
     </Lozenge>
   );
 }

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -60,6 +60,11 @@ async function quietOffice() {
   );
   return vi.spyOn(store, "fetchOffice").mockImplementation(async () => ({ ...base, personas, activeMeeting: null }));
 }
+
+// 사무실은 라우트 lazy 청크다 — 전체 스위트 병렬 실행에서 첫 테스트가 청크 로드에 findBy 한도를 다 쓰지 않게 미리 받는다
+beforeAll(async () => {
+  await import("./AiOfficePage");
+}, 60_000);
 
 beforeEach(() => {
   localStorage.clear();

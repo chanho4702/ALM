@@ -31,7 +31,10 @@ import type {
   AgentPersonaActivity,
   AgentPersonaDetail,
   AgentProjectCredential,
+  AgentReviewerSource,
+  AgentReviewSetting,
   AgentRole,
+  AgentRunDirective,
   AgentRunStatus,
   AgentRunSummary,
   AgentRunTrigger,
@@ -69,6 +72,8 @@ export interface AgentCurrentRunDto {
   /** P4a — 구 백엔드는 없다 */
   executionSite?: string | null;
   awaitingRunner?: boolean | null;
+  /** P4b(AGP-67) — 구 백엔드는 없다 */
+  pendingDirectiveCount?: number | null;
 }
 
 export interface AgentOfficePersonaDto {
@@ -173,6 +178,8 @@ export interface AgentOfficeDto {
   activeMeeting?: AgentActiveMeetingDto | null;
   /** P3g 이전 백엔드는 이 필드가 없다 — 없으면 전부 꺼짐 */
   features?: { chat?: boolean | null } | null;
+  /** P4b 이전 백엔드는 이 필드가 없다 — 없으면 준비됨(경고 안 함) */
+  reviewReady?: boolean | null;
 }
 
 export interface AgentActiveMeetingDto {
@@ -253,7 +260,18 @@ function mapCurrentRun(dto: AgentCurrentRunDto): AgentCurrentRun | null {
     executionSite: executionSiteOf(dto.executionSite),
     // "러너 대기"는 QUEUED의 하위 상태 — 다른 상태에 붙어 오면 무시한다
     awaitingRunner: dto.status === "QUEUED" && dto.awaitingRunner === true,
+    ...directiveCountOf(dto.pendingDirectiveCount),
   };
+}
+
+/**
+ * 필드가 없으면(구 백엔드) 키째 뺀다 — "지시 API가 있는 서버인가"의 신호라 0으로 채우지 않는다.
+ * 있는데 숫자가 아니거나 음수면 0(대기 표식을 잘못 띄우지 않게).
+ */
+function directiveCountOf(value: unknown): { pendingDirectiveCount?: number } {
+  if (value === undefined) return {};
+  const n = typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : 0;
+  return { pendingDirectiveCount: Math.max(0, n) };
 }
 
 export function mapAgentRunSummary(dto: AgentRunSummaryDto): AgentRunSummary {
@@ -387,6 +405,8 @@ export function mapAgentOffice(dto: AgentOfficeDto): AgentOffice {
     boardPosts: (dto.boardPosts ?? []).map(mapAgentBoardPost),
     activeMeeting: mapAgentActiveMeeting(dto.activeMeeting),
     features: { chat: dto.features?.chat === true },
+    // false일 때만 경고 — 필드가 없거나(구 백엔드) 모르는 값이면 준비됨
+    reviewReady: dto.reviewReady !== false,
   };
 }
 
@@ -648,6 +668,68 @@ export function mapAgentRunnerIssued(dto: AgentRunnerIssuedDto): AgentRunnerIssu
     tokenPrefix: dto.tokenPrefix || null,
     createdAt: dto.createdAt ?? null,
   };
+}
+
+// ── 리뷰어 지정(P4b D-P4b-1)·실행 중 지시(D-P4b-5) ──
+
+export interface AgentReviewSettingDto {
+  setting?: { personaId?: Id | null; slug?: string | null; name?: string | null } | null;
+  effective?: { personaId?: Id | null; slug?: string | null; name?: string | null; source?: string | null } | null;
+}
+
+const REVIEWER_SOURCES: readonly AgentReviewerSource[] = ["PROJECT", "PLATFORM", "ENV", "AUTO", "NONE"];
+
+/**
+ * 출처를 모르거나 리뷰어 id가 없으면 NONE — "리뷰어 있음"으로 잘못 안심시키는 쪽보다 경고가 뜨는 쪽이 낫다.
+ * NONE이면 서버 계약대로 이름까지 전부 null로 접는다. 지정(setting)은 id가 없으면 없는 것으로 본다.
+ */
+export function mapAgentReviewSetting(dto: AgentReviewSettingDto | null): AgentReviewSetting {
+  const s = dto?.setting ?? null;
+  const e = dto?.effective ?? null;
+  const settingId = optId(s?.personaId);
+  const effectiveId = optId(e?.personaId);
+  const source = effectiveId === null ? "NONE" : pick(REVIEWER_SOURCES, e?.source, "NONE");
+  const none = source === "NONE";
+  return {
+    setting: settingId === null ? null : { personaId: settingId, slug: s?.slug || null, name: s?.name || null },
+    effective: {
+      personaId: none ? null : effectiveId,
+      slug: none ? null : e?.slug || null,
+      name: none ? null : e?.name || null,
+      source,
+    },
+  };
+}
+
+export interface AgentRunDirectiveDto {
+  id: Id;
+  runId: Id;
+  text?: string | null;
+  /** 서버가 본문을 가렸다(관리자 아님) */
+  textRedacted?: boolean | null;
+  createdAt: string;
+  deliveredAt?: string | null;
+}
+
+export function mapAgentRunDirective(dto: AgentRunDirectiveDto): AgentRunDirective {
+  return {
+    id: String(dto.id),
+    runId: String(dto.runId),
+    text: dto.textRedacted === true || typeof dto.text !== "string" ? null : dto.text,
+    createdAt: dto.createdAt,
+    deliveredAt: dto.deliveredAt ?? null,
+  };
+}
+
+/** 오래된 것 먼저(id 순) — 서버 순서에 기대지 않는다 */
+export function mapAgentRunDirectives(body: AgentRunDirectiveDto[] | null): AgentRunDirective[] {
+  const list = (body ?? []).map(mapAgentRunDirective);
+  list.sort((a, b) => {
+    const na = Number(a.id);
+    const nb = Number(b.id);
+    return Number.isFinite(na) && Number.isFinite(nb) ? na - nb : a.createdAt.localeCompare(b.createdAt);
+  });
+  return list;
 }
 
 /** 출처를 모르면 NONE — "키 없음"으로 보이는 쪽이 "키 있음"으로 잘못 안심시키는 쪽보다 낫다 */

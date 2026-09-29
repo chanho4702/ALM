@@ -12,7 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Banner, Button, Select, Spinner, TextArea, TextField, Tooltip } from "@chanho/react";
-import { ClipboardCheck, FastForward, MessageSquare, PanelRight, ScrollText, Send, Sparkles, X } from "lucide-react";
+import { ClipboardCheck, FastForward, MessageSquare, PanelRight, ScrollText, Send, Sparkles, X, Zap } from "lucide-react";
 import type {
   AgentBudget,
   AgentDialogEntry,
@@ -33,9 +33,10 @@ import {
   listProjectStatuses,
   searchIssues,
   sendPersonaChat,
+  sendRunDirective,
 } from "../store/jiraStore";
 import { errorStatus } from "../store/mapping";
-import { AgentRoleGlyph, AgentRunTypeGlyph, AgentStatusLozenge } from "../components/AgentGlyphs";
+import { AgentDirectiveDeliveryLozenge, AgentRoleGlyph, AgentRunTypeGlyph, AgentStatusLozenge } from "../components/AgentGlyphs";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { StatusGlyph } from "../components/StatusGlyph";
 import { statusKind, statusName } from "../components/labels";
@@ -55,7 +56,8 @@ import {
   spritePaths,
   type FaceExpression,
 } from "./pixel";
-import { linkableIssueKey, personaState } from "./officeModel";
+import { linkableIssueKey, personaState, supportsLiveDirective } from "./officeModel";
+import { useDirectiveDelivery, type TrackedDirective } from "./useDirectiveDelivery";
 import {
   executionChoiceText,
   ExecutionSiteSelect,
@@ -81,7 +83,11 @@ import {
   CHAT_TURN_LIMIT,
   dialogTitle,
   DIRECTIVE_ASK,
+  DIRECTIVE_DELIVERED,
   DIRECTIVE_FAILED,
+  DIRECTIVE_LIVE_OK,
+  DIRECTIVE_LIVE_STOPPED,
+  DIRECTIVE_LIVE_UNSUPPORTED,
   DIRECTIVE_FORBIDDEN,
   DIRECTIVE_OK,
   DIRECTIVE_WHERE,
@@ -90,6 +96,10 @@ import {
   farewellLine,
   greetingLine,
   ISSUE_NOT_FOUND,
+  LIVE_DIRECTIVE_LABEL,
+  LIVE_DIRECTIVE_MAX,
+  LIVE_NOTICE,
+  LIVE_TOO_LONG,
   logLabel,
   MANAGE_DENIED,
   MANAGE_REASON,
@@ -156,6 +166,7 @@ type Mode =
   | { kind: "directiveText" }
   | { kind: "directiveWhere" }
   | { kind: "directiveConfirm" }
+  | { kind: "directiveLive"; runId: string }
   | { kind: "assignPick" }
   | { kind: "assignConfirm" }
   | { kind: "chat" }
@@ -395,6 +406,15 @@ function Conversation({
   const [chatTurns, setChatTurns] = useState(0);
   const sessionId = useRef<string | undefined>(undefined);
 
+  // 실행 중 지시(P4b AGP-67) — 서버에 지시 API가 없으면(404) 이 장면에선 코멘트만. 409로 멈춘 run도 다시 권하지 않는다
+  const [liveUnsupported, setLiveUnsupported] = useState(false);
+  const [stoppedRunId, setStoppedRunId] = useState<string | null>(null);
+  const [tracked, setTracked] = useState<TrackedDirective | null>(null);
+  const delivery = useDirectiveDelivery(tracked);
+  const run = persona.currentRun;
+  const liveRunId =
+    run && run.status === "RUNNING" && supportsLiveDirective(run) && !liveUnsupported && run.id !== stoppedRunId ? run.id : null;
+
   const boxRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<PixelChoiceMenuHandle>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -444,6 +464,10 @@ function Conversation({
     return () => clearTimeout(t);
   }, [greet]);
 
+  useEffect(() => {
+    if (delivery === "delivered") setLive(`${name}: ${DIRECTIVE_DELIVERED}`);
+  }, [delivery, name]);
+
   // 전이 알림(승인 대기·차단·회의) — 장면이 열려 있는 동안 장면 live 영역으로. 대사를 끊지 않는다
   const firstAnnouncement = useRef(announcement);
   useEffect(() => {
@@ -459,7 +483,7 @@ function Conversation({
   const lineComplete = line !== null && lastPage && tw.done;
 
   const showMenu = lineComplete && !busy && (mode.kind === "menu" || mode.kind === "directiveWhere");
-  const formKinds = ["directiveText", "directiveConfirm", "assignPick", "assignConfirm", "exitConfirm"];
+  const formKinds = ["directiveText", "directiveConfirm", "directiveLive", "assignPick", "assignConfirm", "exitConfirm"];
   const showForm = lineComplete && formKinds.includes(mode.kind);
   const chatMode = mode.kind === "chat";
 
@@ -528,7 +552,8 @@ function Conversation({
   // ── 흐름 ──
 
   const hasInput =
-    ((mode.kind === "directiveText" || mode.kind === "directiveConfirm" || mode.kind === "directiveWhere") && directiveText.trim() !== "") ||
+    ((mode.kind === "directiveText" || mode.kind === "directiveConfirm" || mode.kind === "directiveLive" || mode.kind === "directiveWhere") &&
+      directiveText.trim() !== "") ||
     ((mode.kind === "assignPick" || mode.kind === "assignConfirm") && (picked !== null || query.trim() !== "" || instruction.trim() !== "")) ||
     (mode.kind === "chat" && chatText.trim() !== "");
 
@@ -587,6 +612,16 @@ function Conversation({
   }, [canManage, ctx]);
 
   const whereItems: ChoiceItem[] = [
+    // 실행 중이면 코멘트(다음 단계부터 반영)보다 먼저 — 지금 하던 일에 바로 닿는다
+    ...(liveRunId
+      ? [
+          {
+            id: "live",
+            label: LIVE_DIRECTIVE_LABEL,
+            disabledReason: directiveText.trim().length > LIVE_DIRECTIVE_MAX ? LIVE_TOO_LONG : null,
+          },
+        ]
+      : []),
     {
       id: "current",
       label: currentKey ? `지금 하는 ${currentKey}에 남기기` : "지금 하는 이슈에 남기기",
@@ -637,7 +672,8 @@ function Conversation({
       say({ text: `${item.disabledReason}.`, mood: "TROUBLED" }, { kind: "directiveWhere" });
       return;
     }
-    if (item.id === "current") setMode({ kind: "directiveConfirm" });
+    if (item.id === "live" && liveRunId) setMode({ kind: "directiveLive", runId: liveRunId });
+    else if (item.id === "current") setMode({ kind: "directiveConfirm" });
     else if (item.id === "new") startAssign(directiveText);
     else setMode({ kind: "directiveText" });
   };
@@ -662,6 +698,33 @@ function Conversation({
     } catch (error) {
       const status = errorStatus(error);
       say(status === 403 ? DIRECTIVE_FORBIDDEN : status === 404 ? ISSUE_NOT_FOUND : DIRECTIVE_FAILED, { kind: "menu" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitLive = async (runId: string) => {
+    setBusy(true);
+    try {
+      const directive = await sendRunDirective(runId, directiveText);
+      const text = directiveText.trim().slice(0, 200);
+      log.record({ speaker: "USER", kind: "DIRECTIVE", text, issueKey: currentKey, runId }, "now");
+      pushScene({ speaker: "USER", kind: "DIRECTIVE", text, issueKey: currentKey, runId, commentId: null });
+      setDirectiveText("");
+      setTracked({ runId, directiveId: directive.id });
+      say(DIRECTIVE_LIVE_OK, { kind: "menu" });
+    } catch (error) {
+      const status = errorStatus(error);
+      // 404 = 지시 API가 없는 서버(또는 run이 사라짐), 409 = 이미 실행 중이 아님 — 둘 다 코멘트로 폴백을 권한다(입력 유지)
+      if (status === 404) {
+        setLiveUnsupported(true);
+        say(DIRECTIVE_LIVE_UNSUPPORTED, { kind: "directiveWhere" });
+      } else if (status === 409) {
+        setStoppedRunId(runId);
+        say(DIRECTIVE_LIVE_STOPPED, { kind: "directiveWhere" });
+      } else {
+        say(status === 403 ? MANAGE_DENIED : DIRECTIVE_FAILED, { kind: "menu" });
+      }
     } finally {
       setBusy(false);
     }
@@ -742,6 +805,7 @@ function Conversation({
       case "directiveText":
       case "directiveWhere":
       case "directiveConfirm":
+      case "directiveLive":
       case "assignPick":
       case "assignConfirm":
         setMode({ kind: "menu" });
@@ -880,6 +944,12 @@ function Conversation({
           <AgentRoleGlyph role={persona.role} size={14} />
           <span>{name}</span>
         </span>
+        {delivery ? (
+          <span className="office-scene-directive" data-delivery={delivery}>
+            <span>지시</span>
+            <AgentDirectiveDeliveryLozenge delivered={delivery === "delivered"} />
+          </span>
+        ) : null}
       </div>
 
       <div className="office-scene-el office-scene-tools" style={at(118, 1)}>
@@ -949,6 +1019,26 @@ function Conversation({
                 </Button>
                 <Button variant="primary" size="small" loading={busy} onClick={() => void submitDirective()}>
                   남기기
+                </Button>
+              </FormActions>
+            </FormBody>
+          ) : mode.kind === "directiveLive" ? (
+            <FormBody title="확인">
+              <p className="status-cell office-form-summary">
+                <Zap size={14} aria-hidden />
+                실행 중인 #{mode.runId}에 바로 전합니다
+              </p>
+              <p className="office-form-preview">{directiveText}</p>
+              <p className="office-form-notice">{LIVE_NOTICE}</p>
+              <FormActions>
+                <Button variant="ghost" size="small" onClick={() => setMode({ kind: "menu" })}>
+                  취소
+                </Button>
+                <Button variant="secondary" size="small" disabled={busy} onClick={() => setMode({ kind: "directiveText" })}>
+                  고치기
+                </Button>
+                <Button variant="primary" size="small" loading={busy} onClick={() => void submitLive(mode.runId)}>
+                  전하기
                 </Button>
               </FormActions>
             </FormBody>

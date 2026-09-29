@@ -2247,3 +2247,35 @@ button.office-attendee:focus-visible {
     animation: none;
   }
 }
+
+/* ── 리뷰어 없음 경고·실행 중 지시(P4b AGP-59·67) ── */
+.ai-office-review-warn {
+  display: inline-flex;
+  border-radius: var(--chanho-radius-small);
+  text-decoration: none;
+}
+
+.ai-office-review-warn:hover .agent-lozenge {
+  text-decoration: underline;
+}
+
+.ai-office-review-warn:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: 2px;
+}
+
+.office-scene-directive {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  padding: 2px var(--chanho-space-100);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--office-label-bg);
+  color: var(--office-hi);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.office-panel-directive {
+  color: var(--chanho-color-text-warning);
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate } from "react-router";
 import { Badge, Banner, Button, Lozenge, Spinner, Tabs } from "@chanho/react";
-import { ExternalLink, FileText, History, Keyboard, Laptop, MessageCircle, Users, UsersRound, Wrench, X } from "lucide-react";
+import { ExternalLink, FileText, History, Keyboard, Laptop, Mail, MessageCircle, Users, UsersRound, Wrench, X } from "lucide-react";
 import type {
   AgentActiveMeeting,
   AgentAuditEntry,
@@ -43,6 +43,7 @@ import {
   meetingRunStatus,
   personaState,
   PROJECT_WIDE_LABEL,
+  pendingDirectives,
   runnerWaitText,
   type EpicGoal,
 } from "./officeModel";
@@ -444,6 +445,15 @@ function PersonaActivity({
               <dd>{run.attempt}회</dd>
               <dt>모델</dt>
               <dd className="office-mono">{run.model ?? "—"}</dd>
+              {pendingDirectives(run) > 0 ? (
+                <>
+                  <dt>사람 지시</dt>
+                  <dd className="status-cell office-panel-directive">
+                    <Mail size={14} aria-hidden />
+                    전달 대기 {pendingDirectives(run)}건 — 다음 도구 호출 때 전달돼요
+                  </dd>
+                </>
+              ) : null}
             </dl>
             <Button
               variant="secondary"

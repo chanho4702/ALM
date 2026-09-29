@@ -113,6 +113,12 @@ export const saveExecutionSite = impl.saveExecutionSite;
 export const listAgentRunners = impl.listAgentRunners;
 export const issueAgentRunner = impl.issueAgentRunner;
 export const revokeAgentRunner = impl.revokeAgentRunner;
+/** 리뷰어 지정·실행 중 지시(P4b AGP-59·67) — 조회는 구 백엔드면 null(지원 안 함) */
+export const fetchReviewSetting = impl.fetchReviewSetting;
+export const saveReviewSetting = impl.saveReviewSetting;
+export const clearReviewSetting = impl.clearReviewSetting;
+export const fetchRunDirectives = impl.fetchRunDirectives;
+export const sendRunDirective = impl.sendRunDirective;
 /** AI 사무실 1:1 대화(P3g) — USER run·수다·대화 기록 */
 export const createAgentRun = impl.createAgentRun;
 export const sendPersonaChat = impl.sendPersonaChat;

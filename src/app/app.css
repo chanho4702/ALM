@@ -5023,6 +5023,71 @@ th:last-child > [role="separator"] {
   color: var(--chanho-color-text-subtle);
 }
 
+/* 실행 상세 — 사람 지시(P4b AGP-67) */
+.agent-run-directives {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.agent-run-directive-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-run-directive {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+  padding: var(--chanho-space-150) var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface-raised);
+}
+
+.agent-run-directive-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-75);
+}
+
+.agent-run-directive-text {
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agent-run-directive-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  max-width: 720px;
+}
+
+.agent-run-directive-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.agent-run-directives-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  color: var(--chanho-color-text-danger);
+}
+
+.agent-run-directives-error p {
+  margin: 0;
+}
+
 /* 승인 인박스 */
 .agent-gate-list {
   display: flex;
@@ -5521,6 +5586,28 @@ th:last-child > [role="separator"] {
 .ai-team-effective > svg {
   flex-shrink: 0;
   color: var(--chanho-color-text-success);
+}
+
+.ai-team-effective.is-reviewer {
+  background: var(--chanho-color-background-info-subtle);
+}
+
+.ai-team-effective.is-reviewer > svg {
+  color: var(--chanho-color-text-info);
+}
+
+.ai-team-reviewer-text {
+  display: inline-flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  min-width: 0;
+}
+
+/* 사무실 "리뷰어 없음" 칩이 여는 앵커 — 상단 고정 헤더에 가리지 않게 */
+.ai-team-anchor {
+  scroll-margin-top: var(--chanho-space-800);
 }
 
 .ai-team-effective.is-none {

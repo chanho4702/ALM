@@ -857,6 +857,42 @@ export interface AgentProjectCredential {
   };
 }
 
+// ── 리뷰어 지정(P4b D-P4b-1, AGP-59) — `GET/PUT/DELETE /api/agent/review-settings/{projects/{id}|platform}` ──
+
+/** 실제 리뷰어가 정해진 단계 — 프로젝트 설정 > 전역 설정 > 서버 env > 자동(활성 REVIEWER 중 id 최소) > 없음 */
+export type AgentReviewerSource = "PROJECT" | "PLATFORM" | "ENV" | "AUTO" | "NONE";
+
+export interface AgentReviewerRef {
+  personaId: string;
+  /** 지정한 페르소나가 없어졌으면 null */
+  slug: string | null;
+  name: string | null;
+}
+
+export interface AgentReviewSetting {
+  /** 이 범위에 저장된 지정 — null이면 상위 설정·자동을 따른다 */
+  setting: AgentReviewerRef | null;
+  /** 지금 실제로 쓰일 리뷰어 — source가 NONE이면 personaId·slug·name 모두 null */
+  effective: {
+    personaId: string | null;
+    slug: string | null;
+    name: string | null;
+    source: AgentReviewerSource;
+  };
+}
+
+// ── 실행 중 지시(P4b D-P4b-5, AGP-67) — `POST/GET /api/agent/runs/{id}/directives` ──
+
+export interface AgentRunDirective {
+  id: string;
+  runId: string;
+  /** 본문은 run 프로젝트 관리자에게만 온다 — 그 밖의 조회자는 null */
+  text: string | null;
+  createdAt: string;
+  /** null = 아직 워커에게 전달되지 않음 */
+  deliveredAt: string | null;
+}
+
 export interface AgentCredentialInput {
   apiKey: string;
   /** 저장 전에 저비용 호출로 키를 검증한다(실패 400) */
@@ -904,6 +940,11 @@ export interface AgentCurrentRun {
   executionSite?: AgentExecutionSite;
   /** QUEUED인데 집어 갈 러너가 없다(P4a D-P4-4) — "러너 대기". 구 백엔드는 없다(= false) */
   awaitingRunner?: boolean;
+  /**
+   * 아직 워커에게 전달되지 않은 실행 중 지시 수(P4b AGP-67). 구 백엔드는 필드가 없다(undefined) — 그 서버엔 지시 API도
+   * 없다는 신호로 쓴다(화면이 "바로 전하기"를 숨기고 코멘트로 폴백).
+   */
+  pendingDirectiveCount?: number;
 }
 
 /** 감사 출처(AGP-63) — 내부 워커 run / 사람이 발급한 페르소나 토큰으로 붙은 외부 MCP / 시스템 */
@@ -1007,6 +1048,11 @@ export interface AgentOffice {
   activeMeeting: AgentActiveMeeting | null;
   /** 설치·키 상태로 켜지는 기능(P3g) — 구 백엔드 응답이면 전부 false */
   features: AgentOfficeFeatures;
+  /**
+   * TASK가 끝나면 검증할 리뷰어가 있다(P4b D-P4b-1) — false면 AI 작업이 done이 되지 않는다("리뷰어 없음" 경고).
+   * 구 백엔드(필드 없음)는 true — 모르는 상태로 경고를 띄우지 않는다.
+   */
+  reviewReady: boolean;
 }
 
 export interface AgentOfficeFeatures {

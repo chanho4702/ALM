@@ -209,6 +209,18 @@ export const DIRECTIVE_FORBIDDEN = say("이 이슈엔 코멘트를 남길 권한
 export const ISSUE_NOT_FOUND = say("그 이슈를 찾을 수 없어요.", "TROUBLED");
 export const DIRECTIVE_FAILED = say("지금은 전달이 안 돼요. 잠시 뒤 다시 해 볼까요?", "TROUBLED");
 
+// ── 실행 중 지시(P4b AGP-67) — 실행 중(RUNNING)이면 워커의 다음 도구 결과 끝에 붙어 바로 전달된다 ──
+
+/** "바로 전하기" 본문 상한(서버 run_directive.text) — 코멘트 지시(4000자)보다 짧다 */
+export const LIVE_DIRECTIVE_MAX = 2000;
+export const LIVE_DIRECTIVE_LABEL = "실행 중인 작업에 바로 전하기";
+export const LIVE_TOO_LONG = `바로 전하기는 ${LIVE_DIRECTIVE_MAX.toLocaleString("ko-KR")}자까지예요`;
+export const LIVE_NOTICE = "작업을 멈추지 않고, 다음 도구 호출 결과에 붙여 바로 전해요. 작업 규약과 부딪히면 규약이 먼저예요.";
+export const DIRECTIVE_LIVE_OK = say("네, 지금 하던 일에 바로 반영할게요!", "HAPPY");
+export const DIRECTIVE_LIVE_STOPPED = say("방금 실행이 멈췄나 봐요. 코멘트로 남겨 둘까요?", "TROUBLED");
+export const DIRECTIVE_LIVE_UNSUPPORTED = say("이 서버는 바로 전하기를 못 해요. 코멘트로 남겨 둘까요?", "TROUBLED");
+export const DIRECTIVE_DELIVERED = "지시가 전달됐어요";
+
 const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 

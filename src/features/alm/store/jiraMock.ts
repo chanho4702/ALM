@@ -67,6 +67,9 @@ import type {
   AgentRunner,
   AgentRunnerInput,
   AgentRunnerIssued,
+  AgentReviewSetting,
+  AgentReviewerSource,
+  AgentRunDirective,
   AuditEntry,
   SystemStats,
   IssueTypeDef,
@@ -2529,12 +2532,15 @@ function mockOffice(now: number, projectId = "p1"): AgentOffice {
   });
   const recentRuns = baseRecentRuns(now);
   applyAgentOverrides(personas, recentRuns);
+  deliverDueDirectives(now);
   for (const p of personas) {
     if (p.currentRun) {
       const run = p.currentRun;
       p.currentRun = {
         ...run,
         awaitingRunner: run.status === "QUEUED" && mockAwaitingRunner(run.executionSite ?? "SERVER", projectId),
+        // 구 백엔드(지시 API 없음)는 필드 자체가 없다
+        ...(teamState.directivesApi ? { pendingDirectiveCount: pendingDirectiveCount(run.id) } : {}),
       };
     }
   }
@@ -2559,6 +2565,7 @@ function mockOffice(now: number, projectId = "p1"): AgentOffice {
     boardPosts: baseBoardPosts(now, projectId),
     activeMeeting: mockActiveMeeting(now, projectId),
     features: { chat: teamState.chat },
+    reviewReady: mockReviewReady(projectId),
   };
 }
 
@@ -2913,6 +2920,25 @@ interface AgentTeamMockState {
   inProcess: boolean;
   /** false면 실행 위치·러너 API가 404(구 백엔드) */
   executionApi: boolean;
+  /** 프로젝트 id → 리뷰어로 지정한 페르소나 id(P4b) */
+  reviewSettings: Map<string, string>;
+  /** 전역 리뷰어 지정 — 공용 페르소나 id */
+  platformReviewer: string | null;
+  /** 서버 env REVIEW_PERSONA 슬러그(폴백) */
+  envReviewer: string | null;
+  /** REVIEW_ENABLED — 꺼져 있으면 reviewReady는 늘 true */
+  reviewEnabled: boolean;
+  /** false면 리뷰어 지정 API 404(구 백엔드) */
+  reviewApi: boolean;
+  /** run id → 실행 중 지시(오래된 것 먼저, P4b AGP-67) */
+  directives: Map<string, MockDirective[]>;
+  /** false면 지시 API 404 + 사무실 pendingDirectiveCount 없음(구 백엔드) */
+  directivesApi: boolean;
+}
+
+/** hold = 목업 시드(자동 전달하지 않는다 — 사무실 편지 표식이 늘 보이게) */
+interface MockDirective extends AgentRunDirective {
+  hold?: boolean;
 }
 
 /**
@@ -2980,6 +3006,23 @@ function freshTeamState(): AgentTeamMockState {
     defaultSite: "SERVER",
     inProcess: false,
     executionApi: true,
+    // 리뷰어 — 지정 없음, 공용 리뷰봇이 "자동 선택"으로 잡힌다
+    reviewSettings: new Map(),
+    platformReviewer: null,
+    envReviewer: null,
+    reviewEnabled: true,
+    reviewApi: true,
+    // 기획봇(RUNNING 9001) — 전달된 지시 1 + 아직 전달 대기 1(책상 편지 표식)
+    directives: new Map<string, MockDirective[]>([
+      [
+        "9001",
+        [
+          { id: "701", runId: "9001", text: "ALM-4 인수 조건에 비로그인 사용자 경우도 넣어 주세요", createdAt: ago(now, 11), deliveredAt: ago(now, 10) },
+          { id: "702", runId: "9001", text: "우선순위 표는 오늘 공유할 수 있는 수준까지만 정리해 주세요", createdAt: ago(now, 1), deliveredAt: null, hold: true },
+        ],
+      ],
+    ]),
+    directivesApi: true,
   };
 }
 
@@ -3025,6 +3068,20 @@ export interface AgentMockScenario {
   projectSite?: AgentExecutionSite | null;
   /** false면 온라인 LOCAL 러너를 전부 오프라인으로 */
   runnersOnline?: boolean;
+  /** false면 리뷰어 지정 API 404(구 백엔드 폴백 확인용) */
+  reviewApi?: boolean;
+  /** 공용 리뷰봇(106) 활성 — false면 자동으로 고를 리뷰어가 없다(NONE) */
+  reviewerActive?: boolean;
+  /** 전역 리뷰어 지정(페르소나 id) — null이면 해제 */
+  platformReviewer?: string | null;
+  /** 서버 env REVIEW_PERSONA 슬러그 */
+  envReviewer?: string | null;
+  /** REVIEW_ENABLED */
+  reviewEnabled?: boolean;
+  /** false면 지시 API 404(구 백엔드 폴백 확인용) */
+  directivesApi?: boolean;
+  /** true면 대기 중 지시를 전부 지금 전달된 것으로 */
+  deliverDirectives?: boolean;
 }
 
 /** 테스트 전용 — 권한·키 시나리오를 바꾼다(`__resetForTest`가 기본으로 되돌린다) */
@@ -3051,6 +3108,19 @@ export function __setAgentMockScenario(scenario: AgentMockScenario): void {
   }
   if (scenario.runnersOnline === false) {
     for (const r of teamState.runners) if (r.kind === "LOCAL" && r.status === "ONLINE") r.status = "OFFLINE";
+  }
+  if (scenario.reviewApi !== undefined) teamState.reviewApi = scenario.reviewApi;
+  if (scenario.reviewerActive !== undefined) {
+    const reviewer = teamState.personas.find((p) => p.id === "106");
+    if (reviewer) reviewer.active = scenario.reviewerActive;
+  }
+  if (scenario.platformReviewer !== undefined) teamState.platformReviewer = scenario.platformReviewer;
+  if (scenario.envReviewer !== undefined) teamState.envReviewer = scenario.envReviewer;
+  if (scenario.reviewEnabled !== undefined) teamState.reviewEnabled = scenario.reviewEnabled;
+  if (scenario.directivesApi !== undefined) teamState.directivesApi = scenario.directivesApi;
+  if (scenario.deliverDirectives) {
+    const now = new Date().toISOString();
+    for (const list of teamState.directives.values()) for (const d of list) if (!d.deliveredAt) d.deliveredAt = now;
   }
 }
 
@@ -3416,6 +3486,154 @@ export async function revokeAgentRunner(runnerId: string): Promise<void> {
   runner.revokedAt = new Date().toISOString();
   runner.status = "REVOKED";
   runner.currentRunIds = [];
+}
+
+// ── 리뷰어 지정(목업, P4b D-P4b-1) — 해석 순서·거부 문구는 agent-service ReviewerResolver ──
+
+const REVIEWER_INVALID =
+  "리뷰어로 지정할 수 없는 페르소나입니다 — 활성 REVIEWER 롤이고 이 범위에서 쓸 수 있는 페르소나(프로젝트 소속은 그 프로젝트에서만, 공용은 어디서나)만 지정할 수 있습니다";
+
+/** 활성 REVIEWER이고 그 범위에서 쓸 수 있다(프로젝트 소속은 그 프로젝트에서만, 전역 범위는 공용만) */
+function mockReviewerUsable(persona: AgentTeamPersona | undefined, projectId: string | null): persona is AgentTeamPersona {
+  return (
+    persona !== undefined &&
+    persona.role === "REVIEWER" &&
+    persona.active &&
+    (persona.projectId === null || persona.projectId === projectId)
+  );
+}
+
+/**
+ * 프로젝트 설정 > 전역 설정 > env > 자동 > 없음. 명시 지정(설정·env)이 깨졌으면 다음 단계로 내려가지 않고 NONE —
+ * 사람이 고른 리뷰어를 조용히 바꾸지 않는다. projectId null = 전역 범위(프로젝트 축 없이 푼다).
+ */
+function mockReviewerView(projectId: string | null): AgentReviewSetting {
+  const byId = (id: string) => teamState.personas.find((p) => p.id === id);
+  const ref = (id: string) => {
+    const p = byId(id);
+    return { personaId: id, slug: p?.slug ?? null, name: p?.name ?? null };
+  };
+  const eff = (p: AgentTeamPersona | undefined, source: AgentReviewerSource): AgentReviewSetting["effective"] =>
+    p && source !== "NONE"
+      ? { personaId: p.id, slug: p.slug, name: p.name, source }
+      : { personaId: null, slug: null, name: null, source: "NONE" };
+
+  const savedId = projectId === null ? teamState.platformReviewer : (teamState.reviewSettings.get(projectId) ?? null);
+  const setting = savedId === null ? null : ref(savedId);
+  let effective: AgentReviewSetting["effective"];
+  const projectPick = projectId === null ? null : teamState.reviewSettings.get(projectId);
+  if (projectPick) {
+    const p = byId(projectPick);
+    effective = eff(p, mockReviewerUsable(p, projectId) ? "PROJECT" : "NONE");
+  } else if (teamState.platformReviewer) {
+    const p = byId(teamState.platformReviewer);
+    effective = eff(p, mockReviewerUsable(p, null) ? "PLATFORM" : "NONE");
+  } else if (teamState.envReviewer) {
+    const p = teamState.personas.find((x) => x.slug === teamState.envReviewer);
+    effective = eff(p, p?.active ? "ENV" : "NONE");
+  } else {
+    const active = teamState.personas
+      .filter((p) => p.role === "REVIEWER" && p.active)
+      .sort((a, b) => Number(a.id) - Number(b.id));
+    const auto = (projectId !== null ? active.find((p) => p.projectId === projectId) : undefined) ?? active.find((p) => p.projectId === null);
+    effective = eff(auto, "AUTO");
+  }
+  return { setting, effective };
+}
+
+function mockReviewReady(projectId: string | null): boolean {
+  return !teamState.reviewEnabled || mockReviewerView(projectId).effective.source !== "NONE";
+}
+
+function requireReviewApi(): void {
+  if (!teamState.reviewApi) throw new ApiError(404, "찾을 수 없습니다.");
+}
+
+/** 인증 사용자 누구나 — 구 백엔드(404)면 null */
+export async function fetchReviewSetting(projectId: string): Promise<AgentReviewSetting | null> {
+  if (!teamState.reviewApi) return null;
+  return mockReviewerView(projectId);
+}
+
+export async function saveReviewSetting(projectId: string, personaId: string): Promise<AgentReviewSetting> {
+  requireReviewApi();
+  if (!teamState.permissions.canManage) throw new ApiError(403, AGENT_FORBIDDEN);
+  if (!personaId) throw new ApiError(400, "personaId가 필요합니다");
+  const persona = teamState.personas.find((p) => p.id === personaId);
+  if (!mockReviewerUsable(persona, projectId)) throw new ApiError(400, REVIEWER_INVALID);
+  teamState.reviewSettings.set(projectId, personaId);
+  return mockReviewerView(projectId);
+}
+
+/** 멱등 204 */
+export async function clearReviewSetting(projectId: string): Promise<void> {
+  requireReviewApi();
+  if (!teamState.permissions.canManage) throw new ApiError(403, AGENT_FORBIDDEN);
+  teamState.reviewSettings.delete(projectId);
+}
+
+// ── 실행 중 지시(목업, P4b D-P4b-5) — 검증 순서·문구는 agent-service RunDirectiveService(본문 400 → run 404 → RUNNING 409) ──
+
+/** 목업 전달 — 워커가 다음 도구를 부르는 데 걸리는 시간. 시드(hold)는 전달하지 않는다 */
+const MOCK_DIRECTIVE_DELIVERY_MS = 15_000;
+const DIRECTIVE_MAX = 2000;
+
+function deliverDueDirectives(now: number): void {
+  for (const list of teamState.directives.values()) {
+    for (const d of list) {
+      if (d.deliveredAt || d.hold) continue;
+      if (now - Date.parse(d.createdAt) >= MOCK_DIRECTIVE_DELIVERY_MS) d.deliveredAt = new Date(now).toISOString();
+    }
+  }
+}
+
+function pendingDirectiveCount(runId: string): number {
+  return (teamState.directives.get(runId) ?? []).filter((d) => !d.deliveredAt).length;
+}
+
+const directiveView = (d: MockDirective, withText: boolean): AgentRunDirective => ({
+  id: d.id,
+  runId: d.runId,
+  text: withText ? d.text : null,
+  createdAt: d.createdAt,
+  deliveredAt: d.deliveredAt,
+});
+
+/** 누구나 — 본문은 관리자에게만. 구 백엔드(404)면 null */
+export async function fetchRunDirectives(runId: string): Promise<AgentRunDirective[] | null> {
+  if (!teamState.directivesApi) return null;
+  const now = Date.now();
+  if (!mockAllRuns(now).some((r) => r.id === runId)) throw new ApiError(404, `run을 찾을 수 없습니다: ${runId}`);
+  deliverDueDirectives(now);
+  return (teamState.directives.get(runId) ?? []).map((d) => directiveView(d, teamState.permissions.canManage));
+}
+
+export async function sendRunDirective(runId: string, text: string): Promise<AgentRunDirective> {
+  if (!teamState.directivesApi) throw new ApiError(404, "찾을 수 없습니다.");
+  if (!teamState.permissions.canManage) throw new ApiError(403, AGENT_FORBIDDEN);
+  const body = text.trim();
+  if (!body) throw new ApiError(400, "text가 필요합니다");
+  if (body.length > DIRECTIVE_MAX) throw new ApiError(400, `text는 ${DIRECTIVE_MAX}자 이하여야 합니다`);
+  const now = Date.now();
+  const run = mockAllRuns(now).find((r) => r.id === runId);
+  if (!run) throw new ApiError(404, `run을 찾을 수 없습니다: ${runId}`);
+  if (run.status !== "RUNNING") {
+    throw new ApiError(
+      409,
+      `실행 중(RUNNING)인 run에만 지시할 수 있습니다(현재: ${run.status}) — 대기 중이면 취소 후 지시문과 함께 다시 요청하거나 이슈 코멘트로 남기세요`,
+    );
+  }
+  const directive: MockDirective = {
+    id: String(teamState.seq++),
+    runId,
+    text: body,
+    createdAt: new Date(now).toISOString(),
+    deliveredAt: null,
+  };
+  const list = teamState.directives.get(runId) ?? [];
+  list.push(directive);
+  teamState.directives.set(runId, list);
+  return directiveView(directive, true);
 }
 
 // ── AI 사무실 1:1 대화(목업, P3g) — 거부 문구·순서는 agent-service RunService.createUserRun·ChatService·DialogService를 따른다 ──

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EmptyState, Spinner } from "@chanho/react";
 import { formatDateTime, relTime } from "../components/time";
+import type { AgentTeamPersona } from "../store/types";
+import { OfficePortrait } from "./PixelSprite";
 
 /** AI 팀 설정 구획 공용 — 조회 상태·재시도·시각 표기(AiTeamSettings·실행 위치/러너 카드) */
 
@@ -13,6 +15,15 @@ export function When({ iso, format = relTime }: { iso: string | null; format?: (
     <time dateTime={iso} title={formatDateTime(iso)}>
       {format(iso)}
     </time>
+  );
+}
+
+/** 초상 썸네일 — 사무실 도트 초상(롤별 셔츠색) 재사용. `.ai-office`는 팔레트 변수 스코프일 뿐 레이아웃이 없다 */
+export function PersonaAvatar({ persona }: { persona: Pick<AgentTeamPersona, "slug" | "role" | "avatarConfig"> }) {
+  return (
+    <span className="ai-office ai-team-avatar">
+      <OfficePortrait slug={persona.slug} role={persona.role} avatarConfig={persona.avatarConfig} className="is-row" />
+    </span>
   );
 }
 
