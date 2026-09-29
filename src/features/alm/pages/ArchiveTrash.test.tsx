@@ -59,8 +59,9 @@ describe("프로젝트 보관·휴지통", () => {
     expect(await listProjects()).toHaveLength(0);
     renderAt("/projects/trash");
     const trash = await screen.findByRole("list", { name: "휴지통 프로젝트 목록" });
-    expect(within(trash).getByText("ALM 플랫폼")).toBeInTheDocument();
-    await user.click(within(trash).getByRole("button", { name: "복원" }));
+    // 목록 컨테이너가 항목보다 먼저 그려질 수 있다(비동기 로드) — 항목은 기다려서 찾는다(CI 간헐 실패)
+    expect(await within(trash).findByText("ALM 플랫폼")).toBeInTheDocument();
+    await user.click(await within(trash).findByRole("button", { name: "복원" }));
     expect(await screen.findByText("프로젝트 ALM를 복원했습니다")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "휴지통이 비어 있습니다" })).toBeInTheDocument();
     expect(await listProjects()).toHaveLength(1);
