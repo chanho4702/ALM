@@ -300,7 +300,7 @@ describe("실행 상세 — 사람 지시(D-P4b-5)", () => {
     store.__setAgentMockScenario({ canManage: false });
     renderApp(RUN_PATH);
     const list = await screen.findByRole("list", { name: "사람 지시 목록" });
-    expect(within(list).getAllByText("본문은 프로젝트 관리자만 볼 수 있습니다.")).toHaveLength(2);
+    expect(within(list).getAllByText("(관리자만 볼 수 있는 지시)")).toHaveLength(2);
     expect(screen.queryByRole("textbox", { name: "지시 내용" })).not.toBeInTheDocument();
   });
 
@@ -309,6 +309,18 @@ describe("실행 상세 — 사람 지시(D-P4b-5)", () => {
     expect(await screen.findByText("이 실행에 보낸 지시가 없습니다.")).toBeInTheDocument();
     expect(screen.getByText(/실행 중일 때만 지시할 수 있습니다/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "지시 내용" })).not.toBeInTheDocument();
+  });
+
+  it("끝난 실행의 미전달 지시는 '전달 안 됨 — run 종료'(더는 전달되지 않는다)", async () => {
+    vi.spyOn(store, "fetchRunDirectives").mockResolvedValue([
+      { id: "1", runId: "8990", text: "먼저 보낸 것", createdAt: new Date(Date.now() - 600_000).toISOString(), deliveredAt: new Date(Date.now() - 590_000).toISOString() },
+      { id: "2", runId: "8990", text: "늦게 보낸 것", createdAt: new Date(Date.now() - 60_000).toISOString(), deliveredAt: null },
+    ]);
+    renderApp("/projects/p1/ai-office/runs/8990");
+    const items = within(await screen.findByRole("list", { name: "사람 지시 목록" })).getAllByRole("listitem");
+    expect(within(items[0]).getByText("전달됨")).toBeInTheDocument();
+    expect(within(items[1]).getByText("전달 안 됨 — run 종료")).toBeInTheDocument();
+    expect(within(items[1]).queryByText("전달 대기")).not.toBeInTheDocument();
   });
 
   it("보내기 409(그새 끝남)면 서버 문구 토스트 + run을 다시 읽는다", async () => {

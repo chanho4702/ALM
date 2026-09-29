@@ -410,8 +410,9 @@ function Conversation({
   const [liveUnsupported, setLiveUnsupported] = useState(false);
   const [stoppedRunId, setStoppedRunId] = useState<string | null>(null);
   const [tracked, setTracked] = useState<TrackedDirective | null>(null);
-  const delivery = useDirectiveDelivery(tracked);
   const run = persona.currentRun;
+  // 보낸 run이 아직 실행 중인가 — 끝나면(사무실 폴링이 알려 준다) 전달 대기는 "전달 안 됨"으로 굳는다
+  const delivery = useDirectiveDelivery(tracked, !!tracked && run?.id === tracked.runId && run.status === "RUNNING");
   const liveRunId =
     run && run.status === "RUNNING" && supportsLiveDirective(run) && !liveUnsupported && run.id !== stoppedRunId ? run.id : null;
 
@@ -947,7 +948,7 @@ function Conversation({
         {delivery ? (
           <span className="office-scene-directive" data-delivery={delivery}>
             <span>지시</span>
-            <AgentDirectiveDeliveryLozenge delivered={delivery === "delivered"} />
+            <AgentDirectiveDeliveryLozenge delivered={delivery === "delivered"} runEnded={delivery === "undelivered"} />
           </span>
         ) : null}
       </div>

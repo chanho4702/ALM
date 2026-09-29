@@ -3578,10 +3578,12 @@ export async function clearReviewSetting(projectId: string): Promise<void> {
 const MOCK_DIRECTIVE_DELIVERY_MS = 15_000;
 const DIRECTIVE_MAX = 2000;
 
+/** 서버처럼 실행 중(RUNNING)인 run에만 전달한다 — 끝난 run에 남은 지시는 미전달로 남는다 */
 function deliverDueDirectives(now: number): void {
+  const running = new Set(mockAllRuns(now).filter((r) => r.status === "RUNNING").map((r) => r.id));
   for (const list of teamState.directives.values()) {
     for (const d of list) {
-      if (d.deliveredAt || d.hold) continue;
+      if (d.deliveredAt || d.hold || !running.has(d.runId)) continue;
       if (now - Date.parse(d.createdAt) >= MOCK_DIRECTIVE_DELIVERY_MS) d.deliveredAt = new Date(now).toISOString();
     }
   }

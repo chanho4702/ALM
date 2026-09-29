@@ -24,6 +24,7 @@ import {
   Keyboard,
   Laptop,
   Mail,
+  MailX,
   Palette,
   Plug,
   PowerOff,
@@ -358,8 +359,18 @@ export function AgentReviewerSourceLozenge({ source }: { source: AgentReviewerSo
   );
 }
 
-/** 실행 중 지시 전달 상태 — 전달 대기(편지)/전달됨(두 번 체크) */
-export function AgentDirectiveDeliveryLozenge({ delivered }: { delivered: boolean }) {
+/**
+ * 실행 중 지시 전달 상태 — 전달 대기(편지)/전달됨(두 번 체크)/전달 안 됨(run이 끝나 더는 전달되지 않는다 — 서버는 RUNNING일 때만 전달)
+ */
+export function AgentDirectiveDeliveryLozenge({ delivered, runEnded = false }: { delivered: boolean; runEnded?: boolean }) {
+  if (!delivered && runEnded) {
+    return (
+      <Lozenge appearance="neutral" className="agent-lozenge is-neutral">
+        <MailX size={12} strokeWidth={2.25} aria-hidden />
+        전달 안 됨 — run 종료
+      </Lozenge>
+    );
+  }
   return delivered ? (
     <Lozenge appearance="success" className="agent-lozenge is-success">
       <CheckCheck size={12} strokeWidth={2.25} aria-hidden />

@@ -82,7 +82,7 @@ export function RunDirectivesSection({ run, canManage, onStale }: { run: AgentRu
           {directives.map((d) => (
             <li key={d.id} className="agent-run-directive">
               <div className="agent-run-directive-head">
-                <AgentDirectiveDeliveryLozenge delivered={d.deliveredAt !== null} />
+                <AgentDirectiveDeliveryLozenge delivered={d.deliveredAt !== null} runEnded={!running} />
                 <span className="agent-sup-subtle">
                   보냄 <When iso={d.createdAt} />
                   {d.deliveredAt ? (
@@ -95,7 +95,7 @@ export function RunDirectivesSection({ run, canManage, onStale }: { run: AgentRu
               {d.text !== null ? (
                 <p className="agent-run-directive-text">{d.text}</p>
               ) : (
-                <p className="agent-sup-subtle">본문은 프로젝트 관리자만 볼 수 있습니다.</p>
+                <p className="agent-sup-subtle">(관리자만 볼 수 있는 지시)</p>
               )}
             </li>
           ))}
