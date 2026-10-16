@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   createIssue,
@@ -79,7 +80,7 @@ describe("프로젝트 우선순위 구성", () => {
     await expect(createIssue({ projectId: project.id, title: "보통?", priority: "medium" })).rejects.toThrow(
       "이 프로젝트에서 사용할 수 없는 우선순위입니다: 보통",
     );
-    await expect(updateIssue(next.id, { priority: "urgent" })).rejects.toThrow("없는 우선순위입니다: urgent");
+    await expect(updateIssue(next.id, { priority: "urgent" }, __versionForTest("issue", next.id))).rejects.toThrow("없는 우선순위입니다: urgent");
     await expect(
       updateProjectCustomSettings(project.id, { ...resolved.body, enabledPriorities: ["high"], defaultPriority: "low" }),
     ).rejects.toThrow("기본 우선순위는 활성화된 우선순위 중에서 골라야 합니다");

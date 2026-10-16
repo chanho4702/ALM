@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   createIssue,
@@ -82,10 +83,10 @@ describe("이슈 타입 레지스트리 (전역)", () => {
     });
     const parent = await createIssue({ projectId: PROJECT, title: "큰 그림", type: initiative.id });
     const child = (await getIssueByKey("ALM-1"))!; // 일반 이슈
-    const updated = await setIssueParent(child.id, parent.id);
+    const updated = await setIssueParent(child.id, parent.id, __versionForTest("issue", child.id));
     expect(updated.parentId).toBe(parent.id);
     // 계층 깊이 제한 없음 — 상위 타입도 자손이 아닌 이슈를 부모로 둘 수 있고, 자손을 부모로 두면 순환
-    await expect(setIssueParent(parent.id, child.id)).rejects.toThrow("상위 항목이 순환합니다");
+    await expect(setIssueParent(parent.id, child.id, __versionForTest("issue", parent.id))).rejects.toThrow("상위 항목이 순환합니다");
     // 사용자 하위 타입도 자식을 가질 수 있다
     const check = await createIssueType({ name: "체크", level: "subtask", icon: "list-tree", color: "neutral" });
     await updateScheme(scheme.id, {
@@ -93,10 +94,10 @@ describe("이슈 타입 레지스트리 (전역)", () => {
     });
     const sub = await createIssue({ projectId: PROJECT, title: "체크 항목", type: check.id, parentId: child.id });
     expect(sub.parentId).toBe(child.id);
-    await expect(setIssueParent(child.id, sub.id)).rejects.toThrow("상위 항목이 순환합니다");
+    await expect(setIssueParent(child.id, sub.id, __versionForTest("issue", child.id))).rejects.toThrow("상위 항목이 순환합니다");
     const grand = await createIssue({ projectId: PROJECT, title: "체크의 체크", type: check.id, parentId: sub.id });
     expect(grand.parentId).toBe(sub.id);
-    expect((await updateIssue(child.id, { type: check.id })).type).toBe(check.id);
+    expect((await updateIssue(child.id, { type: check.id }, __versionForTest("issue", child.id))).type).toBe(check.id);
   });
 
   it("타입을 지우면 스킴의 활성 목록에서도 빠진다", async () => {

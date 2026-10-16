@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   createComponent,
@@ -29,16 +30,16 @@ describe("컴포넌트 (지라 Components)", () => {
     expect((await listIssues("p1", { componentId: api.id })).map((i) => i.id)).toEqual([issue.id]);
     expect((await listComponents("p1"))[0].issueCount).toBe(1);
 
-    const moved = await updateIssue(issue.id, { componentIds: [ui.id] });
+    const moved = await updateIssue(issue.id, { componentIds: [ui.id] }, __versionForTest("issue", issue.id));
     expect(moved.componentIds).toEqual([ui.id]);
-    await expect(updateIssue(issue.id, { componentIds: ["nope"] })).rejects.toThrow("컴포넌트를 찾을 수 없습니다");
+    await expect(updateIssue(issue.id, { componentIds: ["nope"] }, __versionForTest("issue", issue.id))).rejects.toThrow("컴포넌트를 찾을 수 없습니다");
 
     await deleteComponent(ui.id);
     expect((await getIssueByKey(issue.key))?.componentIds).toEqual([]);
   });
 
   it("컴포넌트 기본 담당자가 프로젝트 규칙보다 우선한다", async () => {
-    await updateProject("p1", { defaultAssignee: "lead" }); // 프로젝트 리더 u1
+    await updateProject("p1", { defaultAssignee: "lead" }, __versionForTest("project", "p1")); // 프로젝트 리더 u1
     const api = await createComponent("p1", { name: "API", leadId: "u2", defaultAssignee: "lead" });
     const none = await createComponent("p1", { name: "기타", defaultAssignee: "unassigned" });
     expect((await createIssue({ projectId: "p1", title: "a", componentIds: [api.id] })).assigneeId).toBe("u2");

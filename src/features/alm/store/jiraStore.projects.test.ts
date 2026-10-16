@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   addComment,
@@ -93,19 +94,19 @@ describe("updateProject", () => {
     const updated = await updateProject(project.id, {
       name: "ALM 플랫폼 v2",
       description: "새 설명",
-    });
+    }, __versionForTest("project", project.id));
     expect(updated).toMatchObject({ key: "ALM", name: "ALM 플랫폼 v2", description: "새 설명" });
   });
 
   it("이름이 공백이면 거부한다", async () => {
     const [project] = await listProjects();
-    await expect(updateProject(project.id, { name: "  " })).rejects.toThrow(
+    await expect(updateProject(project.id, { name: "  " }, __versionForTest("project", project.id))).rejects.toThrow(
       "프로젝트 이름을 입력하세요",
     );
   });
 
   it("없는 프로젝트면 거부한다", async () => {
-    await expect(updateProject("nope", { name: "x" })).rejects.toThrow(
+    await expect(updateProject("nope", { name: "x" }, __versionForTest("project", "nope"))).rejects.toThrow(
       "프로젝트를 찾을 수 없습니다",
     );
   });

@@ -25,11 +25,13 @@ jobs:
 
       # 디자인시스템은 GitHub Packages(@chanho4702/*, 공개 패키지)에서 받는다 — 예전처럼 design-system을
       # 체크아웃해 tgz를 다시 만들지 않는다(S-03, wiki-front와 같은 방식). 공개 패키지라 GITHUB_TOKEN으로 읽힌다.
-      - name: Test & build
+      # 게이트는 로컬 규칙과 같다: typecheck → test → build (vite build는 타입 오류를 잡지 않는다)
+      - name: Typecheck, test & build
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pnpm install --frozen-lockfile
+          pnpm typecheck
           pnpm test
           pnpm build
 

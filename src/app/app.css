@@ -1993,6 +1993,29 @@ body {
   min-width: 0;
 }
 
+/* 저장 충돌(409) 배너 — 내 변경을 들고 있는 동안 선택지를 보여 준다 */
+.issue-conflict-banner {
+  margin-top: var(--chanho-space-150);
+}
+
+.issue-conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.issue-conflict-text {
+  flex: 1 1 280px;
+  margin: 0;
+}
+
+.issue-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-100);
+}
+
 .issue-detail-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
@@ -2701,6 +2724,13 @@ body {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* 목록이 일부만 보일 때의 안내 — 전체 건수와 함께 알린다 */
+.home-list-note {
+  margin: var(--chanho-space-100) 0 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
 }
 
 .home-row {
@@ -5654,4 +5684,15 @@ th:last-child > [role="separator"] {
   .ai-team-command-row {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* 새 배포 안내 — 화면 아래에 떠서 레이아웃을 밀지 않는다(자동 새로고침 없음) */
+.new-version-banner {
+  position: fixed;
+  right: var(--chanho-space-200);
+  bottom: var(--chanho-space-200);
+  left: var(--chanho-space-200);
+  z-index: var(--chanho-z-toast);
+  max-width: 720px;
+  margin: 0 auto;
 }

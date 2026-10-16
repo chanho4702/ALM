@@ -57,6 +57,7 @@ describe("alm-backend DTO mapping", () => {
       archivedAt: null,
       deletedAt: null,
       purgeAt: null,
+      version: 2, // 편집 버전은 화면이 들고 있다가 저장 때 그대로 보낸다
       createdAt: "2026-08-16T00:00:00Z",
     });
   });

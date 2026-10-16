@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { EmptyState, Lozenge, Spinner, Tabs } from "@chanho/react";
-import type { Issue, Project, StatusKind, User, WorkflowStatus } from "../store/types";
+import type { Issue, Project, User, WorkflowStatus } from "../store/types";
 import {
+  findIssues,
   getCurrentUser,
-  listIssues,
   listProjects,
   statusMetaByProject,
 } from "../store/jiraStore";
@@ -14,7 +14,6 @@ import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { StatusGlyph } from "../components/StatusGlyph";
 import {
   statusAppearance,
-  statusKind,
   statusName,
 } from "../components/labels";
 import { relTime } from "../components/time";
@@ -38,15 +37,36 @@ interface Recommendation {
   appearance: "danger" | "warning" | "info";
 }
 
+/** 최근 업데이트 탭 건수 */
+const RECENT_LIMIT = 15;
+/** 추천 작업 최대 건수 */
+const RECOMMEND_LIMIT = 8;
+/** 나에게 배정됨 탭이 보여 주는 최대 건수 — 넘으면 전체 건수와 함께 "일부만 표시"를 알린다 */
+const ASSIGNED_LIMIT = 50;
+/** 담당자 필요 후보를 고를 때 읽는 최대 건수(마감 임박분은 앞 사유로 빠지므로 여유 있게) */
+const UNASSIGNED_SCAN = 50;
+
+/** 홈이 서버에서 받는 조각들 — 이슈 전량이 아니라 목적별 상위 N건과 건수(total)다 */
+interface HomeData {
+  recent: Issue[];
+  assigned: { items: Issue[]; total: number };
+  overdue: { items: Issue[]; total: number };
+  dueSoon: { items: Issue[]; total: number };
+  unassignedHigh: Issue[];
+  /** 추천·요약의 마감 임박 기준일(YYYY-MM-DD) — 조회할 때의 값을 그대로 쓴다 */
+  soon: string;
+}
+
 /**
  * 지라의 For you 홈 모방 — 인사말 → "이어서 하기" 카드 → 추천 작업/배정/최근/별표 탭.
- * 모든 데이터는 전 프로젝트 합산이다.
+ * 모든 데이터는 볼 수 있는 전 프로젝트 합산이며, 서버 검색 조건(미완료·마감일 범위·정렬·상위 N)으로 받는다 —
+ * 프로젝트마다 이슈 전량을 내려받지 않는다.
  */
 export function HomePage() {
   const navigate = useNavigate();
   const [me, setMe] = useState<User | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
+  const [home, setHome] = useState<HomeData | null>(null); // null = 로딩 중
   const [statusMeta, setStatusMeta] = useState<Record<string, Record<string, WorkflowStatus>>>({});
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
@@ -58,25 +78,47 @@ export function HomePage() {
     let cancelled = false;
     setLoadError(null);
     void (async () => {
-      // 이슈는 프로젝트 목록만 기다린다. 사용자/상태 조회가 느려도 바로 시작한다.
-      const projectData = listProjects().then(async (projectList) => ({
-        projectList,
-        allIssues: (await Promise.all(projectList.map((p) => listIssues(p.id)))).flat(),
-      }));
-      const [currentUser, { projectList, allIssues }, meta, recents, starred] = await Promise.all([
-        getCurrentUser(),
-        projectData,
-        statusMetaByProject(),
-        listRecentProjectIds(),
-        listStarredProjectIds(),
-      ]);
+      const today = new Date().toISOString().slice(0, 10);
+      const soon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+      const updatedDesc = { field: "updated", dir: "desc" } as const;
+      const dueAsc = { field: "due", dir: "asc" } as const;
+      // 목적별 검색을 바로 병렬로 시작한다 — 사용자·상태 메타·프로젝트 조회를 기다리지 않는다.
+      // "나에게 배정됨"만 사용자 id가 필요해 사용자 조회 뒤에 이어 붙는다.
+      const currentUserData = getCurrentUser();
+      const [currentUser, recent, assigned, overdue, dueSoon, unassignedHigh, projectList, meta, recents, starred] =
+        await Promise.all([
+          currentUserData,
+          findIssues({}, { page: 0, size: RECENT_LIMIT }, updatedDesc),
+          currentUserData.then((user) =>
+            findIssues({ assigneeIds: [user.id], openOnly: true }, { page: 0, size: ASSIGNED_LIMIT }, updatedDesc),
+          ),
+          // 추천 순서: 기한 지남 → 마감 임박(7일) → 높은 우선순위 미배정. total이 오늘 요약 건수다
+          findIssues({ openOnly: true, dueBefore: today }, { page: 0, size: RECOMMEND_LIMIT }, dueAsc),
+          findIssues({ openOnly: true, dueFrom: today, dueTo: soon }, { page: 0, size: RECOMMEND_LIMIT }, dueAsc),
+          findIssues(
+            { openOnly: true, assigneeIds: ["unassigned"], priorities: ["high"] },
+            { page: 0, size: UNASSIGNED_SCAN },
+            updatedDesc,
+          ),
+          listProjects(),
+          statusMetaByProject(),
+          listRecentProjectIds(),
+          listStarredProjectIds(),
+        ]);
       if (cancelled) return;
       setMe(currentUser);
       setProjects(projectList);
       setStatusMeta(meta);
       setRecentIds(recents);
       setStarredIds(starred);
-      setIssues(allIssues);
+      setHome({
+        recent: recent.items,
+        assigned: { items: assigned.items, total: assigned.total },
+        overdue: { items: overdue.items, total: overdue.total },
+        dueSoon: { items: dueSoon.items, total: dueSoon.total },
+        unassignedHigh: unassignedHigh.items,
+        soon,
+      });
     })().catch((error: unknown) => {
       if (!cancelled) setLoadError(error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.");
     });
@@ -89,9 +131,6 @@ export function HomePage() {
   const openIssue = (issue: Issue) =>
     navigate(`/projects/${issue.projectId}/issues?issue=${issue.key}`);
 
-  /** 이슈 → 상태 의미 — 프로젝트별 해석 메타에서 읽고, 없으면 기본 id로 폴백 */
-  const kindOf = (issue: Issue): StatusKind =>
-    statusKind(Object.values(statusMeta[issue.projectId] ?? {}), issue.status);
 
   /**
    * 이어서 하기 — 최근 방문 프로젝트(없으면 전체 앞순) + 최근 업데이트 이슈.
@@ -106,64 +145,25 @@ export function HomePage() {
     return [...byRecent, ...rest].slice(0, 2);
   }, [recentIds, projects]);
 
-  const resumeIssues = useMemo(
-    () =>
-      [...(issues ?? [])]
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .slice(0, Math.max(0, RESUME_MAX - resumeProjects.length)),
-    [issues, resumeProjects.length],
-  );
+  const recentIssues = home?.recent ?? [];
+  const resumeIssues = recentIssues.slice(0, Math.max(0, RESUME_MAX - resumeProjects.length));
 
-  /** 추천 작업 — 기한 지남 > 마감 임박(일주일) > 높은 우선순위 미배정 */
+  /** 추천 작업 — 기한 지남 > 마감 임박(일주일) > 높은 우선순위 미배정(마감 임박분은 앞 사유로 이미 잡힌다) */
   const recommendations = useMemo<Recommendation[]>(() => {
-    if (!issues) return [];
-    const today = new Date().toISOString().slice(0, 10);
-    const soon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
-    const overdue: Recommendation[] = [];
-    const dueSoon: Recommendation[] = [];
-    const unassigned: Recommendation[] = [];
-    for (const issue of issues) {
-      if (kindOf(issue) === "complete") continue;
-      if (issue.dueDate && issue.dueDate < today) {
-        overdue.push({ issue, reason: "기한 지남", appearance: "danger" });
-      } else if (issue.dueDate && issue.dueDate <= soon) {
-        dueSoon.push({ issue, reason: "마감 임박", appearance: "warning" });
-      } else if (issue.assigneeId === null && issue.priority === "high") {
-        unassigned.push({ issue, reason: "담당자 필요", appearance: "info" });
-      }
-    }
-    const byDue = (a: Recommendation, b: Recommendation) =>
-      (a.issue.dueDate ?? "9999").localeCompare(b.issue.dueDate ?? "9999");
-    return [...overdue.sort(byDue), ...dueSoon.sort(byDue), ...unassigned].slice(0, 8);
-  }, [issues, statusMeta]);
+    if (!home) return [];
+    const overdue = home.overdue.items.map((issue): Recommendation => ({ issue, reason: "기한 지남", appearance: "danger" }));
+    const dueSoon = home.dueSoon.items.map((issue): Recommendation => ({ issue, reason: "마감 임박", appearance: "warning" }));
+    const unassigned = home.unassignedHigh
+      .filter((issue) => !(issue.dueDate && issue.dueDate <= home.soon))
+      .map((issue): Recommendation => ({ issue, reason: "담당자 필요", appearance: "info" }));
+    return [...overdue, ...dueSoon, ...unassigned].slice(0, RECOMMEND_LIMIT);
+  }, [home]);
 
-  /** 오늘 요약 — 기한 지남/이번 주 마감 (추천 작업과 같은 기준: 미완료 + 마감일 기준 7일) */
-  const dueCounts = useMemo(() => {
-    if (!issues) return { overdue: 0, thisWeek: 0 };
-    const today = new Date().toISOString().slice(0, 10);
-    const soon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
-    let overdue = 0;
-    let thisWeek = 0;
-    for (const issue of issues) {
-      if (kindOf(issue) === "complete" || !issue.dueDate) continue;
-      if (issue.dueDate < today) overdue += 1;
-      else if (issue.dueDate <= soon) thisWeek += 1;
-    }
-    return { overdue, thisWeek };
-  }, [issues, statusMeta]);
+  /** 오늘 요약 — 기한 지남/이번 주 마감(추천 작업과 같은 기준: 미완료 + 마감일 기준 7일). 서버 total이다 */
+  const dueCounts = { overdue: home?.overdue.total ?? 0, thisWeek: home?.dueSoon.total ?? 0 };
 
-  const myIssues = useMemo(
-    () =>
-      (issues ?? [])
-        .filter((i) => me && i.assigneeId === me.id)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [issues, me],
-  );
-
-  const recentIssues = useMemo(
-    () => [...(issues ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 15),
-    [issues],
-  );
+  const myIssues = home?.assigned.items ?? [];
+  const myIssueTotal = home?.assigned.total ?? 0;
 
   /** 최근 업데이트를 날짜 그룹으로 — 그룹 등장 순서 유지 */
   const recentGroups = useMemo(() => {
@@ -196,7 +196,7 @@ export function HomePage() {
     );
   }
 
-  if (issues === null || me === null) {
+  if (home === null || me === null) {
     return (
       <div className="board-loading">
         <Spinner size="large" label="홈 불러오는 중" />
@@ -261,7 +261,7 @@ export function HomePage() {
           // 오늘 요약 — 이미 계산한 값 재사용, 누르면 해당 탭으로 이동한다
           <p className="home-greeting-summary" data-testid="home-summary">
             <button type="button" onClick={() => setTab("assigned")}>
-              나에게 배정 {myIssues.length}
+              나에게 배정 {myIssueTotal}
             </button>
             <span aria-hidden>·</span>
             <button type="button" onClick={() => setTab("recommended")}>
@@ -344,7 +344,7 @@ export function HomePage() {
               },
               {
                 value: "assigned",
-                label: `나에게 배정됨${myIssues.length > 0 ? ` ${myIssues.length}` : ""}`,
+                label: `나에게 배정됨${myIssueTotal > 0 ? ` ${myIssueTotal}` : ""}`,
                 content:
                   myIssues.length === 0 ? (
                     <EmptyState
@@ -352,9 +352,16 @@ export function HomePage() {
                       description="이슈 상세에서 담당자를 지정하면 여기에 모입니다."
                     />
                   ) : (
-                    <ul className="home-issue-list" data-testid="my-issues">
-                      {myIssues.map((issue) => issueRow(issue))}
-                    </ul>
+                    <>
+                      <ul className="home-issue-list" data-testid="my-issues">
+                        {myIssues.map((issue) => issueRow(issue))}
+                      </ul>
+                      {myIssueTotal > myIssues.length ? (
+                        <p className="home-list-note">
+                          {`최근 수정한 ${myIssues.length}건만 표시합니다(전체 ${myIssueTotal}건) — 나머지는 검색에서 확인하세요.`}
+                        </p>
+                      ) : null}
+                    </>
                   ),
               },
               {

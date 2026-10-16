@@ -1,8 +1,17 @@
 // alm-backend Project/Issue/Sprint REST 계약 어댑터.
 // 서버가 아직 저장하지 않는 ALM 확장 필드는 조용히 유실시키지 않고 명시적으로 거부한다.
 import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
+import { ATTACHMENT_TOO_LARGE_MESSAGE, assertAttachmentSize } from "./attachmentLimits";
 import { sharedApiFetch, sharedAuthClient } from "./apiClient";
 import type { IssueQuery } from "./searchQuery";
+import {
+  MAX_SEARCH_PAGE_SIZE,
+  queryToCriteria,
+  type IssueAggregate,
+  type IssueAggregateGroup,
+  type IssueSearchCriteria,
+  type IssueSort,
+} from "./issueSearch";
 import {
   ApiError,
   extractApiError,
@@ -179,6 +188,26 @@ async function json<T>(response: Response): Promise<T> {
   return body as T;
 }
 
+/**
+ * 같은 URL의 GET이 동시에 여러 번 나가면(홈·대시보드 가젯이 한꺼번에 뜰 때) 요청 하나를 나눠 쓴다.
+ * 공유는 **응답이 오기 전까지만**이다 — 끝나면 바로 지워 다음 호출은 새로 묻는다(캐시가 아니다).
+ * 인증은 세션(같은 탭의 같은 사용자) 단위라 다른 사용자와 섞일 일이 없다. 결과 객체는 호출자들이 함께
+ * 보므로 매퍼로 새 객체를 만들어 쓰고 원본을 고치지 않는다.
+ */
+const inflightGets = new Map<string, Promise<unknown>>();
+
+function sharedGet<T>(path: string): Promise<T> {
+  const pending = inflightGets.get(path);
+  if (pending) return pending as Promise<T>;
+  const request = (async () => json<T>(await sharedApiFetch(path)))();
+  inflightGets.set(path, request);
+  const forget = () => {
+    if (inflightGets.get(path) === request) inflightGets.delete(path);
+  };
+  request.then(forget, forget);
+  return request;
+}
+
 async function projectDto(id: string): Promise<ProjectDto> {
   return json(await sharedApiFetch(`/api/alm/projects/${toBackendId(id)}`));
 }
@@ -275,7 +304,8 @@ async function applyTemplate(projectId: string, template: ReturnType<typeof getT
   }
 }
 
-export async function updateProject(id: string, patch: ProjectPatch): Promise<Project> {
+/** 건드리지 않은 필드는 최신 값으로 채우되, 낙관적 락 기준은 설정 화면이 편집을 시작할 때 본 버전이다 */
+export async function updateProject(id: string, patch: ProjectPatch, expectedVersion: number): Promise<Project> {
   const current = await projectDto(id);
   const response = await sharedApiFetch(`/api/alm/projects/${toBackendId(id)}`, {
     method: "PUT",
@@ -290,7 +320,7 @@ export async function updateProject(id: string, patch: ProjectPatch): Promise<Pr
       icon: patch.icon,
       color: patch.color,
       url: patch.url,
-      expectedVersion: current.version,
+      expectedVersion,
     }),
   });
   return mapProject(await json(response));
@@ -338,27 +368,48 @@ function searchParams(entries: Record<string, string | string[] | undefined>): s
   return params.toString();
 }
 
-/** 필터를 서버가 거른다 — 클라이언트 전량 필터(BACKLOG #5)를 쓰지 않는다 */
-export async function listIssuesPage(
-  projectId: string,
-  filter: IssueFilter | undefined,
+/** 검색 조건 → 서버 쿼리 파라미터(목록은 반복 파라미터). id는 경계에서만 숫자로 바꾼다 */
+function criteriaParams(criteria: IssueSearchCriteria): Record<string, string | string[] | undefined> {
+  const ids = (list?: string[]) => list?.map((id) => toBackendId(id).toString());
+  const one = (id?: string) => (id ? toBackendId(id).toString() : undefined);
+  return {
+    projectIds: ids(criteria.projectIds),
+    text: criteria.text?.trim() || undefined,
+    statuses: criteria.statuses,
+    statusCategories: criteria.statusCategories,
+    openOnly: criteria.openOnly ? "true" : undefined,
+    priorities: criteria.priorities?.map(toApiIssuePriority),
+    types: criteria.types?.map(toApiIssueType),
+    assignees: criteria.assigneeIds?.map((id) => (id === "unassigned" ? id : toBackendId(id).toString())),
+    labels: criteria.labels,
+    componentIds: ids(criteria.componentIds),
+    sprintId: one(criteria.sprintId),
+    parentId: one(criteria.parentId),
+    fixVersionId: one(criteria.fixVersionId),
+    dueBefore: criteria.dueBefore,
+    dueFrom: criteria.dueFrom,
+    dueTo: criteria.dueTo,
+    updatedSince: criteria.updatedSince,
+  };
+}
+
+/**
+ * 서버 검색 한 페이지 — `total`은 조건 전체 건수다(화면은 이것으로 건수·페이저를 그린다).
+ * 정렬 기본은 서버와 같은 `updated desc`. 같은 조건 동시 호출은 요청 하나를 나눠 쓴다.
+ */
+export async function findIssues(
+  criteria: IssueSearchCriteria,
   paging: { page: number; size: number },
+  sort: IssueSort = { field: "updated", dir: "desc" },
 ): Promise<IssuePage> {
   const query = searchParams({
-    projectIds: toBackendId(projectId).toString(),
-    text: filter?.text,
-    statuses: filter?.status,
-    priorities: filter?.priority ? toApiIssuePriority(filter.priority) : undefined,
-    types: filter?.type ? toApiIssueType(filter.type) : undefined,
-    assignees: filter?.assigneeId ? toBackendId(filter.assigneeId).toString() : undefined,
-    labels: filter?.label,
-    componentIds: filter?.componentId ? toBackendId(filter.componentId).toString() : undefined,
-    sort: "key",
-    dir: "asc",
-    page: String(paging.page),
-    size: String(paging.size),
+    ...criteriaParams(criteria),
+    sort: sort.field,
+    dir: sort.dir,
+    page: String(Math.max(0, paging.page)),
+    size: String(Math.min(MAX_SEARCH_PAGE_SIZE, Math.max(1, paging.size))),
   });
-  const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`));
+  const dto = await sharedGet<IssuePageDto>(`/api/alm/issues/search?${query}`);
   return {
     items: dto.items.map((row, index) => mapIssue(row, dto.page * dto.size + index + 1)),
     page: dto.page,
@@ -367,11 +418,51 @@ export async function listIssuesPage(
   };
 }
 
+/** 한 축 집계 — 이슈 본문을 받지 않고 서버가 GROUP BY로 센다 */
+export async function aggregateIssues(
+  criteria: IssueSearchCriteria,
+  groupBy: IssueAggregateGroup,
+): Promise<IssueAggregate> {
+  const query = searchParams({ ...criteriaParams(criteria), groupBy });
+  const dto = await sharedGet<IssueAggregate>(`/api/alm/issues/aggregate?${query}`);
+  return { total: dto.total, buckets: dto.buckets.map((b) => ({ key: b.key, count: b.count })) };
+}
+
+/** 프로젝트에서 쓰이는 라벨(보관 이슈 제외) — 서버가 정렬해 준다 */
+export async function listProjectLabels(projectId: string): Promise<string[]> {
+  const rows = await sharedGet<string[]>(`/api/alm/projects/${toBackendId(projectId)}/labels`);
+  return [...rows];
+}
+
+/** 목록 화면 필터(단일 값) → 검색 조건 */
+function filterCriteria(projectId: string, filter: IssueFilter | undefined): IssueSearchCriteria {
+  return {
+    projectIds: [projectId],
+    text: filter?.text,
+    statuses: filter?.status ? [filter.status] : undefined,
+    priorities: filter?.priority ? [filter.priority] : undefined,
+    types: filter?.type ? [filter.type] : undefined,
+    assigneeIds: filter?.assigneeId ? [filter.assigneeId] : undefined,
+    labels: filter?.label ? [filter.label] : undefined,
+    componentIds: filter?.componentId ? [filter.componentId] : undefined,
+  };
+}
+
+/** 필터·정렬·페이지를 서버가 처리한다 — 클라이언트 전량 필터(BACKLOG #5)를 쓰지 않는다. 기본 정렬은 키 오름차순 */
+export async function listIssuesPage(
+  projectId: string,
+  filter: IssueFilter | undefined,
+  paging: { page: number; size: number },
+  sort: IssueSort = { field: "key", dir: "asc" },
+): Promise<IssuePage> {
+  return findIssues(filterCriteria(projectId, filter), paging, sort);
+}
+
 /** 전량이 필요한 화면(보드·백로그·리포트)용 — 서버 최대 페이지 크기로 끝까지 읽는다 */
 export async function listIssues(projectId: string, filter?: IssueFilter): Promise<Issue[]> {
   const all: Issue[] = [];
   for (let page = 0; ; page += 1) {
-    const chunk = await listIssuesPage(projectId, filter, { page, size: 200 });
+    const chunk = await listIssuesPage(projectId, filter, { page, size: MAX_SEARCH_PAGE_SIZE });
     all.push(...chunk.items);
     if (all.length >= chunk.total || chunk.items.length === 0) break;
   }
@@ -384,22 +475,16 @@ export async function getIssueByKey(key: string): Promise<Issue | null> {
   return mapIssue(await json<IssueDto>(response));
 }
 
-/** 교차 프로젝트 검색(검색 페이지·모달) — 카테고리 필터는 기본 상태 id로만 서버에 전달한다 */
-export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
-  const params = searchParams({
-    projectIds: query.projectIds.map((id) => toBackendId(id).toString()),
-    text: query.text.trim() || undefined,
-    statuses: [...query.statuses, ...query.statusIds],
-    priorities: query.priorities.map(toApiIssuePriority),
-    types: query.types.map(toApiIssueType),
-    assignees: query.assigneeIds.map((id) => (id === "unassigned" ? id : toBackendId(id).toString())),
-    labels: query.labels,
-    sort: query.sort,
-    dir: query.sort === "priority" || query.sort === "due" ? "asc" : "desc",
-    size: "200",
-  });
-  const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${params}`));
-  return dto.items.map((row, index) => mapIssue(row, index + 1));
+/**
+ * 교차 프로젝트 검색(검색 페이지·필터 가젯) — 서버 페이징. 쿼리의 상태 **분류**는 `statusCategories`로,
+ * 상태 **id**는 `statuses`로 나눠 보낸다(서버가 분류를 상태 레지스트리로 풀어 커스텀 상태까지 잡는다).
+ */
+export async function queryIssuesPage(
+  query: IssueQuery,
+  paging: { page: number; size: number },
+): Promise<IssuePage> {
+  const { criteria, sort } = queryToCriteria(query);
+  return findIssues(criteria, paging, sort);
 }
 
 export interface IssueCreateInput {
@@ -477,8 +562,14 @@ function assertPatchFieldsSupported(_patch: IssuePatch): void {
   // V3에서 스프린트까지 서버가 저장한다. 남은 미지원 필드가 생기면 여기서 막는다.
 }
 
-export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue> {
+/**
+ * 서버는 전체 본문을 받으므로 건드리지 않은 필드는 최신 값으로 채운다(보드 이동·랭크처럼 버전을 올리지
+ * 않는 변경을 되돌리지 않기 위해서). 낙관적 락 기준은 **화면이 편집을 시작할 때 본 버전**이다 —
+ * 저장 시점에 다시 읽은 버전을 쓰면 그 사이 남이 저장한 내용을 조용히 덮어쓴다(409가 나야 한다).
+ */
+export async function updateIssue(id: string, patch: IssuePatch, expectedVersion: number): Promise<Issue> {
   assertPatchFieldsSupported(patch);
+  if (!Number.isInteger(expectedVersion)) throw new Error("편집을 시작한 이슈 버전이 필요합니다");
   const current = await issueDto(id);
   const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}`, {
     method: "PUT",
@@ -525,7 +616,7 @@ export async function updateIssue(id: string, patch: IssuePatch): Promise<Issue>
               ? null
               : toBackendId(patch.fixVersionId),
       },
-      expectedVersion: current.version,
+      expectedVersion,
       mentionedUserIds:
         patch.description === undefined
           ? []
@@ -557,11 +648,13 @@ async function sprintDto(id: string): Promise<SprintDto> {
 
 /**
  * 계획 메타 수정. 서버는 전체 본문을 받으므로 최신 값을 먼저 읽어 건드리지 않은 필드를
- * 그대로 되돌려 보내고, 그때 읽은 version을 expectedVersion으로 쓴다(이슈 수정과 같은 규칙).
+ * 그대로 되돌려 보낸다. expectedVersion은 **편집을 시작할 때 화면이 본 버전**이다(이슈 수정과 같은 규칙) —
+ * 저장 시점에 읽은 버전을 쓰면 그 사이 남의 수정을 조용히 덮어쓴다.
  */
 export async function updateSprint(
   id: string,
   patch: { name?: string; goal?: string | null; plannedStart?: string | null; plannedEnd?: string | null },
+  expectedVersion: number,
 ): Promise<Sprint> {
   const current = await sprintDto(id);
   const pick = (next: string | null | undefined, currentValue?: string | null) =>
@@ -574,7 +667,7 @@ export async function updateSprint(
       goal: pick(patch.goal, current.goal),
       plannedStart: pick(patch.plannedStart, current.plannedStart),
       plannedEnd: pick(patch.plannedEnd, current.plannedEnd),
-      expectedVersion: current.version,
+      expectedVersion,
     }),
   });
   return mapSprint(await json(response));
@@ -691,14 +784,19 @@ export async function listAttachments(issueId: string): Promise<Attachment[]> {
   return rows.map(mapAttachment);
 }
 
-/** multipart — Content-Type은 브라우저가 boundary와 함께 붙이므로 직접 쓰지 않는다 */
+/**
+ * multipart — Content-Type은 브라우저가 boundary와 함께 붙이므로 직접 쓰지 않는다.
+ * 상한(20MB)을 넘는 파일은 보내지 않고, 프록시·서버가 413으로 막으면(본문이 JSON이 아닐 수 있다) 같은 문구로 알린다.
+ */
 export async function uploadAttachment(issueId: string, file: File): Promise<Attachment> {
+  assertAttachmentSize(file);
   const body = new FormData();
   body.append("file", file, file.name);
   const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/attachments`, {
     method: "POST",
     body,
   });
+  if (response.status === 413) throw new ApiError(413, `${ATTACHMENT_TOO_LARGE_MESSAGE}: ${file.name}`);
   return mapAttachment(await json(response));
 }
 
@@ -789,16 +887,22 @@ export interface BulkIssuePatch {
   removeLabels?: string[];
 }
 
+export interface BulkIssueTarget {
+  id: string;
+  version: number;
+}
+
 export interface BulkResult {
   updated: number;
   failed: { id: string; key: string; reason: string }[];
 }
 
-export async function bulkUpdateIssues(ids: string[], patch: BulkIssuePatch): Promise<BulkResult> {
-  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
+/** 대상마다 화면이 본 버전으로 저장한다 — 그 사이 남이 고친 이슈는 409로 실패 목록에 남는다 */
+export async function bulkUpdateIssues(targets: BulkIssueTarget[], patch: BulkIssuePatch): Promise<BulkResult> {
+  if (targets.length === 0) throw new Error("선택한 이슈가 없습니다");
   let updated = 0;
   const failed: BulkResult["failed"] = [];
-  for (const id of ids) {
+  for (const { id, version } of targets) {
     try {
       const current = mapIssue(await issueDto(id));
       const remove = new Set(patch.removeLabels ?? []);
@@ -813,7 +917,7 @@ export async function bulkUpdateIssues(ids: string[], patch: BulkIssuePatch): Pr
         ...(patch.sprintId !== undefined ? { sprintId: patch.sprintId } : {}),
         ...(patch.fixVersionId !== undefined ? { fixVersionId: patch.fixVersionId } : {}),
         ...(labels ? { labels } : {}),
-      });
+      }, version);
       updated += 1;
     } catch (error) {
       failed.push({ id, key: id, reason: error instanceof Error ? error.message : String(error) });
@@ -2386,8 +2490,8 @@ export async function listActivity(issueId: string): Promise<Activity[]> {
   }));
 }
 
-export async function setIssueParent(id: string, parentId: string | null): Promise<Issue> {
-  return updateIssue(id, { parentId });
+export async function setIssueParent(id: string, parentId: string | null, expectedVersion: number): Promise<Issue> {
+  return updateIssue(id, { parentId }, expectedVersion);
 }
 
 /** 서버 검색으로 자식을 찾는다 — 키 오름차순 */

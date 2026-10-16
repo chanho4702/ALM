@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   createIssue,
@@ -165,7 +166,7 @@ describe("필드 구성 — 만들기 필수 검사", () => {
     const issue = await createIssue({ projectId: PROJECT, title: "먼저 만든 이슈" });
     await saveSchemeFields(fieldsWith("assignee", { required: true }));
     const { updateIssue } = await import("./jiraStore");
-    await expect(updateIssue(issue.id, { title: "제목만 바꾼다" })).resolves.toMatchObject({
+    await expect(updateIssue(issue.id, { title: "제목만 바꾼다" }, __versionForTest("issue", issue.id))).resolves.toMatchObject({
       title: "제목만 바꾼다",
     });
   });
@@ -185,7 +186,7 @@ describe("필드 구성 — 만들기 필수 검사", () => {
 
   it("담당자 필수는 명시 선택만 인정한다 — 프로젝트 기본 담당자로는 통과하지 않는다", async () => {
     const { updateProject } = await import("./jiraStore");
-    await updateProject(PROJECT, { leadId: "u1", defaultAssignee: "lead" });
+    await updateProject(PROJECT, { leadId: "u1", defaultAssignee: "lead" }, __versionForTest("project", PROJECT));
     await saveSchemeFields(fieldsWith("assignee", { required: true }));
     await expect(createIssue({ projectId: PROJECT, title: "기본 담당자만" })).rejects.toThrow(
       "담당자는 필수입니다",

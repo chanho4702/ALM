@@ -89,13 +89,21 @@ describe("AQL 모드 — 페이징", () => {
     expect(screen.getAllByRole("row")).toHaveLength(3);
     expect(within(pager).getByRole("button", { name: "다음" })).toBeDisabled();
 
-    // 기본 모드는 서버 페이지가 없으므로 범위·페이저가 없다 (updated 정렬은 기본 모드로 되돌릴 수 있다)
+    // 기본 모드도 같은 서버 페이징이다 — 질의가 바뀌었으니 첫 페이지로, 건수는 전체(52), 그린 줄은 50
+    // (updated 정렬은 기본 모드로 되돌릴 수 있다)
     await user.click(screen.getByRole("button", { name: "기본 검색으로 전환" }));
     await waitFor(() => {
-      expect(screen.queryByTestId("search-range")).not.toBeInTheDocument();
+      expect(screen.getByTestId("search-range")).toHaveTextContent("1–50 / 52건");
     });
-    expect(screen.queryByRole("navigation", { name: "페이지" })).not.toBeInTheDocument();
     expect(screen.getByTestId("search-count")).toHaveTextContent("52개 이슈");
+    expect(screen.getAllByRole("row")).toHaveLength(51);
+    const basicPager = screen.getByRole("navigation", { name: "페이지" });
+    expect(within(basicPager).getByRole("button", { name: "이전" })).toBeDisabled();
+    await user.click(within(basicPager).getByRole("button", { name: "다음" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("search-range")).toHaveTextContent("51–52 / 52건");
+    });
+    expect(screen.getAllByRole("row")).toHaveLength(3);
   }, 30_000);
 
   it("정렬만 있는 AQL이 기본 모드로 못 돌아가면 AQL을 유지하고 범위 표시도 남긴다", async () => {

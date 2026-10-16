@@ -8,6 +8,7 @@ import {
   listAttachments,
   uploadAttachment,
 } from "../store/jiraStore";
+import { ATTACHMENT_TOO_LARGE_MESSAGE, isAttachmentTooLarge } from "../store/attachmentLimits";
 import { formatDate } from "./time";
 
 /** 사람이 읽는 크기 — 1024 단위, 소수 한 자리 */
@@ -74,12 +75,22 @@ export function IssueAttachments({
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const picked = Array.from(files);
+    // 상한을 넘는 파일은 올리기 전에 걸러 이름과 함께 알린다 — 몇 분 업로드한 뒤 413으로 실패하지 않게
+    const tooLarge = Array.from(files).filter(isAttachmentTooLarge);
+    const picked = Array.from(files).filter((file) => !isAttachmentTooLarge(file));
+    if (tooLarge.length > 0) {
+      toast({
+        title: ATTACHMENT_TOO_LARGE_MESSAGE,
+        description: tooLarge.map((file) => `${file.name} (${formatBytes(file.size)})`).join(" · "),
+        appearance: "danger",
+      });
+    }
+    if (inputRef.current) inputRef.current.value = "";
+    if (picked.length === 0) return;
     void run("첨부 올리기 실패", async () => {
       for (const file of picked) await uploadAttachment(issueId, file);
       toast({ title: `${picked.length}개 파일을 첨부했습니다`, appearance: "success" });
     });
-    if (inputRef.current) inputRef.current.value = "";
   };
 
   const handleDownload = (attachment: Attachment) =>

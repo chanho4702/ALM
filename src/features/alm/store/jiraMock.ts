@@ -95,9 +95,19 @@ import { CURRENT_USER_ID } from "../../../mock/users";
 import { createSeedData } from "../../../mock/seed";
 import { ISSUE_FIELD_IDS, ISSUE_FIELD_NAMES, WORKFLOW_ANY_NODE } from "./types";
 import type { IssueQuery } from "./searchQuery";
+import {
+  MAX_SEARCH_PAGE_SIZE,
+  compareLabels,
+  queryToCriteria,
+  type IssueAggregate,
+  type IssueAggregateGroup,
+  type IssueSearchCriteria,
+  type IssueSort,
+} from "./issueSearch";
 import { projectWideIssueKey } from "./agentMapping";
 import { ApiError } from "./mapping";
 import { getTemplate } from "./projectTemplates";
+import { assertAttachmentSize } from "./attachmentLimits";
 import type { ProjectTemplateId } from "./projectTemplates";
 import { extractMentionIds, htmlToText, newMentionIds } from "./richText";
 import { seedDemoProject, type SampleDataApi, type SeedDemoOptions } from "./sampleData";
@@ -386,7 +396,11 @@ function normalize(data: JiraData): JiraData {
     project.icon ??= "";
     project.color ??= "";
     project.url ??= "";
+    project.version ??= 1;
   }
+  // 버전 이전 데이터 — 서버처럼 1부터 센다
+  for (const sprint of data.sprints ?? []) sprint.version ??= 1;
+  for (const project of data.trashedProjects ?? []) project.version ??= 1;
   data.shortcuts ??= [];
   data.preferences ??= {};
   data.avatars ??= {};
@@ -400,6 +414,8 @@ function normalize(data: JiraData): JiraData {
     issue.resolution ??= null;
     issue.resolvedAt ??= null;
     issue.fixVersionId ??= null;
+    // 버전 이전 데이터 — 서버처럼 1부터 센다
+    issue.version ??= 1;
   }
   data.notifications ??= [];
   data.boards ??= [];
@@ -637,6 +653,7 @@ export async function createProject(
     url: "",
     archivedAt: null,
     deletedAt: null,
+    version: 1,
     createdAt: new Date().toISOString(),
   };
   data.projects.push(project);
@@ -661,7 +678,7 @@ export async function createProject(
   }
   data.boards.push(board);
   if (template.withSprint) {
-    data.sprints.push({ id: nextId(), projectId: project.id, name: "Sprint 1", state: "planned" });
+    data.sprints.push({ id: nextId(), projectId: project.id, name: "Sprint 1", state: "planned", version: 1 });
   }
   persist();
 
@@ -740,11 +757,13 @@ function applyProjectDetails(data: JiraData, project: Project, patch: ProjectPat
   if (patch.url !== undefined) project.url = assertHttpUrl(patch.url, "");
 }
 
-export async function updateProject(id: string, patch: ProjectPatch): Promise<Project> {
+/** 서버 PUT과 같은 낙관적 락 — 설정 화면이 편집을 시작할 때 본 버전이 아니면 409 */
+export async function updateProject(id: string, patch: ProjectPatch, expectedVersion: number): Promise<Project> {
   const data = load();
   const project = data.projects.find((p) => p.id === id);
   if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
   assertCanAdmin(data, id);
+  if (project.version !== expectedVersion) throw new ApiError(409, STALE_EDIT_MESSAGE);
   if (patch.name !== undefined) {
     const name = patch.name.trim();
     if (!name) throw new Error("프로젝트 이름을 입력하세요");
@@ -754,6 +773,7 @@ export async function updateProject(id: string, patch: ProjectPatch): Promise<Pr
     project.description = patch.description.trim();
   }
   applyProjectDetails(data, project, patch);
+  project.version += 1;
   persist();
   return clone(project);
 }
@@ -1088,12 +1108,6 @@ function statusKindOf(data: JiraData, projectId: string, statusId: string): Stat
   return categoryById(data, statusId).kind; // 기본 id 폴백 (구버전 데이터)
 }
 
-/** 상태 id → 카테고리 id — 스마트 검색의 카테고리 필터용 */
-function statusCategoryIdOf(data: JiraData, projectId: string, statusId: string): string {
-  const found = resolvedStatuses(data, projectId).find((s) => s.id === statusId);
-  return found?.category ?? categoryById(data, statusId).id;
-}
-
 /**
  * 구조화 변경 이력 — 사람이 읽는 활동로그(activities)와 별도로, 리포트가 집계하는 원천이다.
  * 서버 `issue_change_log`와 같은 모양이라 REST 전환 때 계약이 바뀌지 않는다.
@@ -1390,6 +1404,7 @@ export async function uploadAttachment(issueId: string, file: File): Promise<Att
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   assertCanEdit(data, issue.projectId);
   if (file.size === 0) throw new Error("빈 파일은 올릴 수 없습니다");
+  assertAttachmentSize(file); // 서버와 같은 상한(20MB)
   const now = new Date().toISOString();
   const attachment: Attachment = {
     id: nextId(),
@@ -1625,6 +1640,7 @@ export async function createSprint(projectId: string): Promise<Sprint> {
     projectId,
     name: `Sprint ${count + 1}`,
     state: "planned",
+    version: 1,
   };
   data.sprints.push(sprint);
   persist();
@@ -1649,11 +1665,12 @@ function planValue(next: string | null | undefined, current: string | undefined)
  * 스프린트 계획 메타(이름·목표·예정 기간) 수정. 상태와 무관하게 허용한다 — 진행 중에도
  * 목표를 다시 쓰는 일이 실제로 일어난다. 기간 역전은 저장 전에 막는다.
  */
-export async function updateSprint(id: string, patch: SprintPlanPatch): Promise<Sprint> {
+export async function updateSprint(id: string, patch: SprintPlanPatch, expectedVersion: number): Promise<Sprint> {
   const data = load();
   const sprint = data.sprints.find((s) => s.id === id);
   if (!sprint) throw new Error("스프린트를 찾을 수 없습니다");
   assertCanEdit(data, sprint.projectId);
+  if (sprint.version !== expectedVersion) throw new ApiError(409, STALE_EDIT_MESSAGE);
 
   const name = patch.name === undefined ? sprint.name : patch.name.trim();
   if (!name) throw new Error("스프린트 이름을 입력하세요");
@@ -1668,6 +1685,7 @@ export async function updateSprint(id: string, patch: SprintPlanPatch): Promise<
   assignOrDelete(sprint, "goal", goal);
   assignOrDelete(sprint, "plannedStart", plannedStart);
   assignOrDelete(sprint, "plannedEnd", plannedEnd);
+  sprint.version += 1;
   persist();
   return clone(sprint);
 }
@@ -1692,6 +1710,7 @@ export async function startSprint(id: string): Promise<Sprint> {
   }
   sprint.state = "active";
   sprint.startedAt = new Date().toISOString();
+  sprint.version += 1;
   persist();
   return clone(sprint);
 }
@@ -1729,6 +1748,7 @@ export async function completeSprint(
   }
   sprint.state = "done";
   sprint.completedAt = now;
+  sprint.version += 1;
   persist();
   return clone(sprint);
 }
@@ -1768,64 +1788,15 @@ export async function listIssues(
 }
 
 /**
- * 상세 검색 — IssueQuery 실행 (전 프로젝트, 다중 값 OR·필드 간 AND).
- * 추후 jira-service GraphQL 쿼리로 이 시그니처가 그대로 넘어간다.
+ * 상세 검색 — IssueQuery를 서버 검색 조건으로 바꿔 한 페이지를 돌려준다(REST와 같은 의미·같은 페이징).
+ * 쿼리의 `statuses`는 상태 분류 id, `statusIds`는 상태 id다.
  */
-export async function queryIssues(query: IssueQuery): Promise<Issue[]> {
-  const data = load();
-  let issues = [...data.issues];
-  const text = query.text.trim().toLowerCase();
-  if (text) {
-    issues = issues.filter(
-      (i) =>
-        i.title.toLowerCase().includes(text) ||
-        i.key.toLowerCase().includes(text) ||
-        htmlToText(i.description).toLowerCase().includes(text),
-    );
-  }
-  if (query.projectIds.length > 0) {
-    issues = issues.filter((i) => query.projectIds.includes(i.projectId));
-  }
-  if (query.statuses.length > 0) {
-    // 카테고리 기준 매치 — 프로젝트별 커스텀 상태도 카테고리로 걸린다
-    issues = issues.filter((i) =>
-      (query.statuses as string[]).includes(statusCategoryIdOf(data, i.projectId, i.status)),
-    );
-  }
-  if (query.statusIds.length > 0) {
-    issues = issues.filter((i) => query.statusIds.includes(i.status));
-  }
-  if (query.priorities.length > 0) {
-    issues = issues.filter((i) => query.priorities.includes(i.priority));
-  }
-  if (query.types.length > 0) issues = issues.filter((i) => query.types.includes(i.type));
-  if (query.assigneeIds.length > 0) {
-    issues = issues.filter((i) =>
-      i.assigneeId === null
-        ? query.assigneeIds.includes("unassigned")
-        : query.assigneeIds.includes(i.assigneeId),
-    );
-  }
-  if (query.labels.length > 0) {
-    issues = issues.filter((i) => i.labels.some((l) => query.labels.includes(l)));
-  }
-  const priorityRank: Record<IssuePriority, number> = { high: 0, medium: 1, low: 2 };
-  issues.sort((a, b) => {
-    switch (query.sort) {
-      case "created":
-        return b.createdAt.localeCompare(a.createdAt);
-      case "due":
-        if (a.dueDate === null && b.dueDate === null) return a.key.localeCompare(b.key);
-        if (a.dueDate === null) return 1; // 미지정 마감일은 뒤로
-        if (b.dueDate === null) return -1;
-        return a.dueDate.localeCompare(b.dueDate);
-      case "priority":
-        return priorityRank[a.priority] - priorityRank[b.priority];
-      default:
-        return b.updatedAt.localeCompare(a.updatedAt);
-    }
-  });
-  return clone(issues);
+export async function queryIssuesPage(
+  query: IssueQuery,
+  paging: { page: number; size: number },
+): Promise<IssuePage> {
+  const { criteria, sort } = queryToCriteria(query);
+  return findIssues(criteria, paging, sort);
 }
 
 /** 전역 검색 — 전 프로젝트 이슈에서 키/제목/설명 매치, 최근 수정 순, 최대 limit건 */
@@ -1948,6 +1919,7 @@ export async function createIssue(input: {
     labels: input.labels ?? [],
     componentIds: componentIdsForCreate,
     order: maxOrder + 1,
+    version: 1,
     createdAt: now,
     updatedAt: now,
   };
@@ -1994,10 +1966,12 @@ export async function updateIssue(
       | "fixVersionId"
     >
   >,
+  expectedVersion: number,
 ): Promise<Issue> {
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertIssueVersion(issue, expectedVersion);
   if (patch.estimateHours !== undefined && patch.estimateHours !== null && !(patch.estimateHours > 0)) {
     throw new Error("예상 시간은 0보다 커야 합니다");
   }
@@ -2060,10 +2034,20 @@ export async function updateIssue(
       .reduce((max, i) => Math.max(max, i.order), 0);
     issue.order = maxOrder + 1;
   }
+  issue.version += 1;
   issue.updatedAt = new Date().toISOString();
   recordChanges(data, before, issue, issue.updatedAt);
   persist();
   return clone(issue);
+}
+
+/** 서버 PUT과 같은 낙관적 락 — 편집을 시작할 때 본 버전이 아니면 409로 막는다(남의 저장을 덮지 않는다) */
+export const ISSUE_CONFLICT_MESSAGE = "다른 사용자가 먼저 이 이슈를 수정했습니다";
+/** 프로젝트·스프린트 편집 충돌(409) — 서버 문구와 같은 뜻 */
+const STALE_EDIT_MESSAGE = "다른 사용자가 먼저 수정했습니다. 새로고침 후 다시 시도하세요.";
+
+function assertIssueVersion(issue: Issue, expectedVersion: number): void {
+  if (issue.version !== expectedVersion) throw new ApiError(409, ISSUE_CONFLICT_MESSAGE);
 }
 
 export async function moveIssue(
@@ -2159,16 +2143,23 @@ export async function deleteWorklog(id: string): Promise<void> {
 // ── issue relations (parent / links) ─────────────────────────
 
 /** 부모 지정/해제 — 계층 규칙은 assertParentAllowed가 단일 진실 */
-export async function setIssueParent(id: string, parentId: string | null): Promise<Issue> {
+/** 서버에서는 PUT(편집)이라 버전을 확인하고 올린다 — 목업도 같다 */
+export async function setIssueParent(
+  id: string,
+  parentId: string | null,
+  expectedVersion: number,
+): Promise<Issue> {
   const data = load();
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertIssueVersion(issue, expectedVersion);
   assertParentAllowed(data, issue, parentId);
   if (issue.parentId === parentId) return clone(issue);
   const keyOf = (pid: string | null) =>
     pid === null ? "없음" : (data.issues.find((i) => i.id === pid)?.key ?? "없음");
   const detail = `${keyOf(issue.parentId)} → ${keyOf(parentId)}`;
   issue.parentId = parentId;
+  issue.version += 1;
   issue.updatedAt = new Date().toISOString();
   data.activities.push({
     id: nextId(),
@@ -3778,18 +3769,227 @@ export interface IssuePage {
 }
 
 /**
- * 필터 + 페이지 — 목업은 `listIssues`를 자른다. REST는 서버 검색(`/api/alm/issues/search`)으로
- * total을 받는다. 화면은 이 계약만 쓰고 전량을 들고 있지 않는다(BACKLOG #5 해소).
+ * 필터 + 정렬 + 페이지 — 서버 검색(`/api/alm/issues/search`)과 같은 의미로 거르고 정렬해 자른다.
+ * 화면은 이 계약만 쓰고 전량을 들고 있지 않는다(BACKLOG #5 해소). 기본 정렬은 키 오름차순.
  */
 export async function listIssuesPage(
   projectId: string,
   filter: Parameters<typeof listIssues>[1],
   paging: { page: number; size: number },
+  sort: IssueSort = { field: "key", dir: "asc" },
 ): Promise<IssuePage> {
-  const all = await listIssues(projectId, filter);
-  const size = Math.max(1, paging.size);
+  return findIssues(
+    {
+      projectIds: [projectId],
+      text: filter?.text,
+      statuses: filter?.status ? [filter.status] : undefined,
+      priorities: filter?.priority ? [filter.priority] : undefined,
+      types: filter?.type ? [filter.type] : undefined,
+      assigneeIds: filter?.assigneeId ? [filter.assigneeId] : undefined,
+      labels: filter?.label ? [filter.label] : undefined,
+      componentIds: filter?.componentId ? [filter.componentId] : undefined,
+    },
+    paging,
+    sort,
+  );
+}
+
+// ── 서버 검색·집계 계약의 목업 구현 (issueSearch.ts) ─────────────────
+
+type StatusLookup = (projectId: string, statusId: string) => { categoryId: string; kind: StatusKind };
+
+/** 요청 한 번 동안 프로젝트별 상태 해석을 한 번만 한다 — 상태 id → 분류 id·kind(프로젝트 워크플로 기준) */
+function statusLookup(data: JiraData): StatusLookup {
+  const byProject = new Map<string, Map<string, { categoryId: string; kind: StatusKind }>>();
+  return (projectId, statusId) => {
+    let index = byProject.get(projectId);
+    if (!index) {
+      index = new Map(
+        resolvedStatuses(data, projectId).map((s) => [s.id, { categoryId: s.category, kind: s.kind ?? "new" }]),
+      );
+      byProject.set(projectId, index);
+    }
+    const found = index.get(statusId);
+    if (found) return found;
+    const category = categoryById(data, statusId); // 기본 id 폴백 (구버전 데이터)
+    return { categoryId: category.id, kind: category.kind };
+  };
+}
+
+/** 분류 지정자(id·kind·이름) → 분류 id 집합 — 서버 `statusCategories`와 같은 해석. 모르면 빈 집합 */
+function matchingCategoryIds(data: JiraData, spec: string): string[] {
+  const all = [
+    ...data.statusCategories,
+    ...BUILTIN_CATEGORIES.filter((b) => !data.statusCategories.some((c) => c.id === b.id)),
+  ];
+  return all.filter((c) => c.id === spec || c.kind === spec || c.name === spec).map((c) => c.id);
+}
+
+function matchesCriteria(
+  issue: Issue,
+  criteria: IssueSearchCriteria,
+  statusOf: StatusLookup,
+  categoryIds: Set<string> | null,
+): boolean {
+  const has = (list?: string[]): list is string[] => list !== undefined && list.length > 0;
+  if (has(criteria.projectIds) && !criteria.projectIds.includes(issue.projectId)) return false;
+  const text = criteria.text?.trim().toLowerCase();
+  if (
+    text &&
+    !(
+      issue.title.toLowerCase().includes(text) ||
+      issue.key.toLowerCase().includes(text) ||
+      htmlToText(issue.description).toLowerCase().includes(text)
+    )
+  ) {
+    return false;
+  }
+  if (has(criteria.statuses) || categoryIds !== null) {
+    // 상태 id ∪ 분류에 속한 상태 — 분류는 프로젝트 워크플로 설정으로 해석한다(커스텀 상태도 걸린다)
+    const byId = criteria.statuses?.includes(issue.status) ?? false;
+    const byCategory = categoryIds !== null && categoryIds.has(statusOf(issue.projectId, issue.status).categoryId);
+    if (!byId && !byCategory) return false;
+  }
+  if (criteria.openOnly && statusOf(issue.projectId, issue.status).kind === "complete") return false;
+  if (has(criteria.priorities) && !criteria.priorities.includes(issue.priority)) return false;
+  if (has(criteria.types) && !criteria.types.includes(issue.type)) return false;
+  if (has(criteria.assigneeIds) && !criteria.assigneeIds.includes(issue.assigneeId ?? "unassigned")) return false;
+  if (has(criteria.labels) && !issue.labels.some((l) => criteria.labels!.includes(l))) return false;
+  if (has(criteria.componentIds) && !(issue.componentIds ?? []).some((c) => criteria.componentIds!.includes(c))) {
+    return false;
+  }
+  if (criteria.sprintId && issue.sprintId !== criteria.sprintId) return false;
+  if (criteria.parentId && issue.parentId !== criteria.parentId) return false;
+  if (criteria.fixVersionId && issue.fixVersionId !== criteria.fixVersionId) return false;
+  // 마감일 조건은 마감일 없는 이슈를 절대 잡지 않는다
+  if (criteria.dueBefore && !(issue.dueDate !== null && issue.dueDate < criteria.dueBefore)) return false;
+  if (criteria.dueFrom && !(issue.dueDate !== null && issue.dueDate >= criteria.dueFrom)) return false;
+  if (criteria.dueTo && !(issue.dueDate !== null && issue.dueDate <= criteria.dueTo)) return false;
+  if (criteria.updatedSince && Date.parse(issue.updatedAt) < Date.parse(criteria.updatedSince)) return false;
+  return true;
+}
+
+function filterByCriteria(data: JiraData, criteria: IssueSearchCriteria): { issues: Issue[]; statusOf: StatusLookup } {
+  const statusOf = statusLookup(data);
+  const categoryIds =
+    criteria.statusCategories && criteria.statusCategories.length > 0
+      ? new Set(criteria.statusCategories.flatMap((spec) => matchingCategoryIds(data, spec)))
+      : null;
+  return {
+    issues: data.issues.filter((issue) => matchesCriteria(issue, criteria, statusOf, categoryIds)),
+    statusOf,
+  };
+}
+
+const KIND_RANK: Record<StatusKind, number> = { new: 0, active: 1, complete: 2 };
+
+/** 키 번호 — 서버는 프로젝트 안 일련번호(issueNumber)로 정렬한다 */
+function issueNumberOf(issue: Issue): number {
+  const n = Number(issue.key.slice(issue.key.lastIndexOf("-") + 1));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** 서버와 같은 끝 묶음 — id 오름차순(숫자 id는 수로) */
+function compareIds(a: string, b: string): number {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function plainCompare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function sortIssues(data: JiraData, issues: Issue[], sort: IssueSort, statusOf: StatusLookup): Issue[] {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  // 레지스트리 순서(높음→낮음) — 모르는 값은 맨 끝 순위(서버와 같이 방향을 따른다)
+  const priorityRank = new Map([...data.priorities].sort((a, b) => a.order - b.order).map((p, i) => [p.id, i]));
+  const rankOfPriority = (id: string) => priorityRank.get(id) ?? priorityRank.size + 1;
+  return [...issues].sort((a, b) => {
+    let cmp = 0;
+    switch (sort.field) {
+      case "created":
+        cmp = plainCompare(a.createdAt, b.createdAt) * dir;
+        break;
+      case "due":
+        // 마감일 없음은 방향과 무관하게 맨 뒤
+        if ((a.dueDate === null) !== (b.dueDate === null)) return a.dueDate === null ? 1 : -1;
+        cmp = a.dueDate === null || b.dueDate === null ? 0 : plainCompare(a.dueDate, b.dueDate) * dir;
+        break;
+      case "key":
+        cmp = (issueNumberOf(a) - issueNumberOf(b)) * dir;
+        break;
+      case "priority":
+        cmp = (rankOfPriority(a.priority) - rankOfPriority(b.priority)) * dir;
+        break;
+      case "title":
+        cmp = plainCompare(a.title.toLowerCase(), b.title.toLowerCase()) * dir;
+        break;
+      case "type":
+        cmp = plainCompare(a.type, b.type) * dir;
+        break;
+      case "status":
+        cmp =
+          (KIND_RANK[statusOf(a.projectId, a.status).kind] - KIND_RANK[statusOf(b.projectId, b.status).kind]) * dir ||
+          plainCompare(a.status, b.status) * dir;
+        break;
+      default:
+        cmp = plainCompare(a.updatedAt, b.updatedAt) * dir;
+    }
+    return cmp || compareIds(a.id, b.id);
+  });
+}
+
+/** 서버 검색 한 페이지 — `total`은 조건 전체 건수. 크기는 서버처럼 1..200으로 묶는다 */
+export async function findIssues(
+  criteria: IssueSearchCriteria,
+  paging: { page: number; size: number },
+  sort: IssueSort = { field: "updated", dir: "desc" },
+): Promise<IssuePage> {
+  const data = load();
+  const { issues, statusOf } = filterByCriteria(data, criteria);
+  const sorted = sortIssues(data, issues, sort, statusOf);
+  const size = Math.min(MAX_SEARCH_PAGE_SIZE, Math.max(1, paging.size));
   const page = Math.max(0, paging.page);
-  return { items: all.slice(page * size, page * size + size), page, size, total: all.length };
+  return { items: clone(sorted.slice(page * size, page * size + size)), page, size, total: sorted.length };
+}
+
+/** 한 축 집계 — 나온 값만, 건수 내림차순·키 오름차순(서버와 같다) */
+export async function aggregateIssues(
+  criteria: IssueSearchCriteria,
+  groupBy: IssueAggregateGroup,
+): Promise<IssueAggregate> {
+  const data = load();
+  const { issues, statusOf } = filterByCriteria(data, criteria);
+  const keyOf = (issue: Issue): string => {
+    switch (groupBy) {
+      case "status":
+        return issue.status;
+      case "priority":
+        return issue.priority;
+      case "type":
+        return issue.type;
+      case "assignee":
+        return issue.assigneeId ?? "unassigned";
+      default:
+        return statusOf(issue.projectId, issue.status).categoryId;
+    }
+  };
+  const counts = new Map<string, number>();
+  for (const issue of issues) counts.set(keyOf(issue), (counts.get(keyOf(issue)) ?? 0) + 1);
+  const buckets = [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || plainCompare(a.key, b.key));
+  return { total: issues.length, buckets };
+}
+
+/** 프로젝트에서 쓰이는 라벨(보관 이슈 제외) — 대소문자 무시 순(서버와 같다) */
+export async function listProjectLabels(projectId: string): Promise<string[]> {
+  const data = load();
+  if (!data.projects.some((p) => p.id === projectId)) throw new Error("프로젝트를 찾을 수 없습니다");
+  const labels = new Set(data.issues.filter((i) => i.projectId === projectId).flatMap((i) => i.labels));
+  return [...labels].sort(compareLabels);
 }
 
 // ── 워처 ─────────────────────────────────────────────────────
@@ -3842,6 +4042,12 @@ export interface BulkIssuePatch {
   removeLabels?: string[];
 }
 
+/** 대량 변경 대상 — 화면이 목록을 그릴 때 본 버전을 함께 보낸다(그 뒤 남이 고쳤으면 그 이슈만 실패) */
+export interface BulkIssueTarget {
+  id: string;
+  version: number;
+}
+
 export interface BulkResult {
   updated: number;
   failed: { id: string; key: string; reason: string }[];
@@ -3852,12 +4058,15 @@ export interface BulkResult {
  * 그대로 먹는다. 막힌 이슈는 사유와 함께 실패 목록에 남기고 나머지는 적용한다(전부 롤백하지 않는다).
  * 이미 같은 값인 필드는 변경으로 세지 않는다.
  */
-export async function bulkUpdateIssues(ids: string[], patch: BulkIssuePatch): Promise<BulkResult> {
-  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
+export async function bulkUpdateIssues(
+  targets: BulkIssueTarget[],
+  patch: BulkIssuePatch,
+): Promise<BulkResult> {
+  if (targets.length === 0) throw new Error("선택한 이슈가 없습니다");
   const data = load();
   let updated = 0;
   const failed: BulkResult["failed"] = [];
-  for (const id of ids) {
+  for (const { id, version } of targets) {
     const issue = data.issues.find((i) => i.id === id);
     if (!issue) {
       failed.push({ id, key: id, reason: "이슈를 찾을 수 없습니다" });
@@ -3886,7 +4095,7 @@ export async function bulkUpdateIssues(ids: string[], patch: BulkIssuePatch): Pr
     }
     if (Object.keys(next).length === 0) continue;
     try {
-      await updateIssue(id, next);
+      await updateIssue(id, next, version);
       updated += 1;
     } catch (error) {
       failed.push({
@@ -5519,4 +5728,20 @@ export async function aqlFields(): Promise<AqlFieldsInfo> {
     functions: functionInfos(),
     keywords: keywordList(),
   };
+}
+
+/**
+ * 테스트 전용 — 지금 저장된 편집 버전. 동시 편집과 무관한 테스트가 "최신 버전 기준으로 저장"할 때만 쓴다
+ * (화면은 편집을 시작할 때 들고 있던 버전을 보낸다 — 충돌 의미는 jiraStore.concurrency 테스트가 검증한다).
+ */
+export function __versionForTest(kind: "issue" | "sprint" | "project", id: string): number {
+  const data = load();
+  const row =
+    kind === "issue"
+      ? data.issues.find((i) => i.id === id)
+      : kind === "sprint"
+        ? data.sprints.find((s) => s.id === id)
+        : data.projects.find((p) => p.id === id);
+  // 없는 대상은 0 — "찾을 수 없습니다" 거부는 스토어 함수가 내야 테스트가 그 의미를 본다
+  return row?.version ?? 0;
 }

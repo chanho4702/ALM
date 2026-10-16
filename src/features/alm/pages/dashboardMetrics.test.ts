@@ -24,6 +24,7 @@ const USERS: User[] = [
 function issue(over: Partial<Issue> & { id: string }): Issue {
   return {
     key: `ALM-${over.id}`,
+    version: 1,
     projectId: "p1",
     title: `이슈 ${over.id}`,
     description: "",

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
-import { __resetForTest } from "../store/jiraStore";
+import { __resetForTest, listSprints, updateSprint } from "../store/jiraStore";
 
 /** 현재 pathname+search를 노출하는 테스트 프로브 */
 function LocationProbe() {
@@ -59,6 +59,48 @@ describe("BacklogPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("시작 예정일")).toHaveValue("2026-09-12");
     expect(screen.getByLabelText("종료 예정일")).toHaveValue("2026-09-01");
+  });
+
+  it("모달을 연 뒤 동료가 계획을 먼저 저장하면 409 — 초안을 남기고 불러오기/다시 적용을 고르게 한다", async () => {
+    renderBacklog();
+    const user = userEvent.setup();
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
+    const goal = await screen.findByLabelText("스프린트 목표");
+
+    // 동료 저장 — 내가 모달을 연 뒤의 일이다
+    const [sprint] = (await listSprints("p1")).filter((s) => s.name === "Sprint 1");
+    await updateSprint(sprint.id, { goal: "동료가 바꾼 목표" }, sprint.version);
+
+    await user.clear(goal);
+    await user.type(goal, "내 목표");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByText(/다른 사용자가 이 스프린트를 먼저 수정해/)).toBeInTheDocument();
+    expect(screen.getByLabelText("스프린트 목표")).toHaveValue("내 목표");
+    expect((await listSprints("p1")).find((s) => s.id === sprint.id)!.goal).toBe("동료가 바꾼 목표");
+
+    await user.click(screen.getByRole("button", { name: "내 변경 다시 적용(최신 버전 기준)" }));
+    await waitFor(async () => {
+      expect((await listSprints("p1")).find((s) => s.id === sprint.id)!.goal).toBe("내 목표");
+    });
+    await waitFor(() => expect(screen.queryByLabelText("스프린트 목표")).not.toBeInTheDocument());
+  });
+
+  it("계획 충돌에서 '최신 내용 불러오기'는 내 초안을 버리고 동료 값으로 다시 채운다", async () => {
+    renderBacklog();
+    const user = userEvent.setup();
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
+    const goal = await screen.findByLabelText("스프린트 목표");
+    const [sprint] = (await listSprints("p1")).filter((s) => s.name === "Sprint 1");
+    await updateSprint(sprint.id, { goal: "동료가 바꾼 목표" }, sprint.version);
+    await user.clear(goal);
+    await user.type(goal, "내 목표");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    await user.click(await screen.findByRole("button", { name: "최신 내용 불러오기" }));
+    await waitFor(() => expect(screen.getByLabelText("스프린트 목표")).toHaveValue("동료가 바꾼 목표"));
+    expect(screen.queryByText(/다른 사용자가 이 스프린트를 먼저 수정해/)).not.toBeInTheDocument();
   });
 
   it("스프린트·백로그 머리글에 예상 시간 합계와 미입력 건수를 보여준다", async () => {

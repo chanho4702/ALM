@@ -36,6 +36,8 @@ import {
   SprintPanel,
 } from "../components/SprintPanel";
 import { SprintEditModal } from "../components/SprintEditModal";
+import type { SprintPlanDraft } from "../components/SprintEditModal";
+import { errorStatus } from "../store/mapping";
 import { SprintCompleteModal } from "../components/SprintCompleteModal";
 import type { MoveTarget } from "../components/SprintPanel";
 import {
@@ -55,6 +57,8 @@ export function BacklogPage() {
   const [creating, setCreating] = useState(false);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
+  /** 스프린트 계획 저장 충돌(409) — 모달과 초안은 그대로 두고 사용자가 해소 방법을 고른다 */
+  const [sprintConflict, setSprintConflict] = useState(false);
   const [completingSprint, setCompletingSprint] = useState<Sprint | null>(null);
   const toast = useToast();
 
@@ -162,8 +166,60 @@ export function BacklogPage() {
     });
   };
 
+  /** 계획 저장 — 모달을 연 때 본 버전(또는 해소 시 다시 읽은 최신 버전)으로 보낸다 */
+  const saveSprintPlan = async (sprint: Sprint, draft: SprintPlanDraft, version: number) => {
+    try {
+      await updateSprint(sprint.id, {
+        name: draft.name,
+        goal: draft.goal,
+        plannedStart: draft.plannedStart,
+        plannedEnd: draft.plannedEnd,
+      }, version);
+      // 성공했을 때만 닫는다 — 거부(기간 역전·버전 충돌)당한 초안을 삼키지 않기 위해.
+      setEditingSprint(null);
+      setSprintConflict(false);
+      toast({ title: "스프린트를 수정했습니다", appearance: "success" });
+    } catch (error) {
+      if (errorStatus(error) === 409) {
+        setSprintConflict(true);
+        return;
+      }
+      toast({
+        title: "스프린트 수정 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+    await reload();
+  };
+
+  const latestSprint = async (id: string) => {
+    if (!projectId) throw new Error("프로젝트를 찾을 수 없습니다");
+    const found = (await listSprints(projectId)).find((s) => s.id === id);
+    if (!found) throw new Error("스프린트를 찾을 수 없습니다");
+    return found;
+  };
+
+  const resolveSprintConflict = async (sprint: Sprint, draft: SprintPlanDraft, mode: "reload" | "reapply") => {
+    try {
+      const latest = await latestSprint(sprint.id);
+      if (mode === "reload") {
+        setSprintConflict(false);
+        setEditingSprint(latest); // 모달이 최신 값으로 초안을 다시 채운다(내 입력은 버림)
+      } else {
+        await saveSprintPlan(latest, draft, latest.version);
+      }
+    } catch (error) {
+      toast({
+        title: "스프린트를 다시 읽지 못했습니다",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
+  };
+
   const handleMove = (issue: Issue, sprintId: string | null) =>
-    void run("이슈 이동 실패", "이슈를 이동했습니다", () => updateIssue(issue.id, { sprintId }));
+    void run("이슈 이동 실패", "이슈를 이동했습니다", () => updateIssue(issue.id, { sprintId }, issue.version));
 
   const handleDelete = (issue: Issue) =>
     void run("이슈 삭제 실패", `${issue.key} 이슈를 삭제했습니다`, () => deleteIssue(issue.id));
@@ -221,19 +277,13 @@ export function BacklogPage() {
       />
       <SprintEditModal
         sprint={editingSprint}
-        onClose={() => setEditingSprint(null)}
-        onSave={(sprint, draft) => {
-          // 성공했을 때만 닫는다 — 거부(기간 역전·버전 충돌)당한 초안을 삼키지 않기 위해.
-          void run("스프린트 수정 실패", "스프린트를 수정했습니다", async () => {
-            await updateSprint(sprint.id, {
-              name: draft.name,
-              goal: draft.goal,
-              plannedStart: draft.plannedStart,
-              plannedEnd: draft.plannedEnd,
-            });
-            setEditingSprint(null);
-          });
+        conflict={sprintConflict}
+        onClose={() => {
+          setEditingSprint(null);
+          setSprintConflict(false);
         }}
+        onSave={(sprint, draft) => void saveSprintPlan(sprint, draft, sprint.version)}
+        onResolveConflict={(sprint, draft, mode) => void resolveSprintConflict(sprint, draft, mode)}
       />
       <section className="backlog-page">
         <DndContext

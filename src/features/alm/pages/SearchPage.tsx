@@ -27,7 +27,7 @@ import {
   listAllStatuses,
   listProjects,
   listUsers,
-  queryIssues,
+  queryIssuesPage,
   statusMetaByProject,
 } from "../store/jiraStore";
 import { aqlFields, listStatusCategories, queryIssuesAql } from "../store/jiraStore";
@@ -56,8 +56,8 @@ import { UserAvatar } from "../components/UserAvatar";
 
 type SearchMode = "basic" | "smart" | "aql";
 
-/** AQL 결과 한 페이지 크기 — 이슈 목록과 같은 값을 쓴다 */
-const AQL_PAGE_SIZE = 50;
+/** 결과 한 페이지 크기 — 세 모드(기본·스마트·AQL)가 같은 서버 페이징을 쓴다. 이슈 목록과 같은 값 */
+const PAGE_SIZE = 50;
 
 /**
  * 모드 전환 버튼 — 보이는 글자는 짧게, 접근 이름은 하던 말 그대로 둔다.
@@ -97,7 +97,7 @@ export function SearchPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
-  const [total, setTotal] = useState<number | null>(null); // AQL은 서버/실행기가 준 총건수
+  const [total, setTotal] = useState<number | null>(null); // 조건 전체 건수(서버가 준 값) — 페이지 길이가 아니다
   const [page, setPage] = useState(0);
   const [allStatuses, setAllStatuses] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string; kind: string }[]>([]);
@@ -149,15 +149,29 @@ export function SearchPage() {
     [ctx, issueTypes, categories],
   );
   const query = useMemo(() => parseSmartQuery(q, ctx), [q, ctx]);
+  /** 마지막으로 보낸 조회 번호 — 늦게 도착한 이전 조건·페이지의 응답이 최신 결과를 덮지 못하게 한다 */
+  const requestSeq = useRef(0);
 
   const reload = useCallback(async () => {
+    const seq = ++requestSeq.current;
+    const stale = () => seq !== requestSeq.current;
+    // 결과가 줄어 지금 페이지가 끝을 넘었으면(모달에서 삭제 등) 남은 마지막 페이지로 옮겨 다시 읽는다
+    const pastLastPage = (count: number) => {
+      const lastPage = Math.max(0, Math.ceil(count / PAGE_SIZE) - 1);
+      if (page <= lastPage) return false;
+      setPage(lastPage);
+      return true;
+    };
     if (aql !== null) {
       try {
-        const result = await queryIssuesAql(aql, { page, size: AQL_PAGE_SIZE });
+        const result = await queryIssuesAql(aql, { page, size: PAGE_SIZE });
+        if (stale()) return;
+        if (pastLastPage(result.total)) return;
         setIssues(result.items);
         setTotal(result.total);
         setAqlError(null);
       } catch (error) {
+        if (stale()) return;
         // 문법 오류는 밑줄로, 그 밖(로드 실패)은 토스트로 — 결과는 비운다
         setIssues([]);
         setTotal(0);
@@ -174,15 +188,30 @@ export function SearchPage() {
       }
       return;
     }
-    setTotal(null);
     setAqlError(null);
-    setIssues(await queryIssues(query));
+    try {
+      // 기본·스마트도 서버 페이징 — 건수는 받은 행 수가 아니라 서버 total이다
+      const result = await queryIssuesPage(query, { page, size: PAGE_SIZE });
+      if (stale()) return;
+      if (pastLastPage(result.total)) return;
+      setIssues(result.items);
+      setTotal(result.total);
+    } catch (error) {
+      if (stale()) return;
+      setIssues([]);
+      setTotal(0);
+      toast({
+        title: "검색을 실행하지 못했습니다",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
   }, [aql, page, query, toast]);
 
-  // 질의가 바뀌면 첫 페이지로 — 3쪽을 보다 조건을 바꾸면 빈 화면이 나오면 안 된다
+  // 질의(AQL·스마트 문자열)가 바뀌면 첫 페이지로 — 3쪽을 보다 조건을 바꾸면 빈 화면이 나오면 안 된다
   useEffect(() => {
     setPage(0);
-  }, [aql]);
+  }, [aql, q]);
 
   useEffect(() => {
     void reload();
@@ -576,17 +605,16 @@ export function SearchPage() {
       ) : (
         <>
           <div className="search-result-bar">
-            {/* 건수 문구는 세 모드가 같다 — 페이징은 범위 표시와 페이저를 옆에 덧붙일 뿐이다 */}
+            {/* 건수는 세 모드 모두 서버가 준 조건 전체 건수다 — 현재 페이지 행 수가 아니다 */}
             <p className="search-count" data-testid="search-count">
-              {mode === "aql" && total !== null ? total : issues.length}개 이슈
+              {total ?? issues.length}개 이슈
             </p>
-            {/* 범위·페이저는 AQL 모드에서만 — 전환 직후 stale total이 남아도 그리지 않는다 */}
-            {mode === "aql" && total !== null && total > 0 ? (
+            {total !== null && total > 0 ? (
               <span className="search-range" data-testid="search-range">
-                {`${page * AQL_PAGE_SIZE + 1}–${Math.min((page + 1) * AQL_PAGE_SIZE, total)} / ${total}건`}
+                {`${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} / ${total}건`}
               </span>
             ) : null}
-            {mode === "aql" && total !== null && total > AQL_PAGE_SIZE ? (
+            {total !== null && total > PAGE_SIZE ? (
               <div className="issue-pager" role="navigation" aria-label="페이지">
                 <Button
                   size="small"
@@ -599,7 +627,7 @@ export function SearchPage() {
                 <Button
                   size="small"
                   variant="ghost"
-                  disabled={(page + 1) * AQL_PAGE_SIZE >= total}
+                  disabled={(page + 1) * PAGE_SIZE >= total}
                   onClick={() => setPage((p) => p + 1)}
                 >
                   다음

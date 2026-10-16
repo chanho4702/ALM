@@ -6,6 +6,7 @@ import {
   getIssueByKey,
   importIssues,
   listIssues,
+  updateIssue,
   listSchemes,
   updateScheme,
 } from "./jiraStore";
@@ -17,11 +18,17 @@ beforeEach(() => {
 
 const idsOf = async (...keys: string[]) =>
   Promise.all(keys.map(async (key) => (await getIssueByKey(key))!.id));
+/** 화면처럼 "목록을 그릴 때 본" 버전을 함께 보낸다 */
+const targetsOf = async (...keys: string[]) =>
+  Promise.all(keys.map(async (key) => {
+    const issue = (await getIssueByKey(key))!;
+    return { id: issue.id, version: issue.version };
+  }));
 
 describe("대량 변경", () => {
   it("여러 이슈의 우선순위·담당자를 한 번에 바꾸고 결과 수를 돌려준다", async () => {
-    const ids = await idsOf("ALM-3", "ALM-4");
-    const result = await bulkUpdateIssues(ids, { priority: "high", assigneeId: "u2" });
+    const targets = await targetsOf("ALM-3", "ALM-4");
+    const result = await bulkUpdateIssues(targets, { priority: "high", assigneeId: "u2" });
     expect(result).toEqual({ updated: 2, failed: [] });
     for (const key of ["ALM-3", "ALM-4"]) {
       expect(await getIssueByKey(key)).toMatchObject({ priority: "high", assigneeId: "u2" });
@@ -29,10 +36,10 @@ describe("대량 변경", () => {
   });
 
   it("라벨은 추가·제거를 합쳐 적용하고 중복 없이 남긴다", async () => {
-    const [id] = await idsOf("ALM-6"); // 시드 라벨: backend
-    await bulkUpdateIssues([id], { addLabels: ["backend", "urgent"], removeLabels: ["nothing"] });
+    // 시드 라벨: backend
+    await bulkUpdateIssues(await targetsOf("ALM-6"), { addLabels: ["backend", "urgent"], removeLabels: ["nothing"] });
     expect((await getIssueByKey("ALM-6"))!.labels).toEqual(["backend", "urgent"]);
-    await bulkUpdateIssues([id], { removeLabels: ["backend"] });
+    await bulkUpdateIssues(await targetsOf("ALM-6"), { removeLabels: ["backend"] });
     expect((await getIssueByKey("ALM-6"))!.labels).toEqual(["urgent"]);
   });
 
@@ -44,7 +51,7 @@ describe("대량 변경", () => {
         transitions: [{ id: "t1", name: "시작", from: ["todo"], to: "inprogress" }],
       },
     });
-    const [todo, inprogress] = await idsOf("ALM-4", "ALM-2"); // ALM-4 할 일, ALM-2 진행 중
+    const [todo, inprogress] = await targetsOf("ALM-4", "ALM-2"); // ALM-4 할 일, ALM-2 진행 중
     const result = await bulkUpdateIssues([todo, inprogress], { status: "done" });
     expect(result.updated).toBe(0);
     expect(result.failed).toHaveLength(2);
@@ -54,6 +61,19 @@ describe("대량 변경", () => {
     const partial = await bulkUpdateIssues([todo, inprogress], { status: "inprogress" });
     expect(partial.updated).toBe(1); // ALM-4만 이동, ALM-2는 같은 상태(변경 아님)
     expect((await getIssueByKey("ALM-4"))!.status).toBe("inprogress");
+  });
+
+  it("목록을 본 뒤 남이 고친 이슈는 덮어쓰지 않고 실패 목록에 남긴다(나머지는 적용)", async () => {
+    const [stale, fresh] = await targetsOf("ALM-3", "ALM-5");
+    // 동료가 ALM-3을 먼저 저장 — 내가 본 버전은 낡았다
+    await updateIssue(stale.id, { title: "동료가 고친 제목" }, stale.version);
+    const result = await bulkUpdateIssues([stale, fresh], { priority: "high" });
+    expect(result.updated).toBe(1);
+    expect(result.failed).toEqual([
+      expect.objectContaining({ key: "ALM-3", reason: expect.stringContaining("먼저") }),
+    ]);
+    expect(await getIssueByKey("ALM-3")).toMatchObject({ title: "동료가 고친 제목", priority: "medium" });
+    expect((await getIssueByKey("ALM-5"))!.priority).toBe("high");
   });
 
   it("빈 선택은 거부하고, 대량 삭제는 하위 작업까지 지운다", async () => {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   addComment,
@@ -34,15 +35,15 @@ describe("워처", () => {
   it("상태 변경·코멘트 알림은 워처 ∪ 담당자 − 행위자에게 간다", async () => {
     const issue = await createIssue({ projectId: "p1", title: "알림 대상", assigneeId: "u2" });
     // u3은 관심만 등록한 사람 — 현재 사용자는 u1이라 스토어에 직접 워처를 넣는 대신 배정 뒤 해제로 만든다
-    await updateIssue(issue.id, { assigneeId: "u3" });
-    await updateIssue(issue.id, { assigneeId: "u2" });
+    await updateIssue(issue.id, { assigneeId: "u3" }, __versionForTest("issue", issue.id));
+    await updateIssue(issue.id, { assigneeId: "u2" }, __versionForTest("issue", issue.id));
     const before = {
       u2: (await listNotifications("u2")).length,
       u3: (await listNotifications("u3")).length,
       u1: (await listNotifications("u1")).length,
     };
 
-    await updateIssue(issue.id, { status: "inprogress" });
+    await updateIssue(issue.id, { status: "inprogress" }, __versionForTest("issue", issue.id));
     const u2 = await listNotifications("u2");
     const u3 = await listNotifications("u3");
     expect(u2.length).toBe(before.u2 + 1);

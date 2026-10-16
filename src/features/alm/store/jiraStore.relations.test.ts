@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   addIssueLink,
@@ -24,7 +25,7 @@ describe("parentId 계층 규칙", () => {
   it("일반 이슈 ← 에픽, 하위 작업 ← 일반 이슈는 허용된다", async () => {
     const epic = await getIssueByKey("ALM-4");
     const task = await createIssue({ projectId: PROJECT, title: "에픽 자식" });
-    const withEpic = await setIssueParent(task.id, epic!.id);
+    const withEpic = await setIssueParent(task.id, epic!.id, __versionForTest("issue", task.id));
     expect(withEpic.parentId).toBe(epic!.id);
 
     const sub = await createIssue({
@@ -43,34 +44,34 @@ describe("parentId 계층 규칙", () => {
     const story = await getIssueByKey("ALM-2"); // story(parent=epic)
 
     // 에픽도 상위 항목을 가질 수 있고, 일반 이슈끼리도 상하 관계가 된다
-    await setIssueParent(task!.id, story!.id);
+    await setIssueParent(task!.id, story!.id, __versionForTest("issue", task!.id));
     const sub = await createIssue({ projectId: PROJECT, title: "하위", type: "subtask", parentId: task!.id });
     const subSub = await createIssue({ projectId: PROJECT, title: "하위의 하위", type: "subtask", parentId: sub.id });
     expect(subSub.parentId).toBe(sub.id);
     expect((await listChildren(sub.id)).map((i) => i.id)).toEqual([subSub.id]);
 
-    await expect(setIssueParent(task!.id, task!.id)).rejects.toThrow(
+    await expect(setIssueParent(task!.id, task!.id, __versionForTest("issue", task!.id))).rejects.toThrow(
       "자기 자신을 부모로 지정할 수 없습니다",
     );
     // epic → story → task → sub → subSub 체인에서 epic의 상위를 subSub로 올리면 순환
-    await expect(setIssueParent(epic!.id, subSub.id)).rejects.toThrow("상위 항목이 순환합니다");
+    await expect(setIssueParent(epic!.id, subSub.id, __versionForTest("issue", epic!.id))).rejects.toThrow("상위 항목이 순환합니다");
   });
 
   it("부모 변경은 활동로그(parent)에 남는다", async () => {
     const story = await getIssueByKey("ALM-2"); // parent = ALM-4
-    await setIssueParent(story!.id, null);
+    await setIssueParent(story!.id, null, __versionForTest("issue", story!.id));
     const acts = await listActivity(story!.id);
     expect(acts.at(-1)).toMatchObject({ type: "parent", detail: "ALM-4 → 없음" });
   });
 
   it("타입 전환은 계층과 무관 — 부모·자식을 유지한 채 바뀐다", async () => {
     const story = await getIssueByKey("ALM-2"); // parent = ALM-4
-    const changed = await updateIssue(story!.id, { type: "subtask" });
+    const changed = await updateIssue(story!.id, { type: "subtask" }, __versionForTest("issue", story!.id));
     expect(changed.parentId).toBe(story!.parentId);
 
     const epic = await getIssueByKey("ALM-4");
     const child = await createIssue({ projectId: PROJECT, title: "자식", parentId: epic!.id });
-    const asTask = await updateIssue(epic!.id, { type: "task" });
+    const asTask = await updateIssue(epic!.id, { type: "task" }, __versionForTest("issue", epic!.id));
     expect(asTask.type).toBe("task");
     expect((await getIssueByKey(child.key))!.parentId).toBe(epic!.id);
   });

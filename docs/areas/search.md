@@ -3,7 +3,7 @@
 **파일**: `store/searchQuery.ts`(파서/직렬화, 진실 모델), `store/aql/`(AQL 렉서·파서·실행기·번역·자동완성),
 `pages/SearchPage.tsx`, `components/AqlEditor.tsx`, `components/SearchModal.tsx`(전역 검색 모달),
 `components/FilterDropdown.tsx`, `store/jiraStore.ts`의
-`queryIssues`/`searchIssues`/`listAllStatuses`/`queryIssuesAql`/`validateAql`/`aqlFields`.
+`queryIssuesPage`(서버 페이징·total)/`searchIssues`/`listAllStatuses`/`queryIssuesAql`/`validateAql`/`aqlFields`.
 
 ## 모델 — 진실은 URL의 `q` 문자열 하나
 

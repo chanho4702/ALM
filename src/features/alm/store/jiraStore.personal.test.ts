@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   addComment,
   addProjectShortcut,
@@ -39,7 +40,7 @@ describe("프로젝트 세부(지라 프로젝트 설정 > 세부)", () => {
       icon: "rocket",
       color: "purple",
       url: "https://example.com",
-    });
+    }, __versionForTest("project", project.id));
     expect(updated).toMatchObject({ category: "플랫폼", defaultAssignee: "lead", icon: "rocket", color: "purple" });
     const issue = await createIssue({ projectId: project.id, title: "담당자 없이" });
     expect(issue.assigneeId).toBe(CURRENT_USER_ID);
@@ -49,7 +50,7 @@ describe("프로젝트 세부(지라 프로젝트 설정 > 세부)", () => {
 
   it("URL은 http(s)만 받는다", async () => {
     const project = await createProject({ key: "DTL", name: "세부" });
-    await expect(updateProject(project.id, { url: "javascript:alert(1)" })).rejects.toThrow(
+    await expect(updateProject(project.id, { url: "javascript:alert(1)" }, __versionForTest("project", project.id))).rejects.toThrow(
       "URL은 http:// 또는 https://로 시작해야 합니다",
     );
   });

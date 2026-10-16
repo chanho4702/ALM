@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
-import { __resetForTest, createIssue, listProjects, listProjectShortcuts } from "../store/jiraStore";
+import { __resetForTest, createIssue, listProjects, listProjectShortcuts, updateProject } from "../store/jiraStore";
 
 function renderAt(path: string) {
   return render(
@@ -19,6 +19,27 @@ function renderAt(path: string) {
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
+});
+
+describe("프로젝트 일반 설정 저장 충돌(409)", () => {
+  it("화면을 연 뒤 동료가 먼저 저장하면 덮어쓰지 않고, 입력을 남긴 채 다시 적용을 고르게 한다", async () => {
+    const user = userEvent.setup();
+    renderAt("/projects/p1/settings/general");
+    expect(await screen.findByRole("heading", { name: "일반" })).toBeInTheDocument();
+    const seen = (await listProjects()).find((p) => p.id === "p1")!;
+    await updateProject("p1", { category: "동료 범주" }, seen.version); // 동료 저장
+
+    await user.type(screen.getByLabelText("범주"), "내 범주");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByText(/다른 사용자가 이 프로젝트를 먼저 수정해/)).toBeInTheDocument();
+    expect(screen.getByLabelText("범주")).toHaveValue("내 범주");
+    expect((await listProjects()).find((p) => p.id === "p1")!.category).toBe("동료 범주");
+
+    await user.click(screen.getByRole("button", { name: "내 변경 다시 적용(최신 버전 기준)" }));
+    expect(await screen.findByText("프로젝트를 수정했습니다")).toBeInTheDocument();
+    expect((await listProjects()).find((p) => p.id === "p1")!.category).toBe("내 범주");
+    expect(screen.queryByText(/다른 사용자가 이 프로젝트를 먼저 수정해/)).not.toBeInTheDocument();
+  });
 });
 
 describe("프로젝트 세부 (지라 프로젝트 설정 > 세부)", () => {

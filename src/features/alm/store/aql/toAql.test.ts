@@ -10,7 +10,7 @@ const CTX: AqlTranslateContext = {
     { id: "u2", name: "이서연" },
   ],
   projects: [
-    { id: "p1", key: "ALM", name: "ALM 플랫폼", description: "", category: "", leadId: null, defaultAssignee: "unassigned", icon: "", color: "", url: "", createdAt: "" },
+    { id: "p1", key: "ALM", name: "ALM 플랫폼", description: "", category: "", leadId: null, defaultAssignee: "unassigned", icon: "", color: "", url: "", version: 1, createdAt: "" },
   ],
   statuses: [
     { id: "todo", name: "할 일" },

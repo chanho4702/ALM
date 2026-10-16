@@ -7,6 +7,7 @@ import { App } from "../../../app/App";
 // 이 화면은 App에서 lazy()로 쪼개져 있다. 전체 스위트를 병렬로 돌릴 때 첫 findBy가 청크 로딩까지
 // 기다리다 한도(5s)를 넘기므로, 수집 시점에 미리 올려 lazy 해석이 즉시 끝나게 한다.
 import "./ReportsPage";
+import { __versionForTest } from "../store/jiraStore";
 import {
   __resetForTest,
   createSprint,
@@ -101,7 +102,7 @@ describe("ReportsPage", () => {
 
   it("완료됨이 아닌 해결은 아이콘 + 이름으로 드러난다", async () => {
     const alm1 = await getIssueByKey("ALM-1");
-    await updateIssue(alm1!.id, { resolution: "duplicate" });
+    await updateIssue(alm1!.id, { resolution: "duplicate" }, __versionForTest("issue", alm1!.id));
     renderReports();
 
     const report = await screen.findByRole("region", { name: "스프린트 리포트" });

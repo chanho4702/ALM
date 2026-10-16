@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   purgeProject,
   __resetForTest,
@@ -40,8 +41,8 @@ describe("버전(릴리스)", () => {
     const version = await createVersion("p1", { name: "1.0" });
     const done = await getIssueByKey("ALM-1"); // 완료
     const open = await getIssueByKey("ALM-5"); // 할 일
-    await updateIssue(done!.id, { fixVersionId: version.id });
-    await updateIssue(open!.id, { fixVersionId: version.id });
+    await updateIssue(done!.id, { fixVersionId: version.id }, __versionForTest("issue", done!.id));
+    await updateIssue(open!.id, { fixVersionId: version.id }, __versionForTest("issue", open!.id));
 
     expect(await versionProgress(version.id)).toEqual({ total: 2, done: 1, percent: 50 });
   });
@@ -51,8 +52,8 @@ describe("버전(릴리스)", () => {
     const v2 = await createVersion("p1", { name: "1.1" });
     const done = await getIssueByKey("ALM-1");
     const open = await getIssueByKey("ALM-5");
-    await updateIssue(done!.id, { fixVersionId: v1.id });
-    await updateIssue(open!.id, { fixVersionId: v1.id });
+    await updateIssue(done!.id, { fixVersionId: v1.id }, __versionForTest("issue", done!.id));
+    await updateIssue(open!.id, { fixVersionId: v1.id }, __versionForTest("issue", open!.id));
 
     const released = await releaseVersion(v1.id, { moveUnresolvedTo: v2.id });
 
@@ -65,7 +66,7 @@ describe("버전(릴리스)", () => {
   it("이관 대상을 주지 않으면 미완료 이슈는 그 버전에 그대로 남는다 (지라와 동일)", async () => {
     const v1 = await createVersion("p1", { name: "1.0" });
     const open = await getIssueByKey("ALM-5");
-    await updateIssue(open!.id, { fixVersionId: v1.id });
+    await updateIssue(open!.id, { fixVersionId: v1.id }, __versionForTest("issue", open!.id));
 
     await releaseVersion(v1.id);
 
@@ -86,14 +87,14 @@ describe("버전(릴리스)", () => {
   it("보관하면 새 이슈에 달 수 없지만 기존 이슈의 표시는 유지된다", async () => {
     const version = await createVersion("p1", { name: "0.9" });
     const issue = await getIssueByKey("ALM-1");
-    await updateIssue(issue!.id, { fixVersionId: version.id });
+    await updateIssue(issue!.id, { fixVersionId: version.id }, __versionForTest("issue", issue!.id));
 
     const archived = await archiveVersion(version.id);
     expect(archived.status).toBe("archived");
     expect((await getIssueByKey("ALM-1"))!.fixVersionId).toBe(version.id);
 
     const other = await getIssueByKey("ALM-2");
-    await expect(updateIssue(other!.id, { fixVersionId: version.id })).rejects.toThrow(
+    await expect(updateIssue(other!.id, { fixVersionId: version.id }, __versionForTest("issue", other!.id))).rejects.toThrow(
       "보관된 버전에는 이슈를 달 수 없습니다",
     );
   });
@@ -101,7 +102,7 @@ describe("버전(릴리스)", () => {
   it("버전을 지우면 달려 있던 이슈의 수정 버전이 비워진다", async () => {
     const version = await createVersion("p1", { name: "1.0" });
     const issue = await getIssueByKey("ALM-1");
-    await updateIssue(issue!.id, { fixVersionId: version.id });
+    await updateIssue(issue!.id, { fixVersionId: version.id }, __versionForTest("issue", issue!.id));
 
     await deleteVersion(version.id);
 
@@ -114,7 +115,7 @@ describe("버전(릴리스)", () => {
     const foreign = await createVersion(other.id, { name: "1.0" });
     const issue = await getIssueByKey("ALM-1");
 
-    await expect(updateIssue(issue!.id, { fixVersionId: foreign.id })).rejects.toThrow(
+    await expect(updateIssue(issue!.id, { fixVersionId: foreign.id }, __versionForTest("issue", issue!.id))).rejects.toThrow(
       "다른 프로젝트의 버전입니다",
     );
   });

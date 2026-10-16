@@ -60,16 +60,27 @@ describe("디렉터리 조회와 복구", () => {
 });
 
 describe("홈 로딩", () => {
-  it("느린 사용자 조회를 기다리지 않고 프로젝트 이슈 조회를 시작한다", async () => {
+  it("느린 사용자 조회를 기다리지 않고 목적별 서버 검색을 시작한다(프로젝트 이슈 전량은 읽지 않는다)", async () => {
     const currentUser = await store.getCurrentUser();
     let resolveUser!: (user: User) => void;
     vi.spyOn(store, "getCurrentUser").mockReturnValue(new Promise((resolve) => { resolveUser = resolve; }));
-    const issues = vi.spyOn(store, "listIssues");
+    const all = vi.spyOn(store, "listIssues");
+    const search = vi.spyOn(store, "findIssues");
     renderPage(<HomePage />);
-    await waitFor(() => expect(issues).toHaveBeenCalledWith("p1"));
+    // 최근 15건·기한 지남·마감 임박·담당자 필요 — 사용자 없이도 바로 나간다
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(4));
+    expect(search).toHaveBeenCalledWith({}, { page: 0, size: 15 }, { field: "updated", dir: "desc" });
     expect(screen.queryByRole("heading", { name: /안녕하세요/ })).not.toBeInTheDocument();
     resolveUser(currentUser);
     expect(await screen.findByRole("heading", { name: /안녕하세요/ })).toBeInTheDocument();
+    // "나에게 배정됨"은 사용자를 안 뒤 미완료만, 상한을 두고 묻는다
+    expect(search).toHaveBeenCalledWith(
+      { assigneeIds: [currentUser.id], openOnly: true },
+      { page: 0, size: 50 },
+      { field: "updated", dir: "desc" },
+    );
+    expect(search).toHaveBeenCalledTimes(5);
+    expect(all).not.toHaveBeenCalled();
   });
 
   it("홈 조회 실패 후 무한 로딩 대신 다시 시도할 수 있다", async () => {

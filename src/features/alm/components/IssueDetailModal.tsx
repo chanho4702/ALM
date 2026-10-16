@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
-import { Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
+import { Banner, Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
 import type {
   Activity,
   Comment,
@@ -46,6 +46,7 @@ import {
   updateIssue,
 } from "../store/jiraStore";
 import type { IssueLinkView } from "../store/jiraStore";
+import { errorStatus } from "../store/mapping";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PriorityGlyph } from "./PriorityGlyph";
 import { ResolutionGlyph } from "./ResolutionGlyph";
@@ -135,6 +136,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   /** 수정 중인 코멘트 id — null이면 보기 모드 */
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [commentEditDraft, setCommentEditDraft] = useState("");
+  /**
+   * 저장 충돌(409) — 편집을 시작한 뒤 다른 사람이 먼저 저장했다. 내 변경은 버리지 않고 여기 들고 있다가
+   * 사용자가 "최신 내용 불러오기"(버림) 또는 "내 변경 다시 적용"(최신 버전 기준 재저장)을 직접 고른다.
+   */
+  const [conflict, setConflict] = useState<{ save: (version: number) => Promise<Issue>; successTitle: string } | null>(null);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -249,18 +256,85 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     successTitle: string,
   ) => {
     if (!issue) return;
+    const id = issue.id;
+    await saveEdit((version) => updateIssue(id, patch, version), successTitle, "저장 실패");
+  };
+
+  /** 편집 저장 공통 — 이 모달이 이슈를 읽었을 때의 버전으로 보낸다. 409면 내 변경을 들고 충돌 배너를 띄운다 */
+  const saveEdit = async (
+    save: (version: number) => Promise<Issue>,
+    successTitle: string,
+    failureTitle: string,
+  ) => {
+    if (!issue) return;
     try {
-      const updated = await updateIssue(issue.id, patch);
-      setIssue(updated);
-      await refreshLogs(updated.id); // 상태 등 변경 → 활동 탭 즉시 반영
-      await onIssueChanged();
-      toast({ title: successTitle, appearance: "success" });
+      const updated = await save(issue.version);
+      await afterSaved(updated, successTitle);
     } catch (error) {
+      if (errorStatus(error) === 409) {
+        setConflict({ save, successTitle });
+        return;
+      }
       toast({
-        title: "저장 실패",
+        title: failureTitle,
         description: error instanceof Error ? error.message : String(error),
         appearance: "danger",
       });
+    }
+  };
+
+  const afterSaved = async (updated: Issue, successTitle: string) => {
+    setIssue(updated);
+    await refreshLogs(updated.id); // 상태 등 변경 → 활동 탭 즉시 반영
+    await onIssueChanged();
+    toast({ title: successTitle, appearance: "success" });
+  };
+
+  /** 충돌 해소 ① — 최신 내용을 불러오고 내 변경(설명·예상 시간 입력 포함)은 버린다 */
+  const handleConflictReload = async () => {
+    if (!issue) return;
+    setResolvingConflict(true);
+    try {
+      const latest = await getIssueByKey(issue.key);
+      if (!latest) throw new Error(`이슈를 찾을 수 없습니다: ${issue.key}`);
+      setIssue(latest);
+      setDescriptionDraft(latest.description);
+      setEstimateDraft(latest.estimateHours === null ? "" : String(latest.estimateHours));
+      setConflict(null);
+      await refreshLogs(latest.id);
+      await onIssueChanged();
+    } catch (error) {
+      toast({
+        title: "최신 내용을 불러오지 못했습니다",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
+
+  /** 충돌 해소 ② — 최신 버전을 기준으로 내 변경만 다시 저장한다(내가 안 건드린 필드는 최신 값 유지) */
+  const handleConflictReapply = async () => {
+    if (!issue || !conflict) return;
+    setResolvingConflict(true);
+    try {
+      const latest = await getIssueByKey(issue.key);
+      if (!latest) throw new Error(`이슈를 찾을 수 없습니다: ${issue.key}`);
+      const updated = await conflict.save(latest.version);
+      setConflict(null);
+      await afterSaved(updated, conflict.successTitle);
+    } catch (error) {
+      // 그 사이 또 다른 저장이 끼었으면 충돌 배너를 유지한다 — 내 변경은 계속 들고 있다
+      if (errorStatus(error) !== 409) {
+        toast({
+          title: "다시 적용하지 못했습니다",
+          description: error instanceof Error ? error.message : String(error),
+          appearance: "danger",
+        });
+      }
+    } finally {
+      setResolvingConflict(false);
     }
   };
 
@@ -348,19 +422,9 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
 
   const handleParentChange = async (value: string) => {
     if (!issue) return;
-    try {
-      const updated = await setIssueParent(issue.id, value === NO_PARENT ? null : value);
-      setIssue(updated);
-      await refreshLogs(updated.id);
-      await onIssueChanged();
-      toast({ title: "상위 항목을 변경했습니다", appearance: "success" });
-    } catch (error) {
-      toast({
-        title: "상위 항목 변경 실패",
-        description: error instanceof Error ? error.message : String(error),
-        appearance: "danger",
-      });
-    }
+    const id = issue.id;
+    const parentId = value === NO_PARENT ? null : value;
+    await saveEdit((version) => setIssueParent(id, parentId, version), "상위 항목을 변경했습니다", "상위 항목 변경 실패");
   };
 
   const handleSubtaskSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -589,6 +653,24 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <WatchButton issueId={issue.id} users={users} />
         </div>
       </div>
+      {conflict ? (
+        <Banner variant="warning" className="issue-conflict-banner">
+          <div className="issue-conflict">
+            <p className="issue-conflict-text">
+              다른 사용자가 이 이슈를 먼저 수정해 내 변경을 저장하지 않았습니다. 입력한 내용은 그대로 남아 있습니다 —
+              어떻게 할지 고르세요.
+            </p>
+            <div className="issue-conflict-actions">
+              <Button size="small" variant="secondary" disabled={resolvingConflict} onClick={() => void handleConflictReload()}>
+                최신 내용 불러오기
+              </Button>
+              <Button size="small" variant="primary" disabled={resolvingConflict} onClick={() => void handleConflictReapply()}>
+                내 변경 다시 적용(최신 버전 기준)
+              </Button>
+            </div>
+          </div>
+        </Banner>
+      ) : null}
       <div className="issue-detail-body">
         <div className="issue-detail-main">
           <InlineEdit

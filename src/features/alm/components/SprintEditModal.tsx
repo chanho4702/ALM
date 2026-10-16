@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Button, Modal, TextArea, TextField } from "@chanho/react";
+import { Banner, Button, Modal, TextArea, TextField } from "@chanho/react";
 import type { Sprint } from "../store/types";
 
 export interface SprintPlanDraft {
@@ -15,13 +15,17 @@ export interface SprintEditModalProps {
   sprint: Sprint | null;
   onClose: () => void;
   onSave: (sprint: Sprint, draft: SprintPlanDraft) => void;
+  /** 저장이 409(다른 사람이 먼저 수정)로 막혔다 — 초안을 유지한 채 해소 선택지를 보인다 */
+  conflict?: boolean;
+  /** reload = 최신 값으로 초안을 다시 채움(내 입력 버림), reapply = 최신 버전 기준으로 내 초안을 다시 저장 */
+  onResolveConflict?: (sprint: Sprint, draft: SprintPlanDraft, mode: "reload" | "reapply") => void;
 }
 
 /**
  * 스프린트 계획 편집 — 지라 백로그의 "스프린트 수정"과 같은 자리(이름·목표·기간).
  * 저장 검증(기간 역전)은 스토어가 하고 여기서는 초안만 다룬다.
  */
-export function SprintEditModal({ sprint, onClose, onSave }: SprintEditModalProps) {
+export function SprintEditModal({ sprint, onClose, onSave, conflict = false, onResolveConflict }: SprintEditModalProps) {
   const [draft, setDraft] = useState<SprintPlanDraft>({
     name: "",
     goal: "",
@@ -56,6 +60,23 @@ export function SprintEditModal({ sprint, onClose, onSave }: SprintEditModalProp
       }}
     >
       <form className="sprint-edit-form" onSubmit={handleSubmit}>
+        {conflict && sprint ? (
+          <Banner variant="warning">
+            <div className="issue-conflict">
+              <p className="issue-conflict-text">
+                다른 사용자가 이 스프린트를 먼저 수정해 저장하지 않았습니다. 입력한 내용은 그대로 남아 있습니다.
+              </p>
+              <div className="issue-conflict-actions">
+                <Button size="small" variant="secondary" type="button" onClick={() => onResolveConflict?.(sprint, draft, "reload")}>
+                  최신 내용 불러오기
+                </Button>
+                <Button size="small" variant="primary" type="button" onClick={() => onResolveConflict?.(sprint, draft, "reapply")}>
+                  내 변경 다시 적용(최신 버전 기준)
+                </Button>
+              </div>
+            </div>
+          </Banner>
+        ) : null}
         <TextField
           label="스프린트 이름"
           value={draft.name}

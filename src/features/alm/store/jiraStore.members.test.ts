@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   createIssue,
@@ -125,7 +126,7 @@ describe("역할이 쓰기를 제한한다", () => {
     });
     await expect(createSprint(project.id)).resolves.toMatchObject({ state: "planned" });
 
-    await expect(updateProject(project.id, { name: "바꾸기" })).rejects.toThrow(
+    await expect(updateProject(project.id, { name: "바꾸기" }, __versionForTest("project", project.id))).rejects.toThrow(
       "프로젝트 관리자만 할 수 있습니다",
     );
     await expect(setProjectCustom(project.id, true)).rejects.toThrow(

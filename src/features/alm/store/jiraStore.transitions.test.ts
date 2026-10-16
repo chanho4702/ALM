@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   getIssueByKey,
@@ -25,7 +26,7 @@ describe("워크플로 전이 규칙", () => {
   it("전이를 정의하지 않으면 모든 이동이 허용된다 (기존 프로젝트 호환)", async () => {
     const issue = await getIssueByKey("ALM-5"); // 할 일
 
-    await expect(updateIssue(issue!.id, { status: "done" })).resolves.toMatchObject({
+    await expect(updateIssue(issue!.id, { status: "done" }, __versionForTest("issue", issue!.id))).resolves.toMatchObject({
       status: "done",
     });
   });
@@ -41,10 +42,10 @@ describe("워크플로 전이 규칙", () => {
     );
     const issue = await getIssueByKey("ALM-5"); // 할 일
 
-    await expect(updateIssue(issue!.id, { status: "done" })).rejects.toThrow(
+    await expect(updateIssue(issue!.id, { status: "done" }, __versionForTest("issue", issue!.id))).rejects.toThrow(
       "할 일에서 완료로 옮길 수 없습니다",
     );
-    await expect(updateIssue(issue!.id, { status: "inprogress" })).resolves.toMatchObject({
+    await expect(updateIssue(issue!.id, { status: "inprogress" }, __versionForTest("issue", issue!.id))).resolves.toMatchObject({
       status: "inprogress",
     });
   });
@@ -57,7 +58,7 @@ describe("워크플로 전이 규칙", () => {
     );
     const issue = await getIssueByKey("ALM-2"); // 진행 중
 
-    await expect(updateIssue(issue!.id, { status: "todo" })).resolves.toMatchObject({
+    await expect(updateIssue(issue!.id, { status: "todo" }, __versionForTest("issue", issue!.id))).resolves.toMatchObject({
       status: "todo",
     });
   });
@@ -86,7 +87,7 @@ describe("워크플로 전이 규칙", () => {
     );
     const issue = await getIssueByKey("ALM-5");
 
-    await expect(updateIssue(issue!.id, { status: "todo", priority: "high" })).resolves.toMatchObject(
+    await expect(updateIssue(issue!.id, { status: "todo", priority: "high" }, __versionForTest("issue", issue!.id))).resolves.toMatchObject(
       { priority: "high" },
     );
   });

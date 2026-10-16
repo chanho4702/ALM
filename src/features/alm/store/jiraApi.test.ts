@@ -106,17 +106,20 @@ describe("jiraApi projects", () => {
     expect(calls.indexOf("POST /api/alm/projects/3/sprints")).toBeLessThan(calls.indexOf("POST /api/alm/projects/3/issues"));
   });
 
-  it("수정 직전 최신 version을 조회해 expectedVersion으로 보낸다", async () => {
+  it("expectedVersion은 편집을 시작할 때 본 버전이다 — 저장 직전 최신 값은 안 건드린 필드 채우기에만 쓴다", async () => {
     const spy = vi
       .spyOn(client, "sharedApiFetch")
+      // 저장 시점의 서버 값: 그 사이 동료가 저장해 version 4가 됐다
       .mockResolvedValueOnce(response(200, PROJECT))
-      .mockResolvedValueOnce(response(200, { ...PROJECT, name: "새 이름", version: 5 }));
+      .mockResolvedValueOnce(response(409, { error: "다른 사용자가 먼저 수정했습니다" }));
 
-    await updateProject("3", { name: " 새 이름 " });
+    // 화면은 version 3을 보고 편집을 시작했다 → 3을 보내 서버가 409로 막게 해야 한다(4를 보내면 조용히 덮어쓴다)
+    await expect(updateProject("3", { name: " 새 이름 " }, 3)).rejects.toThrow("다른 사용자가 먼저 수정했습니다");
 
     expect(spy.mock.calls[0][0]).toBe("/api/alm/projects/3");
     const body = JSON.parse(spy.mock.calls[1][1]!.body as string);
-    expect(body).toMatchObject({ name: "새 이름", description: PROJECT.description, expectedVersion: 4 });
+    expect(body).toMatchObject({ name: "새 이름", description: PROJECT.description, expectedVersion: 3 });
+    expect(body.expectedVersion).not.toBe(PROJECT.version);
   });
 });
 
@@ -168,7 +171,7 @@ describe("jiraApi issues", () => {
     });
   });
 
-  it("수정 요청도 최신 version과 완전한 PUT 본문을 보낸다", async () => {
+  it("수정 요청은 편집을 시작할 때 본 version과 완전한 PUT 본문(안 건드린 필드는 최신 값)을 보낸다", async () => {
     const spy = vi
       .spyOn(client, "sharedApiFetch")
       .mockResolvedValueOnce(response(200, ISSUE))
@@ -176,13 +179,15 @@ describe("jiraApi issues", () => {
         response(200, { ...ISSUE, status: "inprogress", priority: "MEDIUM", version: 3 }),
       );
 
-    await updateIssue("7", {
+    const updated = await updateIssue("7", {
       status: "inprogress",
       priority: "medium",
       dueDate: "2026-08-21",
       estimateHours: 2.5,
       labels: ["backend"],
-    });
+    }, 2);
+    // 응답의 새 버전을 화면이 들고 있어야 다음 저장이 맞는다
+    expect(updated.version).toBe(3);
 
     const body = JSON.parse(spy.mock.calls[1][1]!.body as string);
     expect(body).toEqual({
@@ -219,7 +224,7 @@ describe("jiraApi issues", () => {
     expect(JSON.parse(spy.mock.calls[0][1]!.body as string).details.sprintId).toBe(5);
 
     // 스프린트 해제는 null을 명시해야 서버가 미변경과 구분한다.
-    await updateIssue("7", { sprintId: null });
+    await updateIssue("7", { sprintId: null }, ISSUE.version);
     expect(JSON.parse(spy.mock.calls[2][1]!.body as string).details.sprintId).toBeNull();
   });
 
@@ -271,6 +276,7 @@ describe("jiraApi issues", () => {
       state: "done",
       startedAt: "2026-08-20T00:00:00Z",
       completedAt: "2026-08-23T00:00:00Z",
+      version: 3,
     });
   });
 
@@ -302,7 +308,7 @@ describe("jiraApi sprints", () => {
     updatedAt: "2026-08-28T00:00:00Z",
   };
 
-  it("최신 version을 조회한 뒤 계획 메타를 expectedVersion과 함께 보낸다", async () => {
+  it("최신 값으로 안 건드린 필드를 채우고, 계획 메타를 편집 시작 때 본 expectedVersion과 함께 보낸다", async () => {
     const spy = vi
       .spyOn(client, "sharedApiFetch")
       .mockResolvedValueOnce(response(200, SPRINT))
@@ -320,7 +326,7 @@ describe("jiraApi sprints", () => {
       goal: "결제 실패율 절반으로",
       plannedStart: "2026-09-01",
       plannedEnd: "2026-09-12",
-    });
+    }, 4);
 
     expect(spy.mock.calls[0][0]).toBe("/api/alm/sprints/12");
     const [path, init] = spy.mock.calls[1];
@@ -342,14 +348,15 @@ describe("jiraApi sprints", () => {
       .mockResolvedValueOnce(response(200, { ...SPRINT, goal: "유지할 목표", plannedEnd: "2026-09-12" }))
       .mockResolvedValueOnce(response(200, { ...SPRINT, goal: "유지할 목표", version: 5 }));
 
-    await updateSprint("12", { plannedEnd: null });
+    // 모달을 연 뒤 서버 값이 4가 됐어도(목표가 채워짐) 화면이 본 3을 보낸다 — 서버가 409로 막을 몫이다
+    await updateSprint("12", { plannedEnd: null }, 3);
 
     expect(JSON.parse(String(spy.mock.calls[1][1]?.body))).toEqual({
       name: "Sprint 1",
       goal: "유지할 목표",
       plannedStart: null,
       plannedEnd: null,
-      expectedVersion: 4,
+      expectedVersion: 3,
     });
   });
 
@@ -381,7 +388,7 @@ describe("jiraApi sprints", () => {
       .mockResolvedValueOnce(response(200, SPRINT))
       .mockResolvedValueOnce(response(409, { error: "다른 사용자가 먼저 스프린트를 수정했습니다" }));
 
-    await expect(updateSprint("12", { goal: "x" })).rejects.toThrow(
+    await expect(updateSprint("12", { goal: "x" }, 4)).rejects.toThrow(
       "다른 사용자가 먼저 스프린트를 수정했습니다",
     );
   });

@@ -36,6 +36,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     icon: "",
     color: "",
     url: "",
+    version: 1,
     createdAt: now,
   };
 
@@ -61,6 +62,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     plannedStart: dayKey(-5),
     plannedEnd: dayKey(9),
     startedAt: sprintStartedAt,
+    version: 2,
   };
 
   const base = {
@@ -74,6 +76,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     resolution: null as Issue["resolution"],
     resolvedAt: null as string | null,
     fixVersionId: null as string | null,
+    version: 1,
     labels: [] as string[],
     createdAt: now,
     updatedAt: now,
@@ -324,6 +327,7 @@ function applyRichSeed(
     resolution: null as Issue["resolution"],
     resolvedAt: null as string | null,
     fixVersionId: null as string | null,
+    version: 1,
     labels: [] as string[],
     componentIds: [] as string[],
     createdAt: now,
@@ -355,6 +359,7 @@ function applyRichSeed(
     icon: "",
     color: "",
     url: "",
+    version: 1,
     archivedAt: null,
     deletedAt: null,
     createdAt: now,
@@ -369,6 +374,7 @@ function applyRichSeed(
     plannedStart: dayKey(-3),
     plannedEnd: dayKey(11),
     startedAt: wikiSprintStartedAt,
+    version: 2,
   };
   const wikiBase = { ...almBase, projectId: "p2", reporterId: "u2", componentIds: [] as string[] };
   const wikiIssues: Issue[] = [

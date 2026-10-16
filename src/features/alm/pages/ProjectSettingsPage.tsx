@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import {
   Badge,
+  Banner,
   Button,
   Card,
   Checkbox,
@@ -33,7 +34,8 @@ import {
   deleteProject,
   archiveProject,
   unarchiveProject,
-  listIssues,
+  listIssuesPage,
+  listProjects,
   listSchemes,
   listUsers,
   getMyProjectRole,
@@ -43,6 +45,7 @@ import {
   updateProjectCustomSettings,
 } from "../store/jiraStore";
 import { pruneProject } from "../store/uiStore";
+import { errorStatus } from "../store/mapping";
 import { StatusEditor } from "../components/StatusEditor";
 import { StatusGlyph } from "../components/StatusGlyph";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
@@ -105,6 +108,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
 
   const project = projects.find((p) => p.id === projectId);
   const [nameDraft, setNameDraft] = useState(project?.name ?? "");
+  /** 초안을 채운 시점의 프로젝트 버전 — 저장은 이 값으로 보내 그 사이 남의 수정을 덮지 않는다(409) */
+  const [baseVersion, setBaseVersion] = useState(project?.version ?? 0);
   const [descriptionDraft, setDescriptionDraft] = useState(project?.description ?? "");
   const [categoryDraft, setCategoryDraft] = useState(project?.category ?? "");
   const [leadDraft, setLeadDraft] = useState(project?.leadId ?? NO_LEAD);
@@ -114,6 +119,9 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const [iconDraft, setIconDraft] = useState(project?.icon || AUTO);
   const [colorDraft, setColorDraft] = useState(project?.color || AUTO);
   const [urlDraft, setUrlDraft] = useState(project?.url ?? "");
+  /** 일반 설정 저장 충돌(409) — 초안은 그대로 두고 사용자가 불러오기/다시 적용을 고른다 */
+  const [projectConflict, setProjectConflict] = useState(false);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
   const [myRole, setMyRole] = useState<ProjectRole | null>(null);
   const [issueCount, setIssueCount] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -150,20 +158,28 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     setFieldsByTypeDraft(normalizeFieldsByType(resolvedSettings.body));
   }, [currentProjectId]);
 
+  /** 일반 설정 초안을 프로젝트 값으로 채운다 — 이때의 버전이 다음 저장의 기준이다 */
+  const resetGeneralDrafts = (source: Project) => {
+    setNameDraft(source.name);
+    setBaseVersion(source.version);
+    setDescriptionDraft(source.description);
+    setCategoryDraft(source.category);
+    setLeadDraft(source.leadId ?? NO_LEAD);
+    setDefaultAssigneeDraft(source.defaultAssignee);
+    setIconDraft(source.icon || AUTO);
+    setColorDraft(source.color || AUTO);
+    setUrlDraft(source.url);
+    setProjectConflict(false);
+  };
+
   useEffect(() => {
     if (!project) return;
-    setNameDraft(project.name);
-    setDescriptionDraft(project.description);
-    setCategoryDraft(project.category);
-    setLeadDraft(project.leadId ?? NO_LEAD);
-    setDefaultAssigneeDraft(project.defaultAssignee);
-    setIconDraft(project.icon || AUTO);
-    setColorDraft(project.color || AUTO);
-    setUrlDraft(project.url);
+    resetGeneralDrafts(project);
     void getMyProjectRole(project.id).then(setMyRole).catch(() => setMyRole(null));
     let cancelled = false;
-    void listIssues(project.id).then((issues) => {
-      if (!cancelled) setIssueCount(issues.length);
+    // 개수만 필요하다 — 본문 전량 대신 1건 페이지의 total을 쓴다
+    void listIssuesPage(project.id, undefined, { page: 0, size: 1 }).then((page) => {
+      if (!cancelled) setIssueCount(page.total);
     });
     void reloadSettings();
     return () => {
@@ -203,10 +219,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     await reloadSettings();
   };
 
-  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    try {
-      await updateProject(project.id, {
+  const saveGeneral = (version: number) =>
+    updateProject(project.id, {
         name: nameDraft,
         description: descriptionDraft,
         category: categoryDraft,
@@ -215,15 +229,54 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         icon: iconDraft === AUTO ? "" : iconDraft,
         color: colorDraft === AUTO ? "" : colorDraft,
         url: urlDraft,
-      });
-      await onProjectsChanged();
-      toast({ title: "프로젝트를 수정했습니다", appearance: "success" });
+      }, version);
+
+  const afterGeneralSaved = async (saved: Project) => {
+    setBaseVersion(saved.version);
+    setProjectConflict(false);
+    await onProjectsChanged();
+    toast({ title: "프로젝트를 수정했습니다", appearance: "success" });
+  };
+
+  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await afterGeneralSaved(await saveGeneral(baseVersion));
     } catch (error) {
+      if (errorStatus(error) === 409) {
+        setProjectConflict(true);
+        return;
+      }
       toast({
         title: "수정 실패",
         description: error instanceof Error ? error.message : String(error),
         appearance: "danger",
       });
+    }
+  };
+
+  /** 충돌 해소 — 최신 프로젝트를 다시 읽어 초안을 버리거나(불러오기) 최신 버전 기준으로 다시 저장한다 */
+  const resolveGeneralConflict = async (mode: "reload" | "reapply") => {
+    setResolvingConflict(true);
+    try {
+      const latest = (await listProjects()).find((p) => p.id === project.id);
+      if (!latest) throw new Error("프로젝트를 찾을 수 없습니다");
+      if (mode === "reload") {
+        resetGeneralDrafts(latest);
+        await onProjectsChanged();
+      } else {
+        await afterGeneralSaved(await saveGeneral(latest.version));
+      }
+    } catch (error) {
+      if (errorStatus(error) !== 409) {
+        toast({
+          title: mode === "reload" ? "최신 내용을 불러오지 못했습니다" : "다시 적용하지 못했습니다",
+          description: error instanceof Error ? error.message : String(error),
+          appearance: "danger",
+        });
+      }
+    } finally {
+      setResolvingConflict(false);
     }
   };
 
@@ -285,6 +338,23 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     <div className="project-settings">
       <Card padding="lg" title="일반">
         <form className="project-create-form" onSubmit={handleSave}>
+          {projectConflict ? (
+            <Banner variant="warning">
+              <div className="issue-conflict">
+                <p className="issue-conflict-text">
+                  다른 사용자가 이 프로젝트를 먼저 수정해 저장하지 않았습니다. 입력한 내용은 그대로 남아 있습니다.
+                </p>
+                <div className="issue-conflict-actions">
+                  <Button size="small" variant="secondary" disabled={resolvingConflict} onClick={() => void resolveGeneralConflict("reload")}>
+                    최신 내용 불러오기
+                  </Button>
+                  <Button size="small" variant="primary" disabled={resolvingConflict} onClick={() => void resolveGeneralConflict("reapply")}>
+                    내 변경 다시 적용(최신 버전 기준)
+                  </Button>
+                </div>
+              </div>
+            </Banner>
+          ) : null}
           <div className="project-key-readonly">
             <span className="project-key-readonly-label">키</span>
             <span className="issue-key-cell">{project.key}</span>

@@ -86,6 +86,7 @@ export function mapProject(dto: ProjectDto): Project {
     archivedAt: dto.archivedAt ?? null,
     deletedAt: dto.deletedAt ?? null,
     purgeAt: dto.purgeAt ?? null,
+    version: dto.version,
     createdAt: dto.createdAt,
   };
 }
@@ -122,6 +123,7 @@ export function mapSprint(dto: SprintDto): Sprint {
     projectId: String(dto.projectId),
     name: dto.name,
     state: SPRINT_STATES_FROM_API[dto.state],
+    version: dto.version,
   };
   if (dto.goal) sprint.goal = dto.goal;
   if (dto.plannedStart) sprint.plannedStart = dto.plannedStart;
@@ -272,6 +274,7 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     labels: dto.labels ? [...dto.labels] : [],
     componentIds: dto.componentIds ? dto.componentIds.map(String) : [],
     order: dto.order ?? order,
+    version: dto.version,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
   };

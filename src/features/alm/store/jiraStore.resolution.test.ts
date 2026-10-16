@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   getIssueByKey,
@@ -16,7 +17,7 @@ describe("해결(Resolution)", () => {
   it("완료 카테고리로 옮기면 해결이 '완료됨'으로 채워진다 (지라 기본값)", async () => {
     const issue = await getIssueByKey("ALM-5"); // 할 일
 
-    const moved = await updateIssue(issue!.id, { status: "done" });
+    const moved = await updateIssue(issue!.id, { status: "done" }, __versionForTest("issue", issue!.id));
 
     expect(moved.resolution).toBe("done");
   });
@@ -25,7 +26,7 @@ describe("해결(Resolution)", () => {
     const issue = await getIssueByKey("ALM-1"); // 시드 완료 이슈
     expect(issue!.resolution).toBe("done");
 
-    const reopened = await updateIssue(issue!.id, { status: "inprogress" });
+    const reopened = await updateIssue(issue!.id, { status: "inprogress" }, __versionForTest("issue", issue!.id));
 
     expect(reopened.resolution).toBeNull();
   });
@@ -33,7 +34,7 @@ describe("해결(Resolution)", () => {
   it("완료된 이슈의 해결을 다른 값으로 바꿀 수 있고 활동로그에 남는다", async () => {
     const issue = await getIssueByKey("ALM-1");
 
-    const updated = await updateIssue(issue!.id, { resolution: "wont_do" });
+    const updated = await updateIssue(issue!.id, { resolution: "wont_do" }, __versionForTest("issue", issue!.id));
 
     expect(updated.resolution).toBe("wont_do");
     const activity = await listActivity(issue!.id);
@@ -43,7 +44,7 @@ describe("해결(Resolution)", () => {
   it("완료가 아닌 이슈에는 해결을 설정할 수 없다", async () => {
     const issue = await getIssueByKey("ALM-5");
 
-    await expect(updateIssue(issue!.id, { resolution: "duplicate" })).rejects.toThrow(
+    await expect(updateIssue(issue!.id, { resolution: "duplicate" }, __versionForTest("issue", issue!.id))).rejects.toThrow(
       "완료된 이슈에만 해결을 설정할 수 있습니다",
     );
   });
@@ -51,7 +52,7 @@ describe("해결(Resolution)", () => {
   it("상태와 해결을 한 번에 바꾸면 명시한 해결이 기본값보다 우선한다", async () => {
     const issue = await getIssueByKey("ALM-5");
 
-    const moved = await updateIssue(issue!.id, { status: "done", resolution: "duplicate" });
+    const moved = await updateIssue(issue!.id, { status: "done", resolution: "duplicate" }, __versionForTest("issue", issue!.id));
 
     expect(moved.resolution).toBe("duplicate");
   });
@@ -60,20 +61,20 @@ describe("해결(Resolution)", () => {
     const open = await getIssueByKey("ALM-5"); // 할 일 — 아직 해결 없음
     expect(open!.resolvedAt).toBeNull();
 
-    const done = await updateIssue(open!.id, { status: "done" });
+    const done = await updateIssue(open!.id, { status: "done" }, __versionForTest("issue", open!.id));
     expect(done.resolution).toBe("done");
     expect(done.resolvedAt).not.toBeNull();
     const firstResolvedAt = done.resolvedAt!;
 
     // 해결 값만 바꾸는 것은 "다시 해결"이 아니다 — 처음 해결한 시각을 지킨다
-    const changed = await updateIssue(open!.id, { resolution: "duplicate" });
+    const changed = await updateIssue(open!.id, { resolution: "duplicate" }, __versionForTest("issue", open!.id));
     expect(changed.resolvedAt).toBe(firstResolvedAt);
 
-    const reopened = await updateIssue(open!.id, { status: "inprogress" });
+    const reopened = await updateIssue(open!.id, { status: "inprogress" }, __versionForTest("issue", open!.id));
     expect(reopened.resolution).toBeNull();
     expect(reopened.resolvedAt).toBeNull();
 
-    const again = await updateIssue(open!.id, { status: "done" });
+    const again = await updateIssue(open!.id, { status: "done" }, __versionForTest("issue", open!.id));
     expect(again.resolvedAt).not.toBeNull();
   });
 

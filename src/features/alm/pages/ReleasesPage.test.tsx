@@ -6,6 +6,7 @@ import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 // 이 화면은 App에서 lazy()로 쪼개져 있다 — 수집 시점에 미리 올려 병렬 실행에서 청크 대기가 한도를 넘지 않게
 import "./ReleasesPage";
+import { __versionForTest } from "../store/jiraStore";
 import { __resetForTest, createVersion, getIssueByKey, updateIssue } from "../store/jiraStore";
 
 function renderReleases() {
@@ -43,8 +44,8 @@ describe("ReleasesPage", () => {
     const version = await createVersion("p1", { name: "1.0" });
     const done = await getIssueByKey("ALM-1");
     const open = await getIssueByKey("ALM-5");
-    await updateIssue(done!.id, { fixVersionId: version.id });
-    await updateIssue(open!.id, { fixVersionId: version.id });
+    await updateIssue(done!.id, { fixVersionId: version.id }, __versionForTest("issue", done!.id));
+    await updateIssue(open!.id, { fixVersionId: version.id }, __versionForTest("issue", open!.id));
     renderReleases();
 
     const list = await screen.findByRole("list", { name: "버전 목록" });
@@ -57,7 +58,7 @@ describe("ReleasesPage", () => {
     const v1 = await createVersion("p1", { name: "1.0" });
     await createVersion("p1", { name: "1.1" });
     const open = await getIssueByKey("ALM-5");
-    await updateIssue(open!.id, { fixVersionId: v1.id });
+    await updateIssue(open!.id, { fixVersionId: v1.id }, __versionForTest("issue", open!.id));
     renderReleases();
 
     const list = await screen.findByRole("list", { name: "버전 목록" });

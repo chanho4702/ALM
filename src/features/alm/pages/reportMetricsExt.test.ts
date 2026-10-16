@@ -11,6 +11,7 @@ const STATUSES: WorkflowStatus[] = [
 function issue(over: Partial<Issue> & { id: string }): Issue {
   return {
     key: `ALM-${over.id}`,
+    version: 1,
     projectId: "p1",
     title: `이슈 ${over.id}`,
     description: "",
@@ -59,7 +60,7 @@ const SPRINT: Sprint = {
   id: "s1",
   projectId: "p1",
   name: "Sprint 1",
-  state: "active",
+  state: "active", version: 1,
   plannedStart: "2026-08-24",
   plannedEnd: "2026-08-27",
   startedAt: "2026-08-24T00:00:00.000Z",
@@ -87,13 +88,13 @@ describe("burnupSeries", () => {
 
 describe("velocitySeries", () => {
   it("완료된 스프린트마다 약속(시작 총량)과 완료량을 순서대로 낸다", () => {
-    const s1: Sprint = { ...SPRINT, state: "done", completedAt: "2026-08-27T18:00:00.000Z" };
+    const s1: Sprint = { ...SPRINT, state: "done", version: 1, completedAt: "2026-08-27T18:00:00.000Z" };
     const s2: Sprint = {
-      id: "s2", projectId: "p1", name: "Sprint 2", state: "done",
+      id: "s2", projectId: "p1", name: "Sprint 2", state: "done", version: 1,
       plannedStart: "2026-08-28", plannedEnd: "2026-08-31",
       startedAt: "2026-08-28T00:00:00.000Z", completedAt: "2026-08-31T18:00:00.000Z",
     };
-    const active: Sprint = { ...SPRINT, id: "s3", name: "Sprint 3", state: "active", startedAt: "2026-09-01T00:00:00.000Z" };
+    const active: Sprint = { ...SPRINT, id: "s3", name: "Sprint 3", state: "active", version: 1, startedAt: "2026-09-01T00:00:00.000Z" };
     const issues = [
       issue({ id: "1", status: "done", estimateHours: 3 }),
       issue({ id: "2", status: "done", sprintId: "s2", estimateHours: 5 }), // s1 미완료 → s2로 이관 뒤 완료

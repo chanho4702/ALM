@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   completeSprint,
@@ -38,7 +39,7 @@ describe("스프린트 계획 메타", () => {
       goal: "결제 실패율 절반으로",
       plannedStart: "2026-09-01",
       plannedEnd: "2026-09-12",
-    });
+    }, __versionForTest("sprint", sprint.id));
 
     expect(updated).toMatchObject({
       goal: "결제 실패율 절반으로",
@@ -54,7 +55,7 @@ describe("스프린트 계획 메타", () => {
     const sprint = await sprintInNewProject();
 
     await expect(
-      updateSprint(sprint.id, { plannedStart: "2026-09-12", plannedEnd: "2026-09-01" }),
+      updateSprint(sprint.id, { plannedStart: "2026-09-12", plannedEnd: "2026-09-01" }, __versionForTest("sprint", sprint.id)),
     ).rejects.toThrow("시작 예정일은 종료 예정일보다 늦을 수 없습니다");
 
     const [reloaded] = await listSprints(sprint.projectId);
@@ -67,9 +68,9 @@ describe("스프린트 계획 메타", () => {
       goal: "임시 목표",
       plannedStart: "2026-09-01",
       plannedEnd: "2026-09-12",
-    });
+    }, __versionForTest("sprint", sprint.id));
 
-    const cleared = await updateSprint(sprint.id, { goal: "  ", plannedStart: "", plannedEnd: "" });
+    const cleared = await updateSprint(sprint.id, { goal: "  ", plannedStart: "", plannedEnd: "" }, __versionForTest("sprint", sprint.id));
 
     expect(cleared.goal).toBeUndefined();
     expect(cleared.plannedStart).toBeUndefined();
@@ -80,7 +81,7 @@ describe("스프린트 계획 메타", () => {
     const sprint = await sprintInNewProject();
     await startSprint(sprint.id);
 
-    const updated = await updateSprint(sprint.id, { name: "릴리스 준비", goal: "진행 중 재정의" });
+    const updated = await updateSprint(sprint.id, { name: "릴리스 준비", goal: "진행 중 재정의" }, __versionForTest("sprint", sprint.id));
 
     expect(updated.name).toBe("릴리스 준비");
     expect(updated.state).toBe("active");
@@ -88,7 +89,7 @@ describe("스프린트 계획 메타", () => {
   });
 
   it("없는 스프린트는 거부한다", async () => {
-    await expect(updateSprint("없는-id", { goal: "x" })).rejects.toThrow(
+    await expect(updateSprint("없는-id", { goal: "x" }, __versionForTest("sprint", "없는-id"))).rejects.toThrow(
       "스프린트를 찾을 수 없습니다",
     );
   });

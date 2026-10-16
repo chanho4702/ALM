@@ -17,13 +17,14 @@ import type { Component, Issue, IssuePriority, IssueType, Sprint, User, Workflow
 import {
   listComponents,
   bulkDeleteIssues,
-  listIssues,
   listIssuesPage,
+  listProjectLabels,
   listProjectStatuses,
   listSprints,
   listUsers,
   resolveSettings,
 } from "../store/jiraStore";
+import type { IssueSortField } from "../store/jiraStore";
 import { BulkEditModal } from "../components/BulkEditModal";
 import { CsvImportModal } from "../components/CsvImportModal";
 import { issuesToCsv } from "../store/csv";
@@ -36,8 +37,6 @@ import { FilterDropdown } from "../components/FilterDropdown";
 import { formatDate } from "../components/time";
 import {
   priorityName,
-  priorityRank,
-  KIND_ORDER,
   statusAppearance,
   statusKind,
   statusName,
@@ -61,6 +60,24 @@ const INITIAL_QUERY = {
   componentId: ALL,
   type: ALL,
   page: 0,
+  /** 정렬 열 — 없으면 서버 기본(키 오름차순) */
+  sortKey: undefined as string | undefined,
+  sortDirection: "asc" as SortDirection,
+};
+
+/**
+ * 열 → 서버 정렬 기준. 정렬은 서버가 조건 전체에 대해 하고 화면은 받은 페이지를 그대로 그린다
+ * (한 페이지 안에서만 다시 정렬하면 2쪽의 앞선 이슈가 1쪽에 안 나온다).
+ * 담당자는 서버가 정렬하지 못한다(이름이 org-service에 있다) — 그래서 정렬 가능한 열로 내지 않는다.
+ */
+const SORT_FIELDS: Record<string, IssueSortField> = {
+  key: "key",
+  title: "title",
+  status: "status",
+  priority: "priority",
+  dueDate: "due",
+  createdAt: "created",
+  updatedAt: "updated",
 };
 
 export function IssueListPage() {
@@ -79,14 +96,13 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
   const [text, setText] = useState("");
   const [query, setQuery] = useState(INITIAL_QUERY);
   const [loadedQuery, setLoadedQuery] = useState<typeof INITIAL_QUERY | null>(null);
-  const { status, priority, assigneeId, label, type, componentId, page } = query;
+  const { status, priority, assigneeId, label, type, componentId, page, sortKey, sortDirection } = query;
   const [labelOptions, setLabelOptions] = useState<string[]>([]);
   const [componentOptions, setComponentOptions] = useState<Component[]>([]);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   /** 프로젝트 필드 구성 — 대량 변경에서 숨긴 필드를 뺀다 */
   const [fields, setFields] = useState(() => resolveFields(null));
-  const [sortKey, setSortKey] = useState<string | undefined>(undefined);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
   // 대량 변경 — 선택은 화면 상태, 적용은 스토어(bulkUpdateIssues)
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -113,13 +129,17 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     return () => clearTimeout(timer);
   }, [text, query.text]);
 
-  const changeFilter = (key: Exclude<keyof typeof INITIAL_QUERY, "text" | "page">, value: string) => {
+  const changeFilter = (
+    key: Exclude<keyof typeof INITIAL_QUERY, "text" | "page" | "sortKey" | "sortDirection">,
+    value: string,
+  ) => {
     setQuery((prev) => ({ ...prev, [key]: value, page: 0 }));
   };
 
+  // 필터만 지운다 — 사용자가 고른 정렬은 유지한다
   const resetFilters = () => {
     setText("");
-    setQuery(INITIAL_QUERY);
+    setQuery((prev) => ({ ...INITIAL_QUERY, sortKey: prev.sortKey, sortDirection: prev.sortDirection }));
   };
 
   const reload = useCallback(() => setRefreshVersion((version) => version + 1), []);
@@ -127,7 +147,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
   // 필터 변경 시에는 현재 페이지 하나만 조회한다. 취소된 응답은 최신 결과를 덮지 못한다.
   useEffect(() => {
     if (!projectId) return;
-    const { status, priority, assigneeId, label, componentId, type, page } = query;
+    const { status, priority, assigneeId, label, componentId, type, page, sortKey, sortDirection } = query;
+    const sortField = sortKey ? SORT_FIELDS[sortKey] : undefined;
     let active = true;
     setLoading(true);
     setLoadError(null);
@@ -143,6 +164,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
         type: type === ALL ? undefined : (type as IssueType),
       },
       { page, size: PAGE_SIZE },
+      sortField ? { field: sortField, dir: sortDirection } : undefined,
     ).then((result) => {
       if (!active) return;
       // 마지막 페이지의 이슈를 삭제했으면 남은 마지막 페이지로 이동한다.
@@ -183,9 +205,9 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
       // 대량 변경은 여러 타입이 섞이므로 기본 구성으로 해석한다.
       setFields(resolveFields(settings.body));
     });
-    // 라벨 수집은 전체 이슈를 읽으므로 첫 페이지와 사용자·상태 표시를 기다리게 하지 않는다.
-    const labelMetadata = listIssues(projectId).then((all) => {
-      if (active) setLabelOptions([...new Set(all.flatMap((issue) => issue.labels))].sort());
+    // 라벨 선택지는 서버가 DISTINCT로 준다 — 프로젝트 이슈 전량을 읽어 모으지 않는다.
+    const labelMetadata = listProjectLabels(projectId).then((labels) => {
+      if (active) setLabelOptions(labels);
     });
     void Promise.all([projectMetadata, labelMetadata]).then(() => {
       if (active) setMetadataLoaded(true);
@@ -210,54 +232,19 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
   /** 담당자 셀의 프로필 사진 조회용 — 이름만 필요한 자리는 userNames를 계속 쓴다 */
   const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
 
+  /** 정렬 변경은 서버 재조회 — 다른 정렬의 3쪽은 의미가 없으니 첫 페이지로 돌아간다 */
   const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDirection("asc");
-    }
+    if (!SORT_FIELDS[key]) return;
+    setQuery((prev) => ({
+      ...prev,
+      sortKey: key,
+      sortDirection: prev.sortKey === key && prev.sortDirection === "asc" ? "desc" : "asc",
+      page: 0,
+    }));
   };
 
-  // 정렬은 스토어 반환 목록 위에서 클라이언트가 수행한다 (필터는 스토어, 정렬은 화면)
-  const sortedIssues = useMemo(() => {
-    if (!issues || !sortKey) return issues ?? [];
-    const dir = sortDirection === "asc" ? 1 : -1;
-    const assigneeName = (i: Issue) =>
-      i.assigneeId ? (userNames[i.assigneeId] ?? "") : "￿"; // 미지정은 항상 뒤로
-    return [...issues].sort((a, b) => {
-      let cmp = 0;
-      switch (sortKey) {
-        case "title":
-          cmp = a.title.localeCompare(b.title, "ko");
-          break;
-        case "status":
-          cmp =
-            KIND_ORDER[statusKind(statuses, a.status)] - KIND_ORDER[statusKind(statuses, b.status)];
-          break;
-        case "priority":
-          cmp = priorityRank(priorities, a.priority) - priorityRank(priorities, b.priority);
-          break;
-        case "assignee":
-          cmp = assigneeName(a).localeCompare(assigneeName(b), "ko");
-          break;
-        case "createdAt":
-          cmp = a.createdAt.localeCompare(b.createdAt);
-          break;
-        case "updatedAt":
-          cmp = a.updatedAt.localeCompare(b.updatedAt);
-          break;
-        case "dueDate":
-          // 미지정 마감일은 정렬 방향과 무관하게 항상 뒤로 (dir 미적용 early return)
-          if (a.dueDate === null && b.dueDate === null) return 0;
-          if (a.dueDate === null) return 1;
-          if (b.dueDate === null) return -1;
-          cmp = a.dueDate.localeCompare(b.dueDate);
-          break;
-      }
-      return cmp * dir;
-    });
-  }, [issues, sortKey, sortDirection, userNames, statuses, priorities]);
+  // 서버가 정렬한 순서 그대로 — 화면에서 다시 정렬하지 않는다
+  const sortedIssues = issues ?? [];
 
   const selectedId = useMemo(
     () => (issueKey ? (issues?.find((i) => i.key === issueKey)?.id ?? undefined) : undefined),
@@ -308,7 +295,11 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     await reload();
   };
 
-  /** 현재 보이는(필터·정렬 적용) 목록을 CSV로 — 선택이 있으면 선택만 */
+  /**
+   * CSV 내보내기 범위는 **지금 보이는 페이지**(선택이 있으면 선택한 이슈)다 — 필터 결과 전체가 아니다.
+   * 버튼과 완료 알림이 그 범위를 그대로 말한다.
+   */
+  const exportScope = selected.size > 0 ? `선택 ${selected.size}건` : `현재 페이지 ${sortedIssues.length}건`;
   const exportCsv = () => {
     const rows = selected.size > 0 ? sortedIssues.filter((i) => selected.has(i.id)) : sortedIssues;
     const csv = issuesToCsv(rows, { statuses, users, types: issueTypes });
@@ -322,7 +313,11 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     anchor.download = `issues-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast({ title: `${rows.length}개 이슈를 CSV로 내보냈습니다`, appearance: "success" });
+    toast({
+      title: `${selected.size > 0 ? "선택한" : "현재 페이지의"} ${rows.length}개 이슈를 CSV로 내보냈습니다`,
+      description: total > rows.length ? `조건에 맞는 전체 ${total}건 중 ${rows.length}건입니다.` : undefined,
+      appearance: "success",
+    });
   };
 
   const columns: TableColumn<Issue>[] = [
@@ -372,6 +367,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     {
       key: "key",
       header: "키",
+      sortable: true,
       width: "80px",
       render: (issue) => <span className="issue-key-cell">{issue.key}</span>,
     },
@@ -417,9 +413,9 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
       ),
     },
     {
+      // 서버 정렬 미지원(이름이 org-service에 있다) — 정렬 버튼을 내지 않는다
       key: "assignee",
       header: "담당자",
-      sortable: true,
       width: "136px",
       render: (issue) =>
         issue.assigneeId ? (
@@ -632,7 +628,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
               </div>
               <div className="issue-toolbar-actions">
                 <Button size="small" variant="secondary" disabled={actionsDisabled || !issues?.length} onClick={exportCsv}>
-                  CSV 내보내기
+                  {`CSV 내보내기 (${exportScope})`}
                 </Button>
                 <Button size="small" variant="secondary" disabled={!metadataLoaded || metadataLoading || metadataError !== null} onClick={() => setImportOpen(true)}>
                   CSV 가져오기
@@ -690,7 +686,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
       </section>
       <BulkEditModal
         open={bulkOpen}
-        issueIds={[...selected]}
+        targets={(issues ?? []).filter((i) => selected.has(i.id)).map((i) => ({ id: i.id, version: i.version }))}
         statuses={statuses}
         users={users}
         sprints={sprints}

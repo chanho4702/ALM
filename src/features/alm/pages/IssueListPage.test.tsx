@@ -267,7 +267,7 @@ describe("IssueListPage 표 위 툴바", () => {
     expect(within(pager).getByRole("button", { name: "다음" })).toBeDisabled();
     expect(within(pager).getByRole("button", { name: "이전" })).toBeDisabled();
     // CSV 동작도 같은 줄에 있다 (선택 0건이면 대량 작업 바는 숨는다)
-    expect(within(toolbar).getByRole("button", { name: "CSV 내보내기" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: /^CSV 내보내기/ })).toBeInTheDocument();
     expect(screen.queryByRole("toolbar", { name: "대량 작업" })).not.toBeInTheDocument();
   });
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   aqlFields,
@@ -53,7 +54,7 @@ describe("jiraStore AQL 파사드 (목업)", () => {
   it("날짜 경계는 실행 기계 시간대가 아니라 Asia/Seoul이다", async () => {
     // 2026-09-06 23:30 UTC = 2026-09-07 08:30 KST. UTC로 계산하면 "오늘"이 하루 밀린다.
     const issue = await getIssueByKey("ALM-2");
-    await updateIssue(issue!.id, { dueDate: "2026-09-07" });
+    await updateIssue(issue!.id, { dueDate: "2026-09-07" }, __versionForTest("issue", issue!.id));
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-06T23:30:00Z"));
     try {

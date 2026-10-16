@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   archiveIssue,
@@ -46,7 +47,7 @@ describe("프로젝트 보관·휴지통", () => {
     const project = await archiveProject("p1");
     expect(project.archivedAt).toBeTruthy();
     await expect(createIssue({ projectId: "p1", title: "막힘" })).rejects.toThrow("보관된 프로젝트는 읽기만 할 수 있습니다");
-    await expect(updateProject("p1", { name: "바꿈" })).rejects.toThrow("보관된 프로젝트는 읽기만 할 수 있습니다");
+    await expect(updateProject("p1", { name: "바꿈" }, __versionForTest("project", "p1"))).rejects.toThrow("보관된 프로젝트는 읽기만 할 수 있습니다");
     expect((await listIssues("p1")).length).toBeGreaterThan(0); // 읽기는 된다
     await unarchiveProject("p1");
     expect((await listProjects()).find((p) => p.id === "p1")?.archivedAt).toBeNull();

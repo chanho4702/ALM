@@ -1,4 +1,6 @@
+import type { IssueQuery } from "./searchQuery";
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   addComment,
@@ -163,7 +165,7 @@ describe("updateIssue 활동로그", () => {
       assigneeId: "u1",
       priority: "high",
       sprintId: null,
-    });
+    }, __versionForTest("issue", issue!.id));
     const acts = await listActivity(issue!.id);
     const byType = Object.fromEntries(acts.map((a) => [a.type, a.detail]));
     expect(byType.status).toBe("할 일 → 진행 중");
@@ -175,34 +177,34 @@ describe("updateIssue 활동로그", () => {
   it("제목/설명만 바꾸면 활동로그를 남기지 않는다", async () => {
     const issue = await getIssueByKey("ALM-4");
     const before = (await listActivity(issue!.id)).length;
-    const updated = await updateIssue(issue!.id, { title: "수정된 제목", description: "상세" });
+    const updated = await updateIssue(issue!.id, { title: "수정된 제목", description: "상세" }, __versionForTest("issue", issue!.id));
     expect(updated.title).toBe("수정된 제목");
     expect(await listActivity(issue!.id)).toHaveLength(before);
   });
 
   it("없는 이슈는 거부한다", async () => {
-    await expect(updateIssue("없음", { title: "x" })).rejects.toThrow("이슈를 찾을 수 없습니다");
+    await expect(updateIssue("없음", { title: "x" }, __versionForTest("issue", "없음"))).rejects.toThrow("이슈를 찾을 수 없습니다");
   });
 });
 
 describe("updateIssue order 재계산 (W3)", () => {
   it("sprintId 변경 시 대상 그룹(프로젝트+스프린트+상태) 맨 뒤 order를 부여한다", async () => {
     const six = await getIssueByKey("ALM-6"); // 백로그 todo, order 1
-    const moved = await updateIssue(six!.id, { sprintId: "s1" });
+    const moved = await updateIssue(six!.id, { sprintId: "s1" }, __versionForTest("issue", six!.id));
     // s1 todo 그룹: ALM-4(1), ALM-5(2) → 맨 뒤 3
     expect(moved.order).toBe(3);
   });
 
   it("status 변경 시 대상 그룹 맨 뒤 order를 부여한다", async () => {
     const four = await getIssueByKey("ALM-4"); // s1 todo, order 1
-    const moved = await updateIssue(four!.id, { status: "done" });
+    const moved = await updateIssue(four!.id, { status: "done" }, __versionForTest("issue", four!.id));
     // s1 done 그룹: ALM-1(1) → 맨 뒤 2
     expect(moved.order).toBe(2);
   });
 
   it("제목/설명만 바꾸면 order를 유지한다", async () => {
     const four = await getIssueByKey("ALM-4");
-    const updated = await updateIssue(four!.id, { title: "제목만 수정" });
+    const updated = await updateIssue(four!.id, { title: "제목만 수정" }, __versionForTest("issue", four!.id));
     expect(updated.order).toBe(four!.order);
   });
 });
@@ -249,7 +251,7 @@ describe("dueDate / labels (요구사항 갭)", () => {
 
   it("updateIssue로 dueDate/labels를 바꾸면 활동로그에 남는다", async () => {
     const issue = await createIssue({ projectId: PROJECT, title: "변경 대상" });
-    await updateIssue(issue.id, { dueDate: "2026-08-15", labels: ["design"] });
+    await updateIssue(issue.id, { dueDate: "2026-08-15", labels: ["design"] }, __versionForTest("issue", issue.id));
     const acts = await listActivity(issue.id);
     expect(acts).toContainEqual(
       expect.objectContaining({ type: "duedate", detail: "미지정 → 2026-08-15" }),
@@ -347,7 +349,7 @@ describe("이슈 타입", () => {
 
   it("타입 변경은 활동로그에 남는다", async () => {
     const issue = await createIssue({ projectId: PROJECT, title: "타입 변경" });
-    await updateIssue(issue.id, { type: "story" });
+    await updateIssue(issue.id, { type: "story" }, __versionForTest("issue", issue.id));
     const acts = await listActivity(issue.id);
     expect(acts).toContainEqual(
       expect.objectContaining({ type: "issuetype", detail: "작업 → 스토리" }),
@@ -369,8 +371,8 @@ describe("notifications", () => {
 
   it("담당자 변경/상태 변경/코멘트가 담당자에게 알림을 만든다 (본인 액션 제외)", async () => {
     const issue = await createIssue({ projectId: PROJECT, title: "알림 대상" });
-    await updateIssue(issue.id, { assigneeId: "u2" }); // u1(actor) → u2 할당 알림
-    await updateIssue(issue.id, { status: "done" }); // u2에게 상태 알림
+    await updateIssue(issue.id, { assigneeId: "u2" }, __versionForTest("issue", issue.id)); // u1(actor) → u2 할당 알림
+    await updateIssue(issue.id, { status: "done" }, __versionForTest("issue", issue.id)); // u2에게 상태 알림
     await addComment(issue.id, "확인 부탁"); // u2에게 코멘트 알림
 
     const toU2 = await listNotifications("u2");
@@ -379,7 +381,7 @@ describe("notifications", () => {
 
     // 자신에게 할당(u1 → u1)은 알림이 없다
     const mine = await createIssue({ projectId: PROJECT, title: "본인 할당" });
-    await updateIssue(mine.id, { assigneeId: "u1" });
+    await updateIssue(mine.id, { assigneeId: "u1" }, __versionForTest("issue", mine.id));
     const toMe = await listNotifications();
     expect(toMe.filter((n) => n.issueKey === mine.key)).toHaveLength(0);
   });
@@ -436,9 +438,10 @@ describe("rankIssue (백로그 DnD)", () => {
   });
 });
 
-describe("queryIssues (상세 검색)", () => {
+describe("queryIssuesPage (상세 검색 — 서버 페이징)", () => {
   it("필드 간 AND, 다중 값 OR로 거른다", async () => {
-    const { queryIssues } = await import("./jiraStore");
+    const { queryIssuesPage } = await import("./jiraStore");
+    const queryIssues = async (q: IssueQuery) => (await queryIssuesPage(q, { page: 0, size: 200 })).items;
     const { EMPTY_QUERY } = await import("./searchQuery");
     // 진행 중 OR 완료 + frontend 라벨 = ALM-2, ALM-3 중 라벨 매치
     const result = await queryIssues({
@@ -450,7 +453,8 @@ describe("queryIssues (상세 검색)", () => {
   });
 
   it("정렬: 마감일은 미지정이 뒤, 우선순위는 높음 먼저", async () => {
-    const { queryIssues } = await import("./jiraStore");
+    const { queryIssuesPage } = await import("./jiraStore");
+    const queryIssues = async (q: IssueQuery) => (await queryIssuesPage(q, { page: 0, size: 200 })).items;
     const { EMPTY_QUERY } = await import("./searchQuery");
     const byDue = await queryIssues({ ...EMPTY_QUERY, sort: "due" });
     expect(byDue[0].dueDate).not.toBeNull();
@@ -462,7 +466,8 @@ describe("queryIssues (상세 검색)", () => {
   });
 
   it("전 프로젝트를 가로질러 검색하고 프로젝트 필터로 좁힌다", async () => {
-    const { queryIssues } = await import("./jiraStore");
+    const { queryIssuesPage } = await import("./jiraStore");
+    const queryIssues = async (q: IssueQuery) => (await queryIssuesPage(q, { page: 0, size: 200 })).items;
     const { EMPTY_QUERY } = await import("./searchQuery");
     const other = await createProject({ key: "PAY", name: "결제" });
     await createIssue({ projectId: other.id, title: "결제 검색 대상" });
@@ -509,10 +514,10 @@ describe("worklogs (시간 추적)", () => {
   it("estimateHours patch 검증 + 이슈 삭제 시 워크로그 cascade", async () => {
     const { listWorklogs } = await import("./jiraStore");
     const two = await getIssueByKey("ALM-2");
-    await expect(updateIssue(two!.id, { estimateHours: -1 })).rejects.toThrow(
+    await expect(updateIssue(two!.id, { estimateHours: -1 }, __versionForTest("issue", two!.id))).rejects.toThrow(
       "예상 시간은 0보다 커야 합니다",
     );
-    const updated = await updateIssue(two!.id, { estimateHours: 12 });
+    const updated = await updateIssue(two!.id, { estimateHours: 12 }, __versionForTest("issue", two!.id));
     expect(updated.estimateHours).toBe(12);
 
     await deleteIssue(two!.id);

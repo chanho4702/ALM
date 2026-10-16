@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   assignScheme,
@@ -13,7 +14,7 @@ import {
   listProjectStatuses,
   listSchemes,
   moveIssue,
-  queryIssues,
+  queryIssuesPage,
   resolveSettings,
   setDefaultScheme,
   setProjectCustom,
@@ -125,7 +126,7 @@ describe("타입 활성화가 이슈 생성/전환을 제약한다", () => {
     ).rejects.toThrow("이 프로젝트에서 사용할 수 없는 타입입니다: 버그");
 
     const task = await getIssueByKey("ALM-1");
-    await expect(updateIssue(task!.id, { type: "bug" })).rejects.toThrow(
+    await expect(updateIssue(task!.id, { type: "bug" }, __versionForTest("issue", task!.id))).rejects.toThrow(
       "이 프로젝트에서 사용할 수 없는 타입입니다: 버그",
     );
 
@@ -199,9 +200,9 @@ describe("프로젝트 커스텀 전환/복귀·스킴 재배정", () => {
     expect((await getIssueByKey("ALM-1"))!.status).toBe("review");
 
     // 카테고리 검색(진행중)에 걸리고, 상태 id 직접 필터도 동작
-    const byCategory = await queryIssues({ ...EMPTY_QUERY, statuses: ["inprogress"] });
+    const byCategory = (await queryIssuesPage({ ...EMPTY_QUERY, statuses: ["inprogress"] }, { page: 0, size: 200 })).items;
     expect(byCategory.map((i) => i.key)).toContain("ALM-1");
-    const byId = await queryIssues({ ...EMPTY_QUERY, statusIds: ["review"] });
+    const byId = (await queryIssuesPage({ ...EMPTY_QUERY, statusIds: ["review"] }, { page: 0, size: 200 })).items;
     expect(byId.map((i) => i.key)).toEqual(["ALM-1"]);
 
     // 크로스 프로젝트 메타·전체 합집합
@@ -236,7 +237,7 @@ describe("프로젝트 커스텀 전환/복귀·스킴 재배정", () => {
     await expect(moveIssue(issue!.id, { status: "ghost" })).rejects.toThrow(
       "이 프로젝트에 없는 상태입니다",
     );
-    await expect(updateIssue(issue!.id, { status: "ghost" })).rejects.toThrow(
+    await expect(updateIssue(issue!.id, { status: "ghost" }, __versionForTest("issue", issue!.id))).rejects.toThrow(
       "이 프로젝트에 없는 상태입니다",
     );
     await expect(

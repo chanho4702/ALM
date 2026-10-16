@@ -12,6 +12,13 @@ import * as mock from "./jiraMock";
 import * as rest from "./jiraApi";
 
 export type { SavedFilter, SavedFilterInput } from "./uiStore";
+export type {
+  IssueAggregate,
+  IssueAggregateGroup,
+  IssueSearchCriteria,
+  IssueSort,
+  IssueSortField,
+} from "./issueSearch";
 export type { ProjectPatch,
   ProjectMemberView,
   VersionInput,
@@ -21,6 +28,7 @@ export type { ProjectPatch,
   IssuePage,
   WatchersView,
   BulkIssuePatch,
+  BulkIssueTarget,
   BulkResult,
   ResolvedSettings,
 } from "./jiraMock";
@@ -32,6 +40,25 @@ export const USE_REST =
 
 // REST에 없는 함수는 목업이 채운다 — 계약 타입은 목업 것을 쓴다
 const impl = (USE_REST ? { ...mock, ...rest } : mock) as unknown as typeof mock;
+
+/**
+ * 위 캐스트는 REST 시그니처를 검사하지 않는다 — 동시 편집 버전·서버 검색 계약처럼 두 어댑터가 반드시 같아야 하는
+ * 함수는 여기서 컴파일 타임에 REST가 목업 계약을 만족하는지 확인한다(어긋나면 typecheck가 깨진다).
+ */
+rest satisfies Pick<
+  typeof mock,
+  | "updateIssue"
+  | "setIssueParent"
+  | "bulkUpdateIssues"
+  | "updateSprint"
+  | "updateProject"
+  | "listIssuesPage"
+  | "queryIssuesPage"
+  | "findIssues"
+  | "aggregateIssues"
+  | "listProjectLabels"
+  | "uploadAttachment"
+>;
 
 export const defaultBoard = impl.defaultBoard;
 export const __resetForTest = impl.__resetForTest;
@@ -66,7 +93,12 @@ export const updateSprint = impl.updateSprint;
 export const startSprint = impl.startSprint;
 export const completeSprint = impl.completeSprint;
 export const listIssues = impl.listIssues;
-export const queryIssues = impl.queryIssues;
+/** 교차 프로젝트 검색(스마트/기본 쿼리) — 서버 페이징, total은 조건 전체 건수 */
+export const queryIssuesPage = impl.queryIssuesPage;
+/** 서버 검색·집계·라벨 계약(issueSearch.ts) — 홈·대시보드·목록이 이슈 전량을 읽지 않게 한다 */
+export const findIssues = impl.findIssues;
+export const aggregateIssues = impl.aggregateIssues;
+export const listProjectLabels = impl.listProjectLabels;
 export const searchIssues = impl.searchIssues;
 export const getIssueByKey = impl.getIssueByKey;
 export const createIssue = impl.createIssue;
@@ -126,6 +158,8 @@ export const fetchPersonaDialog = impl.fetchPersonaDialog;
 export const savePersonaDialog = impl.savePersonaDialog;
 /** 테스트 전용 — 목업의 권한·키 시나리오 전환(REST에는 없다) */
 export const __setAgentMockScenario = mock.__setAgentMockScenario;
+/** 테스트 전용 — 목업에 저장된 현재 편집 버전(동시 편집과 무관한 테스트의 저장용) */
+export const __versionForTest = mock.__versionForTest;
 export type { AgentMockScenario } from "./jiraMock";
 export const listIssuesPage = impl.listIssuesPage;
 export const listWatchers = impl.listWatchers;

@@ -42,11 +42,12 @@ afterEach(() => vi.restoreAllMocks());
 describe("IssueListPage 조회 수명주기", () => {
   it("전체 라벨 조회가 지연되어도 첫 페이지와 담당자를 먼저 보여주고 준비되지 않은 작업만 잠근다", async () => {
     const initial = await store.listIssuesPage("p1", {}, { page: 0, size: 50 });
-    const labels = deferred<Awaited<ReturnType<typeof store.listIssues>>>();
+    const labels = deferred<string[]>();
     const pages = vi.spyOn(store, "listIssuesPage").mockImplementation(async (_id, _filter, paging) => ({
       ...initial, ...paging, total: 51,
     }));
-    vi.spyOn(store, "listIssues").mockReturnValue(labels.promise);
+    vi.spyOn(store, "listProjectLabels").mockReturnValue(labels.promise);
+    const all = vi.spyOn(store, "listIssues");
     renderIssues();
 
     const table = await screen.findByRole("table", { name: "이슈 목록" });
@@ -54,22 +55,24 @@ describe("IssueListPage 조회 수명주기", () => {
     expect(await within(table).findByText("박준영")).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "필터 정보 불러오는 중" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "ALM-1 선택" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "CSV 내보내기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^CSV 내보내기/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: "CSV 가져오기" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "다음" })).toBeEnabled();
     await userEvent.setup().click(screen.getByRole("button", { name: "다음" }));
-    await waitFor(() => expect(pages).toHaveBeenLastCalledWith("p1", expect.anything(), { page: 1, size: 50 }));
+    await waitFor(() => expect(pages).toHaveBeenLastCalledWith("p1", expect.anything(), { page: 1, size: 50 }, undefined));
 
-    await act(async () => labels.resolve(initial.items));
+    await act(async () => labels.resolve(["frontend"]));
     await waitFor(() => expect(screen.getByRole("checkbox", { name: "ALM-1 선택" })).toBeEnabled());
     expect(screen.getByRole("button", { name: "CSV 가져오기" })).toBeEnabled();
+    // 라벨 선택지는 서버 DISTINCT — 프로젝트 이슈 전량을 읽지 않는다
+    expect(all).not.toHaveBeenCalled();
   });
 
   it("연속 입력은 한 번 검색하고 필터·초기화에서 프로젝트 메타데이터를 다시 조회하지 않는다", async () => {
     const user = userEvent.setup();
     const pages = vi.spyOn(store, "listIssuesPage");
     const metadata = [
-      vi.spyOn(store, "listUsers"), vi.spyOn(store, "listIssues"),
+      vi.spyOn(store, "listUsers"), vi.spyOn(store, "listProjectLabels"),
       vi.spyOn(store, "listSprints"), vi.spyOn(store, "listProjectStatuses"),
       vi.spyOn(store, "listComponents"), vi.spyOn(store, "resolveSettings"),
     ];
@@ -81,7 +84,7 @@ describe("IssueListPage 조회 수명주기", () => {
     fireEvent.change(search, { target: { value: "구현" } });
     await waitFor(() => expect(screen.queryByText("ALM-1")).not.toBeInTheDocument());
     expect(pages).toHaveBeenCalledTimes(2);
-    expect(pages).toHaveBeenLastCalledWith("p1", expect.objectContaining({ text: "구현" }), { page: 0, size: 50 });
+    expect(pages).toHaveBeenLastCalledWith("p1", expect.objectContaining({ text: "구현" }), { page: 0, size: 50 }, undefined);
 
     await pickFilter(user, "상태", "할 일");
     await waitFor(() => expect(screen.queryByText("ALM-2")).not.toBeInTheDocument());
@@ -113,7 +116,7 @@ describe("IssueListPage 조회 수명주기", () => {
     expect(screen.getByText("결과 업데이트 중 · 이전 결과 표시")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "ALM-1 선택" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "대량 변경" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "CSV 내보내기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^CSV 내보내기/ })).toBeDisabled();
 
     fireEvent.change(search, { target: { value: "최신" } });
     await waitFor(() => expect(pages).toHaveBeenCalledTimes(3));
@@ -122,7 +125,7 @@ describe("IssueListPage 조회 수명주기", () => {
     await act(async () => older.resolve({ ...initial, items: [{ ...initial.items[0], title: "지난 결과" }], total: 1 }));
     expect(screen.getByText("최신 결과")).toBeInTheDocument();
     expect(screen.queryByText("지난 결과")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "CSV 내보내기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^CSV 내보내기/ })).toBeEnabled();
   });
 
   it("최초 조회 실패를 빈 목록으로 숨기지 않고 재시도로 복구한다", async () => {
@@ -170,10 +173,68 @@ describe("IssueListPage 조회 수명주기", () => {
     await pickFilter(user, "컴포넌트", "API");
     await screen.findByText("조건에 맞는 이슈가 없습니다");
     expect(pages).toHaveBeenCalledTimes(1);
-    expect(pages).toHaveBeenLastCalledWith("p1", expect.objectContaining({ componentId: "c1" }), { page: 0, size: 50 });
+    expect(pages).toHaveBeenLastCalledWith("p1", expect.objectContaining({ componentId: "c1" }), { page: 0, size: 50 }, undefined);
     expect(screen.getByRole("toolbar", { name: "이슈 목록 도구" })).toHaveTextContent("0건");
     expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "CSV 가져오기" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "CSV 내보내기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^CSV 내보내기/ })).toBeDisabled();
+  });
+
+  it("정렬은 서버로 보내 첫 페이지부터 다시 읽고, 늦게 온 이전 정렬 응답은 버린다", async () => {
+    const initial = await store.listIssuesPage("p1", {}, { page: 0, size: 50 });
+    const byTitle = deferred<IssuePage>();
+    const pages = vi.spyOn(store, "listIssuesPage").mockImplementation(async (_id, _filter, paging, sort) => {
+      if (sort?.field === "title" && sort.dir === "asc") return byTitle.promise;
+      if (sort?.field === "title") return { ...initial, ...paging, total: 51, items: [{ ...initial.items[0], title: "제목 내림차순 결과" }] };
+      return { ...initial, ...paging, total: 51 };
+    });
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    await screen.findByText("51–51 / 51건");
+
+    await user.click(screen.getByRole("button", { name: /^제목/ }));
+    await waitFor(() =>
+      expect(pages).toHaveBeenLastCalledWith("p1", expect.anything(), { page: 0, size: 50 }, { field: "title", dir: "asc" }),
+    );
+    await user.click(screen.getByRole("button", { name: /^제목/ }));
+    await screen.findByText("제목 내림차순 결과");
+    expect(pages).toHaveBeenLastCalledWith("p1", expect.anything(), { page: 0, size: 50 }, { field: "title", dir: "desc" });
+    // 오름차순 응답이 늦게 와도 화면을 덮지 못한다
+    await act(async () => byTitle.resolve({ ...initial, items: [{ ...initial.items[0], title: "늦은 오름차순 결과" }], total: 51 }));
+    expect(screen.getByText("제목 내림차순 결과")).toBeInTheDocument();
+    expect(screen.queryByText("늦은 오름차순 결과")).not.toBeInTheDocument();
+  });
+
+  it("담당자 열은 서버가 정렬하지 못하므로 정렬 버튼을 내지 않는다", async () => {
+    renderIssues();
+    const table = await screen.findByRole("table", { name: "이슈 목록" });
+    const header = within(table).getByRole("columnheader", { name: /담당자/ });
+    expect(within(header).queryByRole("button", { name: /담당자/ })).not.toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: /^수정일/ })).toBeInTheDocument();
+  });
+
+  it("CSV 내보내기는 범위(현재 페이지·선택)를 버튼과 알림에 그대로 밝힌다", async () => {
+    const initial = await store.listIssuesPage("p1", {}, { page: 0, size: 50 });
+    vi.spyOn(store, "listIssuesPage").mockResolvedValue({ ...initial, total: 120 });
+    // jsdom에는 object URL이 없다 — 이 테스트 동안만 붙인다
+    const urlApi = URL as unknown as { createObjectURL?: (blob: Blob) => string; revokeObjectURL?: (url: string) => void };
+    urlApi.createObjectURL = () => "blob:csv";
+    urlApi.revokeObjectURL = () => {};
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderIssues();
+    await screen.findByText("ALM-1");
+    const exportButton = await screen.findByRole("button", { name: `CSV 내보내기 (현재 페이지 ${initial.items.length}건)` });
+    await waitFor(() => expect(exportButton).toBeEnabled());
+    await user.click(exportButton);
+    expect(await screen.findByText(`현재 페이지의 ${initial.items.length}개 이슈를 CSV로 내보냈습니다`)).toBeInTheDocument();
+    expect(screen.getByText(`조건에 맞는 전체 120건 중 ${initial.items.length}건입니다.`)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: "ALM-1 선택" }));
+    expect(screen.getByRole("button", { name: "CSV 내보내기 (선택 1건)" })).toBeInTheDocument();
+    delete urlApi.createObjectURL;
+    delete urlApi.revokeObjectURL;
   });
 });

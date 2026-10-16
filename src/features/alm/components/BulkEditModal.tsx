@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Button, Modal, Select, TextField, useToast } from "@chanho/react";
 import type { IssueFieldConfig, IssueFieldId, IssuePriority, Sprint, User, WorkflowStatus } from "../store/types";
 import { bulkUpdateIssues } from "../store/jiraStore";
-import type { BulkIssuePatch } from "../store/jiraStore";
+import type { BulkIssuePatch, BulkIssueTarget } from "../store/jiraStore";
 import { priorityName } from "./labels";
 import { resolveFields } from "./fieldConfig";
 import { FieldLabel } from "./FieldLabel";
@@ -19,7 +19,8 @@ const splitLabels = (text: string) =>
 
 export interface BulkEditModalProps {
   open: boolean;
-  issueIds: string[];
+  /** 고른 이슈와 목록을 그릴 때 본 버전 — 그 뒤 남이 고친 이슈는 덮어쓰지 않고 실패로 알린다 */
+  targets: BulkIssueTarget[];
   statuses: WorkflowStatus[];
   users: User[];
   sprints: Sprint[];
@@ -36,7 +37,7 @@ export interface BulkEditModalProps {
  */
 export function BulkEditModal({
   open,
-  issueIds,
+  targets,
   statuses,
   users,
   sprints,
@@ -81,7 +82,7 @@ export function BulkEditModal({
     if (!dirty) return;
     setBusy(true);
     try {
-      const result = await bulkUpdateIssues(issueIds, patch);
+      const result = await bulkUpdateIssues(targets, patch);
       toast({
         title: `${result.updated}개 이슈를 변경했습니다`,
         appearance: result.failed.length > 0 ? "info" : "success",
@@ -111,7 +112,7 @@ export function BulkEditModal({
     <Modal
       trigger={<span hidden />}
       title="대량 변경"
-      description={`${issueIds.length}개 이슈에 같은 변경을 적용합니다. 손대지 않은 항목은 그대로 둡니다.`}
+      description={`${targets.length}개 이슈에 같은 변경을 적용합니다. 손대지 않은 항목은 그대로 둡니다.`}
       open={open}
       onOpenChange={(next) => {
         if (!next) reset();

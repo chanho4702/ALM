@@ -43,7 +43,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("jiraApi 프로젝트 세부·바로 가기·개인 설정·배너", () => {
   it("프로젝트 세부 필드를 보내고 리더 해제는 clearLead로 표현한다", async () => {
     const spy = fetchSpy((_path, init) => response(init?.method === "PUT" ? 200 : 200, PROJECT));
-    const updated = await updateProject("3", { category: "플랫폼", leadId: null, defaultAssignee: "lead", icon: "rocket" });
+    const updated = await updateProject("3", { category: "플랫폼", leadId: null, defaultAssignee: "lead", icon: "rocket" }, 4);
     const body = JSON.parse(spy.mock.calls[1][1]!.body as string);
     expect(body).toMatchObject({ category: "플랫폼", clearLead: true, defaultAssignee: "lead", icon: "rocket", expectedVersion: 4 });
     expect(body.leadId).toBeUndefined();

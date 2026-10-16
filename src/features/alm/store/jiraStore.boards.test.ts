@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   completeSprint,
@@ -154,7 +155,7 @@ describe("listBoardIssues", () => {
   it("이슈 상태를 바꿔도 보드 조회에 반영된다 (뷰일 뿐 소속이 아니다)", async () => {
     const [, backend] = await listBoards(PROJECT);
     const [issue] = await listBoardIssues(backend.id); // ALM-6 todo
-    await updateIssue(issue.id, { status: "done" });
+    await updateIssue(issue.id, { status: "done" }, __versionForTest("issue", issue.id));
     const after = await listBoardIssues(backend.id);
     expect(after.find((i) => i.key === "ALM-6")?.status).toBe("done");
   });

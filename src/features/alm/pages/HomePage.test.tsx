@@ -61,9 +61,9 @@ describe("HomePage (For you)", () => {
     renderHome();
     await screen.findByRole("heading", { name: /안녕하세요/ });
 
-    // 시드: 김찬호 담당 2건, 마감 임박(7일 내) 2건, 기한 지남 0건
+    // 시드: 김찬호 담당 미완료 1건(ALM-3 — ALM-1은 완료), 마감 임박(7일 내) 2건, 기한 지남 0건
     const summary = screen.getByTestId("home-summary");
-    expect(summary).toHaveTextContent("나에게 배정 2");
+    expect(summary).toHaveTextContent("나에게 배정 1");
     expect(summary).toHaveTextContent("기한 지남 0");
     expect(summary).toHaveTextContent("이번 주 마감 2");
 
@@ -71,15 +71,15 @@ describe("HomePage (For you)", () => {
     expect(await screen.findByTestId("my-issues")).toBeInTheDocument();
   });
 
-  it("나에게 배정됨 탭: 내 담당 이슈만 보여준다 (시드: 김찬호 = ALM-1, ALM-3)", async () => {
+  it("나에게 배정됨 탭: 내 담당 미완료 이슈만 보여준다 (시드: 김찬호 = ALM-1 완료, ALM-3 진행 중)", async () => {
     const user = userEvent.setup();
     renderHome();
     await screen.findByRole("heading", { name: /안녕하세요/ });
 
     await user.click(screen.getByRole("tab", { name: /나에게 배정됨/ }));
     const mine = await screen.findByTestId("my-issues");
-    expect(within(mine).getByText(/ALM-1 ·/)).toBeInTheDocument();
     expect(within(mine).getByText(/ALM-3 ·/)).toBeInTheDocument();
+    expect(within(mine).queryByText(/ALM-1 ·/)).not.toBeInTheDocument(); // 완료 — 지라 "나에게 배정됨"처럼 미해결만
     expect(within(mine).queryByText(/ALM-4 ·/)).not.toBeInTheDocument(); // 박준영 담당
   });
 

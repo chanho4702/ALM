@@ -12,7 +12,7 @@ const SPRINT: Sprint = {
   id: "s1",
   projectId: "p1",
   name: "Sprint 1",
-  state: "active",
+  state: "active", version: 1,
   plannedStart: "2026-08-24",
   plannedEnd: "2026-08-28",
   startedAt: "2026-08-24T00:00:00.000Z",
@@ -21,6 +21,7 @@ const SPRINT: Sprint = {
 function issue(over: Partial<Issue> & { id: string }): Issue {
   return {
     key: `ALM-${over.id}`,
+    version: 1,
     projectId: "p1",
     title: `이슈 ${over.id}`,
     description: "",
@@ -159,7 +160,7 @@ describe("burndownSeries", () => {
   it("예정 종료일을 넘겨 완료하면 실제 완료일까지 축을 늘린다", () => {
     const late: Sprint = {
       ...SPRINT,
-      state: "done",
+      state: "done", version: 1,
       completedAt: "2026-08-30T10:00:00.000Z",
     };
 
@@ -176,7 +177,7 @@ describe("burndownSeries", () => {
   });
 
   it("시작하지 않은 스프린트는 점을 만들지 않는다", () => {
-    const planned: Sprint = { id: "s2", projectId: "p1", name: "Sprint 2", state: "planned" };
+    const planned: Sprint = { id: "s2", projectId: "p1", name: "Sprint 2", state: "planned", version: 1 };
 
     const series = burndownSeries({
       sprint: planned,
@@ -226,8 +227,8 @@ describe("sprintReport", () => {
   });
 
   it("완료된 스프린트는 미완료 이슈의 이관 행선지를 알려준다", () => {
-    const done: Sprint = { ...SPRINT, state: "done", completedAt: "2026-08-28T10:00:00.000Z" };
-    const next: Sprint = { id: "s2", projectId: "p1", name: "Sprint 2", state: "active" };
+    const done: Sprint = { ...SPRINT, state: "done", version: 1, completedAt: "2026-08-28T10:00:00.000Z" };
+    const next: Sprint = { id: "s2", projectId: "p1", name: "Sprint 2", state: "active", version: 1 };
     const issues = [issue({ id: "1", status: "done" }), issue({ id: "2", sprintId: "s2" })];
     const changes = [
       ...joined("1"),
@@ -279,7 +280,7 @@ describe("burndownSeries 경계", () => {
   });
 
   it("완료된 스프린트의 미입력 건수는 이관 직전 소속으로 센다", () => {
-    const done: Sprint = { ...SPRINT, state: "done", completedAt: "2026-08-28T10:00:00.000Z" };
+    const done: Sprint = { ...SPRINT, state: "done", version: 1, completedAt: "2026-08-28T10:00:00.000Z" };
     // 이관돼 지금은 백로그에 있는 미완료 이슈 — 예상 미입력 경고에 잡혀야 한다
     const issues = [issue({ id: "1", sprintId: null })];
     const changes = [

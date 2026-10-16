@@ -3,13 +3,16 @@ import { useNavigate } from "react-router";
 import { Button, EmptyState, Lozenge, Spinner } from "@chanho/react";
 import type { DashboardGadget, GadgetType, Issue, ProjectWorklogRow, Sprint, User, WorkflowStatus } from "../store/types";
 import {
+  aggregateIssues,
+  findIssues,
+  listAllStatuses,
   listIssues,
   listProjectChanges,
   listProjectStatuses,
   listProjectWorklogs,
   listSprints,
   listUsers,
-  queryIssues,
+  queryIssuesPage,
   listProjects,
 } from "../store/jiraStore";
 import { parseSmartQuery } from "../store/searchQuery";
@@ -17,7 +20,7 @@ import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PriorityGlyph } from "./PriorityGlyph";
 import { StatusGlyph } from "./StatusGlyph";
 import { ValueWithIcon } from "./ValueWithIcon";
-import { priorityAppearance, priorityName, statusAppearance, statusKind } from "./labels";
+import { priorityAppearance, priorityName, statusAppearance } from "./labels";
 import { usePriorities } from "./usePriorities";
 import { burnupSeries } from "../pages/reportMetricsExt";
 import { todayKey } from "../pages/dashboardMetrics";
@@ -103,14 +106,25 @@ function BarList({ rows, max }: { rows: { key: string; label: React.ReactNode; c
   );
 }
 
+/** 집계 버킷 → 키별 건수 */
+const countsOf = (buckets: { key: string; count: number }[]) => new Map(buckets.map((b) => [b.key, b.count]));
+
 export function StatusDistributionGadget({ gadget }: GadgetProps) {
   const projectId = gadget.config.projectId ?? "";
+  // 이슈를 내려받아 세지 않는다 — 서버 집계(GROUP BY) 한 번 + 상태 메타
   const { data, error } = useAsync(
-    async () => ({ issues: await listIssues(projectId), statuses: await listProjectStatuses(projectId) }),
+    async () => {
+      const [aggregate, statuses] = await Promise.all([
+        aggregateIssues({ projectIds: [projectId] }, "status"),
+        listProjectStatuses(projectId),
+      ]);
+      return { counts: countsOf(aggregate.buckets), statuses };
+    },
     [projectId],
   );
   const rows = useMemo(() => {
     if (!data) return [];
+    // 워크플로 상태 순서대로, 0건 상태도 행으로 남긴다(이전과 같은 표시)
     return [...data.statuses]
       .sort((a, b) => a.order - b.order)
       .map((s) => ({
@@ -120,7 +134,7 @@ export function StatusDistributionGadget({ gadget }: GadgetProps) {
             <Lozenge appearance={statusAppearance(data.statuses, s.id)}>{s.name}</Lozenge>
           </ValueWithIcon>
         ),
-        count: data.issues.filter((i) => i.status === s.id).length,
+        count: data.counts.get(s.id) ?? 0,
       }));
   }, [data]);
   return (
@@ -132,29 +146,25 @@ export function StatusDistributionGadget({ gadget }: GadgetProps) {
 
 export function AssigneeLoadGadget({ gadget }: GadgetProps) {
   const projectId = gadget.config.projectId ?? "";
+  // 열린 이슈만 담당자별로 — 서버 집계(openOnly)가 완료 분류를 뺀다
   const { data, error } = useAsync(
-    async () => ({
-      issues: await listIssues(projectId),
-      statuses: await listProjectStatuses(projectId),
-      users: await listUsers(),
-    }),
+    async () => {
+      const [aggregate, users] = await Promise.all([
+        aggregateIssues({ projectIds: [projectId], openOnly: true }, "assignee"),
+        listUsers(),
+      ]);
+      return { buckets: aggregate.buckets, users };
+    },
     [projectId],
   );
   const rows = useMemo(() => {
     if (!data) return [];
-    const open = data.issues.filter((i) => statusKind(data.statuses, i.status) !== "complete");
-    const counts = new Map<string, number>();
-    for (const issue of open) {
-      const key = issue.assigneeId ?? "unassigned";
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([id, count]) => ({
-        key: id,
-        label: id === "unassigned" ? "미지정" : (data.users.find((u) => u.id === id)?.name ?? `사용자 ${id}`),
-        count,
-      }))
-      .sort((a, b) => b.count - a.count);
+    // 버킷은 건수 내림차순으로 온다
+    return data.buckets.map(({ key, count }) => ({
+      key,
+      label: key === "unassigned" ? "미지정" : (data.users.find((u) => u.id === key)?.name ?? `사용자 ${key}`),
+      count,
+    }));
   }, [data]);
   return (
     <GadgetBody error={error} loading={!data}>
@@ -166,14 +176,15 @@ export function AssigneeLoadGadget({ gadget }: GadgetProps) {
 export function PriorityDistributionGadget({ gadget }: GadgetProps) {
   const projectId = gadget.config.projectId ?? "";
   const priorities = usePriorities();
+  // 열린 이슈의 우선순위 분포 — 서버 집계(openOnly)
   const { data, error } = useAsync(
-    async () => ({ issues: await listIssues(projectId), statuses: await listProjectStatuses(projectId) }),
+    async () => ({ counts: countsOf((await aggregateIssues({ projectIds: [projectId], openOnly: true }, "priority")).buckets) }),
     [projectId],
   );
   const rows = useMemo(() => {
     if (!data) return [];
-    const open = data.issues.filter((i) => statusKind(data.statuses, i.status) !== "complete");
-    const ids = priorities.length > 0 ? priorities.map((p) => p.id) : [...new Set(open.map((i) => i.priority))];
+    // 레지스트리 순서대로(0건 포함), 레지스트리를 못 받았으면 나온 값만
+    const ids = priorities.length > 0 ? priorities.map((p) => p.id) : [...data.counts.keys()];
     return ids
       .map((id) => ({
         key: id,
@@ -186,7 +197,7 @@ export function PriorityDistributionGadget({ gadget }: GadgetProps) {
             </Lozenge>
           </ValueWithIcon>
         ),
-        count: open.filter((i) => i.priority === id).length,
+        count: data.counts.get(id) ?? 0,
       }))
       .filter((r) => r.count > 0 || priorities.length > 0);
   }, [data, priorities]);
@@ -199,6 +210,8 @@ export function PriorityDistributionGadget({ gadget }: GadgetProps) {
 
 export function SprintBurnupGadget({ gadget }: GadgetProps) {
   const projectId = gadget.config.projectId ?? "";
+  // 번업은 스프린트에 들어왔다 나간 이슈(변경 이력으로 찾는다)까지 범위에 넣으므로 스프린트 필터로
+  // 좁히면 값이 틀어진다 — 프로젝트 이슈 전량을 그대로 읽는다(reportMetrics.candidates)
   const { data, error } = useAsync(
     async () => {
       const [issues, sprints, statuses, changes] = await Promise.all([
@@ -246,14 +259,15 @@ export function RecentIssuesGadget({ gadget }: GadgetProps) {
   const period = gadget.config.period ?? 7;
   const { data, error } = useAsync(
     async () => {
-      const projects = projectId ? [projectId] : (await listProjects()).map((p) => p.id);
-      const all = (await Promise.all(projects.map((id) => listIssues(id)))).flat();
+      // 서버가 기간·정렬·상위 10건을 처리한다 — 프로젝트를 비우면 볼 수 있는 전 프로젝트
       const since = new Date();
       since.setDate(since.getDate() - period);
-      return all
-        .filter((i) => new Date(i.updatedAt) >= since)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .slice(0, 10);
+      const page = await findIssues(
+        { projectIds: projectId ? [projectId] : undefined, updatedSince: since.toISOString() },
+        { page: 0, size: 10 },
+        { field: "updated", dir: "desc" },
+      );
+      return page.items;
     },
     [projectId, period],
   );
@@ -270,10 +284,10 @@ export function FilterResultsGadget({ gadget }: GadgetProps) {
   const priorities = usePriorities();
   const { data, error } = useAsync(
     async () => {
-      const [users, projects] = await Promise.all([listUsers(), listProjects()]);
-      const statuses = (await Promise.all(projects.map((p) => listProjectStatuses(p.id)))).flat();
+      // 상태 이름 어휘는 전역 레지스트리 한 번으로 — 프로젝트마다 상태를 따로 묻지 않는다
+      const [users, projects, statuses] = await Promise.all([listUsers(), listProjects(), listAllStatuses()]);
       const parsed = parseSmartQuery(query, { users, projects, statuses, priorities });
-      return (await queryIssues(parsed)).slice(0, 10);
+      return (await queryIssuesPage(parsed, { page: 0, size: 10 })).items;
     },
     [query, priorities.length],
   );

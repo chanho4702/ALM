@@ -40,6 +40,7 @@ export interface SampleDataApi {
   updateSprint(
     id: string,
     patch: { name?: string; goal?: string | null; plannedStart?: string | null; plannedEnd?: string | null },
+    expectedVersion: number,
   ): Promise<Sprint>;
   startSprint(id: string): Promise<Sprint>;
   completeSprint(
@@ -373,19 +374,19 @@ export async function seedDemoProject(
     goal: "결제 재시도와 관리자 로그인을 정식 배포한다",
     plannedStart: dayKey(-21),
     plannedEnd: dayKey(-8),
-  });
+  }, sprint1.version);
   const sprint2 = await api.createSprint(projectId);
   await api.updateSprint(sprint2.id, {
     goal: "소셜 로그인과 정기 결제를 실제로 쓸 수 있게 만든다",
     plannedStart: dayKey(-6),
     plannedEnd: dayKey(8),
-  });
+  }, sprint2.version);
   const sprint3 = await api.createSprint(projectId);
   await api.updateSprint(sprint3.id, {
     goal: "관리자 콘솔 2.0 범위를 확정한다",
     plannedStart: dayKey(9),
     plannedEnd: dayKey(23),
-  });
+  }, sprint3.version);
   await step(); // 스프린트
   const sprintOf: Record<Bucket, string | null> = {
     s1: sprint1.id,

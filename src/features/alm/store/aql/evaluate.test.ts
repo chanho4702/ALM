@@ -30,6 +30,7 @@ const base = {
   labels: [] as string[],
   componentIds: [] as string[],
   order: 1,
+  version: 1,
   createdAt: at(2026, 8, 1),
   updatedAt: at(2026, 9, 1),
 };

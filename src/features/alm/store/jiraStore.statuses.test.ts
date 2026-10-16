@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { __versionForTest } from "./jiraStore";
 import {
   __resetForTest,
   createStatusCategory,
@@ -184,9 +185,9 @@ describe("완료 판정은 카테고리 의미에서 나온다", () => {
     // 아직 완료되지 않은 이슈 하나 — 시드의 완료 이슈는 이미 해결이 채워져 있다
     const issue = (await listIssues("p1")).find((i) => i.status === "todo")!;
     expect(issue.resolution).toBeNull();
-    const moved = await updateIssue(issue.id, { status: archived.id });
+    const moved = await updateIssue(issue.id, { status: archived.id }, __versionForTest("issue", issue.id));
     expect(moved.resolution).toBe("done");
-    const reopened = await updateIssue(issue.id, { status: "todo" });
+    const reopened = await updateIssue(issue.id, { status: "todo" }, __versionForTest("issue", issue.id));
     expect(reopened.resolution).toBeNull();
   });
 

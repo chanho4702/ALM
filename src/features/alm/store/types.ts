@@ -31,6 +31,8 @@ export interface Project {
   deletedAt?: string | null;
   /** 자동 영구 삭제 예정 시각(deletedAt + 보존 기간, 서버 계산) — 휴지통 목록에서만 값이 있다 */
   purgeAt?: string | null;
+  /** 편집 버전(낙관적 락) — 설정 화면이 편집을 시작할 때 본 값을 `updateProject`에 그대로 보낸다 */
+  version: number;
   createdAt: string;
 }
 
@@ -160,6 +162,8 @@ export interface Sprint {
   plannedEnd?: string;
   startedAt?: string;
   completedAt?: string;
+  /** 편집 버전(낙관적 락) — 계획 수정·시작·완료가 올린다. 계획 수정은 편집을 시작할 때 본 값을 보낸다 */
+  version: number;
 }
 
 /**
@@ -269,6 +273,11 @@ export interface Issue {
   /** 컴포넌트 id 목록(순서 유지). 없으면 빈 배열로 본다 */
   componentIds?: string[];
   order: number; // 컬럼/목록 내 정렬
+  /**
+   * 편집 버전(낙관적 락) — 서버 `version`. 편집 저장(`updateIssue`)만 올리고 보드 이동·랭크는 올리지 않는다.
+   * 화면은 편집을 **시작할 때** 들고 있던 값을 `expectedVersion`으로 보내야 남의 저장을 덮어쓰지 않는다.
+   */
+  version: number;
   createdAt: string;
   updatedAt: string;
 }

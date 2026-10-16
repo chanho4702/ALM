@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import { __resetForTest, addWorklog, createDashboard, getIssueByKey, listDashboards } from "../store/jiraStore";
+import * as store from "../store/jiraStore";
+
+afterEach(() => vi.restoreAllMocks());
 
 function LocationProbe() {
   const location = useLocation();
@@ -86,6 +89,43 @@ describe("대시보드 (지라 Dashboards)", () => {
     const priorityGadget = await screen.findByRole("region", { name: "우선순위 분포" });
     await waitFor(() => expect(priorityGadget).toHaveTextContent("보통"));
     expect(within(priorityGadget).getByTestId("priority-glyph-medium")).toBeInTheDocument();
+  });
+});
+
+describe("통계 가젯 — 서버 집계", () => {
+  it("상태·담당자·우선순위 가젯은 이슈 전량 대신 집계 한 번씩으로 세고, 0건 상태·우선순위도 행으로 남긴다", async () => {
+    const all = vi.spyOn(store, "listIssues");
+    const aggregate = vi.spyOn(store, "aggregateIssues");
+    const board = await createDashboard({
+      name: "통계",
+      gadgets: [
+        { id: "g1", type: "status-distribution", column: 0, config: { projectId: "p1" } },
+        { id: "g2", type: "assignee-load", column: 1, config: { projectId: "p1" } },
+        { id: "g3", type: "priority-distribution", column: 0, config: { projectId: "p1" } },
+      ],
+    });
+    renderAt(`/dashboards/${board.id}`);
+
+    // 시드 p1: 할 일 5 · 진행 중 2 · 완료 1
+    const statusGadget = await screen.findByRole("region", { name: "상태 분포" });
+    await waitFor(() => expect(within(statusGadget).getAllByRole("listitem")).toHaveLength(3));
+    const statusRows = within(statusGadget).getAllByRole("listitem").map((li) => li.textContent);
+    expect(statusRows).toEqual([expect.stringMatching(/할 일.*5$/), expect.stringMatching(/진행 중.*2$/), expect.stringMatching(/완료.*1$/)]);
+
+    // 열린 이슈의 담당자 — 미지정(ALM-5·7·8)이 가장 많아 맨 위
+    const assigneeGadget = await screen.findByRole("region", { name: "담당자별 이슈" });
+    await waitFor(() => expect(within(assigneeGadget).getAllByRole("listitem")[0]).toHaveTextContent(/미지정.*3$/));
+
+    // 우선순위는 레지스트리 순서대로, 열린 이슈만, 0건도 행으로
+    const priorityGadget = await screen.findByRole("region", { name: "우선순위 분포" });
+    await waitFor(() => expect(priorityGadget).toHaveTextContent("보통"));
+    const priorityRows = within(priorityGadget).getAllByRole("listitem").map((li) => li.textContent ?? "");
+    expect(priorityRows.some((row) => /최상.*0$/.test(row))).toBe(true);
+
+    expect(aggregate).toHaveBeenCalledWith({ projectIds: ["p1"] }, "status");
+    expect(aggregate).toHaveBeenCalledWith({ projectIds: ["p1"], openOnly: true }, "assignee");
+    expect(aggregate).toHaveBeenCalledWith({ projectIds: ["p1"], openOnly: true }, "priority");
+    expect(all).not.toHaveBeenCalled();
   });
 });
 
