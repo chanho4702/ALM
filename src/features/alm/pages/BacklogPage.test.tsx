@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import { __resetForTest, listSprints, updateSprint } from "../store/jiraStore";
+import * as store from "../store/jiraStore";
+
+afterEach(() => vi.restoreAllMocks());
 
 /** 현재 pathname+search를 노출하는 테스트 프로브 */
 function LocationProbe() {
@@ -106,6 +109,29 @@ describe("BacklogPage", () => {
         goal: "내 목표",
       });
     });
+  });
+
+  it("계획 저장이 끝날 때까지 입력을 잠가, 저장 완료(모달 닫힘)로 그 사이 입력을 잃지 않게 한다", async () => {
+    renderBacklog();
+    const user = userEvent.setup();
+    const original = store.updateSprint;
+    let release!: () => void;
+    const gate = new Promise<void>((done) => { release = done; });
+    vi.spyOn(store, "updateSprint").mockImplementation(async (...args: Parameters<typeof original>) => {
+      await gate;
+      return original(...args);
+    });
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
+    const goal = await screen.findByLabelText("스프린트 목표");
+    await user.clear(goal);
+    await user.type(goal, "보낸 목표");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(screen.getByLabelText("스프린트 목표")).toBeDisabled());
+    release();
+    await waitFor(() => expect(screen.queryByLabelText("스프린트 목표")).not.toBeInTheDocument());
+    expect((await listSprints("p1")).find((s) => s.name === "Sprint 1")!.goal).toBe("보낸 목표");
   });
 
   it("계획 충돌에서 '최신 내용 불러오기'는 내 초안을 버리고 동료 값으로 다시 채운다", async () => {

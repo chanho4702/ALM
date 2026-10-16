@@ -19,13 +19,25 @@ export interface SprintEditModalProps {
   conflict?: boolean;
   /** reload = 최신 값으로 초안을 다시 채움(내 입력 버림), reapply = 최신 버전 기준으로 내 초안을 다시 저장 */
   onResolveConflict?: (sprint: Sprint, draft: SprintPlanDraft, mode: "reload" | "reapply") => void;
+  /**
+   * 저장(또는 다시 적용) 중 — 성공하면 모달이 닫히므로 그 사이 입력은 잃게 된다. 그래서 저장이 끝날 때까지
+   * 입력을 잠근다(조용히 버리지 않는다).
+   */
+  saving?: boolean;
 }
 
 /**
  * 스프린트 계획 편집 — 지라 백로그의 "스프린트 수정"과 같은 자리(이름·목표·기간).
  * 저장 검증(기간 역전)은 스토어가 하고 여기서는 초안만 다룬다.
  */
-export function SprintEditModal({ sprint, onClose, onSave, conflict = false, onResolveConflict }: SprintEditModalProps) {
+export function SprintEditModal({
+  sprint,
+  onClose,
+  onSave,
+  conflict = false,
+  onResolveConflict,
+  saving = false,
+}: SprintEditModalProps) {
   const [draft, setDraft] = useState<SprintPlanDraft>({
     name: "",
     goal: "",
@@ -46,7 +58,7 @@ export function SprintEditModal({ sprint, onClose, onSave, conflict = false, onR
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (sprint) onSave(sprint, draft);
+    if (sprint && !saving) onSave(sprint, draft);
   };
 
   return (
@@ -59,7 +71,8 @@ export function SprintEditModal({ sprint, onClose, onSave, conflict = false, onR
         if (!next) onClose();
       }}
     >
-      <form className="sprint-edit-form" onSubmit={handleSubmit}>
+      <form className="sprint-edit-form" onSubmit={handleSubmit} aria-busy={saving}>
+        <fieldset className="sprint-edit-fieldset" disabled={saving}>
         {conflict && sprint ? (
           <Banner variant="warning">
             <div className="issue-conflict">
@@ -67,10 +80,10 @@ export function SprintEditModal({ sprint, onClose, onSave, conflict = false, onR
                 다른 사용자가 이 스프린트를 먼저 수정해 저장하지 않았습니다. 입력한 내용은 그대로 남아 있습니다.
               </p>
               <div className="issue-conflict-actions">
-                <Button size="small" variant="secondary" type="button" onClick={() => onResolveConflict?.(sprint, draft, "reload")}>
+                <Button size="small" variant="secondary" type="button" disabled={saving} onClick={() => onResolveConflict?.(sprint, draft, "reload")}>
                   최신 내용 불러오기
                 </Button>
-                <Button size="small" variant="primary" type="button" onClick={() => onResolveConflict?.(sprint, draft, "reapply")}>
+                <Button size="small" variant="primary" type="button" disabled={saving} onClick={() => onResolveConflict?.(sprint, draft, "reapply")}>
                   내 변경 다시 적용(최신 버전 기준)
                 </Button>
               </div>
@@ -107,10 +120,11 @@ export function SprintEditModal({ sprint, onClose, onSave, conflict = false, onR
           <Button variant="ghost" type="button" onClick={onClose}>
             취소
           </Button>
-          <Button type="submit" disabled={!draft.name.trim()}>
+          <Button type="submit" loading={saving} disabled={!draft.name.trim()}>
             저장
           </Button>
         </div>
+        </fieldset>
       </form>
     </Modal>
   );

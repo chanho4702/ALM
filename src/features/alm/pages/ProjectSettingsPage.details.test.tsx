@@ -1,10 +1,26 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import { __resetForTest, createIssue, listProjects, listProjectShortcuts, updateProject } from "../store/jiraStore";
+import * as store from "../store/jiraStore";
+import type { Project } from "../store/types";
+
+afterEach(() => vi.restoreAllMocks());
+
+/** 저장 응답을 손으로 풀 때까지 붙잡는다 — 그 사이 사용자가 더 입력하는 상황 */
+function holdUpdateProject() {
+  const original = store.updateProject;
+  let release!: () => void;
+  const gate = new Promise<void>((done) => { release = done; });
+  vi.spyOn(store, "updateProject").mockImplementation(async (...args: Parameters<typeof original>): Promise<Project> => {
+    await gate;
+    return original(...args);
+  });
+  return () => release();
+}
 
 function renderAt(path: string) {
   return render(
@@ -59,6 +75,60 @@ describe("프로젝트 일반 설정 — 다시 적용은 내가 손댄 필드�
     expect(saved).toMatchObject({ name: "동료가 바꾼 이름", category: "내 범주" });
     // 초안도 저장된 값으로 다시 맞춰져, 다음 저장이 동료의 이름을 되돌리지 않는다
     expect(screen.getByLabelText("이름")).toHaveValue("동료가 바꾼 이름");
+  });
+});
+
+describe("프로젝트 일반 설정 — 저장 중 입력 보존", () => {
+  it("저장을 기다리는 동안 고친 입력은 저장이 끝나도 덮이지 않고 여전히 변경됨으로 남는다", async () => {
+    const user = userEvent.setup();
+    renderAt("/projects/p1/settings/general");
+    expect(await screen.findByRole("heading", { name: "일반" })).toBeInTheDocument();
+    const release = holdUpdateProject();
+
+    await user.type(screen.getByLabelText("범주"), "보낸 범주");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    // 저장이 아직 안 끝났다 — 이름을 더 고친다
+    const name = screen.getByLabelText("이름");
+    await user.clear(name);
+    await user.type(name, "저장 뒤에 쓴 이름");
+    release();
+
+    expect(await screen.findByText("프로젝트를 수정했습니다")).toBeInTheDocument();
+    expect(screen.getByLabelText("이름")).toHaveValue("저장 뒤에 쓴 이름");
+    expect(screen.getByLabelText("범주")).toHaveValue("보낸 범주");
+    const saved = (await listProjects()).find((p) => p.id === "p1")!;
+    expect(saved).toMatchObject({ category: "보낸 범주", name: "ALM 플랫폼" });
+    // 새 스냅샷(저장된 프로젝트) 대비 이름이 달라 저장 버튼이 살아 있다 — 다음 저장이 이 입력을 보낸다
+    expect(screen.getByRole("button", { name: "저장" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    await waitFor(async () => expect((await listProjects()).find((p) => p.id === "p1")!.name).toBe("저장 뒤에 쓴 이름"));
+  });
+
+  it("충돌 다시 적용 중에 고친 입력도 보존한다", async () => {
+    const user = userEvent.setup();
+    renderAt("/projects/p1/settings/general");
+    expect(await screen.findByRole("heading", { name: "일반" })).toBeInTheDocument();
+    const seen = (await listProjects()).find((p) => p.id === "p1")!;
+    await updateProject("p1", { url: "https://colleague.example" }, seen.version);
+
+    await user.type(screen.getByLabelText("범주"), "내 범주");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    const reapply = await screen.findByRole("button", { name: "내 변경 다시 적용(최신 버전 기준)" });
+    const release = holdUpdateProject();
+    await user.click(reapply);
+    const name = screen.getByLabelText("이름");
+    await user.clear(name);
+    await user.type(name, "다시 적용 중 쓴 이름");
+    release();
+
+    expect(await screen.findByText("프로젝트를 수정했습니다")).toBeInTheDocument();
+    expect(screen.getByLabelText("이름")).toHaveValue("다시 적용 중 쓴 이름");
+    expect(screen.getByRole("button", { name: "저장" })).toBeEnabled();
+    expect((await listProjects()).find((p) => p.id === "p1")).toMatchObject({
+      category: "내 범주",
+      url: "https://colleague.example",
+      name: "ALM 플랫폼",
+    });
   });
 });
 

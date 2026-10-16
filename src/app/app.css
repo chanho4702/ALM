@@ -2451,6 +2451,17 @@ body {
   gap: var(--chanho-space-150);
 }
 
+/* 저장 중 입력 잠금용 fieldset — 모양은 없고 폼과 같은 세로 배치만 잇는다 */
+.sprint-edit-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .sprint-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

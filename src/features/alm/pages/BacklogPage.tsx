@@ -59,6 +59,8 @@ export function BacklogPage() {
   const [editingSprint, setEditingSprint] = useState<Sprint | null>(null);
   /** 스프린트 계획 저장 충돌(409) — 모달과 초안은 그대로 두고 사용자가 해소 방법을 고른다 */
   const [sprintConflict, setSprintConflict] = useState(false);
+  /** 계획 저장 중 — 모달 입력을 잠가 저장 완료(모달 닫힘)로 그 사이 입력을 잃지 않게 한다 */
+  const [sprintSaving, setSprintSaving] = useState(false);
   const [completingSprint, setCompletingSprint] = useState<Sprint | null>(null);
   const toast = useToast();
 
@@ -168,6 +170,15 @@ export function BacklogPage() {
 
   /** 계획 저장 — 모달을 연 때 본 버전(또는 해소 시 다시 읽은 최신 버전)으로 보낸다 */
   const saveSprintPlan = async (sprint: Sprint, patch: Partial<SprintPlanDraft>, version: number) => {
+    setSprintSaving(true);
+    try {
+      await saveSprintPlanUnlocked(sprint, patch, version);
+    } finally {
+      setSprintSaving(false);
+    }
+  };
+
+  const saveSprintPlanUnlocked = async (sprint: Sprint, patch: Partial<SprintPlanDraft>, version: number) => {
     try {
       await updateSprint(sprint.id, patch, version);
       // 성공했을 때만 닫는다 — 거부(기간 역전·버전 충돌)당한 초안을 삼키지 않기 위해.
@@ -210,6 +221,7 @@ export function BacklogPage() {
   };
 
   const resolveSprintConflict = async (sprint: Sprint, draft: SprintPlanDraft, mode: "reload" | "reapply") => {
+    setSprintSaving(true); // 다시 읽기·다시 적용 동안에도 입력을 잠근다
     try {
       const latest = await latestSprint(sprint.id);
       if (mode === "reload") {
@@ -217,7 +229,7 @@ export function BacklogPage() {
         setEditingSprint(latest); // 모달이 최신 값으로 초안을 다시 채운다(내 입력은 버림)
       } else {
         // 모달을 연 때 값(sprint)과 달라진 필드만 최신 버전 위에 얹는다 — 동료가 바꾼 다른 필드를 되돌리지 않는다
-        await saveSprintPlan(latest, touchedPlan(sprint, draft), latest.version);
+        await saveSprintPlanUnlocked(latest, touchedPlan(sprint, draft), latest.version);
       }
     } catch (error) {
       toast({
@@ -225,6 +237,8 @@ export function BacklogPage() {
         description: error instanceof Error ? error.message : String(error),
         appearance: "danger",
       });
+    } finally {
+      setSprintSaving(false);
     }
   };
 
@@ -288,6 +302,7 @@ export function BacklogPage() {
       <SprintEditModal
         sprint={editingSprint}
         conflict={sprintConflict}
+        saving={sprintSaving}
         onClose={() => {
           setEditingSprint(null);
           setSprintConflict(false);

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import {
@@ -93,6 +93,18 @@ export interface ProjectSettingsPageProps {
  * 메뉴는 설정 사이드바(SettingsSideNav)가 그린다. 여기서는 현재 구획 하나만 렌더한다.
  */
 /** Select는 빈 문자열 value를 못 쓴다 — 센티널 */
+/** 일반 설정 초안(저장 계약 값) */
+interface GeneralDraft {
+  name: string;
+  description: string;
+  category: string;
+  leadId: string | null;
+  defaultAssignee: ProjectDefaultAssignee;
+  icon: string;
+  color: string;
+  url: string;
+}
+
 const NO_LEAD = "__none__";
 const AUTO = "__auto__";
 
@@ -125,6 +137,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   /** 일반 설정 저장 충돌(409) — 초안은 그대로 두고 사용자가 불러오기/다시 적용을 고른다 */
   const [projectConflict, setProjectConflict] = useState(false);
   const [resolvingConflict, setResolvingConflict] = useState(false);
+  /** 지금 화면의 일반 설정 초안 — 저장이 끝난 순간(await 뒤) 사용자가 그 사이 더 고친 값을 알아보는 데 쓴다 */
+  const generalDraftRef = useRef<GeneralDraft | null>(null);
   const [myRole, setMyRole] = useState<ProjectRole | null>(null);
   const [issueCount, setIssueCount] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -223,7 +237,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   };
 
   /** 지금 초안 — 화면 값(센티널 포함)을 저장 계약 값으로 옮긴 것 */
-  const generalDraft = {
+  const generalDraft: GeneralDraft = {
     name: nameDraft,
     description: descriptionDraft,
     category: categoryDraft,
@@ -232,6 +246,21 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     icon: iconDraft === AUTO ? "" : iconDraft,
     color: colorDraft === AUTO ? "" : colorDraft,
     url: urlDraft,
+  };
+  generalDraftRef.current = generalDraft;
+
+  /** 저장된 프로젝트의 한 필드를 초안 입력에 되돌려 넣는다(센티널 포함) */
+  const setGeneralFieldFrom = (key: keyof GeneralDraft, source: Project) => {
+    switch (key) {
+      case "name": return setNameDraft(source.name);
+      case "description": return setDescriptionDraft(source.description);
+      case "category": return setCategoryDraft(source.category);
+      case "leadId": return setLeadDraft(source.leadId ?? NO_LEAD);
+      case "defaultAssignee": return setDefaultAssigneeDraft(source.defaultAssignee);
+      case "icon": return setIconDraft(source.icon || AUTO);
+      case "color": return setColorDraft(source.color || AUTO);
+      case "url": return setUrlDraft(source.url);
+    }
   };
 
   /** 편집 시작 스냅샷과 달라진(=내가 손댄) 필드만 */
@@ -244,9 +273,16 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     ) as Partial<typeof generalDraft>;
   };
 
-  const afterGeneralSaved = async (saved: Project) => {
-    // 저장된 값(내 변경 + 남이 바꾼 나머지)으로 초안과 스냅샷을 다시 맞춘다 — 다음 저장이 남의 값을 되돌리지 않게
-    resetGeneralDrafts(saved);
+  /**
+   * 저장 완료 — 스냅샷은 저장된 프로젝트(내 변경 + 남이 바꾼 나머지)가 된다. 초안은 **보낸 값 그대로인 필드만**
+   * 저장 값으로 맞추고, 저장을 기다리는 동안 사용자가 더 고친 필드는 그대로 둔다(새 스냅샷 대비 여전히 변경됨).
+   */
+  const afterGeneralSaved = async (saved: Project, submitted: GeneralDraft) => {
+    const current = generalDraftRef.current ?? submitted;
+    setBaseProject(saved);
+    for (const key of Object.keys(submitted) as (keyof GeneralDraft)[]) {
+      if (current[key] === submitted[key]) setGeneralFieldFrom(key, saved);
+    }
     setProjectConflict(false);
     await onProjectsChanged();
     toast({ title: "프로젝트를 수정했습니다", appearance: "success" });
@@ -255,7 +291,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await afterGeneralSaved(await updateProject(project.id, generalDraft, (baseProject ?? project).version));
+      const submitted = generalDraft;
+      await afterGeneralSaved(await updateProject(project.id, submitted, (baseProject ?? project).version), submitted);
     } catch (error) {
       if (errorStatus(error) === 409) {
         setProjectConflict(true);
@@ -280,7 +317,9 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         await onProjectsChanged();
       } else {
         // 내가 손댄 필드만 최신 값 위에 얹는다 — 동료가 바꾼 다른 필드(예: 이름)를 되돌리지 않는다
-        await afterGeneralSaved(await updateProject(project.id, touchedGeneral(), latest.version));
+        // 비교 기준은 누른 순간의 초안 전체 — 손대지 않은 필드도 그 사이 안 바뀌었으면 동료 값으로 맞춘다
+        const submitted = generalDraftRef.current ?? generalDraft;
+        await afterGeneralSaved(await updateProject(project.id, touchedGeneral(), latest.version), submitted);
       }
     } catch (error) {
       if (errorStatus(error) !== 409) {
