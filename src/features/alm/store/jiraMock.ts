@@ -463,6 +463,8 @@ function normalize(data: JiraData): JiraData {
   // 보관 이슈도 AQL `resolved`를 탄다 — 해결 시각 도입 전 데이터는 마지막 수정 시각으로 본다
   for (const issue of data.archivedIssues) {
     issue.resolvedAt ??= issue.resolution ? issue.updatedAt : null;
+    // 버전 이전에 보관된 이슈 — 복원 뒤 편집이 NaN 비교로 영원히 409가 되지 않게 1부터 센다
+    issue.version ??= 1;
   }
   data.components ??= [];
   data.dashboards ??= [];
@@ -3796,33 +3798,37 @@ export async function listIssuesPage(
 
 // ── 서버 검색·집계 계약의 목업 구현 (issueSearch.ts) ─────────────────
 
-type StatusLookup = (projectId: string, statusId: string) => { categoryId: string; kind: StatusKind };
+/** known=false: 프로젝트 워크플로에도 기본 분류 id에도 없는 상태 — 집계는 서버처럼 "uncategorized"로 묶는다 */
+type StatusLookup = (projectId: string, statusId: string) => { categoryId: string; kind: StatusKind; known: boolean };
 
 /** 요청 한 번 동안 프로젝트별 상태 해석을 한 번만 한다 — 상태 id → 분류 id·kind(프로젝트 워크플로 기준) */
 function statusLookup(data: JiraData): StatusLookup {
-  const byProject = new Map<string, Map<string, { categoryId: string; kind: StatusKind }>>();
+  const byProject = new Map<string, Map<string, { categoryId: string; kind: StatusKind; known: boolean }>>();
   return (projectId, statusId) => {
     let index = byProject.get(projectId);
     if (!index) {
       index = new Map(
-        resolvedStatuses(data, projectId).map((s) => [s.id, { categoryId: s.category, kind: s.kind ?? "new" }]),
+        resolvedStatuses(data, projectId).map((s) => [s.id, { categoryId: s.category, kind: s.kind ?? "new", known: true }]),
       );
       byProject.set(projectId, index);
     }
     const found = index.get(statusId);
     if (found) return found;
     const category = categoryById(data, statusId); // 기본 id 폴백 (구버전 데이터)
-    return { categoryId: category.id, kind: category.kind };
+    return { categoryId: category.id, kind: category.kind, known: category.id === statusId };
   };
 }
 
-/** 분류 지정자(id·kind·이름) → 분류 id 집합 — 서버 `statusCategories`와 같은 해석. 모르면 빈 집합 */
+/** 분류 지정자(id·kind·이름, 대소문자 무시) → 분류 id 집합 — 서버 `statusCategories`와 같은 해석. 모르면 빈 집합 */
 function matchingCategoryIds(data: JiraData, spec: string): string[] {
   const all = [
     ...data.statusCategories,
     ...BUILTIN_CATEGORIES.filter((b) => !data.statusCategories.some((c) => c.id === b.id)),
   ];
-  return all.filter((c) => c.id === spec || c.kind === spec || c.name === spec).map((c) => c.id);
+  const wanted = spec.trim().toLowerCase();
+  return all
+    .filter((c) => [c.id, c.kind, c.name].some((value) => value.toLowerCase() === wanted))
+    .map((c) => c.id);
 }
 
 function matchesCriteria(
@@ -3972,8 +3978,11 @@ export async function aggregateIssues(
         return issue.type;
       case "assignee":
         return issue.assigneeId ?? "unassigned";
-      default:
-        return statusOf(issue.projectId, issue.status).categoryId;
+      default: {
+        // 레지스트리(워크플로)에 없는 상태는 서버처럼 "uncategorized" — 버킷 합 = total
+        const status = statusOf(issue.projectId, issue.status);
+        return status.known ? status.categoryId : "uncategorized";
+      }
     }
   };
   const counts = new Map<string, number>();

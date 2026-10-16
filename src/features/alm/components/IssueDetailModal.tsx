@@ -82,6 +82,12 @@ const UNASSIGNED = "unassigned";
 const BACKLOG = "backlog";
 const NO_PARENT = "none";
 
+/** 모달이 들고 있는 입력 초안 — 충돌 해소 때 누른 순간의 값으로 저장 본문을 다시 만든다 */
+interface EditDrafts {
+  description: string;
+  estimate: string;
+}
+
 export interface IssueDetailModalProps {
   /** "ALM-1" 형식 이슈 키 (?issue= 쿼리 값) */
   issueKey: string;
@@ -140,7 +146,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
    * 저장 충돌(409) — 편집을 시작한 뒤 다른 사람이 먼저 저장했다. 내 변경은 버리지 않고 여기 들고 있다가
    * 사용자가 "최신 내용 불러오기"(버림) 또는 "내 변경 다시 적용"(최신 버전 기준 재저장)을 직접 고른다.
    */
-  const [conflict, setConflict] = useState<{ save: (version: number) => Promise<Issue>; successTitle: string } | null>(null);
+  const [conflict, setConflict] = useState<{
+    save: (version: number, drafts: EditDrafts) => Promise<Issue>;
+    successTitle: string;
+  } | null>(null);
   const [resolvingConflict, setResolvingConflict] = useState(false);
   const toast = useToast();
 
@@ -234,6 +243,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const userOf = (id: string) => users.find((u) => u.id === id);
   const userName = (id: string) => userOf(id)?.name ?? "알 수 없음";
 
+  /** 입력 중인 초안의 최신 값 — 충돌 해소("다시 적용")는 누른 순간의 초안을 저장해야 한다(실패 당시 값이 아니라) */
+  const draftsRef = useRef<EditDrafts>({ description: descriptionDraft, estimate: estimateDraft });
+  draftsRef.current = { description: descriptionDraft, estimate: estimateDraft };
+
   const applyPatch = async (
     patch: Partial<
       Pick<
@@ -260,15 +273,18 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     await saveEdit((version) => updateIssue(id, patch, version), successTitle, "저장 실패");
   };
 
-  /** 편집 저장 공통 — 이 모달이 이슈를 읽었을 때의 버전으로 보낸다. 409면 내 변경을 들고 충돌 배너를 띄운다 */
+  /**
+   * 편집 저장 공통 — 이 모달이 이슈를 읽었을 때의 버전으로 보낸다. 409면 저장 함수를 들고 충돌 배너를 띄운다.
+   * 저장 함수는 초안을 인자로 받는다 — 다시 적용할 때 그 순간의 초안(설명·예상 시간)으로 다시 만든다.
+   */
   const saveEdit = async (
-    save: (version: number) => Promise<Issue>,
+    save: (version: number, drafts: EditDrafts) => Promise<Issue>,
     successTitle: string,
     failureTitle: string,
   ) => {
     if (!issue) return;
     try {
-      const updated = await save(issue.version);
+      const updated = await save(issue.version, draftsRef.current);
       await afterSaved(updated, successTitle);
     } catch (error) {
       if (errorStatus(error) === 409) {
@@ -321,7 +337,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     try {
       const latest = await getIssueByKey(issue.key);
       if (!latest) throw new Error(`이슈를 찾을 수 없습니다: ${issue.key}`);
-      const updated = await conflict.save(latest.version);
+      const updated = await conflict.save(latest.version, draftsRef.current);
       setConflict(null);
       await afterSaved(updated, conflict.successTitle);
     } catch (error) {
@@ -340,7 +356,13 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
 
   const handleDescriptionSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await applyPatch({ description: descriptionDraft }, "설명을 저장했습니다");
+    if (!issue) return;
+    const id = issue.id;
+    await saveEdit(
+      (version, drafts) => updateIssue(id, { description: drafts.description }, version),
+      "설명을 저장했습니다",
+      "저장 실패",
+    );
   };
 
   /** Enter로 라벨 추가 — 중복은 무시하고 입력만 비운다 */
@@ -493,7 +515,13 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     if (!issue) return;
     const next = estimateDraft.trim() === "" ? null : Number(estimateDraft);
     if (next === issue.estimateHours) return;
-    await applyPatch({ estimateHours: next }, "예상 시간을 저장했습니다");
+    const id = issue.id;
+    await saveEdit(
+      (version, drafts) =>
+        updateIssue(id, { estimateHours: drafts.estimate.trim() === "" ? null : Number(drafts.estimate) }, version),
+      "예상 시간을 저장했습니다",
+      "저장 실패",
+    );
   };
 
   const handleWorklogSubmit = async (event: FormEvent<HTMLFormElement>) => {

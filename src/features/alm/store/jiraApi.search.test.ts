@@ -150,6 +150,30 @@ describe("같은 GET 동시 호출 공유", () => {
   });
 });
 
+describe("쓰기 뒤 다시 읽기는 쓰기 전에 시작된 GET에 합류하지 않는다", () => {
+  it("저장 전에 나간 느린 검색이 있어도, 저장 뒤 검색은 새로 묻고 새 값을 받는다", async () => {
+    let releaseOld!: (value: Response) => void;
+    const spy = vi.spyOn(client, "sharedApiFetch").mockImplementation((path, init) => {
+      if (init?.method === "PUT") return Promise.resolve(response(200, { ...ISSUE, title: "저장된 제목", version: 6 }));
+      if (String(path).startsWith("/api/alm/issues/7")) return Promise.resolve(response(200, ISSUE));
+      // 첫 검색은 늦게 온다(저장 전 값), 그 뒤 검색은 저장 뒤 값
+      if (spy.mock.calls.filter(([p]) => String(p).includes("/issues/search")).length === 1) {
+        return new Promise<Response>((done) => { releaseOld = done; });
+      }
+      return Promise.resolve(page([{ ...ISSUE, title: "저장된 제목", version: 6 }], 1));
+    });
+
+    const before = findIssues({ projectIds: ["3"] }, { page: 0, size: 50 });
+    await updateIssue("7", { title: "저장된 제목" }, 5);
+    const after = await findIssues({ projectIds: ["3"] }, { page: 0, size: 50 });
+    expect(after.items[0]).toMatchObject({ title: "저장된 제목", version: 6 });
+    expect(spy.mock.calls.filter(([p]) => String(p).includes("/issues/search"))).toHaveLength(2);
+
+    releaseOld(page([ISSUE], 1));
+    expect((await before).items[0].title).toBe("로그인 오류"); // 먼저 부른 쪽은 자기 응답을 받는다
+  });
+});
+
 describe("REST 이슈 수정 — 편집 시작 버전", () => {
   it("저장 직전 최신 버전이 더 높아도 화면이 본 버전을 expectedVersion으로 보낸다(덮어쓰기 대신 409)", async () => {
     const spy = vi.spyOn(client, "sharedApiFetch")

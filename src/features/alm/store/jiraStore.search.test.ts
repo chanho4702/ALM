@@ -164,6 +164,23 @@ describe("집계와 라벨", () => {
     expect(byCategory.buckets.some((b) => b.key === "review")).toBe(false);
   });
 
+  it("분류 지정자는 id·kind·이름을 대소문자 없이 받고, 워크플로에 없는 상태는 uncategorized로 센다", async () => {
+    const byKind = await findIssues({ projectIds: ["p1"], statusCategories: ["COMPLETE"] }, { page: 0, size: 50 });
+    const byId = await findIssues({ projectIds: ["p1"], statusCategories: ["done"] }, { page: 0, size: 50 });
+    expect(byKind.total).toBe(byId.total);
+    expect(byKind.total).toBeGreaterThan(0);
+
+    // 워크플로 밖 상태(구버전 데이터 등) — 집계 버킷 합이 total과 같아야 한다
+    const created = await createIssue({ projectId: "p1", title: "고아 상태" });
+    const raw = JSON.parse(localStorage.getItem("alm.jira.v1")!);
+    raw.issues.find((i: { id: string }) => i.id === created.id).status = "ghost";
+    localStorage.setItem("alm.jira.v1", JSON.stringify(raw));
+    __resetForTest(); // 캐시를 버리고 저장소에서 다시 읽는다
+    const byCategory = await aggregateIssues({ projectIds: ["p1"] }, "statusCategory");
+    expect(byCategory.buckets.find((b) => b.key === "uncategorized")?.count).toBe(1);
+    expect(byCategory.buckets.reduce((sum, b) => sum + b.count, 0)).toBe(byCategory.total);
+  });
+
   it("라벨은 중복 없이 대소문자 무시 순으로 준다", async () => {
     const created = await createIssue({ projectId: "p1", title: "라벨", labels: ["Zeta", "alpha"] });
     await updateIssue(created.id, { labels: ["Zeta", "alpha", "backend"] }, __versionForTest("issue", created.id));

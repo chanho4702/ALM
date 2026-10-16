@@ -2,7 +2,7 @@
 // 서버가 아직 저장하지 않는 ALM 확장 필드는 조용히 유실시키지 않고 명시적으로 거부한다.
 import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
 import { ATTACHMENT_TOO_LARGE_MESSAGE, assertAttachmentSize } from "./attachmentLimits";
-import { sharedApiFetch, sharedAuthClient } from "./apiClient";
+import { sharedApiFetch as transportFetch, sharedAuthClient } from "./apiClient";
 import type { IssueQuery } from "./searchQuery";
 import {
   MAX_SEARCH_PAGE_SIZE,
@@ -195,14 +195,33 @@ async function json<T>(response: Response): Promise<T> {
  * 보므로 매퍼로 새 객체를 만들어 쓰고 원본을 고치지 않는다.
  */
 const inflightGets = new Map<string, Promise<unknown>>();
+/**
+ * 쓰기 세대 — 쓰기 요청이 시작될 때와 끝날 때 올린다. 공유 키에 세대를 넣어, 저장 뒤 다시 읽기가
+ * 저장 **전**에 시작된 GET(옛 제목·옛 버전)에 합류하지 못하게 한다.
+ */
+let mutationGeneration = 0;
+
+/** 어댑터의 모든 요청이 지나는 길 — GET이 아니면 쓰기로 보고 세대를 앞뒤로 올린다 */
+async function sharedApiFetch(...args: Parameters<typeof transportFetch>): Promise<Response> {
+  // 인자는 그대로 넘긴다(받은 모양 그대로 — 호출 계약을 바꾸지 않는다)
+  const method = (args[1]?.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") return transportFetch(...args);
+  mutationGeneration += 1;
+  try {
+    return await transportFetch(...args);
+  } finally {
+    mutationGeneration += 1;
+  }
+}
 
 function sharedGet<T>(path: string): Promise<T> {
-  const pending = inflightGets.get(path);
+  const key = `${mutationGeneration}|${path}`;
+  const pending = inflightGets.get(key);
   if (pending) return pending as Promise<T>;
   const request = (async () => json<T>(await sharedApiFetch(path)))();
-  inflightGets.set(path, request);
+  inflightGets.set(key, request);
   const forget = () => {
-    if (inflightGets.get(path) === request) inflightGets.delete(path);
+    if (inflightGets.get(key) === request) inflightGets.delete(key);
   };
   request.then(forget, forget);
   return request;

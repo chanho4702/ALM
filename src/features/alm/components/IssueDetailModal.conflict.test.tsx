@@ -61,6 +61,18 @@ describe("IssueDetailModal 저장 충돌(409)", () => {
     expect(await screen.findByText("설명을 저장했습니다")).toBeInTheDocument();
   });
 
+  it("충돌 뒤 더 고쳐 쓴 다음 다시 적용하면 누른 순간의 초안을 저장한다(실패 당시 값이 아니라)", async () => {
+    const { user, dialog } = await openAndCollide();
+    await within(dialog).findByRole("button", { name: "내 변경 다시 적용(최신 버전 기준)" });
+    typeInEditor("설명", " 그리고 덧붙인 문장");
+    await user.click(within(dialog).getByRole("button", { name: "내 변경 다시 적용(최신 버전 기준)" }));
+    await waitFor(async () => {
+      const saved = (await getIssueByKey("ALM-3"))!.description;
+      expect(saved).toContain("내 초안 문장");
+      expect(saved).toContain("그리고 덧붙인 문장");
+    });
+  });
+
   it("'최신 내용 불러오기'를 고르면 내 초안을 버리고 동료의 설명을 보여 준다", async () => {
     const { user, dialog } = await openAndCollide();
     await user.click(await within(dialog).findByRole("button", { name: "최신 내용 불러오기" }));

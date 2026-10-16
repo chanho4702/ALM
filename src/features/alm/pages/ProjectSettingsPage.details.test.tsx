@@ -42,6 +42,26 @@ describe("프로젝트 일반 설정 저장 충돌(409)", () => {
   });
 });
 
+describe("프로젝트 일반 설정 — 다시 적용은 내가 손댄 필드만", () => {
+  it("동료가 이름을 바꾸고 나는 범주만 바꿨으면, 다시 적용해도 동료의 이름이 남는다", async () => {
+    const user = userEvent.setup();
+    renderAt("/projects/p1/settings/general");
+    expect(await screen.findByRole("heading", { name: "일반" })).toBeInTheDocument();
+    const seen = (await listProjects()).find((p) => p.id === "p1")!;
+    await updateProject("p1", { name: "동료가 바꾼 이름" }, seen.version);
+
+    await user.type(screen.getByLabelText("범주"), "내 범주");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    await user.click(await screen.findByRole("button", { name: "내 변경 다시 적용(최신 버전 기준)" }));
+    expect(await screen.findByText("프로젝트를 수정했습니다")).toBeInTheDocument();
+
+    const saved = (await listProjects()).find((p) => p.id === "p1")!;
+    expect(saved).toMatchObject({ name: "동료가 바꾼 이름", category: "내 범주" });
+    // 초안도 저장된 값으로 다시 맞춰져, 다음 저장이 동료의 이름을 되돌리지 않는다
+    expect(screen.getByLabelText("이름")).toHaveValue("동료가 바꾼 이름");
+  });
+});
+
 describe("프로젝트 세부 (지라 프로젝트 설정 > 세부)", () => {
   it("범주·기본 담당자를 저장하면 담당자 없는 새 이슈가 리더에게 간다", async () => {
     const user = userEvent.setup();

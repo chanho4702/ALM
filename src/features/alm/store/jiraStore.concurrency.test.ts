@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   __resetForTest,
+  archiveIssue,
   createIssue,
   getIssueByKey,
   listProjects,
   listSprints,
   moveIssue,
+  restoreIssue,
   setIssueParent,
   startSprint,
   updateIssue,
@@ -97,5 +99,22 @@ describe("스프린트·프로젝트 편집 버전", () => {
     expect(saved.version).toBe(project.version + 1);
     expect(errorStatus(await rejection(updateProject(project.id, { description: "내 설명" }, project.version)))).toBe(409);
     expect((await listProjects())[0].name).toBe("동료가 바꾼 이름");
+  });
+});
+
+describe("버전 이전 데이터 보정", () => {
+  it("버전 없이 저장된 보관 이슈도 복원 뒤 1부터 세어 편집할 수 있다(NaN 비교로 영원히 409가 되지 않는다)", async () => {
+    const issue = (await getIssueByKey("ALM-6"))!;
+    await archiveIssue(issue.id);
+    const raw = JSON.parse(localStorage.getItem("alm.jira.v1")!);
+    const archived = raw.archivedIssues.find((i: { id: string }) => i.id === issue.id);
+    delete archived.version;
+    localStorage.setItem("alm.jira.v1", JSON.stringify(raw));
+    __resetForTest(); // 저장소에서 다시 읽어 정규화한다
+
+    const restored = await restoreIssue(issue.id);
+    expect(restored.version).toBe(1);
+    const saved = await updateIssue(issue.id, { title: "복원 뒤 편집" }, restored.version);
+    expect(saved.version).toBe(2);
   });
 });

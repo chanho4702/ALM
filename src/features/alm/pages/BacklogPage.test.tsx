@@ -87,6 +87,27 @@ describe("BacklogPage", () => {
     await waitFor(() => expect(screen.queryByLabelText("스프린트 목표")).not.toBeInTheDocument());
   });
 
+  it("계획 충돌을 다시 적용하면 내가 손댄 필드만 얹는다 — 동료가 바꾼 이름은 남는다", async () => {
+    renderBacklog();
+    const user = userEvent.setup();
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    await user.click(within(panel).getByRole("button", { name: "Sprint 1 계획 수정" }));
+    const goal = await screen.findByLabelText("스프린트 목표");
+    const [sprint] = (await listSprints("p1")).filter((s) => s.name === "Sprint 1");
+    await updateSprint(sprint.id, { name: "동료가 바꾼 스프린트" }, sprint.version);
+
+    await user.clear(goal);
+    await user.type(goal, "내 목표");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    await user.click(await screen.findByRole("button", { name: "내 변경 다시 적용(최신 버전 기준)" }));
+    await waitFor(async () => {
+      expect((await listSprints("p1")).find((s) => s.id === sprint.id)).toMatchObject({
+        name: "동료가 바꾼 스프린트",
+        goal: "내 목표",
+      });
+    });
+  });
+
   it("계획 충돌에서 '최신 내용 불러오기'는 내 초안을 버리고 동료 값으로 다시 채운다", async () => {
     renderBacklog();
     const user = userEvent.setup();

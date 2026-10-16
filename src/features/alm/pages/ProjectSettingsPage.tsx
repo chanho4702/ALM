@@ -108,8 +108,11 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
 
   const project = projects.find((p) => p.id === projectId);
   const [nameDraft, setNameDraft] = useState(project?.name ?? "");
-  /** 초안을 채운 시점의 프로젝트 버전 — 저장은 이 값으로 보내 그 사이 남의 수정을 덮지 않는다(409) */
-  const [baseVersion, setBaseVersion] = useState(project?.version ?? 0);
+  /**
+   * 초안을 채운 시점의 프로젝트(편집 시작 스냅샷) — 저장은 그 버전으로 보내 남의 수정을 덮지 않고(409),
+   * 충돌 뒤 "다시 적용"은 이 스냅샷과 달라진 필드만 최신 값 위에 얹는다.
+   */
+  const [baseProject, setBaseProject] = useState<Project | null>(project ?? null);
   const [descriptionDraft, setDescriptionDraft] = useState(project?.description ?? "");
   const [categoryDraft, setCategoryDraft] = useState(project?.category ?? "");
   const [leadDraft, setLeadDraft] = useState(project?.leadId ?? NO_LEAD);
@@ -161,7 +164,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   /** 일반 설정 초안을 프로젝트 값으로 채운다 — 이때의 버전이 다음 저장의 기준이다 */
   const resetGeneralDrafts = (source: Project) => {
     setNameDraft(source.name);
-    setBaseVersion(source.version);
+    setBaseProject(source);
     setDescriptionDraft(source.description);
     setCategoryDraft(source.category);
     setLeadDraft(source.leadId ?? NO_LEAD);
@@ -219,20 +222,31 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     await reloadSettings();
   };
 
-  const saveGeneral = (version: number) =>
-    updateProject(project.id, {
-        name: nameDraft,
-        description: descriptionDraft,
-        category: categoryDraft,
-        leadId: leadDraft === NO_LEAD ? null : leadDraft,
-        defaultAssignee: defaultAssigneeDraft,
-        icon: iconDraft === AUTO ? "" : iconDraft,
-        color: colorDraft === AUTO ? "" : colorDraft,
-        url: urlDraft,
-      }, version);
+  /** 지금 초안 — 화면 값(센티널 포함)을 저장 계약 값으로 옮긴 것 */
+  const generalDraft = {
+    name: nameDraft,
+    description: descriptionDraft,
+    category: categoryDraft,
+    leadId: leadDraft === NO_LEAD ? null : leadDraft,
+    defaultAssignee: defaultAssigneeDraft,
+    icon: iconDraft === AUTO ? "" : iconDraft,
+    color: colorDraft === AUTO ? "" : colorDraft,
+    url: urlDraft,
+  };
+
+  /** 편집 시작 스냅샷과 달라진(=내가 손댄) 필드만 */
+  const touchedGeneral = () => {
+    const base = baseProject ?? project;
+    return Object.fromEntries(
+      (Object.keys(generalDraft) as (keyof typeof generalDraft)[])
+        .filter((key) => generalDraft[key] !== (key === "leadId" ? (base.leadId ?? null) : base[key]))
+        .map((key) => [key, generalDraft[key]]),
+    ) as Partial<typeof generalDraft>;
+  };
 
   const afterGeneralSaved = async (saved: Project) => {
-    setBaseVersion(saved.version);
+    // 저장된 값(내 변경 + 남이 바꾼 나머지)으로 초안과 스냅샷을 다시 맞춘다 — 다음 저장이 남의 값을 되돌리지 않게
+    resetGeneralDrafts(saved);
     setProjectConflict(false);
     await onProjectsChanged();
     toast({ title: "프로젝트를 수정했습니다", appearance: "success" });
@@ -241,7 +255,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await afterGeneralSaved(await saveGeneral(baseVersion));
+      await afterGeneralSaved(await updateProject(project.id, generalDraft, (baseProject ?? project).version));
     } catch (error) {
       if (errorStatus(error) === 409) {
         setProjectConflict(true);
@@ -265,7 +279,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         resetGeneralDrafts(latest);
         await onProjectsChanged();
       } else {
-        await afterGeneralSaved(await saveGeneral(latest.version));
+        // 내가 손댄 필드만 최신 값 위에 얹는다 — 동료가 바꾼 다른 필드(예: 이름)를 되돌리지 않는다
+        await afterGeneralSaved(await updateProject(project.id, touchedGeneral(), latest.version));
       }
     } catch (error) {
       if (errorStatus(error) !== 409) {

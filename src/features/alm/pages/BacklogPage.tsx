@@ -167,14 +167,9 @@ export function BacklogPage() {
   };
 
   /** 계획 저장 — 모달을 연 때 본 버전(또는 해소 시 다시 읽은 최신 버전)으로 보낸다 */
-  const saveSprintPlan = async (sprint: Sprint, draft: SprintPlanDraft, version: number) => {
+  const saveSprintPlan = async (sprint: Sprint, patch: Partial<SprintPlanDraft>, version: number) => {
     try {
-      await updateSprint(sprint.id, {
-        name: draft.name,
-        goal: draft.goal,
-        plannedStart: draft.plannedStart,
-        plannedEnd: draft.plannedEnd,
-      }, version);
+      await updateSprint(sprint.id, patch, version);
       // 성공했을 때만 닫는다 — 거부(기간 역전·버전 충돌)당한 초안을 삼키지 않기 위해.
       setEditingSprint(null);
       setSprintConflict(false);
@@ -193,6 +188,20 @@ export function BacklogPage() {
     await reload();
   };
 
+  const touchedPlan = (snapshot: Sprint, draft: SprintPlanDraft): Partial<SprintPlanDraft> => {
+    const before: SprintPlanDraft = {
+      name: snapshot.name,
+      goal: snapshot.goal ?? "",
+      plannedStart: snapshot.plannedStart ?? "",
+      plannedEnd: snapshot.plannedEnd ?? "",
+    };
+    return Object.fromEntries(
+      (Object.keys(draft) as (keyof SprintPlanDraft)[])
+        .filter((key) => draft[key] !== before[key])
+        .map((key) => [key, draft[key]]),
+    );
+  };
+
   const latestSprint = async (id: string) => {
     if (!projectId) throw new Error("프로젝트를 찾을 수 없습니다");
     const found = (await listSprints(projectId)).find((s) => s.id === id);
@@ -207,7 +216,8 @@ export function BacklogPage() {
         setSprintConflict(false);
         setEditingSprint(latest); // 모달이 최신 값으로 초안을 다시 채운다(내 입력은 버림)
       } else {
-        await saveSprintPlan(latest, draft, latest.version);
+        // 모달을 연 때 값(sprint)과 달라진 필드만 최신 버전 위에 얹는다 — 동료가 바꾼 다른 필드를 되돌리지 않는다
+        await saveSprintPlan(latest, touchedPlan(sprint, draft), latest.version);
       }
     } catch (error) {
       toast({
