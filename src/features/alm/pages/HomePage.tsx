@@ -51,30 +51,39 @@ export function HomePage() {
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [tab, setTab] = useState("recommended"); // 오늘 요약 줄에서 탭을 바꿀 수 있게 제어 모드
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     void (async () => {
-      const [currentUser, projectList, meta, recents, starred] = await Promise.all([
+      // 이슈는 프로젝트 목록만 기다린다. 사용자/상태 조회가 느려도 바로 시작한다.
+      const projectData = listProjects().then(async (projectList) => ({
+        projectList,
+        allIssues: (await Promise.all(projectList.map((p) => listIssues(p.id)))).flat(),
+      }));
+      const [currentUser, { projectList, allIssues }, meta, recents, starred] = await Promise.all([
         getCurrentUser(),
-        listProjects(),
+        projectData,
         statusMetaByProject(),
         listRecentProjectIds(),
         listStarredProjectIds(),
       ]);
-      const perProject = await Promise.all(projectList.map((p) => listIssues(p.id)));
       if (cancelled) return;
       setMe(currentUser);
       setProjects(projectList);
       setStatusMeta(meta);
       setRecentIds(recents);
       setStarredIds(starred);
-      setIssues(perProject.flat());
-    })();
+      setIssues(allIssues);
+    })().catch((error: unknown) => {
+      if (!cancelled) setLoadError(error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.");
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retry]);
 
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "알 수 없음";
   const openIssue = (issue: Issue) =>
@@ -172,6 +181,20 @@ export function HomePage() {
     () => projects.filter((p) => starredIds.includes(p.id)),
     [projects, starredIds],
   );
+
+  if (loadError !== null) {
+    return (
+      <main className="project-list-content home-page">
+        <div role="alert">
+          <EmptyState
+            title="홈을 불러오지 못했습니다"
+            description={loadError}
+            primaryAction={{ label: "다시 시도", onClick: () => setRetry((value) => value + 1) }}
+          />
+        </div>
+      </main>
+    );
+  }
 
   if (issues === null || me === null) {
     return (

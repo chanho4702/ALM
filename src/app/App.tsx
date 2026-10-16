@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { Spinner } from "@chanho/react";
 import type { Project } from "../features/alm/store/types";
@@ -6,26 +6,48 @@ import { listProjects } from "../features/alm/store/jiraStore";
 import { AppShell } from "../features/alm/components/AppShell";
 import { StartRedirect } from "../features/alm/components/StartRedirect";
 import { ProjectLayout } from "../features/alm/components/ProjectLayout";
-import { BoardPage } from "../features/alm/pages/BoardPage";
 import { BoardRedirect } from "../features/alm/pages/BoardRedirect";
-import { BacklogPage } from "../features/alm/pages/BacklogPage";
-import { IssueListPage } from "../features/alm/pages/IssueListPage";
 import { ProjectListPage } from "../features/alm/pages/ProjectListPage";
-import { TrashPage } from "../features/alm/pages/TrashPage";
-import { DashboardsPage } from "../features/alm/pages/DashboardsPage";
-import { DashboardViewPage } from "../features/alm/pages/DashboardViewPage";
-import { ArchivePage } from "../features/alm/pages/ArchivePage";
-import { ProjectCreatePage } from "../features/alm/pages/ProjectCreatePage";
-import { DashboardPage } from "../features/alm/pages/DashboardPage";
 import { HomePage } from "../features/alm/pages/HomePage";
-import { SearchPage } from "../features/alm/pages/SearchPage";
-import { GlobalSettingsPage } from "../features/alm/pages/GlobalSettingsPage";
 import { OrgAccountGate } from "../features/alm/components/OrgAccountGate";
+import { LazyPage } from "../features/alm/components/LazyContent";
 import { ORG_ADMIN_BASE } from "../features/alm/components/SettingsSideNav";
 
-/**
- * 리포트만 차트 라이브러리(recharts)를 쓴다 — 첫 화면 번들에 넣지 않고 라우트 단위로 쪼갠다.
- */
+/** 홈·프로젝트 목록 외 화면은 방문할 때 내려받는다(DnD·워크플로·편집기 포함). */
+const BoardPage = lazy(() =>
+  import("../features/alm/pages/BoardPage").then((module) => ({ default: module.BoardPage })),
+);
+const BacklogPage = lazy(() =>
+  import("../features/alm/pages/BacklogPage").then((module) => ({ default: module.BacklogPage })),
+);
+const IssueListPage = lazy(() =>
+  import("../features/alm/pages/IssueListPage").then((module) => ({ default: module.IssueListPage })),
+);
+const TrashPage = lazy(() =>
+  import("../features/alm/pages/TrashPage").then((module) => ({ default: module.TrashPage })),
+);
+const DashboardsPage = lazy(() =>
+  import("../features/alm/pages/DashboardsPage").then((module) => ({ default: module.DashboardsPage })),
+);
+const DashboardViewPage = lazy(() =>
+  import("../features/alm/pages/DashboardViewPage").then((module) => ({ default: module.DashboardViewPage })),
+);
+const ArchivePage = lazy(() =>
+  import("../features/alm/pages/ArchivePage").then((module) => ({ default: module.ArchivePage })),
+);
+const ProjectCreatePage = lazy(() =>
+  import("../features/alm/pages/ProjectCreatePage").then((module) => ({ default: module.ProjectCreatePage })),
+);
+const DashboardPage = lazy(() =>
+  import("../features/alm/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })),
+);
+const SearchPage = lazy(() =>
+  import("../features/alm/pages/SearchPage").then((module) => ({ default: module.SearchPage })),
+);
+const GlobalSettingsPage = lazy(() =>
+  import("../features/alm/pages/GlobalSettingsPage").then((module) => ({ default: module.GlobalSettingsPage })),
+);
+
 /** 프로젝트 설정은 워크플로 캔버스(@xyflow/react)를 쓴다 — 설정에 들어온 사람만 내려받는다 */
 const ProjectSettingsPage = lazy(() =>
   import("../features/alm/pages/ProjectSettingsPage").then((module) => ({
@@ -97,9 +119,30 @@ function AppRoutes() {
         {/* For you 홈 — 내 담당·최근 업데이트 */}
         <Route path="/" element={<StartRedirect />} />
         <Route path="/home" element={<HomePage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/dashboards" element={<DashboardsPage />} />
-        <Route path="/dashboards/:dashboardId" element={<DashboardViewPage />} />
+        <Route
+          path="/search"
+          element={
+            <LazyPage label="검색">
+              <SearchPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="/dashboards"
+          element={
+            <LazyPage label="대시보드 목록">
+              <DashboardsPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="/dashboards/:dashboardId"
+          element={
+            <LazyPage label="대시보드">
+              <DashboardViewPage />
+            </LazyPage>
+          }
+        />
         {/* 전역 관리 — 구획은 URL 세그먼트, 메뉴는 설정 사이드바(SettingsSideNav) */}
         <Route path="/settings" element={<Navigate to="/settings/types" replace />} />
         {/*
@@ -111,130 +154,138 @@ function AppRoutes() {
         <Route
           path={`${ORG_ADMIN_BASE}/*`}
           element={
-            <Suspense
-              fallback={
-                <div className="board-loading">
-                  <Spinner size="large" label="조직 관리 불러오는 중" />
-                </div>
-              }
-            >
+            <LazyPage label="조직 관리">
               <OrgAdminPage projects={projects} />
-            </Suspense>
+            </LazyPage>
           }
         />
-        <Route path="/settings/:section" element={<GlobalSettingsPage />} />
+        <Route
+          path="/settings/:section"
+          element={
+            <LazyPage label="설정">
+              <GlobalSettingsPage />
+            </LazyPage>
+          }
+        />
         <Route
           path="/projects"
           element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}
         />
-        <Route path="/projects/new" element={<ProjectCreatePage onProjectsChanged={reload} />} />
-        <Route path="/projects/trash" element={<TrashPage onProjectsChanged={reload} />} />
+        <Route
+          path="/projects/new"
+          element={
+            <LazyPage label="프로젝트 만들기">
+              <ProjectCreatePage onProjectsChanged={reload} />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="/projects/trash"
+          element={
+            <LazyPage label="휴지통">
+              <TrashPage onProjectsChanged={reload} />
+            </LazyPage>
+          }
+        />
         <Route
           path="/projects/:projectId"
           element={<ProjectLayout projects={projects} onProjectsChanged={reload} />}
         >
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            path="dashboard"
+            element={
+              <LazyPage label="요약">
+                <DashboardPage />
+              </LazyPage>
+            }
+          />
           <Route
             path="releases"
             element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="릴리스 불러오는 중" />
-                  </div>
-                }
-              >
+              <LazyPage label="릴리스">
                 <ReleasesPage />
-              </Suspense>
+              </LazyPage>
             }
           />
           <Route
             path="reports"
             element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="리포트 불러오는 중" />
-                  </div>
-                }
-              >
+              <LazyPage label="리포트">
                 <ReportsPage />
-              </Suspense>
+              </LazyPage>
             }
           />
           <Route
             path="timeline"
             element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="타임라인 불러오는 중" />
-                  </div>
-                }
-              >
+              <LazyPage label="타임라인">
                 <TimelinePage />
-              </Suspense>
+              </LazyPage>
             }
           />
           <Route path="board" element={<BoardRedirect />} />
-          <Route path="boards/:boardId" element={<BoardPage />} />
-          <Route path="backlog" element={<BacklogPage />} />
-          <Route path="issues" element={<IssueListPage />} />
-          <Route path="archive" element={<ArchivePage />} />
+          <Route
+            path="boards/:boardId"
+            element={
+              <LazyPage label="보드">
+                <BoardPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="backlog"
+            element={
+              <LazyPage label="백로그">
+                <BacklogPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="issues"
+            element={
+              <LazyPage label="이슈 목록">
+                <IssueListPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="archive"
+            element={
+              <LazyPage label="보관함">
+                <ArchivePage />
+              </LazyPage>
+            }
+          />
           <Route
             path="ai-office"
             element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="AI 사무실 불러오는 중" />
-                  </div>
-                }
-              >
+              <LazyPage label="AI 사무실">
                 <AiOfficePage />
-              </Suspense>
+              </LazyPage>
             }
           />
           <Route
             path="ai-office/runs"
             element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="실행 기록 불러오는 중" />
-                  </div>
-                }
-              >
+              <LazyPage label="실행 기록">
                 <AgentRunsPage />
-              </Suspense>
+              </LazyPage>
             }
           />
           <Route
             path="ai-office/runs/:runId"
             element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="실행 상세 불러오는 중" />
-                  </div>
-                }
-              >
+              <LazyPage label="실행 상세">
                 <AgentRunDetailPage />
-              </Suspense>
+              </LazyPage>
             }
           />
           <Route
             path="ai-office/gates"
             element={
-              <Suspense
-                fallback={
-                  <div className="board-loading">
-                    <Spinner size="large" label="승인 인박스 불러오는 중" />
-                  </div>
-                }
-              >
+              <LazyPage label="승인 인박스">
                 <AgentGatesPage />
-              </Suspense>
+              </LazyPage>
             }
           />
         </Route>
@@ -243,15 +294,9 @@ function AppRoutes() {
         <Route
           path="/projects/:projectId/settings/:section"
           element={
-            <Suspense
-              fallback={
-                <div className="board-loading">
-                  <Spinner size="large" label="설정 불러오는 중" />
-                </div>
-              }
-            >
+            <LazyPage label="설정">
               <ProjectSettingsPage projects={projects} onProjectsChanged={reload} />
-            </Suspense>
+            </LazyPage>
           }
         />
         {/* "/" 포함 그 외 전부 → 홈 */}

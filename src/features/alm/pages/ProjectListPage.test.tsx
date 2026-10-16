@@ -107,7 +107,7 @@ describe("ProjectListPage (프로젝트 디렉터리)", () => {
     await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
 
     const dialog = await screen.findByRole("dialog", { name: "프로젝트 삭제" });
-    expect(within(dialog).getByText(/이슈 8개가 함께 삭제됩니다/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/이슈 8개가 함께 휴지통으로 이동합니다/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "삭제" }));
 
     await waitFor(() => {

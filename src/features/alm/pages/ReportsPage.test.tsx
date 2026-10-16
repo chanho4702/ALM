@@ -118,7 +118,7 @@ describe("ReportsPage", () => {
     const report = await screen.findByRole("region", { name: "스프린트 리포트" });
     await user.click(within(report).getByRole("button", { name: /ALM-1/ }));
 
-    expect(await screen.findByRole("dialog")).toHaveTextContent("프로젝트 스캐폴드 구성");
+    expect(await screen.findByRole("dialog", { name: "ALM-1" })).toHaveTextContent("프로젝트 스캐폴드 구성");
   });
 });
 

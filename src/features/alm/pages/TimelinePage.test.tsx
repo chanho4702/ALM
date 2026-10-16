@@ -53,7 +53,7 @@ describe("TimelinePage", () => {
     expect(cells[1].textContent).not.toBe(cells[2].textContent);
 
     await user.click(within(table).getByRole("button", { name: /ALM-4/ }));
-    expect(await screen.findByRole("dialog")).toHaveTextContent("백로그 화면 구현");
+    expect(await screen.findByRole("dialog", { name: "ALM-4" })).toHaveTextContent("백로그 화면 구현");
   });
 
   it("SVG 계측이 없는 환경에서는 그래픽 대신 사유와 표를 보여준다", async () => {

@@ -1,0 +1,56 @@
+.issue-list-page .issue-filter-bar {
+  padding-bottom: var(--chanho-space-150);
+  border-bottom: thin solid var(--chanho-color-border-default);
+}
+
+.issue-list-page .issue-filter-search {
+  flex: 1 1 auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.issue-list-filter-reset,
+.issue-list-refreshing {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.issue-list-filter-reset {
+  margin-left: auto;
+}
+
+.issue-list-page .issue-toolbar,
+.issue-list-page .issue-toolbar-actions {
+  flex-wrap: wrap;
+}
+
+.issue-list-result-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-150);
+}
+
+.issue-list-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-150);
+  margin-bottom: var(--chanho-space-150);
+  padding: var(--chanho-space-150);
+  border: thin solid var(--chanho-color-border-danger);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-danger-subtle);
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-100);
+}
+
+.issue-list-error p {
+  margin: var(--chanho-space-50) 0 0;
+  color: var(--chanho-color-text-subtle);
+  overflow-wrap: anywhere;
+}

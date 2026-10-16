@@ -36,13 +36,15 @@ const PROJECT_PAGES = [
 
 export interface GlobalSideNavProps {
   projects: Project[];
+  /** 모바일 내비게이션에서는 데스크톱 접힘 설정과 무관하게 모든 메뉴를 보여준다. */
+  forceExpanded?: boolean;
 }
 
 /**
  * 새 지라 내비게이션의 전역 사이드바 — 모든 화면에 상주한다.
  * 홈/프로젝트 + 최근 · 별표 · 프로젝트 섹션. 접으면 아이콘 레일이 된다.
  */
-export function GlobalSideNav({ projects }: GlobalSideNavProps) {
+export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNavProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const { pathname } = useLocation();
@@ -51,7 +53,8 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   /** 저장 필터를 못 읽은 이유 — null이 아니면 "필터가 없다"가 아니라 "못 읽었다"를 보여 준다 */
   const [filtersError, setFiltersError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [storedCollapsed, setCollapsed] = useState(false);
+  const collapsed = !forceExpanded && storedCollapsed;
   const [width, setWidth] = useState(SIDENAV_DEFAULT_WIDTH);
   /** 드래그 중 최신 너비 — pointerup에서 저장할 값 */
   const widthRef = useRef(SIDENAV_DEFAULT_WIDTH);
@@ -223,7 +226,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
     <nav
       className={collapsed ? "global-nav is-collapsed" : "global-nav"}
       aria-label="전역 내비게이션"
-      style={collapsed ? undefined : { width }}
+      style={collapsed || forceExpanded ? undefined : { width }}
     >
       <div className="global-nav-scroll">
       <ul className="global-nav-list">
@@ -405,15 +408,17 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
 
       </div>
       {/* 지라식 접기 토글 — 사이드바 경계선 상단에 떠 있는 원형 chevron */}
-      <button
-        type="button"
-        className="global-nav-toggle"
-        aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-        title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-        onClick={() => void setSideNavCollapsed(!collapsed)}
-      >
-        <span aria-hidden>{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</span>
-      </button>
+      {forceExpanded ? null : (
+        <button
+          type="button"
+          className="global-nav-toggle"
+          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+          title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+          onClick={() => void setSideNavCollapsed(!collapsed)}
+        >
+          <span aria-hidden>{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</span>
+        </button>
+      )}
       {currentProjectId ? (
         <BoardCreateModal
           projectId={currentProjectId}
@@ -422,7 +427,7 @@ export function GlobalSideNav({ projects }: GlobalSideNavProps) {
           onCreated={(board) => navigate(`/projects/${currentProjectId}/boards/${board.id}`)}
         />
       ) : null}
-      {collapsed ? null : (
+      {collapsed || forceExpanded ? null : (
         <div
           className="global-nav-resizer"
           role="separator"

@@ -1,7 +1,11 @@
-import { useCallback } from "react";
+import { lazy, useCallback } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router";
-import { IssueDetailModal } from "./IssueDetailModal";
+import { LazyModal } from "./LazyContent";
+
+const IssueDetailModal = lazy(() =>
+  import("./IssueDetailModal").then((module) => ({ default: module.IssueDetailModal })),
+);
 
 export interface UseIssueModalResult {
   /** 현재 열린 이슈 키 (?issue= 값). 없으면 null */
@@ -40,12 +44,13 @@ export function useIssueModal(onIssueChanged: () => void | Promise<void>): UseIs
   }, [setSearchParams]);
 
   const issueModal = issueKey ? (
-    <IssueDetailModal
-      key={issueKey} // 키가 바뀌면 모달 내부 상태 초기화
-      issueKey={issueKey}
-      onClose={closeIssue}
-      onIssueChanged={onIssueChanged}
-    />
+    <LazyModal key={issueKey} title={issueKey} onClose={closeIssue}>
+      <IssueDetailModal
+        issueKey={issueKey}
+        onClose={closeIssue}
+        onIssueChanged={onIssueChanged}
+      />
+    </LazyModal>
   ) : null;
 
   return { issueKey, openIssue, closeIssue, issueModal };

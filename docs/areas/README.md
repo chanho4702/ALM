@@ -31,7 +31,7 @@
 
 1. **스마트 검색 공백/센티널 한계** — 공백 포함 라벨·담당 이름, "완료" 등 카테고리 라벨과
    같은 이름의 커스텀 상태 (search.md 참고)
-2. **N+1 패턴** — 홈/디렉터리가 프로젝트마다 `listIssues` 호출, 카운트 전용 API 부재
+2. **프로젝트별 집계 요청** — 홈은 프로젝트마다 `listIssues` 전체 조회가 남아 있다. 디렉터리는 `listIssuesPage(size: 1).total`로 본문 전량 다운로드를 제거했지만 프로젝트별 요청 자체는 남는다. 통합 집계 API는 후속 과제.
 3. ~~시간 표기 4종 혼재~~ — 2026-09-04 해소: `components/time.ts`(`relTime`/`formatDate`/`formatDateTime`)로 통일
 4. (소소) BoardColumn의 도달 불가 폴백·`.issue-card-epic` 죽은 클래스·`#fff` 하드코딩·
    인라인 빈상태 문구 제각각 — 정리 수준

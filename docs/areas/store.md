@@ -209,11 +209,11 @@ REST 전환 때 계약이 바뀌지 않는다. `listProjectChanges(projectId, {f
    - 프로젝트: 템플릿이 만드는 보드·샘플 이슈와 설정 스킴(워크플로 상태·카테고리)
    - 사용자: 현재 목업의 `u1` 형식 대신 서버 숫자 ID를 제공하는 디렉터리
    - 워크플로 스킴이 서버로 갈 때까지 `completeSprint`는 완료로 볼 상태 목록을 프론트가 보낸다.
-2. **카운트/집계 엔드포인트 신설 필요**: 홈(`HomePage`)·디렉터리(`ProjectListPage`)가
-   프로젝트마다 `listIssues`를 불러 N+1이다. `countIssuesByProject`, 전 프로젝트 이슈 조회
-   (`listAllIssues`) 같은 API를 만들고 화면 호출을 교체할 것.
-3. `IssueListPage`는 필터 변경마다 필터본+전체본(라벨 옵션용) 2회 조회한다 — 라벨 옵션은
-   최초 1회로 분리 가능.
+2. **카운트/집계 엔드포인트 신설 필요**: 홈(`HomePage`)은 프로젝트마다 `listIssues` 전량 조회가 남아 있다.
+   디렉터리(`ProjectListPage`)는 `listIssuesPage(size: 1).total`을 사용해 본문 전량 다운로드를 제거했다.
+   프로젝트별 요청 수 자체를 줄이는 `countIssuesByProject` 등 통합 집계 API는 후속 과제.
+3. `IssueListPage`는 검색을 250ms 묶고 필터·페이지 변경 시 해당 페이지만 조회한다. 라벨용 전체본과
+   사용자·상태 등 메타데이터는 프로젝트 진입·저장 후에만 갱신하며, 라벨 조회가 첫 페이지 표시를 막지 않는다.
 4. `queryIssues(IssueQuery)`는 GraphQL 인자로 1:1 매핑하도록 설계돼 있다.
 5. 낙관적 업데이트·실시간은 `../BACKLOG.md` 2번 참고.
 

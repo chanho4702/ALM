@@ -1,0 +1,65 @@
+/* 좁은 화면에서 본문 폭을 확보하고, 내비게이션은 DS 모달의 포커스/닫기 동작을 따른다. */
+.app-mobile-topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--chanho-z-navigation);
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  min-height: var(--chanho-space-600);
+  padding: var(--chanho-space-50) var(--chanho-space-150);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-surface);
+}
+
+.app-mobile-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin-left: auto;
+}
+
+.app-mobile-topbar button {
+  min-width: var(--chanho-space-400);
+  min-height: var(--chanho-space-400);
+  flex-shrink: 0;
+}
+
+.app-mobile-navigation .global-nav {
+  width: 100%;
+  border: 0;
+  background: var(--chanho-color-background-surface);
+}
+
+.app-mobile-navigation .global-nav-scroll {
+  overflow: visible;
+  padding: 0;
+}
+
+.app-mobile-navigation .global-nav-project-menu,
+.app-mobile-navigation .global-nav-filter-delete {
+  opacity: 1;
+}
+
+.app-mobile-navigation .global-nav-item {
+  min-height: var(--chanho-space-500);
+}
+
+.app-mobile-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  margin-top: var(--chanho-space-200);
+  padding-top: var(--chanho-space-200);
+  border-top: 1px solid var(--chanho-color-border-default);
+}
+
+.app-mobile-account-actions .jira-auth-user {
+  overflow-wrap: anywhere;
+}
+
+.app-shell-mobile .project-list-content,
+.app-shell-mobile .jira-content {
+  padding-inline: var(--chanho-space-200);
+}

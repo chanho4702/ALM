@@ -69,7 +69,7 @@ describe("DashboardPage", () => {
     const card = await screen.findByRole("region", { name: "마감 임박·지연" });
     await user.click(within(card).getByRole("button", { name: /ALM-2/ }));
 
-    expect(await screen.findByRole("dialog")).toHaveTextContent("칸반 보드 UI 구현");
+    expect(await screen.findByRole("dialog", { name: "ALM-2" })).toHaveTextContent("칸반 보드 UI 구현");
   });
 
   it("담당자별 이슈 개수를 표시한다 (미지정 포함)", async () => {
