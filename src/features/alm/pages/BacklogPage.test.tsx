@@ -6,6 +6,9 @@ import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import { __resetForTest, listSprints, updateSprint } from "../store/jiraStore";
 import * as store from "../store/jiraStore";
+// 지연 로드(lazy) 청크를 수집 시점에 미리 올린다 — 병렬 실행에서 첫 findBy가 청크 변환을 기다리다 한도를 넘지 않게
+import "../components/IssueDetailModal";
+import "./BacklogPage";
 
 afterEach(() => vi.restoreAllMocks());
 

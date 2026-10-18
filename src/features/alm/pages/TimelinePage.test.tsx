@@ -8,6 +8,8 @@ import { App } from "../../../app/App";
 // 기다리다 한도(5s)를 넘기므로, 수집 시점에 미리 올려 lazy 해석이 즉시 끝나게 한다.
 import "./TimelinePage";
 import { __resetForTest } from "../store/jiraStore";
+// 지연 로드(lazy) 청크를 수집 시점에 미리 올린다 — 병렬 실행에서 첫 findBy가 청크 변환을 기다리다 한도를 넘지 않게
+import "../components/IssueDetailModal";
 
 function renderTimeline() {
   return render(

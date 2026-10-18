@@ -16,6 +16,8 @@ import {
   listSprints,
   updateIssue,
 } from "../store/jiraStore";
+// 지연 로드(lazy) 청크를 수집 시점에 미리 올린다 — 병렬 실행에서 첫 findBy가 청크 변환을 기다리다 한도를 넘지 않게
+import "../components/IssueDetailModal";
 
 /** 이력 기능 도입 전 데이터를 흉내 — localStorage의 changes만 비운다 */
 async function dropChangeHistory() {

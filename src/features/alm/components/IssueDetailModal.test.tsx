@@ -6,6 +6,9 @@ import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import { __resetForTest, updateProjectMemberRole } from "../store/jiraStore";
+// 지연 로드(lazy) 청크를 수집 시점에 미리 올린다 — 병렬 실행에서 첫 findBy가 청크 변환을 기다리다 한도를 넘지 않게
+import "./IssueDetailModal";
+import "../pages/BoardPage";
 
 /** 현재 pathname+search를 노출하는 테스트 프로브 */
 function LocationProbe() {

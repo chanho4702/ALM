@@ -5,6 +5,10 @@ import { MemoryRouter } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import { __resetForTest, deleteProject, listIssues, listProjects } from "../store/jiraStore";
+// 지연 로드(lazy) 청크를 수집 시점에 미리 올린다 — 병렬 실행에서 첫 findBy가 청크 변환을 기다리다 한도를 넘지 않게
+import "../components/IssueDetailModal";
+import "./IssueListPage";
+import "./ProjectSettingsPage";
 
 function renderAt(path: string) {
   return render(
@@ -32,7 +36,8 @@ describe("이슈 보관함 (지라 보관된 업무 항목)", () => {
 
     await user.click(await screen.findByRole("button", { name: "보관함" }));
     const list = await screen.findByRole("list", { name: "보관된 이슈 목록" });
-    expect(within(list).getByText("ALM-2")).toBeInTheDocument();
+    // 목록 컨테이너는 로드 전에도 그려진다(비동기) — 항목은 기다려서 찾는다
+    expect(await within(list).findByText("ALM-2")).toBeInTheDocument();
     await user.click(within(list).getByRole("button", { name: "복원" }));
     expect(await screen.findByText("ALM-2을(를) 복원했습니다")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "보관된 이슈가 없습니다" })).toBeInTheDocument();
