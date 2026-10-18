@@ -48,6 +48,7 @@ export {
   listAttachments,
   uploadAttachment,
   downloadAttachment,
+  inlineAttachment,
   deleteAttachment,
 } from "./api/attachments";
 export {

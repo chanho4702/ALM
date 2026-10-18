@@ -37,6 +37,7 @@ export {
   listAttachments,
   uploadAttachment,
   downloadAttachment,
+  inlineAttachment,
   deleteAttachment,
 } from "./mock/attachments";
 export {

@@ -1,6 +1,6 @@
 // localStorage 목업 스토어 — attachments (jiraMock.ts에서 분할, 동작 불변)
 import type { Attachment } from "../types";
-import { assertAttachmentSize } from "../attachmentLimits";
+import { attachmentPreviewKind, assertAttachmentSize } from "../attachmentLimits";
 import { CURRENT_USER_ID } from "../../../../mock/users";
 import { clone, load, nextId, persist } from "./db";
 import { assertCanEdit } from "./members";
@@ -79,4 +79,12 @@ export async function deleteAttachment(id: string): Promise<void> {
     issue.updatedAt = now;
   }
   persist();
+}
+
+/** 이미지 미리보기 바이트(F-09) — 서버처럼 이미지 4종만, 그 밖은 거부 */
+export async function inlineAttachment(id: string): Promise<Blob> {
+  const attachment = load().attachments.find((a) => a.id === id);
+  if (!attachment) throw new Error("첨부를 찾을 수 없습니다");
+  if (attachmentPreviewKind(attachment.contentType) !== "image") throw new Error("미리보기를 지원하지 않는 형식입니다");
+  return downloadAttachment(id);
 }

@@ -75,6 +75,8 @@ export const hasAnyProjectAdmin = impl.hasAnyProjectAdmin;
 export const listAttachments = impl.listAttachments;
 export const uploadAttachment = impl.uploadAttachment;
 export const downloadAttachment = impl.downloadAttachment;
+/** 이미지 첨부 미리보기 바이트(F-09) — png·jpeg·gif·webp만 */
+export const inlineAttachment = impl.inlineAttachment;
 export const deleteAttachment = impl.deleteAttachment;
 export const listVersions = impl.listVersions;
 export const createVersion = impl.createVersion;

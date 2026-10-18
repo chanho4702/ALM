@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, useToast } from "@chanho/react";
-import { Download, Paperclip, Trash2 } from "lucide-react";
+import { Button, Modal, useToast } from "@chanho/react";
+import { Download, Eye, FileText, Paperclip, Trash2 } from "lucide-react";
 import type { Attachment } from "../store/types";
 import {
   deleteAttachment,
   downloadAttachment,
+  inlineAttachment,
   listAttachments,
   uploadAttachment,
 } from "../store/jiraStore";
-import { ATTACHMENT_TOO_LARGE_MESSAGE, isAttachmentTooLarge } from "../store/attachmentLimits";
+import { ATTACHMENT_TOO_LARGE_MESSAGE, attachmentPreviewKind, isAttachmentTooLarge } from "../store/attachmentLimits";
+import { settleWithConcurrency } from "../store/concurrency";
 import { formatDate } from "./time";
+
+const revokeUrl = (url: string) => {
+  if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
+};
 
 /** 사람이 읽는 크기 — 1024 단위, 소수 한 자리 */
 export function formatBytes(bytes: number): string {
@@ -43,6 +49,44 @@ export function IssueAttachments({
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const toast = useToast();
+  /** 이미지 첨부 썸네일(F-09) — attachmentId → object URL. 언마운트·목록 변경 때 해제한다 */
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  /** 라이트박스로 크게 보는 이미지 */
+  const [viewing, setViewing] = useState<Attachment | null>(null);
+
+  // 이미지 첨부만 inline API로 받아 썸네일을 만든다(동시성 상한). 실패한 것은 썸네일 없이 이름만 남는다
+  useEffect(() => {
+    if (!items) return;
+    const images = items.filter((a) => attachmentPreviewKind(a.contentType) === "image");
+    // object URL을 못 만드는 환경(테스트 jsdom 등)에서는 썸네일 없이 이름만 — 미리보기 때문에 목록이 깨지면 안 된다
+    if (images.length === 0 || typeof URL.createObjectURL !== "function") return;
+    let alive = true;
+    const created: string[] = [];
+    void settleWithConcurrency(images, (a) => inlineAttachment(a.id)).then((results) => {
+      const next: Record<string, string> = {};
+      results.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+        const url = URL.createObjectURL(result.value);
+        created.push(url);
+        next[images[index].id] = url;
+      });
+      if (alive) setThumbs(next);
+      else created.forEach(revokeUrl);
+    });
+    return () => {
+      alive = false;
+      created.forEach(revokeUrl);
+    };
+  }, [items]);
+
+  /** PDF — 내려받은 Blob을 새 탭의 브라우저 미리보기로 연다 */
+  const openPdf = (attachment: Attachment) =>
+    void run("미리보기 실패", async () => {
+      const blob = await downloadAttachment(attachment.id);
+      const url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: "application/pdf" }));
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => revokeUrl(url), 60_000);
+    });
 
   const generation = useRef(0);
   const reload = useCallback(async () => {
@@ -137,12 +181,45 @@ export function IssueAttachments({
         <ul className="issue-attachment-list">
           {items.map((attachment) => (
             <li key={attachment.id} className="issue-attachment-row">
+              {thumbs[attachment.id] ? (
+                <button
+                  type="button"
+                  className="issue-attachment-thumb"
+                  aria-label={`${attachment.filename} 미리보기`}
+                  onClick={() => setViewing(attachment)}
+                >
+                  <img src={thumbs[attachment.id]} alt="" />
+                </button>
+              ) : null}
               <span className="issue-attachment-name" title={attachment.filename}>
                 {attachment.filename}
               </span>
               <span className="issue-attachment-meta">
                 {`${formatBytes(attachment.sizeBytes)} · ${userNames[attachment.uploadedBy] ?? "사용자"} · ${formatDate(attachment.createdAt)}`}
               </span>
+              {attachmentPreviewKind(attachment.contentType) === "pdf" ? (
+                <Button
+                  variant="subtle"
+                  size="small"
+                  iconOnly
+                  aria-label={`${attachment.filename} 새 탭에서 보기`}
+                  disabled={busy}
+                  onClick={() => openPdf(attachment)}
+                >
+                  <FileText size={16} />
+                </Button>
+              ) : null}
+              {thumbs[attachment.id] ? (
+                <Button
+                  variant="subtle"
+                  size="small"
+                  iconOnly
+                  aria-label={`${attachment.filename} 크게 보기`}
+                  onClick={() => setViewing(attachment)}
+                >
+                  <Eye size={16} />
+                </Button>
+              ) : null}
               <Button
                 variant="subtle"
                 size="small"
@@ -171,6 +248,19 @@ export function IssueAttachments({
           ))}
         </ul>
       )}
+      {viewing && thumbs[viewing.id] ? (
+        <Modal
+          trigger={<span hidden />}
+          title={viewing.filename}
+          open
+          onOpenChange={(next) => {
+            if (!next) setViewing(null);
+          }}
+          className="issue-attachment-lightbox"
+        >
+          <img className="issue-attachment-lightbox-image" src={thumbs[viewing.id]} alt={viewing.filename} />
+        </Modal>
+      ) : null}
     </section>
   );
 }

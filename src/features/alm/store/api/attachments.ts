@@ -45,3 +45,16 @@ export async function downloadAttachment(id: string): Promise<Blob> {
 export async function deleteAttachment(id: string): Promise<void> {
   await json(await sharedApiFetch(`/api/alm/attachments/${toBackendId(id)}`, { method: "DELETE" }));
 }
+
+/**
+ * 이미지 미리보기 바이트(F-09) — `GET /api/alm/attachments/{id}/inline`(png·jpeg·gif·webp만). 인증 헤더가 필요해
+ * `<img src>`로 직접 못 열고 Blob으로 받아 화면이 object URL로 그린다.
+ */
+export async function inlineAttachment(id: string): Promise<Blob> {
+  const response = await sharedApiFetch(`/api/alm/attachments/${toBackendId(id)}/inline`);
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    throw new Error(extractApiError(response.status, body));
+  }
+  return response.blob();
+}
