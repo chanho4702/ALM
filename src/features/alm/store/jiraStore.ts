@@ -57,6 +57,7 @@ rest satisfies Pick<
   | "findIssues"
   | "aggregateIssues"
   | "listProjectLabels"
+  | "listIssueAncestors"
   | "uploadAttachment"
 >;
 
@@ -109,6 +110,8 @@ export const addWorklog = impl.addWorklog;
 export const deleteWorklog = impl.deleteWorklog;
 export const setIssueParent = impl.setIssueParent;
 export const listChildren = impl.listChildren;
+/** 상위 항목 경로(루트 먼저) — 이슈 상세의 경로 표시용, 프로젝트 전체를 읽지 않는다 */
+export const listIssueAncestors = impl.listIssueAncestors;
 export const addIssueLink = impl.addIssueLink;
 export const removeIssueLink = impl.removeIssueLink;
 export const listIssueLinks = impl.listIssueLinks;

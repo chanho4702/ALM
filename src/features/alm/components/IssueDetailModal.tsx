@@ -29,12 +29,13 @@ import {
   deleteWorklog,
   getCurrentUser,
   getIssueByKey,
+  findIssues,
   getMyProjectRole,
   listActivity,
   listChildren,
   listComments,
+  listIssueAncestors,
   listIssueLinks,
-  listIssues,
   listSprints,
   listUsers,
   listVersions,
@@ -47,6 +48,7 @@ import {
 } from "../store/jiraStore";
 import type { IssueLinkView } from "../store/jiraStore";
 import { errorStatus } from "../store/mapping";
+import { settleWithConcurrency } from "../store/concurrency";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PriorityGlyph } from "./PriorityGlyph";
 import { ResolutionGlyph } from "./ResolutionGlyph";
@@ -82,6 +84,52 @@ const UNASSIGNED = "unassigned";
 const BACKLOG = "backlog";
 const NO_PARENT = "none";
 
+/**
+ * 상위 항목·링크 대상 후보를 한 번에 보여 줄 수 — 프로젝트 전체를 읽지 않고 최근 수정 순으로 이만큼만 받는다.
+ * 후보가 더 있으면 검색 칸이 나타나 서버 검색(키·제목·설명)으로 좁힌다.
+ */
+export const CANDIDATE_LIMIT = 50;
+const CANDIDATE_SEARCH_DELAY_MS = 250;
+
+interface CandidatePool {
+  items: Issue[];
+  total: number;
+}
+
+/**
+ * 후보 목록 — 프로젝트 안에서 검색어(비면 최근 수정 순)로 서버 검색 한 페이지만 읽는다. 늦게 온 응답은 버린다.
+ * `enabled`가 거짓이면 묻지 않는다(링크 폼이 접혀 있을 때).
+ */
+function useCandidatePool(projectId: string | undefined, query: string, enabled: boolean): CandidatePool {
+  const [pool, setPool] = useState<CandidatePool>({ items: [], total: 0 });
+  useEffect(() => {
+    if (!projectId || !enabled) return;
+    let cancelled = false;
+    const text = query.trim();
+    const timer = setTimeout(
+      () => {
+        void findIssues(
+          { projectIds: [projectId], text: text || undefined },
+          { page: 0, size: CANDIDATE_LIMIT },
+          { field: "updated", dir: "desc" },
+        )
+          .then((page) => {
+            if (!cancelled) setPool({ items: page.items, total: page.total });
+          })
+          .catch(() => {
+            if (!cancelled) setPool({ items: [], total: 0 });
+          });
+      },
+      text ? CANDIDATE_SEARCH_DELAY_MS : 0,
+    );
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [projectId, query, enabled]);
+  return pool;
+}
+
 /** 모달이 들고 있는 입력 초안 — 충돌 해소 때 누른 순간의 값으로 저장 본문을 다시 만든다 */
 interface EditDrafts {
   description: string;
@@ -110,7 +158,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [commentDraft, setCommentDraft] = useState("");
   const [labelDraft, setLabelDraft] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [projectIssues, setProjectIssues] = useState<Issue[]>([]);
+  /** 상위 항목 경로(루트 먼저) — 부모를 한 단계씩 읽는다(프로젝트 전체를 읽지 않는다) */
+  const [ancestors, setAncestors] = useState<Issue[]>([]);
+  /** 하위의 하위 — 하위 이슈마다 그 자식만 읽는다 */
+  const [grandChildren, setGrandChildren] = useState<Record<string, Issue[]>>({});
+  const [parentQuery, setParentQuery] = useState("");
+  const [linkQuery, setLinkQuery] = useState("");
   const [componentOptions, setComponentOptions] = useState<Component[]>([]);
   const [children, setChildren] = useState<Issue[]>([]);
   const [links, setLinks] = useState<IssueLinkView[]>([]);
@@ -169,36 +222,71 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     setActivities(activityList);
   };
 
-  /** 관계(하위 이슈·링크)·워크로그 재조회 */
-  const refreshRelations = async (issueId: string, projectId: string) => {
-    const [childList, linkList, allIssues, worklogList] = await Promise.all([
+  /**
+   * 관계(하위 이슈·하위의 하위·링크)·워크로그 재조회 — 이 이슈에 딸린 것만 읽는다.
+   * 하위의 하위는 하위 이슈마다 자식 검색 1번(동시성 상한)이다. 하나가 실패해도 나머지는 그린다.
+   */
+  const refreshRelations = async (issueId: string) => {
+    const [childList, linkList, worklogList] = await Promise.all([
       listChildren(issueId),
       listIssueLinks(issueId),
-      listIssues(projectId),
       listWorklogs(issueId),
     ]);
     setChildren(childList);
     setLinks(linkList);
-    setProjectIssues(allIssues);
-    setComponentOptions(await listComponents(projectId).catch(() => []));
     setWorklogs(worklogList);
+    const nested = await settleWithConcurrency(childList, (child) => listChildren(child.id));
+    setGrandChildren(
+      Object.fromEntries(
+        childList.map((child, index) => {
+          const result = nested[index];
+          return [child.id, result.status === "fulfilled" ? result.value : []];
+        }),
+      ),
+    );
   };
 
-  // 수정 버전 후보와 내 역할 — 프로젝트가 바뀔 때만 다시 읽는다
+  // 수정 버전·컴포넌트 후보와 내 역할 — 프로젝트가 바뀔 때만 다시 읽는다(모달 수명 동안 한 번)
   useEffect(() => {
     if (!issue) return;
     let cancelled = false;
-    void Promise.all([listVersions(issue.projectId), getMyProjectRole(issue.projectId)]).then(
-      ([list, role]) => {
-        if (cancelled) return;
-        setVersions(list);
-        setCanEdit(role !== null && role !== "viewer");
-      },
-    );
+    void Promise.all([
+      listVersions(issue.projectId),
+      getMyProjectRole(issue.projectId),
+      listComponents(issue.projectId).catch(() => []),
+    ]).then(([list, role, componentList]) => {
+      if (cancelled) return;
+      setVersions(list);
+      setCanEdit(role !== null && role !== "viewer");
+      setComponentOptions(componentList);
+    });
     return () => {
       cancelled = true;
     };
   }, [issue?.projectId]);
+
+  // 상위 항목 경로 — 이슈나 그 부모가 바뀔 때만 다시 따라간다
+  useEffect(() => {
+    if (!issue) return;
+    if (!issue.parentId) {
+      setAncestors([]);
+      return;
+    }
+    let cancelled = false;
+    void listIssueAncestors(issue.id, issue.parentId)
+      .then((list) => {
+        if (!cancelled) setAncestors(list);
+      })
+      .catch(() => {
+        if (!cancelled) setAncestors([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [issue?.id, issue?.parentId]);
+
+  const parentPool = useCandidatePool(issue?.projectId, parentQuery, Boolean(issue));
+  const linkPool = useCandidatePool(issue?.projectId, linkQuery, linkFormOpen);
 
   useEffect(() => {
     let cancelled = false;
@@ -232,7 +320,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         setStatuses([...settings.body.statuses].sort((a, b) => a.order - b.order));
         setSettingsBody(settings.body);
       }
-      await refreshRelations(found.id, found.projectId);
+      await refreshRelations(found.id);
     })();
     return () => {
       cancelled = true;
@@ -462,7 +550,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         sprintId: issue.sprintId,
       });
       setSubtaskDraft("");
-      await refreshRelations(issue.id, issue.projectId);
+      await refreshRelations(issue.id);
       await onIssueChanged();
       toast({ title: "하위 이슈를 추가했습니다", appearance: "success" });
     } catch (error) {
@@ -484,7 +572,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           : { sourceId: issue.id, targetId: linkTargetId, type },
       );
       setLinkTargetId(null);
-      await refreshRelations(issue.id, issue.projectId);
+      await refreshRelations(issue.id);
       await refreshLogs(issue.id);
       toast({ title: "링크를 추가했습니다", appearance: "success" });
     } catch (error) {
@@ -500,7 +588,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     if (!issue) return;
     try {
       await removeIssueLink(linkId);
-      await refreshRelations(issue.id, issue.projectId);
+      await refreshRelations(issue.id);
       toast({ title: "링크를 제거했습니다", appearance: "success" });
     } catch (error) {
       toast({
@@ -535,7 +623,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       });
       setWorklogHours("");
       setWorklogComment("");
-      await refreshRelations(issue.id, issue.projectId);
+      await refreshRelations(issue.id);
       await refreshLogs(issue.id);
       toast({ title: "작업 시간을 기록했습니다", appearance: "success" });
     } catch (error) {
@@ -551,7 +639,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     if (!issue) return;
     try {
       await deleteWorklog(worklogId);
-      await refreshRelations(issue.id, issue.projectId);
+      await refreshRelations(issue.id);
       toast({ title: "워크로그를 삭제했습니다", appearance: "success" });
     } catch (error) {
       toast({
@@ -591,33 +679,23 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         statusKind(statuses, l.other.status) !== "complete",
     );
 
-  /** 계층 깊이 제한 없음 — 상위 항목 후보는 자기 자신과 자손을 뺀 프로젝트의 모든 이슈 */
-  const descendantIds = new Set<string>();
-  {
-    const queue = [issue.id];
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      for (const i of projectIssues) {
-        if (i.parentId === cur && !descendantIds.has(i.id)) {
-          descendantIds.add(i.id);
-          queue.push(i.id);
-        }
-      }
-    }
-  }
-  const parentCandidates = projectIssues.filter((i) => i.id !== issue.id && !descendantIds.has(i.id));
-  /** 상위 항목 경로(루트 먼저) — 순환은 없지만 목록이 덜 실렸을 때를 대비해 방문 가드 */
-  const ancestors: Issue[] = [];
-  {
-    const seen = new Set<string>([issue.id]);
-    let cursor = issue.parentId ? projectIssues.find((i) => i.id === issue.parentId) : undefined;
-    while (cursor && !seen.has(cursor.id)) {
-      seen.add(cursor.id);
-      ancestors.unshift(cursor);
-      cursor = cursor.parentId ? projectIssues.find((i) => i.id === cursor!.parentId) : undefined;
-    }
-  }
-  const grandChildrenOf = (id: string) => projectIssues.filter((i) => i.parentId === id);
+  /**
+   * 계층 깊이 제한 없음 — 상위 항목 후보는 서버 검색 한 페이지에서 자기 자신과 아는 자손(하위·하위의 하위)을 뺀 것.
+   * 더 깊은 자손을 고르면 스토어가 순환으로 거절한다(토스트). 현재 부모는 검색 결과에 없어도 옵션에 남긴다.
+   */
+  const knownDescendants = new Set<string>([
+    ...children.map((c) => c.id),
+    ...Object.values(grandChildren).flatMap((list) => list.map((g) => g.id)),
+  ]);
+  const currentParent = ancestors.at(-1);
+  const parentCandidates = [
+    ...(currentParent && !parentPool.items.some((i) => i.id === currentParent.id) ? [currentParent] : []),
+    ...parentPool.items,
+  ].filter((i) => i.id !== issue.id && !knownDescendants.has(i.id));
+  const parentSearchVisible = parentPool.total > parentPool.items.length || parentQuery !== "";
+  const linkCandidates = linkPool.items.filter((i) => i.id !== issue.id);
+  const linkSearchVisible = linkPool.total > linkPool.items.length || linkQuery !== "";
+  const grandChildrenOf = (id: string) => grandChildren[id] ?? [];
   const childTypeOptions = [
     ...enabledTypes.filter((t) => levelOf(t) !== "subtask"),
     ...issueTypes.filter((t) => t.level === "subtask").map((t) => t.id),
@@ -910,12 +988,19 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                 value={linkTargetId ?? NO_PARENT}
                 options={[
                   { value: NO_PARENT, label: "선택하세요" },
-                  ...projectIssues
-                    .filter((i) => i.id !== issue.id)
-                    .map((i) => ({ value: i.id, label: `${i.key} ${i.title}` })),
+                  ...linkCandidates.map((i) => ({ value: i.id, label: `${i.key} ${i.title}` })),
                 ]}
                 onValueChange={(v) => setLinkTargetId(v === NO_PARENT ? null : v)}
               />
+              {linkSearchVisible ? (
+                <TextField
+                  type="search"
+                  label="대상 이슈 검색"
+                  placeholder="키·제목으로 찾기"
+                  value={linkQuery}
+                  onChange={(event) => setLinkQuery(event.target.value)}
+                />
+              ) : null}
               <Button size="small" disabled={!linkTargetId} onClick={() => void handleLinkAdd()}>
                 링크 추가
               </Button>
@@ -1013,6 +1098,15 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                 ]}
                 onValueChange={(v) => void handleParentChange(v)}
               />
+              {parentSearchVisible ? (
+                <TextField
+                  type="search"
+                  label="상위 항목 검색"
+                  placeholder="키·제목으로 찾기"
+                  value={parentQuery}
+                  onChange={(event) => setParentQuery(event.target.value)}
+                />
+              ) : null}
             </div>
           ) : null}
           {fields.assignee.visible ? (

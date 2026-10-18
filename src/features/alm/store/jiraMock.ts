@@ -2183,6 +2183,20 @@ export async function setIssueParent(
   return clone(issue);
 }
 
+/** 상위 항목 경로(루트 먼저) — 계층 깊이 제한이 없어 끝까지 따라가되 순환·끊긴 부모는 거기서 멈춘다 */
+export async function listIssueAncestors(issueId: string, parentId?: string | null): Promise<Issue[]> {
+  const byId = new Map(load().issues.map((i) => [i.id, i]));
+  const ancestors: Issue[] = [];
+  const seen = new Set<string>([issueId]);
+  let cursor = byId.get((parentId === undefined ? byId.get(issueId)?.parentId : parentId) ?? "");
+  while (cursor && !seen.has(cursor.id)) {
+    seen.add(cursor.id);
+    ancestors.unshift(cursor);
+    cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+  }
+  return clone(ancestors);
+}
+
 export async function listChildren(issueId: string): Promise<Issue[]> {
   return clone(
     load()

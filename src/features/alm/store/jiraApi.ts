@@ -2632,6 +2632,31 @@ export async function setIssueParent(id: string, parentId: string | null, expect
   return updateIssue(id, { parentId }, expectedVersion);
 }
 
+/** 상위 경로를 따라갈 최대 깊이 — 계층은 무제한이지만 끊긴 체인·순환에 무한히 묻지 않게 */
+const MAX_ANCESTOR_DEPTH = 50;
+
+/**
+ * 상위 항목 경로(루트 먼저) — 서버에 조상 API가 없어 부모를 한 단계씩 읽는다(깊이만큼 GET, 보통 1~3).
+ * `parentId`를 넘기면 자기 자신은 다시 읽지 않는다. 중간 부모를 못 읽으면(삭제·권한) 거기까지만 돌려준다.
+ */
+export async function listIssueAncestors(issueId: string, parentId?: string | null): Promise<Issue[]> {
+  const ancestors: Issue[] = [];
+  const seen = new Set<string>([issueId]);
+  let next = parentId === undefined ? mapIssue(await issueDto(issueId)).parentId : parentId;
+  while (next && !seen.has(next) && ancestors.length < MAX_ANCESTOR_DEPTH) {
+    seen.add(next);
+    let parent: Issue;
+    try {
+      parent = mapIssue(await issueDto(next));
+    } catch {
+      break;
+    }
+    ancestors.unshift(parent);
+    next = parent.parentId;
+  }
+  return ancestors;
+}
+
 /** 서버 검색으로 자식을 찾는다 — 키 오름차순 */
 export async function listChildren(issueId: string): Promise<Issue[]> {
   const query = searchParams({
