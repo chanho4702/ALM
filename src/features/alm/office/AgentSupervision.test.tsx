@@ -131,7 +131,7 @@ describe("실행 기록(AGP-12) — 목록·필터", () => {
     const spy = vi.spyOn(store, "fetchAgentRuns");
     renderApp(`${BASE}/runs`);
     await runsTable();
-    expect(spy).toHaveBeenLastCalledWith({ status: undefined, personaId: undefined, projectId: "p1", page: 0, size: 20 });
+    expect(spy).toHaveBeenLastCalledWith({ status: undefined, personaId: undefined, projectId: "p1", projectKey: "ALM", page: 0, size: 20 });
 
     await user.click(screen.getByRole("combobox", { name: "상태" }));
     await user.click(await screen.findByRole("option", { name: "실패" }));
@@ -151,7 +151,7 @@ describe("실행 기록(AGP-12) — 목록·필터", () => {
     await user.click(await screen.findByRole("option", { name: "전체 프로젝트" }));
     expect(screen.getByTestId("location")).toHaveTextContent("scope=all");
     expect(await screen.findByText("WEB-2")).toBeInTheDocument();
-    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ status: "DONE", projectId: undefined }));
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ status: "DONE", projectId: undefined, projectKey: undefined }));
   });
 
   it("페르소나 필터 — ?persona=가 서버 조건으로, '전체 페르소나'로 풀린다", async () => {
