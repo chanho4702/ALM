@@ -100,3 +100,19 @@ describe("저장 필터 파사드 (목업)", () => {
     expect((await listSavedFilters()).map((f) => f.id)).toEqual([first.id]);
   });
 });
+
+describe("목업 저장 필터 공유 (F-12)", () => {
+  it("공유로 만든 필터는 shared, 내 것(mine)이고, 남이 공유한 필터는 따로 나오며 고치거나 지울 수 없다", async () => {
+    const { createSavedFilter, listSavedFilters, listSharedFilters, updateSavedFilter, deleteSavedFilter } = await import("./jiraStore");
+    const mine = await createSavedFilter({ name: "공유 필터", query: "버그", shared: true });
+    expect(mine).toMatchObject({ shared: true, mine: true });
+    expect((await listSavedFilters()).find((f) => f.id === mine.id)).toMatchObject({ shared: true, mine: true });
+    expect((await updateSavedFilter(mine.id, { name: "이름만" })).shared).toBe(true); // 생략하면 유지
+
+    const others = await listSharedFilters();
+    expect(others.length).toBeGreaterThan(0);
+    expect(others.every((f) => f.shared && f.mine === false)).toBe(true);
+    await expect(updateSavedFilter(others[0].id, { name: "x" })).rejects.toThrow("공유된 필터는 만든 사람만 수정·삭제할 수 있습니다");
+    await expect(deleteSavedFilter(others[0].id)).rejects.toThrow("공유된 필터는 만든 사람만 수정·삭제할 수 있습니다");
+  });
+});

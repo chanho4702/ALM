@@ -169,6 +169,37 @@ describe("저장 필터", () => {
       expect(within(globalNav()).queryByTestId("nav-filters")).not.toBeInTheDocument();
     });
   });
+
+  it("'팀과 공유'로 저장하면 내 필터에 공유 표시(아이콘+텍스트)가 붙고, 사이드바에서 공유를 멈출 수 있다 (F-12)", async () => {
+    const user = userEvent.setup();
+    renderSearch("/search?q=" + encodeURIComponent("타입:버그"));
+    await screen.findByText("ALM-8");
+
+    await user.click(screen.getByRole("button", { name: "필터로 저장" }));
+    const dialog = await screen.findByRole("dialog", { name: "필터로 저장" });
+    await user.type(within(dialog).getByLabelText("필터 이름"), "팀 공유 버그");
+    await user.click(within(dialog).getByRole("checkbox", { name: /팀과 공유/ }));
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+    expect(await screen.findByText(`필터 "팀 공유 버그"를 저장하고 팀과 공유했습니다`)).toBeInTheDocument();
+
+    const filters = await within(globalNav()).findByTestId("nav-filters");
+    expect(within(filters).getByRole("button", { name: "팀 공유 버그 공유" })).toBeInTheDocument();
+    await user.click(within(filters).getByRole("button", { name: "필터 팀 공유 버그 공유 멈추기" }));
+    expect(await within(filters).findByRole("button", { name: "팀 공유 버그" })).toBeInTheDocument();
+    expect(within(filters).getByRole("button", { name: "필터 팀 공유 버그 팀과 공유" })).toBeInTheDocument();
+  });
+
+  it("남이 공유한 필터는 '공유된 필터'에 실행만 할 수 있게 보인다 — 삭제·공유 버튼이 없다 (F-12)", async () => {
+    const user = userEvent.setup();
+    renderSearch("/home");
+    const nav = await screen.findByRole("navigation", { name: "전역 내비게이션" });
+    const shared = await within(nav).findByTestId("nav-shared-filters");
+    expect(within(shared).queryByRole("button", { name: /삭제|공유 멈추기|팀과 공유/ })).not.toBeInTheDocument();
+    await user.click(within(shared).getByRole("button", { name: "팀 버그 (이서연)" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location").textContent).toContain("/search?q=");
+    });
+  });
 });
 
 describe("전역 검색 모달 → 고급 검색", () => {

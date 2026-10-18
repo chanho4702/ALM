@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Filter, FolderKanban, Home, LayoutDashboard, MoreHorizontal, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, FolderKanban, Home, LayoutDashboard, Lock, MoreHorizontal, Search, Users } from "lucide-react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Button, Dropdown, useToast } from "@chanho/react";
 import type { Board, Project } from "../store/types";
-import { deleteSavedFilter, listBoards, listSavedFilters } from "../store/jiraStore";
+import { deleteSavedFilter, listBoards, listSavedFilters, listSharedFilters, updateSavedFilter } from "../store/jiraStore";
 import type { SavedFilter } from "../store/jiraStore";
 import { BoardCreateModal } from "./BoardCreateModal";
 import { ProjectAvatar } from "./ProjectAvatar";
@@ -51,6 +51,8 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  /** 남이 공유한 필터(F-12) — 실행만 한다. 못 읽어도 내 필터 섹션은 그대로 둔다 */
+  const [sharedFilters, setSharedFilters] = useState<SavedFilter[]>([]);
   /** 저장 필터를 못 읽은 이유 — null이 아니면 "필터가 없다"가 아니라 "못 읽었다"를 보여 준다 */
   const [filtersError, setFiltersError] = useState<string | null>(null);
   const [storedCollapsed, setCollapsed] = useState(false);
@@ -62,17 +64,40 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
   /** 저장 필터만 따로 — 실패를 삼키면 섹션이 사라져 "없음"과 구분되지 않는다(503이 조용히 빈 목록이 된다) */
   const refreshFilters = useCallback(
     () =>
-      listSavedFilters().then(
-        (filters) => {
-          setSavedFilters(filters);
-          setFiltersError(null);
-        },
-        (error: unknown) => {
-          setFiltersError(error instanceof Error ? error.message : String(error));
-        },
-      ),
+      Promise.all([
+        listSavedFilters().then(
+          (filters) => {
+            setSavedFilters(filters);
+            setFiltersError(null);
+          },
+          (error: unknown) => {
+            setFiltersError(error instanceof Error ? error.message : String(error));
+          },
+        ),
+        listSharedFilters().then(setSharedFilters, () => setSharedFilters([])),
+      ]),
     [],
   );
+
+  const openFilter = (filter: SavedFilter) =>
+    navigate(`/search?${filter.kind === "aql" ? "aql" : "q"}=${encodeURIComponent(filter.query)}`);
+
+  const toggleShare = (filter: SavedFilter) =>
+    void updateSavedFilter(filter.id, { shared: !filter.shared })
+      .then(() => refreshFilters())
+      .then(() =>
+        toast({
+          title: filter.shared ? `필터 "${filter.name}" 공유를 멈췄습니다` : `필터 "${filter.name}"를 팀과 공유했습니다`,
+          appearance: "success",
+        }),
+      )
+      .catch((error: unknown) =>
+        toast({
+          title: `필터 "${filter.name}"의 공유 설정을 바꾸지 못했습니다`,
+          description: error instanceof Error ? error.message : String(error),
+          appearance: "danger",
+        }),
+      );
 
   const refresh = useCallback(() => {
     void listRecentProjectIds().then(setRecentIds);
@@ -310,16 +335,27 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
                   type="button"
                   className="global-nav-item"
                   title={filter.query}
-                  onClick={() =>
-                    navigate(
-                      `/search?${filter.kind === "aql" ? "aql" : "q"}=${encodeURIComponent(filter.query)}`,
-                    )
-                  }
+                  onClick={() => openFilter(filter)}
                 >
                   <span className="global-nav-glyph" aria-hidden>
                     <Filter />
                   </span>
                   <span className="global-nav-label global-nav-project-name">{filter.name}</span>
+                  {filter.shared ? (
+                    <span className="global-nav-filter-badge">
+                      <Users size={12} aria-hidden />
+                      공유
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  className="global-nav-filter-delete"
+                  aria-label={filter.shared ? `필터 ${filter.name} 공유 멈추기` : `필터 ${filter.name} 팀과 공유`}
+                  title={filter.shared ? "공유 멈추기(나만 보기)" : "팀과 공유(조직 전체)"}
+                  onClick={() => toggleShare(filter)}
+                >
+                  {filter.shared ? <Lock size={12} aria-hidden /> : <Users size={12} aria-hidden />}
                 </button>
                 <button
                   type="button"
@@ -338,6 +374,23 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
                   }
                 >
                   ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {!collapsed && sharedFilters.length > 0 ? (
+        <>
+          <span className="global-nav-section">공유된 필터</span>
+          <ul className="global-nav-list" data-testid="nav-shared-filters">
+            {sharedFilters.map((filter) => (
+              <li key={filter.id} className="global-nav-filter-row">
+                <button type="button" className="global-nav-item" title={filter.query} onClick={() => openFilter(filter)}>
+                  <span className="global-nav-glyph" aria-hidden>
+                    <Users />
+                  </span>
+                  <span className="global-nav-label global-nav-project-name">{filter.name}</span>
                 </button>
               </li>
             ))}

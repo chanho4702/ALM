@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import {
   Button,
+  Checkbox,
   Dropdown,
   EmptyState,
   Lozenge,
@@ -106,6 +107,8 @@ export function SearchPage() {
   const [aqlError, setAqlError] = useState<AqlEditorError | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
+  /** 팀과 공유(F-12) — 조직 전체에 보이고 결과는 보는 사람의 권한으로 걸러진다 */
+  const [saveShared, setSaveShared] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -348,10 +351,14 @@ export function SearchPage() {
       const kind = mode === "aql" ? "aql" : "smart";
       // 같은 이름이면 덮어쓴다(지라 "필터 저장"과 같은 동작) — 서버는 중복 이름을 409로 막는다
       const existing = (await listSavedFilters()).find((f) => f.name === name);
-      if (existing) await updateSavedFilter(existing.id, { query, kind });
-      else await createSavedFilter({ name, query, kind });
-      toast({ title: `필터 "${name}"를 저장했습니다`, appearance: "success" });
+      if (existing) await updateSavedFilter(existing.id, { query, kind, shared: saveShared });
+      else await createSavedFilter({ name, query, kind, shared: saveShared });
+      toast({
+        title: saveShared ? `필터 "${name}"를 저장하고 팀과 공유했습니다` : `필터 "${name}"를 저장했습니다`,
+        appearance: "success",
+      });
       setSaveName("");
+      setSaveShared(false);
       setSaveOpen(false);
     } catch (error) {
       // AQL 문법 오류는 저장 대화상자에 묻지 않는다 — 고쳐야 할 곳이 질의라, 대화상자를 닫고
@@ -660,6 +667,11 @@ export function SearchPage() {
               value={saveName}
               onChange={(e) => setSaveName(e.target.value)}
               placeholder="예: 내 진행 중 버그"
+            />
+            <Checkbox
+              label="팀과 공유 — 조직 전체에 보이고, 결과는 각자 볼 수 있는 이슈만 나옵니다"
+              checked={saveShared}
+              onCheckedChange={(checked) => setSaveShared(checked === true)}
             />
             <Button type="submit" disabled={!saveName.trim()}>
               저장

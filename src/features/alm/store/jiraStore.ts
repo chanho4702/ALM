@@ -272,6 +272,8 @@ export const listSavedFilters = impl.listSavedFilters;
 export const createSavedFilter = impl.createSavedFilter;
 export const updateSavedFilter = impl.updateSavedFilter;
 export const deleteSavedFilter = impl.deleteSavedFilter;
+/** 남이 공유한 저장 필터(F-12) — 실행만 하고 고치거나 지울 수 없다 */
+export const listSharedFilters = impl.listSharedFilters;
 /** AQL — 목업은 `store/aql/evaluate.ts`로 메모리 이슈에, REST는 `POST /api/alm/issues/query`로 실행한다 */
 export const queryIssuesAql = impl.queryIssuesAql;
 export const validateAql = impl.validateAql;

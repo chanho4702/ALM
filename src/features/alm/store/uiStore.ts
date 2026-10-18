@@ -27,6 +27,12 @@ export interface SavedFilter {
   query: string;
   /** 없으면 스마트(`?q=`). AQL 필터는 `?aql=`로 연다 — 옛 저장분은 kind가 없어 자동으로 스마트가 된다 */
   kind?: "smart" | "aql";
+  /** 조직 전체에 공유(F-12) — 누구나 실행하지만 결과는 실행하는 사람의 권한으로 걸러진다. 없으면 비공개 */
+  shared?: boolean;
+  /** 내 필터인가 — 남이 공유한 필터는 false(수정·삭제 불가). 옛 저장분·목업 내 필터는 true */
+  mine?: boolean;
+  /** 만든 사람 — 남이 공유한 필터의 출처 표시용 */
+  ownerId?: string;
 }
 
 /** 저장 필터 입력 — 서버 `POST /api/alm/me/filters` 본문과 같은 모양 */
@@ -34,7 +40,22 @@ export interface SavedFilterInput {
   name: string;
   query: string;
   kind?: "smart" | "aql";
+  /** 만들 때 생략하면 비공개, 고칠 때 생략하면 그대로 */
+  shared?: boolean;
 }
+
+/** 남의 공유 필터를 고치거나 지우려 할 때 — 서버 403 문구와 같다 */
+export const SHARED_FILTER_OWNER_ONLY = "공유된 필터는 만든 사람만 수정·삭제할 수 있습니다";
+
+/**
+ * 목업의 "남이 공유한 필터" — 목업에는 다른 사용자의 저장소가 없어 고정 목록으로 흉내 낸다(이서연 u2 소유).
+ * REST는 `GET /api/alm/filters/shared`.
+ */
+const MOCK_SHARED_FILTERS: readonly SavedFilter[] = [
+  { id: "shared-u2-1", name: "팀 버그 (이서연)", query: "버그", kind: "smart", shared: true, mine: false, ownerId: "u2" },
+];
+
+const ownerOnly = () => Object.assign(new Error(SHARED_FILTER_OWNER_ONLY), { status: 403 });
 
 const FILTER_NAME_MAX = 60;
 const FILTER_QUERY_MAX = 4000;
@@ -164,7 +185,14 @@ export function compareSavedFilters(a: SavedFilter, b: SavedFilter): number {
 }
 
 export async function listSavedFilters(): Promise<SavedFilter[]> {
-  return [...load().savedFilters].sort(compareSavedFilters);
+  return load()
+    .savedFilters.map((f) => ({ ...f, shared: f.shared ?? false, mine: true }))
+    .sort(compareSavedFilters);
+}
+
+/** 남이 공유한 필터(이름순) — 내 필터는 listSavedFilters */
+export async function listSharedFilters(): Promise<SavedFilter[]> {
+  return MOCK_SHARED_FILTERS.map((f) => ({ ...f })).sort(compareSavedFilters);
 }
 
 /**
@@ -189,15 +217,16 @@ export async function createSavedFilter(input: SavedFilterInput): Promise<SavedF
   const name = checkFilter(input.name, input.query, kind);
   const state = load();
   if (state.savedFilters.some((f) => f.name === name)) throw new Error("같은 이름의 필터가 있습니다");
-  const filter: SavedFilter = { id: crypto.randomUUID(), name, query: input.query, kind };
+  const filter: SavedFilter = { id: crypto.randomUUID(), name, query: input.query, kind, shared: input.shared ?? false };
   persist({ ...state, savedFilters: [...state.savedFilters, filter] });
-  return { ...filter };
+  return { ...filter, mine: true };
 }
 
 export async function updateSavedFilter(
   id: string,
   patch: Partial<SavedFilterInput>,
 ): Promise<SavedFilter> {
+  if (MOCK_SHARED_FILTERS.some((f) => f.id === id)) throw ownerOnly();
   const state = load();
   const existing = state.savedFilters.find((f) => f.id === id);
   if (!existing) throw new Error("필터를 찾을 수 없습니다");
@@ -206,6 +235,7 @@ export async function updateSavedFilter(
     name: (patch.name ?? existing.name).trim(),
     query: patch.query ?? existing.query,
     kind: patch.kind ?? existing.kind,
+    shared: patch.shared ?? existing.shared ?? false,
   };
   // 이름만 바꿔도 질의만 바꿔도 전체를 다시 본다 — 부분 갱신이 규칙을 비켜 가면 안 된다
   next.name = checkFilter(next.name, next.query, next.kind ?? "smart");
@@ -213,10 +243,11 @@ export async function updateSavedFilter(
     throw new Error("같은 이름의 필터가 있습니다");
   }
   persist({ ...state, savedFilters: state.savedFilters.map((f) => (f.id === id ? next : f)) });
-  return { ...next };
+  return { ...next, mine: true };
 }
 
 export async function deleteSavedFilter(id: string): Promise<void> {
+  if (MOCK_SHARED_FILTERS.some((f) => f.id === id)) throw ownerOnly();
   const state = load();
   // 서버는 없는 id(또는 남의 것)에 404다 — 목업이 조용히 성공하면 화면이 "지워졌다"고 거짓말한다
   if (!state.savedFilters.some((f) => f.id === id)) {

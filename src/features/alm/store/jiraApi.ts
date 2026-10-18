@@ -248,6 +248,7 @@ export {
 } from "./api/personal";
 export {
   listSavedFilters,
+  listSharedFilters,
   createSavedFilter,
   updateSavedFilter,
   deleteSavedFilter,

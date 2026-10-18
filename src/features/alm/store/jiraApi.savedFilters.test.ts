@@ -4,6 +4,7 @@ import {
   createSavedFilter,
   deleteSavedFilter,
   listSavedFilters,
+  listSharedFilters,
   updateSavedFilter,
 } from "./jiraApi";
 import {
@@ -46,8 +47,8 @@ describe("jiraApi 저장 필터 (/api/alm/me/filters)", () => {
     fetchSpy(() => response(200, [ROW, { ...ROW, id: 8, name: "AQL", kind: "aql", query: "due < -1d" }]));
 
     expect(await listSavedFilters()).toEqual([
-      { id: "7", name: "내 버그", query: "타입:버그", kind: "smart" },
-      { id: "8", name: "AQL", query: "due < -1d", kind: "aql" },
+      { id: "7", name: "내 버그", query: "타입:버그", kind: "smart", shared: false, mine: true },
+      { id: "8", name: "AQL", query: "due < -1d", kind: "aql", shared: false, mine: true },
     ]);
   });
 
@@ -190,7 +191,7 @@ describe("jiraApi 저장 필터 (/api/alm/me/filters)", () => {
 
     // 서버 목록은 그대로 온다 — 사이드바가 빈 화면이 되지 않는다
     await expect(listSavedFilters()).resolves.toEqual([
-      { id: "7", name: "내 버그", query: "타입:버그", kind: "smart" },
+      { id: "7", name: "내 버그", query: "타입:버그", kind: "smart", shared: false, mine: true },
     ]);
     expect(localSavedFilters()).toHaveLength(1);
   });
@@ -309,7 +310,34 @@ describe("jiraApi 저장 필터 이관 — 재시도 분류", () => {
 
     const rows = await listSavedFilters();
 
-    expect(rows).toEqual([{ id: "9", name: "나중에 옮길 필터", query: "타입:버그", kind: "smart" }]);
+    expect(rows).toEqual([{ id: "9", name: "나중에 옮길 필터", query: "타입:버그", kind: "smart", shared: false, mine: true }]);
     expect(localSavedFilters()).toEqual([]);
+  });
+});
+
+describe("jiraApi 저장 필터 공유 (F-12)", () => {
+  it("남이 공유한 필터는 /api/alm/filters/shared — shared·ownerId·mine을 옮긴다", async () => {
+    const spy = fetchSpy(() => response(200, [{ ...ROW, id: 21, name: "팀 버그", shared: true, ownerId: 4, mine: false }]));
+    expect(await listSharedFilters()).toEqual([
+      { id: "21", name: "팀 버그", query: "타입:버그", kind: "smart", shared: true, mine: false, ownerId: "4" },
+    ]);
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/filters/shared");
+  });
+
+  it("만들 때 shared를 보내고(생략하면 안 보냄 = 비공개), 고칠 때도 보낸 것만 싣는다", async () => {
+    const spy = fetchSpy((_path, init) => response(init?.method === "POST" ? 201 : 200, { ...ROW, shared: true, ownerId: 1, mine: true }));
+    await createSavedFilter({ name: "공유", query: "a", shared: true });
+    await createSavedFilter({ name: "비공개", query: "a" });
+    await updateSavedFilter("7", { shared: false });
+    const bodies = spy.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies[0]).toMatchObject({ name: "공유", shared: true });
+    expect(bodies[1]).not.toHaveProperty("shared");
+    expect(bodies[2]).toEqual({ shared: false });
+  });
+
+  it("남의 공유 필터 수정·삭제 403은 서버 문구 그대로", async () => {
+    fetchSpy(() => response(403, { error: "공유된 필터는 만든 사람만 수정·삭제할 수 있습니다" }));
+    await expect(updateSavedFilter("21", { name: "x" })).rejects.toThrow("공유된 필터는 만든 사람만 수정·삭제할 수 있습니다");
+    await expect(deleteSavedFilter("21")).rejects.toThrow("공유된 필터는 만든 사람만 수정·삭제할 수 있습니다");
   });
 });

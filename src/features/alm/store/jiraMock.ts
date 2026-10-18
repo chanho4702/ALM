@@ -301,6 +301,7 @@ export {
   createSavedFilter,
   updateSavedFilter,
   deleteSavedFilter,
+  listSharedFilters,
 } from "./uiStore";
 
 export type { SavedFilter, SavedFilterInput } from "./uiStore";

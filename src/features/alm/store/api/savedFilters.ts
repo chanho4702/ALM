@@ -17,6 +17,10 @@ interface SavedFilterDto {
   query: string;
   createdAt?: string;
   updatedAt?: string;
+  /** F-12(2026-10-18) — 구 서버에는 없다(= 내 비공개 필터) */
+  shared?: boolean;
+  ownerId?: number;
+  mine?: boolean;
 }
 
 function mapSavedFilter(dto: SavedFilterDto): SavedFilter {
@@ -25,6 +29,9 @@ function mapSavedFilter(dto: SavedFilterDto): SavedFilter {
     name: dto.name,
     query: dto.query,
     kind: dto.kind === "aql" ? "aql" : "smart",
+    shared: dto.shared === true,
+    mine: dto.mine !== false,
+    ...(dto.ownerId !== undefined && dto.ownerId !== null ? { ownerId: String(dto.ownerId) } : {}),
   };
 }
 
@@ -126,6 +133,12 @@ export async function listSavedFilters(): Promise<SavedFilter[]> {
   }
 }
 
+/** 남이 공유한 필터(이름순, `GET /api/alm/filters/shared`) — 내 필터는 listSavedFilters */
+export async function listSharedFilters(): Promise<SavedFilter[]> {
+  const rows = await json<SavedFilterDto[]>(await sharedApiFetch("/api/alm/filters/shared"));
+  return rows.map(mapSavedFilter);
+}
+
 /** POST 한 번 — 변경 신호는 발행하지 않는다(이관이 끝에 한 번만 알리려고 이 조각을 쓴다) */
 async function postSavedFilter(input: SavedFilterInput): Promise<SavedFilter> {
   return mapSavedFilter(
@@ -136,6 +149,7 @@ async function postSavedFilter(input: SavedFilterInput): Promise<SavedFilter> {
         name: input.name.trim(),
         kind: input.kind ?? "smart",
         query: input.query,
+        ...(input.shared !== undefined ? { shared: input.shared } : {}),
       }),
     }),
   );
@@ -151,7 +165,8 @@ export async function updateSavedFilter(
   id: string,
   patch: Partial<SavedFilterInput>,
 ): Promise<SavedFilter> {
-  const body: Record<string, string> = {};
+  const body: Record<string, string | boolean> = {};
+  if (patch.shared !== undefined) body.shared = patch.shared;
   if (patch.name !== undefined) body.name = patch.name.trim();
   if (patch.kind !== undefined) body.kind = patch.kind;
   if (patch.query !== undefined) body.query = patch.query;
