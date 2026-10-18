@@ -58,6 +58,8 @@ rest satisfies Pick<
   | "aggregateIssues"
   | "listProjectLabels"
   | "listIssueAncestors"
+  | "updateVersion"
+  | "updateProjectShortcut"
   | "uploadAttachment"
 >;
 
@@ -87,7 +89,6 @@ export const updateVersion = impl.updateVersion;
 export const releaseVersion = impl.releaseVersion;
 export const archiveVersion = impl.archiveVersion;
 export const deleteVersion = impl.deleteVersion;
-export const versionProgress = impl.versionProgress;
 export const listSprints = impl.listSprints;
 export const createSprint = impl.createSprint;
 export const updateSprint = impl.updateSprint;

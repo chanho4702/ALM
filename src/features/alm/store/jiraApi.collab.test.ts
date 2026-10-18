@@ -15,7 +15,7 @@ import {
   listWorklogs,
   searchIssues,
   updateBoard,
-  versionProgress,
+  updateVersion,
 } from "./jiraApi";
 import type { IssueDto } from "./mapping";
 
@@ -139,30 +139,25 @@ describe("jiraApi 링크·활동·하위", () => {
     expect(spy.mock.calls[1][0]).toContain("size=5");
   });
 
-  it("버전 진행률은 fixVersion 검색 결과를 완료 카테고리로 센다", async () => {
-    // 진행률은 fixVersion 검색 + 프로젝트별 상태 해석(프로젝트 목록 → 설정 해석)을 합친다
-    const scheme = {
-      id: "1",
-      name: "기본",
-      isDefault: true,
-      body: {
-        statuses: [
-          { id: "todo", name: "할 일", category: "todo", kind: "new", color: "gray", order: 1 },
-          { id: "done", name: "완료", category: "done", kind: "complete", color: "green", order: 2 },
-        ],
-        transitions: [],
-        layout: {},
-        enabledTypes: ["task"],
-      },
-    };
-    fetchSpy((path) => {
-      if (path.includes("/issues/search")) {
-        return response(200, { items: [ISSUE, { ...ISSUE, id: 8, status: "todo" }], page: 0, size: 200, total: 2 });
-      }
-      if (path.endsWith("/settings")) return response(200, { body: scheme.body, source: "scheme", scheme });
-      return response(200, [{ id: 3, key: "ALM", name: "ALM", description: "", version: 1, createdAt: "2026-08-16T00:00:00Z", updatedAt: "2026-08-16T00:00:00Z" }]);
+  it("버전 수정은 화면이 본 값으로 전체 본문을 채우고 그 버전을 expectedVersion으로 보낸다(목록 재조회 없음)", async () => {
+    const spy = fetchSpy(() =>
+      response(200, { id: 4, projectId: 3, name: "1.1", description: "", status: "UNRELEASED", version: 6, createdAt: "2026-08-16T00:00:00Z", updatedAt: "2026-08-16T00:00:00Z" }),
+    );
+    const updated = await updateVersion(
+      { id: "4", projectId: "3", name: "1.0", description: "설명", releaseDate: "2026-09-30", status: "unreleased", createdAt: "2026-08-16T00:00:00Z", version: 5 },
+      { name: " 1.1 ", releaseDate: null },
+    );
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [path, init] = spy.mock.calls[0];
+    expect(String(path)).toBe("/api/alm/versions/4");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      name: "1.1",
+      description: "설명",
+      startDate: null,
+      releaseDate: null,
+      expectedVersion: 5,
     });
-    expect(await versionProgress("4")).toEqual({ total: 2, done: 1, percent: 50 });
+    expect(updated).toMatchObject({ id: "4", name: "1.1", version: 6 });
   });
 });
 

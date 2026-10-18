@@ -769,19 +769,18 @@ export async function createVersion(
   return mapVersion(await json(response));
 }
 
-/** 서버는 전체 본문을 받으므로 목록에서 최신 값을 읽어 채우고 그 version을 expectedVersion으로 쓴다 */
+/**
+ * 버전 수정 — 서버 PUT은 전체 본문이라 보내지 않은 필드는 `current`(화면이 본 값)로 채우고, 낙관적 락 기준도
+ * `current.version`(편집을 시작할 때 본 버전)이다. 저장 직전에 다시 읽은 버전을 쓰면 남의 저장을 조용히 덮는다.
+ */
 export async function updateVersion(
-  id: string,
-  projectId: string,
+  current: ProjectVersion,
   patch: { name?: string; description?: string | null; startDate?: string | null; releaseDate?: string | null },
 ): Promise<ProjectVersion> {
-  const current = (
-    await json<VersionDto[]>(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/versions`))
-  ).find((row) => String(row.id) === id);
-  if (!current) throw new Error("버전을 찾을 수 없습니다");
+  if (!Number.isInteger(current.version)) throw new Error("편집을 시작한 버전 정보가 필요합니다");
   const pick = (next: string | null | undefined, currentValue?: string | null) =>
     next === undefined ? (currentValue ?? null) : next === null || next.trim() === "" ? null : next.trim();
-  const response = await sharedApiFetch(`/api/alm/versions/${toBackendId(id)}`, {
+  const response = await sharedApiFetch(`/api/alm/versions/${toBackendId(current.id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -2676,21 +2675,6 @@ export async function searchIssues(text: string, limit = 20): Promise<Issue[]> {
   const query = searchParams({ text: trimmed, sort: "updated", dir: "desc", size: String(limit) });
   const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`));
   return dto.items.map((row, index) => mapIssue(row, index + 1));
-}
-
-/** 버전 진행률 — fixVersion 검색 결과를 프로젝트 상태 카테고리(complete)로 센다 */
-export async function versionProgress(
-  id: string,
-): Promise<{ total: number; done: number; percent: number }> {
-  const query = searchParams({ fixVersionId: toBackendId(id).toString(), size: "200" });
-  const [dto, meta] = await Promise.all([
-    json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`)),
-    statusMetaByProject(),
-  ]);
-  const issues = dto.items.map((row, index) => mapIssue(row, index + 1));
-  const done = issues.filter((issue) => meta[issue.projectId]?.[issue.status]?.kind === "complete").length;
-  const total = issues.length;
-  return { total, done, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
 }
 
 interface BoardDto {

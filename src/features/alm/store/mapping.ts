@@ -175,6 +175,7 @@ export function mapVersion(dto: VersionDto): ProjectVersion {
     description: dto.description ?? "",
     status: VERSION_STATUS_FROM_API[dto.status],
     createdAt: dto.createdAt,
+    version: dto.version,
   };
   if (dto.startDate) version.startDate = dto.startDate;
   if (dto.releaseDate) version.releaseDate = dto.releaseDate;

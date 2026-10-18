@@ -4240,6 +4240,14 @@ th:last-child > [role="separator"] {
   gap: var(--chanho-space-100);
   align-items: end;
 }
+.shortcut-edit-form {
+  flex: 1;
+  min-width: 0;
+}
+.shortcut-edit-actions {
+  display: flex;
+  gap: var(--chanho-space-50);
+}
 .project-shortcuts {
   display: flex;
   flex-wrap: wrap;

@@ -503,6 +503,8 @@ export interface ProjectVersion {
   status: VersionStatus;
   releasedAt?: string;
   createdAt: string;
+  /** 낙관적 락 — 편집을 시작할 때 본 값으로 저장한다(남이 먼저 고쳤으면 409). 옛 목업 데이터에는 없을 수 있다 */
+  version?: number;
 }
 
 /**

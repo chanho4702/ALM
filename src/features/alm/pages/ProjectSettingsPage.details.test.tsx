@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
-import { __resetForTest, createIssue, listProjects, listProjectShortcuts, updateProject } from "../store/jiraStore";
+import { __resetForTest, addProjectShortcut, createIssue, listProjects, listProjectShortcuts, updateProject } from "../store/jiraStore";
 import * as store from "../store/jiraStore";
 import type { Project } from "../store/types";
 
@@ -167,5 +167,25 @@ describe("프로젝트 세부 (지라 프로젝트 설정 > 세부)", () => {
       "https://wiki.example.com/alm",
     );
     await waitFor(() => expect(nav).toBeInTheDocument());
+  });
+
+  it("바로 가기의 연필 버튼으로 이름·URL을 고친다", async () => {
+    const user = userEvent.setup();
+    await addProjectShortcut("p1", { name: "팀 위키", url: "https://wiki.example.com/alm" });
+    renderAt("/projects/p1/settings/general");
+
+    const list = await screen.findByRole("list", { name: "바로 가기 목록" });
+    await user.click(within(list).getByRole("button", { name: "팀 위키 수정" }));
+    const form = within(list).getByRole("form", { name: "팀 위키 수정" });
+    const name = within(form).getByLabelText("이름");
+    await user.clear(name);
+    await user.type(name, "설계 위키");
+    await user.click(within(form).getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByText("바로 가기를 수정했습니다")).toBeInTheDocument();
+    expect(await listProjectShortcuts("p1")).toEqual([
+      expect.objectContaining({ name: "설계 위키", url: "https://wiki.example.com/alm" }),
+    ]);
+    expect(within(list).getByRole("link", { name: /설계 위키/ })).toBeInTheDocument();
   });
 });

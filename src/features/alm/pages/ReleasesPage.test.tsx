@@ -7,7 +7,7 @@ import { App } from "../../../app/App";
 // 이 화면은 App에서 lazy()로 쪼개져 있다 — 수집 시점에 미리 올려 병렬 실행에서 청크 대기가 한도를 넘지 않게
 import "./ReleasesPage";
 import { __versionForTest } from "../store/jiraStore";
-import { __resetForTest, createVersion, getIssueByKey, updateIssue } from "../store/jiraStore";
+import { __resetForTest, createVersion, getIssueByKey, listVersions, updateIssue, updateVersion } from "../store/jiraStore";
 
 function renderReleases() {
   return render(
@@ -98,5 +98,50 @@ describe("ReleasesPage", () => {
       expect(within(updatedRow).getByText("보관됨")).toBeInTheDocument();
       expect(within(updatedRow).queryByRole("button", { name: "0.9 릴리스" })).not.toBeInTheDocument();
     });
+  });
+
+  it("⋯ 메뉴의 편집으로 이름·설명·날짜를 고치면 행에 반영된다", async () => {
+    const user = userEvent.setup();
+    await createVersion("p1", { name: "1.0" });
+    renderReleases();
+
+    const list = await screen.findByRole("list", { name: "버전 목록" });
+    await user.click(within(list).getByRole("button", { name: "1.0 메뉴" }));
+    await user.click(await screen.findByRole("menuitem", { name: "편집" }));
+    const dialog = await screen.findByRole("dialog", { name: "버전 수정" });
+    const name = within(dialog).getByLabelText("버전 이름");
+    expect(name).toHaveValue("1.0");
+    await user.clear(name);
+    await user.type(name, "1.0 GA");
+    await user.type(within(dialog).getByLabelText("설명"), "첫 정식");
+    await user.type(within(dialog).getByLabelText("릴리스 예정일"), "2026-11-30");
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    expect(await screen.findByText("버전을 수정했습니다")).toBeInTheDocument();
+    const row = within(screen.getByRole("list", { name: "버전 목록" })).getByText("1.0 GA").closest("li")!;
+    expect(within(row).getByText("첫 정식")).toBeInTheDocument();
+    expect((await listVersions("p1"))[0]).toMatchObject({ name: "1.0 GA", releaseDate: "2026-11-30" });
+  });
+
+  it("편집 중 남이 먼저 저장하면 입력을 지키고 해소를 고르게 한다 — 다시 적용은 최신 버전 기준으로 저장한다", async () => {
+    const user = userEvent.setup();
+    const version = await createVersion("p1", { name: "1.0" });
+    renderReleases();
+
+    const list = await screen.findByRole("list", { name: "버전 목록" });
+    await user.click(within(list).getByRole("button", { name: "1.0 메뉴" }));
+    await user.click(await screen.findByRole("menuitem", { name: "편집" }));
+    const dialog = await screen.findByRole("dialog", { name: "버전 수정" });
+    await user.type(within(dialog).getByLabelText("설명"), "내 설명");
+
+    await updateVersion(version, { name: "1.0-rc" }); // 다른 사람의 저장
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    expect(await within(dialog).findByText(/다른 사용자가 이 버전을 먼저 수정해/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("설명")).toHaveValue("내 설명");
+    await user.click(within(dialog).getByRole("button", { name: /내 변경 다시 적용/ }));
+
+    expect(await screen.findByText("버전을 수정했습니다")).toBeInTheDocument();
+    expect((await listVersions("p1"))[0]).toMatchObject({ name: "1.0", description: "내 설명" });
   });
 });

@@ -1520,6 +1520,7 @@ export async function createVersion(
     description: input.description?.trim() ?? "",
     status: "unreleased",
     createdAt: new Date().toISOString(),
+    version: 1,
   };
   if (startDate) version.startDate = startDate;
   if (releaseDate) version.releaseDate = releaseDate;
@@ -1528,10 +1529,15 @@ export async function createVersion(
   return clone(version);
 }
 
-export async function updateVersion(id: string, patch: VersionInput): Promise<ProjectVersion> {
+/**
+ * 버전 수정 — 서버 PUT과 같은 낙관적 락: `current`는 화면이 편집을 시작할 때 본 버전이고, 그 사이 남이 고쳤으면 409.
+ * 보내지 않은 필드는 그대로 둔다.
+ */
+export async function updateVersion(current: ProjectVersion, patch: VersionInput): Promise<ProjectVersion> {
   const data = load();
-  const version = requireVersion(data, id);
+  const version = requireVersion(data, current.id);
   assertCanEdit(data, version.projectId);
+  if ((version.version ?? 1) !== (current.version ?? 1)) throw new ApiError(409, STALE_EDIT_MESSAGE);
   const name = patch.name === undefined ? version.name : patch.name.trim();
   if (!name) throw new Error("버전 이름을 입력하세요");
   if (
@@ -1549,6 +1555,7 @@ export async function updateVersion(id: string, patch: VersionInput): Promise<Pr
   else version.startDate = startDate;
   if (releaseDate === undefined) delete version.releaseDate;
   else version.releaseDate = releaseDate;
+  version.version = (version.version ?? 1) + 1;
   persist();
   return clone(version);
 }
@@ -1610,20 +1617,6 @@ export async function deleteVersion(id: string): Promise<void> {
   }
   data.versions = data.versions.filter((v) => v.id !== id);
   persist();
-}
-
-/** 릴리스 허브의 진행률 — 완료 판정은 카테고리 */
-export async function versionProgress(
-  id: string,
-): Promise<{ total: number; done: number; percent: number }> {
-  const data = load();
-  const version = requireVersion(data, id);
-  const issues = data.issues.filter((i) => i.fixVersionId === version.id);
-  const done = issues.filter(
-    (i) => statusKindOf(data, i.projectId, i.status) === "complete",
-  ).length;
-  const total = issues.length;
-  return { total, done, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
 }
 
 function requireVersion(data: JiraData, id: string): ProjectVersion {

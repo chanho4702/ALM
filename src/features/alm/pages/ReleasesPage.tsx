@@ -22,12 +22,15 @@ import {
   listProjectStatuses,
   listVersions,
   releaseVersion,
+  updateVersion,
 } from "../store/jiraStore";
+import { errorStatus } from "../store/mapping";
 import {
   formatPlannedRange,
   statusKind,
 } from "../components/labels";
 import { VersionReleaseModal } from "../components/VersionReleaseModal";
+import { VersionEditModal, type VersionDraft } from "../components/VersionEditModal";
 
 const STATUS_LABELS: Record<VersionStatus, string> = {
   unreleased: "미릴리스",
@@ -55,6 +58,11 @@ export function ReleasesPage() {
   // 만들기 폼은 기본 접힘 — 상단 [버전 만들기] 버튼으로 편다(백로그 인라인 생성과 같은 패턴)
   const [creating, setCreating] = useState(false);
   const [releasing, setReleasing] = useState<ProjectVersion | null>(null);
+  /** 편집 중인 버전 — 편집을 시작할 때 본 값(낙관적 락 기준). 충돌을 해소하면 최신 값으로 바꾼다 */
+  const [editing, setEditing] = useState<ProjectVersion | null>(null);
+  const [editConflict, setEditConflict] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editReloadToken, setEditReloadToken] = useState(0);
   const toast = useToast();
 
   const generation = useRef(0);
@@ -101,6 +109,58 @@ export function ReleasesPage() {
       setReleaseDate("");
       setCreating(false);
     });
+  };
+
+  const closeEdit = () => {
+    setEditing(null);
+    setEditConflict(false);
+  };
+
+  /** 편집 저장 — 409면 모달을 연 채 초안을 지키고 해소 선택지를 띄운다. 그 밖의 실패는 사유를 토스트로 */
+  const saveEdit = async (base: ProjectVersion, draft: VersionDraft) => {
+    setEditSaving(true);
+    try {
+      await updateVersion(base, {
+        name: draft.name,
+        description: draft.description,
+        startDate: draft.startDate || null,
+        releaseDate: draft.releaseDate || null,
+      });
+      closeEdit();
+      toast({ title: "버전을 수정했습니다", appearance: "success" });
+      await reload();
+    } catch (error) {
+      if (errorStatus(error) === 409) {
+        setEditConflict(true);
+        return;
+      }
+      toast({
+        title: "버전 수정 실패",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  /** 충돌 해소 — 최신 값을 읽어 편집 기준을 바꾸고, "다시 적용"이면 그 기준으로 내 초안을 저장한다 */
+  const resolveEditConflict = async (draft: VersionDraft, mode: "reload" | "reapply") => {
+    if (!editing || !projectId) return;
+    try {
+      const latest = (await listVersions(projectId)).find((v) => v.id === editing.id);
+      if (!latest) throw new Error("버전을 찾을 수 없습니다");
+      setEditing(latest);
+      setEditConflict(false);
+      if (mode === "reload") setEditReloadToken((token) => token + 1);
+      else await saveEdit(latest, draft);
+    } catch (error) {
+      toast({
+        title: "최신 내용을 불러오지 못했습니다",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
+    }
   };
 
   const progressOf = useMemo(() => {
@@ -213,6 +273,7 @@ export function ReleasesPage() {
                         </Button>
                       }
                       items={[
+                        { label: "편집", onSelect: () => setEditing(version) },
                         ...(version.status !== "archived"
                           ? [
                               {
@@ -254,6 +315,16 @@ export function ReleasesPage() {
           </ul>
         )}
       </div>
+
+      <VersionEditModal
+        version={editing}
+        conflict={editConflict}
+        saving={editSaving}
+        reloadToken={editReloadToken}
+        onClose={closeEdit}
+        onSave={(version, draft) => void saveEdit(version, draft)}
+        onResolveConflict={(draft, mode) => void resolveEditConflict(draft, mode)}
+      />
 
       <VersionReleaseModal
         version={releasing}

@@ -13,7 +13,7 @@ import {
   releaseVersion,
   updateIssue,
   updateVersion,
-  versionProgress,
+  aggregateIssues,
 } from "./jiraStore";
 
 beforeEach(() => {
@@ -37,14 +37,16 @@ describe("버전(릴리스)", () => {
     );
   });
 
-  it("이슈에 수정 버전을 달고 진행률을 센다", async () => {
+  it("이슈에 수정 버전을 달고 진행률을 센다(서버 집계 계약)", async () => {
     const version = await createVersion("p1", { name: "1.0" });
     const done = await getIssueByKey("ALM-1"); // 완료
     const open = await getIssueByKey("ALM-5"); // 할 일
     await updateIssue(done!.id, { fixVersionId: version.id }, __versionForTest("issue", done!.id));
     await updateIssue(open!.id, { fixVersionId: version.id }, __versionForTest("issue", open!.id));
 
-    expect(await versionProgress(version.id)).toEqual({ total: 2, done: 1, percent: 50 });
+    const byCategory = await aggregateIssues({ fixVersionId: version.id }, "statusCategory");
+    expect(byCategory.total).toBe(2);
+    expect(byCategory.buckets).toEqual(expect.arrayContaining([{ key: "done", count: 1 }]));
   });
 
   it("릴리스하면 상태와 릴리스 시각이 바뀌고, 미완료 이슈는 다음 버전으로 옮길 수 있다", async () => {
@@ -123,7 +125,7 @@ describe("버전(릴리스)", () => {
   it("이름·설명·날짜를 수정할 수 있고 날짜 역전은 거부한다", async () => {
     const version = await createVersion("p1", { name: "1.0" });
 
-    const updated = await updateVersion(version.id, {
+    const updated = await updateVersion(version, {
       name: "1.0 GA",
       description: "첫 정식",
       startDate: "2026-09-01",
@@ -132,8 +134,16 @@ describe("버전(릴리스)", () => {
     expect(updated).toMatchObject({ name: "1.0 GA", description: "첫 정식", startDate: "2026-09-01" });
 
     await expect(
-      updateVersion(version.id, { startDate: "2026-10-01", releaseDate: "2026-09-30" }),
+      updateVersion(updated, { startDate: "2026-10-01", releaseDate: "2026-09-30" }),
     ).rejects.toThrow("시작일은 릴리스일보다 늦을 수 없습니다");
+  });
+
+  it("편집을 시작한 뒤 남이 먼저 고쳤으면 409로 막는다(남의 저장을 덮지 않는다)", async () => {
+    const version = await createVersion("p1", { name: "1.0" });
+    await updateVersion(version, { description: "먼저 저장" });
+
+    await expect(updateVersion(version, { description: "늦은 저장" })).rejects.toMatchObject({ status: 409 });
+    expect((await listVersions("p1"))[0].description).toBe("먼저 저장");
   });
 
   it("프로젝트를 지우면 버전도 사라진다", async () => {
