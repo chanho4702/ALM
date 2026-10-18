@@ -4,6 +4,7 @@ import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
 import { ATTACHMENT_TOO_LARGE_MESSAGE, assertAttachmentSize } from "./attachmentLimits";
 import { sharedApiFetch as transportFetch, sharedAuthClient } from "./apiClient";
 import { OfficeStreamError, readOfficeStream } from "./officeStream";
+import { reasonText, settleWithConcurrency } from "./concurrency";
 import type { IssueQuery } from "./searchQuery";
 import {
   MAX_SEARCH_PAGE_SIZE,
@@ -596,7 +597,14 @@ function assertPatchFieldsSupported(_patch: IssuePatch): void {
 export async function updateIssue(id: string, patch: IssuePatch, expectedVersion: number): Promise<Issue> {
   assertPatchFieldsSupported(patch);
   if (!Number.isInteger(expectedVersion)) throw new Error("편집을 시작한 이슈 버전이 필요합니다");
-  const current = await issueDto(id);
+  return putIssue(id, await issueDto(id), patch, expectedVersion);
+}
+
+/**
+ * PUT은 전체 교체라 보내지 않은 필드는 `current`(방금 읽은 본문)로 채운다. 대량 변경처럼 본문을 이미 읽은 호출은
+ * 여기로 바로 와서 GET을 한 번 아낀다 — 충돌 판정은 여전히 `expectedVersion`(화면이 본 버전)으로 한다.
+ */
+async function putIssue(id: string, current: IssueDto, patch: IssuePatch, expectedVersion: number): Promise<Issue> {
   const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -915,7 +923,16 @@ export interface BulkIssuePatch {
 
 export interface BulkIssueTarget {
   id: string;
+  /** 실패 보고에 쓰는 이슈 키 — 서버 본문을 읽기 전에 실패해도 숫자 id 대신 보인다 */
+  key?: string;
   version: number;
+}
+
+/** 대량 삭제 대상 — id만 넘기면 실패 보고의 키 자리에 id가 선다 */
+export type BulkDeleteTarget = string | { id: string; key?: string };
+
+export function bulkDeleteTarget(target: BulkDeleteTarget): { id: string; key?: string } {
+  return typeof target === "string" ? { id: target } : target;
 }
 
 export interface BulkResult {
@@ -923,50 +940,59 @@ export interface BulkResult {
   failed: { id: string; key: string; reason: string }[];
 }
 
-/** 대상마다 화면이 본 버전으로 저장한다 — 그 사이 남이 고친 이슈는 409로 실패 목록에 남는다 */
+/**
+ * 대상마다 화면이 본 버전으로 저장한다 — 그 사이 남이 고친 이슈는 409로 실패 목록에 남는다.
+ * 서버 일괄 API가 없어 이슈마다 GET(라벨 병합·전체 교체용 본문) + PUT 두 번을 보내되, 동시성 상한 안에서 병렬로 돈다.
+ */
 export async function bulkUpdateIssues(targets: BulkIssueTarget[], patch: BulkIssuePatch): Promise<BulkResult> {
   if (targets.length === 0) throw new Error("선택한 이슈가 없습니다");
-  let updated = 0;
-  const failed: BulkResult["failed"] = [];
-  for (const { id, version } of targets) {
-    try {
-      const current = mapIssue(await issueDto(id));
-      const remove = new Set(patch.removeLabels ?? []);
-      const labels =
-        patch.addLabels || patch.removeLabels
-          ? [...new Set([...current.labels.filter((l) => !remove.has(l)), ...(patch.addLabels ?? [])])]
-          : undefined;
-      await updateIssue(id, {
-        ...(patch.status !== undefined ? { status: patch.status } : {}),
-        ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
-        ...(patch.assigneeId !== undefined ? { assigneeId: patch.assigneeId } : {}),
-        ...(patch.sprintId !== undefined ? { sprintId: patch.sprintId } : {}),
-        ...(patch.fixVersionId !== undefined ? { fixVersionId: patch.fixVersionId } : {}),
-        ...(labels ? { labels } : {}),
-      }, version);
-      updated += 1;
-    } catch (error) {
-      failed.push({ id, key: id, reason: error instanceof Error ? error.message : String(error) });
-    }
-  }
-  return { updated, failed };
+  const remove = new Set(patch.removeLabels ?? []);
+  const keys = new Map<string, string>();
+  const results = await settleWithConcurrency(targets, async ({ id, version }) => {
+    const current = await issueDto(id);
+    keys.set(id, current.key);
+    const labels =
+      patch.addLabels || patch.removeLabels
+        ? [...new Set([...(current.labels ?? []).filter((l) => !remove.has(l)), ...(patch.addLabels ?? [])])]
+        : undefined;
+    return putIssue(id, current, {
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+      ...(patch.assigneeId !== undefined ? { assigneeId: patch.assigneeId } : {}),
+      ...(patch.sprintId !== undefined ? { sprintId: patch.sprintId } : {}),
+      ...(patch.fixVersionId !== undefined ? { fixVersionId: patch.fixVersionId } : {}),
+      ...(labels ? { labels } : {}),
+    }, version);
+  });
+  return {
+    updated: results.filter((r) => r.status === "fulfilled").length,
+    failed: failedRows(targets, results, keys),
+  };
 }
 
 export async function bulkDeleteIssues(
-  ids: string[],
+  targets: BulkDeleteTarget[],
 ): Promise<{ deleted: number; failed: BulkResult["failed"] }> {
-  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
-  let deleted = 0;
-  const failed: BulkResult["failed"] = [];
-  for (const id of ids) {
-    try {
-      await deleteIssue(id);
-      deleted += 1;
-    } catch (error) {
-      failed.push({ id, key: id, reason: error instanceof Error ? error.message : String(error) });
-    }
-  }
-  return { deleted, failed };
+  if (targets.length === 0) throw new Error("선택한 이슈가 없습니다");
+  const normalized = targets.map(bulkDeleteTarget);
+  const results = await settleWithConcurrency(normalized, ({ id }) => deleteIssue(id));
+  return {
+    deleted: results.filter((r) => r.status === "fulfilled").length,
+    failed: failedRows(normalized, results, new Map()),
+  };
+}
+
+/** 실패 행 — 키는 읽어 둔 본문 → 화면이 넘긴 키 → (둘 다 없을 때만) id 순으로 */
+function failedRows(
+  targets: { id: string; key?: string }[],
+  results: PromiseSettledResult<unknown>[],
+  readKeys: Map<string, string>,
+): BulkResult["failed"] {
+  return results.flatMap((result, index) => {
+    if (result.status === "fulfilled") return [];
+    const { id, key } = targets[index];
+    return [{ id, key: readKeys.get(id) ?? key ?? id, reason: reasonText(result.reason) }];
+  });
 }
 
 // ── CSV/이관 가져오기 — 서버 일괄 API(키 보존·행 단위 실패)로 한 번에 보낸다 ──

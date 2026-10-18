@@ -271,7 +271,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
 
   const handleBulkDelete = async () => {
     try {
-      const result = await bulkDeleteIssues([...selected]);
+      const keyOf = new Map((issues ?? []).map((i) => [i.id, i.key]));
+      const result = await bulkDeleteIssues([...selected].map((id) => ({ id, key: keyOf.get(id) })));
       toast({
         title: `${result.deleted}개 이슈를 삭제했습니다`,
         appearance: result.failed.length > 0 ? "info" : "success",
@@ -686,7 +687,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
       </section>
       <BulkEditModal
         open={bulkOpen}
-        targets={(issues ?? []).filter((i) => selected.has(i.id)).map((i) => ({ id: i.id, version: i.version }))}
+        targets={(issues ?? []).filter((i) => selected.has(i.id)).map((i) => ({ id: i.id, key: i.key, version: i.version }))}
         statuses={statuses}
         users={users}
         sprints={sprints}

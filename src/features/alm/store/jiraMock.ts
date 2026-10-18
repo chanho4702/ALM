@@ -4164,8 +4164,13 @@ export interface BulkIssuePatch {
 /** 대량 변경 대상 — 화면이 목록을 그릴 때 본 버전을 함께 보낸다(그 뒤 남이 고쳤으면 그 이슈만 실패) */
 export interface BulkIssueTarget {
   id: string;
+  /** 실패 보고에 쓰는 이슈 키 — 서버 본문을 읽기 전에 실패해도 숫자 id 대신 보인다 */
+  key?: string;
   version: number;
 }
+
+/** 대량 삭제 대상 — id만 넘기면 실패 보고의 키 자리에 id가 선다 */
+export type BulkDeleteTarget = string | { id: string; key?: string };
 
 export interface BulkResult {
   updated: number;
@@ -4185,10 +4190,10 @@ export async function bulkUpdateIssues(
   const data = load();
   let updated = 0;
   const failed: BulkResult["failed"] = [];
-  for (const { id, version } of targets) {
+  for (const { id, key, version } of targets) {
     const issue = data.issues.find((i) => i.id === id);
     if (!issue) {
-      failed.push({ id, key: id, reason: "이슈를 찾을 수 없습니다" });
+      failed.push({ id, key: key ?? id, reason: "이슈를 찾을 수 없습니다" });
       continue;
     }
     const next: Parameters<typeof updateIssue>[1] = {};
@@ -4228,13 +4233,14 @@ export async function bulkUpdateIssues(
 }
 
 export async function bulkDeleteIssues(
-  ids: string[],
+  targets: BulkDeleteTarget[],
 ): Promise<{ deleted: number; failed: BulkResult["failed"] }> {
-  if (ids.length === 0) throw new Error("선택한 이슈가 없습니다");
+  if (targets.length === 0) throw new Error("선택한 이슈가 없습니다");
   let deleted = 0;
   const failed: BulkResult["failed"] = [];
-  for (const id of ids) {
-    const key = load().issues.find((i) => i.id === id)?.key ?? id;
+  for (const target of targets) {
+    const id = typeof target === "string" ? target : target.id;
+    const key = load().issues.find((i) => i.id === id)?.key ?? (typeof target === "string" ? id : target.key ?? id);
     try {
       await deleteIssue(id);
       deleted += 1;
