@@ -1,1252 +1,159 @@
-export interface User {
-  id: string;
-  name: string;
-  /**
-   * 프로필 사진 — 화면이 `<Avatar src>`에 그대로 넣을 수 있는 URL.
-   * 목업은 base64 dataURL, REST는 인증 헤더가 필요해 바이트를 받아 만든 object URL이다
-   * (`/api/org/members/{id}/avatar`는 Bearer 토큰을 요구하므로 `<img src>`로 직접 못 연다).
-   * 없으면 이니셜 아바타.
-   */
-  avatarUrl?: string | null;
-}
 
-/** 담당자 없이 만든 이슈의 담당자 — 미지정 또는 프로젝트 리더(지라 "기본 담당자") */
-export type ProjectDefaultAssignee = "unassigned" | "lead";
-
-export interface Project {
-  id: string;
-  key: string; // "ALM" 같은 대문자 접두어 — 생성 후 불변 (이슈 키 접두어 보전)
-  name: string;
-  description: string;
-  /** 지라 프로젝트 설정 > 세부: 범주·리더·기본 담당자·아이콘·색·URL */
-  category: string;
-  leadId: string | null;
-  defaultAssignee: ProjectDefaultAssignee;
-  icon: string; // typeIcons 키, "" = 키 이니셜
-  color: string; // 색 이름(typeAppearance 팔레트), "" = 키 해시 색
-  url: string;
-  /** 보관(읽기 전용) 시각 — null/없음이면 활성 */
-  archivedAt?: string | null;
-  /** 휴지통 이동 시각 — 휴지통 목록에서만 값이 있다 */
-  deletedAt?: string | null;
-  /** 자동 영구 삭제 예정 시각(deletedAt + 보존 기간, 서버 계산) — 휴지통 목록에서만 값이 있다 */
-  purgeAt?: string | null;
-  /** 편집 버전(낙관적 락) — 설정 화면이 편집을 시작할 때 본 값을 `updateProject`에 그대로 보낸다 */
-  version: number;
-  createdAt: string;
-}
-
-/** 컴포넌트 기본 담당자 규칙 — project(프로젝트 규칙) | lead(컴포넌트 리더) | unassigned */
-export type ComponentDefaultAssignee = "project" | "lead" | "unassigned";
-
-/** 컴포넌트(지라 Components) — 프로젝트 하위 구성 단위, 이슈는 여러 개를 가질 수 있다 */
-export interface Component {
-  id: string;
-  projectId: string;
-  name: string;
-  description: string;
-  leadId: string | null;
-  defaultAssignee: ComponentDefaultAssignee;
-  issueCount: number;
-  createdAt: string;
-}
-
-/** 대시보드 가젯 종류 — 데이터는 프론트가 기존 스토어 함수로 계산한다 */
-export type GadgetType =
-  | "status-distribution"
-  | "assignee-load"
-  | "priority-distribution"
-  | "sprint-burnup"
-  | "recent-issues"
-  | "filter-results"
-  | "worklog-summary";
-
-export interface GadgetConfig {
-  /** 프로젝트 범위 가젯의 프로젝트. recent-issues/filter-results는 없으면 전체 */
-  projectId?: string;
-  /** 기간(일) — worklog-summary, recent-issues */
-  period?: 7 | 30 | 90;
-  /** 스마트 검색 쿼리 — filter-results */
-  query?: string;
-}
-
-export interface DashboardGadget {
-  id: string;
-  type: GadgetType;
-  /** 2열 그리드의 열(0/1). 같은 열 안에서는 배열 순서 */
-  column: 0 | 1;
-  title?: string;
-  config: GadgetConfig;
-}
-
-/** 대시보드(지라 Dashboards) — 소유자가 가젯을 배치하고, 공유하면 모두가 읽는다 */
-export interface Dashboard {
-  id: string;
-  ownerId: string;
-  name: string;
-  shared: boolean;
-  gadgets: DashboardGadget[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 프로젝트 단위 워크로그 한 줄(가젯·리포트) */
-export interface ProjectWorklogRow {
-  id: string;
-  issueId: string;
-  issueKey: string;
-  authorId: string;
-  hours: number;
-  comment: string;
-  workedOn: string;
-}
-
-/** 프로젝트 바로 가기 — 사이드바/헤더의 외부 링크(위키·저장소·대시보드) */
-export interface ProjectShortcut {
-  id: string;
-  projectId: string;
-  name: string;
-  url: string;
-  order: number;
-  createdAt: string;
-}
-
-/** 개인 설정 — 지라 개인 설정(일반·알림) 축약판 */
-export interface NotificationPreferences {
-  assigned: boolean;
-  statusChanged: boolean;
-  commented: boolean;
-  /** 코멘트·설명에서 @멘션됐을 때 — 워처가 아니어도 받는다 */
-  mentioned: boolean;
-}
-export interface AutoWatchPreferences {
-  created: boolean;
-  commented: boolean;
-  edited: boolean;
-}
-export type StartPage = "home" | "projects" | "last-project";
-export interface UserPreferences {
-  notifications: NotificationPreferences;
-  autoWatch: AutoWatchPreferences;
-  startPage: StartPage;
-  /** 알림함에 새 알림이 생길 때 같은 내용을 이메일로도 받는다(서버 V19). 메일 서버가 없으면 켜도 발송되지 않는다 */
-  emailEnabled: boolean;
-  /** 서버에 메일 서버(ALM_MAIL_HOST)가 구성돼 있는지 — 읽기 전용, 화면 안내용 */
-  mailConfigured?: boolean;
-  /** 내 프로필 사진 URL — 읽기 전용(저장은 uploadMyAvatar/removeMyAvatar). 없으면 null */
-  avatarUrl?: string | null;
-}
-export type UserPreferencesPatch = {
-  notifications?: Partial<NotificationPreferences>;
-  autoWatch?: Partial<AutoWatchPreferences>;
-  startPage?: StartPage;
-  emailEnabled?: boolean;
-};
-
-/** 전역 공지 배너 — 관리자가 켜면 모든 화면 상단에 뜬다 */
-export interface AnnouncementBanner {
-  enabled: boolean;
-  level: "info" | "warning";
-  message: string;
-}
-
-export interface Sprint {
-  id: string;
-  projectId: string;
-  name: string; // "Sprint N" 자동 명명
-  state: "planned" | "active" | "done";
-  /** 스프린트 목표 — "무엇을 위한 스프린트인가". 비어 있으면 필드 자체가 없다 */
-  goal?: string;
-  /** 계획 기간 "YYYY-MM-DD". 실제 시작·완료 시각과 별개로 번다운의 시간축이 된다 */
-  plannedStart?: string;
-  plannedEnd?: string;
-  startedAt?: string;
-  completedAt?: string;
-  /** 편집 버전(낙관적 락) — 계획 수정·시작·완료가 올린다. 계획 수정은 편집을 시작할 때 본 값을 보낸다 */
-  version: number;
-}
-
-/**
- * 상태 카테고리 — 워크플로 커스텀 상태(WorkflowStatus)가 반드시 소속되는 3분류.
- * 통계/색/완료 판정은 전부 카테고리 기준이다. (커스텀 상태 도입 후에도 불변)
- */
-/** 기본 상태 카테고리 id 3종 — 시드·템플릿·검색이 이 id를 쓴다. 사용자 카테고리는 `cat-*` */
-export type IssueStatus = "todo" | "inprogress" | "done";
-
-/** 카테고리의 의미 — 완료 판정·번다운·보드 정렬은 전부 여기서 파생한다 (지라의 statusCategory) */
-export type StatusKind = "new" | "active" | "complete";
-/** 카테고리 색 — Lozenge appearance와 1:1 */
-export type StatusColor = "neutral" | "info" | "success" | "warning" | "danger";
-
-/** 전역 상태 카테고리 — 기본 3개(todo/inprogress/done)는 의미를 바꾸거나 지울 수 없다 */
-export interface StatusCategory {
-  id: string;
-  name: string;
-  kind: StatusKind;
-  color: StatusColor;
-  order: number;
-  builtIn: boolean;
-}
-
-/** 전역 상태 레지스트리 항목 — 워크플로(스킴/커스텀)가 골라 쓴다. 이름·카테고리의 진실 */
-export interface StatusDef {
-  id: string;
-  name: string;
-  categoryId: string; // StatusCategory.id
-  description: string;
-  /**
-   * lucide 아이콘 키 (`components/typeIcons.tsx`의 맵). 빈 문자열이면 카테고리 의미(kind)의
-   * 기본 아이콘으로 폴백한다 — 화면은 `labels.ts`의 `statusIcon()`만 쓴다.
-   */
-  icon: string;
-}
-/** 기본 우선순위 id 5종(지라 5단계) — 시드·CSV·REST 매핑이 쓴다. 사용자 우선순위는 `pr-*` */
-export type BuiltinIssuePriority = "highest" | "high" | "medium" | "low" | "lowest";
-/** 우선순위 id — 레지스트리(`PriorityDef`)가 진실 */
-export type IssuePriority = string;
-
-/** 전역 우선순위 레지스트리 — order가 높음→낮음(정렬 근거). 기본 5종은 삭제 불가 */
-export interface PriorityDef {
-  id: string;
-  name: string;
-  icon: string;
-  color: StatusColor;
-  description: string;
-  order: number;
-  builtIn: boolean;
-}
-/** 기본 이슈 타입 id 5종 — 시드·템플릿·REST 매핑이 쓴다. 사용자 타입은 `it-*` */
-export type BuiltinIssueType = "task" | "story" | "bug" | "epic" | "subtask";
-/** 이슈 타입 id — 레지스트리(`IssueTypeDef`)가 진실 */
-export type IssueType = string;
-/** 타입의 계층 — 부모-자식 규칙의 근거 (상위 → 일반 → 하위 작업) */
-export type IssueTypeLevel = "epic" | "standard" | "subtask";
-
-/** 전역 이슈 타입 레지스트리 항목 — 기본 5종은 계층을 바꾸거나 지울 수 없다 */
-export interface IssueTypeDef {
-  id: string;
-  name: string;
-  /** typeIcons.tsx의 키 */
-  icon: string;
-  color: StatusColor;
-  level: IssueTypeLevel;
-  description: string;
-  order: number;
-  builtIn: boolean;
-}
-/** 해결 — "왜 끝났는가". 지라 기본 4종. 완료 카테고리에서만 값을 갖고, 다시 열면 비워진다 */
-export type IssueResolution = "done" | "wont_do" | "duplicate" | "cannot_reproduce";
-
-export interface Issue {
-  id: string;
-  key: string; // "ALM-1", 불변, 재사용 금지
-  projectId: string;
-  title: string;
-  description: string;
-  type: IssueType;
-  /** WorkflowStatus.id 참조 — 기본 상태 id는 카테고리 값("todo" 등)과 동일 */
-  status: string;
-  priority: IssuePriority;
-  assigneeId: string | null;
-  reporterId: string;
-  sprintId: string | null; // null = 백로그
-  /**
-   * 부모 이슈 (지라 최신 모델의 단일 parent — 2단계 계층):
-   * 에픽은 parent 불가 / 일반 이슈(작업·스토리·버그) parent = 에픽만 / 하위 작업 parent = 일반 이슈만
-   */
-  parentId: string | null;
-  dueDate: string | null; // "YYYY-MM-DD", null = 미지정
-  /** 예상 시간(h, 소수 허용) — 워크로그 합계와 함께 진행률을 만든다 */
-  estimateHours: number | null;
-  /** 완료 카테고리일 때만 non-null. 완료로 들어가면 "done"이 기본값, 벗어나면 null */
-  resolution: IssueResolution | null;
-  /**
-   * 해결 시각 — `resolution`이 null→non-null이 되는 순간 찍히고, 다시 null이 되면 지워진다.
-   * AQL `resolved`(해결일)가 읽는 값이다. 직접 대입하지 말고 해결을 바꾸는 한 경로만 쓴다.
-   */
-  resolvedAt: string | null;
-  /** 수정 버전(fix version). null = 미지정 */
-  fixVersionId: string | null;
-  /** 보관 시각 — 보관함 목록에서만 값이 있다(활성 이슈는 null/없음) */
-  archivedAt?: string | null;
-  labels: string[]; // 자유 문자열 라벨
-  /** 컴포넌트 id 목록(순서 유지). 없으면 빈 배열로 본다 */
-  componentIds?: string[];
-  order: number; // 컬럼/목록 내 정렬
-  /**
-   * 편집 버전(낙관적 락) — 서버 `version`. 편집 저장(`updateIssue`)만 올리고 보드 이동·랭크는 올리지 않는다.
-   * 화면은 편집을 **시작할 때** 들고 있던 값을 `expectedVersion`으로 보내야 남의 저장을 덮어쓰지 않는다.
-   */
-  version: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Comment {
-  id: string;
-  issueId: string;
-  authorId: string;
-  body: string;
-  createdAt: string;
-  updatedAt?: string; // 수정된 댓글만 값 존재 ("수정됨" 표시 근거)
-}
-
-export interface Activity {
-  id: string;
-  issueId: string;
-  actorId: string;
-  type:
-    | "created"
-    | "status"
-    | "assignee"
-    | "priority"
-    | "sprint"
-    | "duedate"
-    | "labels"
-    | "issuetype"
-    | "parent"
-    | "link"
-    | "worklog"
-    | "resolution"
-    | "fixversion"
-    | "attachment";
-  detail: string; // 예: "할 일 → 진행 중"
-  at: string;
-}
-
-export type BoardType = "scrum" | "kanban";
-export type BoardSwimlane = "none" | "assignee" | "epic";
-
-export interface BoardColumn {
-  /** WorkflowStatus.id 참조 — 실제 컬럼 구성은 프로젝트 상태 목록에서 파생된다 */
-  status: string;
-  name: string; // 표시 이름 (기본: 상태 이름)
-  wipLimit: number | null; // null = 제한 없음
-}
-
-/** 보드 저장 필터 — 빈 배열 = 전체. assigneeIds의 "unassigned" = 미지정 매치 */
-export interface BoardFilter {
-  assigneeIds: string[];
-  types: IssueType[];
-  labels: string[];
-}
-
-/**
- * 보드 = "보는 방법"만 저장하는 필터 뷰 (지라와 동일 철학).
- * 이슈/스프린트는 계속 프로젝트 소속이다.
- */
-export interface Board {
-  id: string;
-  projectId: string;
-  name: string;
-  type: BoardType; // scrum = 활성 스프린트 이슈, kanban = 스프린트 무관 전체
-  filter: BoardFilter;
-  columns: BoardColumn[]; // 항상 길이 3, status 순서 고정
-  swimlane: BoardSwimlane; // 기본 스윔레인 (화면에서 임시 전환 가능)
-  isDefault: boolean; // 뷰 탭 "보드"가 여는 보드
-  createdAt: string;
-}
-
-/** 워크플로 상태 — id는 불변(이슈가 참조), category가 색/완료 판정을 결정한다 */
-export interface WorkflowStatus {
-  id: string; // StatusDef.id
-  /** 레지스트리 값의 캐시 — 읽을 때는 레지스트리가 이기고, 저장할 때는 레지스트리로 관통된다 */
-  name: string;
-  category: string; // StatusCategory.id
-  order: number;
-  /** 해석(resolve) 시 채워지는 파생 — 카테고리 의미·색·아이콘. 저장 데이터에는 없다 */
-  kind?: StatusKind;
-  color?: StatusColor;
-  /** 레지스트리(`StatusDef.icon`)의 lucide 키. 빈 문자열/미지정은 kind 기본 아이콘 폴백 */
-  icon?: string;
-}
-
-/**
- * 워크플로 전이 — 어느 상태에서 어느 상태로 갈 수 있는가.
- * `from`이 비면 모든 상태에서 허용한다(지라의 "All statuses" 전이).
- */
-export interface WorkflowTransition {
-  id: string;
-  name: string;
-  from: string[]; // WorkflowStatus.id 목록. 빈 배열 = 모든 상태
-  to: string; // WorkflowStatus.id
-}
-
-/** 워크플로 캔버스 노드 위치 — 상태 id(또는 `WORKFLOW_ANY_NODE`) → 좌상단 좌표 */
-export type WorkflowLayout = Record<string, { x: number; y: number }>;
-/** 캔버스의 가상 "모든 상태" 노드 id — 전역 전이(`from: []`)의 출발점 */
-export const WORKFLOW_ANY_NODE = "__any__";
-
-/**
- * 구성 가능한 이슈 필드 — 프로젝트·타입·요약·상태는 항상 있으므로 목록에 없다.
- * 순서는 만들기 모달·속성 패널의 표시 순서(지라 순서 고정)와 같다.
- */
-export const ISSUE_FIELD_IDS = [
-  "description",
-  "assignee",
-  "priority",
-  "labels",
-  "components",
-  "parent",
-  "sprint",
-  "dueDate",
-  "fixVersion",
-  "resolution",
-  "estimate",
-  "attachments",
-  "links",
-] as const;
-
-export type IssueFieldId = (typeof ISSUE_FIELD_IDS)[number];
-
-/** 필드 이름 — 화면 라벨이자 검증 오류 문구(서버와 같은 말)의 원천 */
-export const ISSUE_FIELD_NAMES: Record<IssueFieldId, string> = {
-  description: "설명",
-  assignee: "담당자",
-  priority: "우선순위",
-  labels: "라벨",
-  components: "컴포넌트",
-  parent: "상위 항목",
-  sprint: "스프린트",
-  dueDate: "마감일",
-  fixVersion: "수정 버전",
-  resolution: "해결",
-  estimate: "예상 시간",
-  attachments: "첨부",
-  links: "링크",
-};
-
-export interface IssueFieldConfig {
-  id: IssueFieldId;
-  /** false면 만들기 모달·상세 속성 패널·대량 변경에서 숨긴다 */
-  visible: boolean;
-  /** true면 만들기 모달에서 필수(값 없으면 만들기 불가) — 서버도 생성 시 검사 */
-  required: boolean;
-}
-
-/** 설정 본문 — 스킴과 프로젝트 커스텀이 같은 형태를 공유한다 */
-export interface SettingsBody {
-  statuses: WorkflowStatus[];
-  /** 캔버스에서 끌어 놓은 노드 위치. 없는 노드는 자동 배치(dagre) */
-  layout?: WorkflowLayout;
-  /**
-   * 전이 목록. **비어 있거나 없으면 모든 이동을 허용**한다 — 기존 프로젝트가 갑자기
-   * 막히지 않게 하려는 기본값이다.
-   */
-  transitions?: WorkflowTransition[];
-  /** 프로젝트에서 쓸 이슈 타입 — subtask는 항상 포함 */
-  enabledTypes: IssueType[];
-  /** 프로젝트에서 쓸 우선순위(레지스트리 id) — 최소 1개 */
-  enabledPriorities: IssuePriority[];
-  /** 우선순위 없이 만든 이슈에 붙는 값 — enabledPriorities 안에 있어야 한다 */
-  defaultPriority: IssuePriority;
-  /**
-   * 이슈 필드 구성의 **기본 구성**(모든 타입) — 없거나 비면 13종 전부 `visible:true, required:false`.
-   * 모르는 id는 거부하고, 빠진 id는 읽을 때 기본값으로 채운다(구버전 호환).
-   */
-  fields?: IssueFieldConfig[];
-  /**
-   * 이슈 타입별 덮어쓰기 — 키는 이슈 타입 레지스트리 id다. 키가 없는 타입은 기본 구성을 따른다.
-   * 읽을 때는 덮어쓰기가 있는 타입만 키로 남고 각 목록은 13종 전부로 채워진다.
-   */
-  fieldsByType?: Record<IssueType, IssueFieldConfig[]>;
-}
-
-/** 지라식 설정 스킴 — 전역 관리가 정의하고 프로젝트에 배정한다 */
-export interface SettingsScheme {
-  id: string;
-  name: string;
-  isDefault: boolean; // 새 프로젝트 자동 배정, 삭제 불가
-  body: SettingsBody;
-}
-
-export interface ProjectSettingsEntry {
-  projectId: string;
-  schemeId: string; // 배정된 스킴 (커스텀 중에도 복귀 대상으로 유지)
-  custom: SettingsBody | null; // null = 스킴 사용
-}
-
-/** 작업 시간 기록 — 시간(h) 단위, 소수 허용 */
-export interface Worklog {
-  id: string;
-  issueId: string;
-  authorId: string;
-  hours: number; // > 0
-  comment: string;
-  workedOn: string; // "YYYY-MM-DD" 작업일
-  at: string; // 기록 시각(ISO)
-}
-
-/**
- * 프로젝트 역할 — org-service `GrantRole`(VIEWER/EDITOR/ADMIN)과 1:1이다.
- * 권한의 단일 진실 소스는 org-service이며 여기 값은 그 계약을 화면 모델로 옮긴 것이다.
- */
-export type ProjectRole = "viewer" | "editor" | "admin";
-
-export interface ProjectMember {
-  projectId: string;
-  userId: string;
-  role: ProjectRole;
-}
-
-/** 버전 상태 — 지라와 같은 3단계 */
-export type VersionStatus = "unreleased" | "released" | "archived";
-
-/** 버전(릴리스). 이름은 프로젝트 안에서 유일하다 */
-export interface ProjectVersion {
-  id: string;
-  projectId: string;
-  name: string;
-  description: string;
-  startDate?: string; // "YYYY-MM-DD"
-  releaseDate?: string;
-  status: VersionStatus;
-  releasedAt?: string;
-  createdAt: string;
-  /** 낙관적 락 — 편집을 시작할 때 본 값으로 저장한다(남이 먼저 고쳤으면 409). 옛 목업 데이터에는 없을 수 있다 */
-  version?: number;
-}
-
-/**
- * 이슈 첨부 메타. 바이트는 서버(오브젝트 스토리지)에 있고 목업은 메모리에만 둔다 — 새로고침하면
- * 목업의 바이트는 사라진다(메타는 남는다). localStorage는 용량·base64 팽창 때문에 부적합하다.
- */
-export interface Attachment {
-  id: string;
-  issueId: string;
-  filename: string;
-  contentType: string;
-  sizeBytes: number;
-  uploadedBy: string;
-  createdAt: string;
-}
-
-/** 이력으로 남기는 필드 — 서버 V5 issue_change_log와 같은 범위(상태·스프린트 소속) */
-export type ChangeField = "status" | "sprint";
-
-/**
- * 이슈 변경 이력 한 줄. 번다운·스프린트 리포트가 "언제 완료됐고 스코프가 어떻게 바뀌었나"를
- * 재구성하는 원천이며, 서버 `GET /api/alm/projects/{id}/changes`와 같은 모양이다.
- */
-export interface IssueChange {
-  id: string;
-  issueId: string;
-  projectId: string;
-  /** 변경 시점의 소속 스프린트 (sprint 변경이면 옮겨간 쪽). null = 백로그 */
-  sprintId: string | null;
-  field: ChangeField;
-  fromValue: string | null;
-  toValue: string | null;
-  actorId: string;
-  at: string;
-}
-
-/** 기본 링크 타입 id 5종 — 시드·타임라인(blocks 의존)이 쓴다. 사용자 타입은 `lt-*` */
-export type BuiltinIssueLinkType = "blocks" | "relates" | "duplicates" | "causes" | "clones";
-/** 링크 타입 id — 레지스트리(`LinkTypeDef`)가 진실 */
-export type IssueLinkType = string;
-
-/** 링크 타입 레지스트리 — outward/inward가 같으면 대칭(양방향) 링크. 기본 5종은 삭제 불가 */
-export interface LinkTypeDef {
-  id: string;
-  name: string;
-  /** source 쪽에서 보는 문구("차단함") */
-  outward: string;
-  /** target 쪽에서 보는 문구("차단됨") */
-  inward: string;
-  order: number;
-  builtIn: boolean;
-}
-
-/**
- * 이슈 링크 — blocks: source가 target을 차단(방향 있음), relates: 양방향(레코드 1개).
- */
-export interface IssueLink {
-  id: string;
-  sourceId: string;
-  targetId: string;
-  type: IssueLinkType;
-}
-
-/** 사용자에게 전달되는 알림 — 본인 액션은 알리지 않는다 (지라와 동일) */
-/** 감사 로그 한 줄 — 서버 이벤트 봉투(payloadCase) 이름이 eventType */
-export interface AuditEntry {
-  id: string;
-  eventType: string;
-  actorId: string;
-  projectId: string | null;
-  targetKey: string | null;
-  summary: string | null;
-  at: string;
-}
-
-export interface SystemStats {
-  projects: number;
-  issues: number;
-  attachments: number;
-  attachmentBytes: number;
-  auditEntries: number;
-}
-
-/** 이슈 워처 — 알림 대상. 보고자·담당자는 자동, 나머지는 스스로 등록 */
-export interface IssueWatcher {
-  issueId: string;
-  userId: string;
-  createdAt: string;
-}
-
-export interface Notification {
-  id: string;
-  /** 수신자 */
-  userId: string;
-  issueId: string;
-  issueKey: string;
-  /** 행위자 */
-  actorId: string;
-  message: string;
-  at: string;
-  read: boolean;
-}
-
-/** localStorage `alm.jira.v1`에 저장되는 루트 구조 */
-export interface JiraData {
-  users: User[];
-  projects: Project[];
-  sprints: Sprint[];
-  issues: Issue[];
-  comments: Comment[];
-  activities: Activity[];
-  notifications: Notification[];
-  boards: Board[];
-  links: IssueLink[];
-  worklogs: Worklog[];
-  /** 상태·스프린트 변경 이력 (리포트 원천) */
-  changes: IssueChange[];
-  /** 프로젝트 멤버십과 역할 */
-  members: ProjectMember[];
-  /** 버전(릴리스) */
-  versions: ProjectVersion[];
-  /** 이슈 첨부 메타 */
-  attachments: Attachment[];
-  /** 이슈 워처 */
-  watchers: IssueWatcher[];
-  /** 전역 상태 카테고리 (order순) */
-  statusCategories: StatusCategory[];
-  /** 전역 상태 레지스트리 */
-  statusDefs: StatusDef[];
-  /** 전역 이슈 타입 레지스트리 (order순) */
-  issueTypes: IssueTypeDef[];
-  priorities: PriorityDef[];
-  linkTypes: LinkTypeDef[];
-  /** 보관된 이슈 + 휴지통 프로젝트의 이슈 — 일반 조회 배열(issues) 밖으로 옮겨 자동으로 숨긴다 */
-  archivedIssues: Issue[];
-  /** 휴지통 프로젝트 — projects 밖으로 옮긴다 */
-  trashedProjects: Project[];
-  components: Component[];
-  dashboards: Dashboard[];
-  schemes: SettingsScheme[];
-  projectSettings: ProjectSettingsEntry[];
-  /** projectId → 마지막 발급 이슈 번호 (삭제돼도 감소하지 않는다) */
-  issueCounters: Record<string, number>;
-  shortcuts: ProjectShortcut[];
-  preferences: Record<string, UserPreferences>;
-  /** userId → 프로필 사진 dataURL (목업 전용 저장소 — 서버는 오브젝트 스토리지에 둔다) */
-  avatars: Record<string, string>;
-  banner: AnnouncementBanner;
-}
-
-/**
- * org-service `GET /api/org/me` — 계정 상태와 전역 역할의 **단일 진실 소스**.
- *
- * ALM은 예전에 관리자 여부를 `/api/org/me/permissions`의 `GLOBAL/ADMIN` grant로 따로 판정했다.
- * 그러면 위키·ALM이 같은 사람을 다르게 볼 수 있어, 판정을 이 한 응답으로 모았다
- * (설계 §3.3). 목업은 항상 ACTIVE·ADMIN을 돌려준다 — 목업 개발자는 모든 화면을 봐야 한다.
- */
-export interface OrgProfile {
-  id: string;
-  displayName: string;
-  email: string | null;
-  status: OrgMemberStatus;
-  kind: "HUMAN" | "AGENT";
-  /** `"ADMIN"`이 있으면 전역 관리자. 문자열 배열 그대로 둔다(서버가 역할을 늘릴 수 있다) */
-  globalRoles: string[];
-  teams: { id: string; name: string; role: "LEAD" | "MEMBER" }[];
-  joinedVia: string | null;
-}
-
-/**
- * agent-service `GET /api/agent/personas` 항목 — "꺼지지 않는 개발팀" 페르소나 하나.
- * ALM은 이름·개수만 안다: 배열이 비어 있지 않으면 AI 기능이 활성인 플랫폼이다
- * (agent-service가 없는 배포는 404/5xx로 답하거나 아예 응답하지 않는다 — 빈 배열과 동일 취급).
- */
-export interface AgentPersona {
-  id: string;
-  name: string;
-  emoji?: string | null;
-}
-
-// ── AI 팀 설정(agent-service P3f·P3h) — 프로젝트 설정 "AI 팀" 화면 ──
-
-/**
- * `GET /api/agent/permissions?projectId=` — 버튼 노출 판정 힌트(D-P3f-6). 실제 판정은 각 관리 API가 다시 한다.
- * canManage = 전역 관리자 OR 그 프로젝트 ADMIN. org 판정 실패는 서버가 canManage=false로 접는다.
- */
-export interface AgentPermissions {
-  canManage: boolean;
-  isGlobalAdmin: boolean;
-}
-
-/** org-service ResourceKind 중 프로젝트 관리자가 줄 수 있는 둘 — GLOBAL은 전역 관리자 전용이라 이 화면에 없다 */
-export type AgentGrantResourceType = "PROJECT" | "SPACE";
-/** org-service GrantRole — ADMIN ⊃ EDITOR ⊃ COMMENTER ⊃ VIEWER */
-export type AgentGrantRole = "VIEWER" | "COMMENTER" | "EDITOR" | "ADMIN";
-
-export interface AgentGrantInput {
-  resourceType: AgentGrantResourceType;
-  resourceId: string;
-  role: AgentGrantRole;
-}
-
-/** `GET /api/agent/personas` 항목 전체(PersonaResponse) — projectId null이면 전사 공용(전역 관리자만 관리) */
-export interface AgentTeamPersona {
-  id: string;
-  slug: string;
-  name: string;
-  emoji: string | null;
-  role: AgentRole;
-  active: boolean;
-  projectId: string | null;
-  /** 렌더용 외형(AGP-62) — 버전드 JSON 문자열 원문. 해석은 office `parseAvatarConfig`, 없으면 기본 외형 */
-  avatarConfig?: string | null;
-}
-
-/**
- * `GET /api/agent/personas/{id}`(관리자 전용 — canManagePersona) — 편집 다이얼로그 프리필. 목록 필드 + 편집 필드.
- * 미설정 필드는 null.
- */
-export interface AgentPersonaDetail extends AgentTeamPersona {
-  avatarConfig: string | null;
-  voicePrompt: string | null;
-  defaultModel: string | null;
-  skills: string | null;
-}
-
-/**
- * `PATCH /api/agent/personas/{id}` 본문 — 전부 선택. 생략 = 그대로, 빈 문자열 = 지움(avatarConfig ""= 기본 외형),
- * name은 지울 수 없다(400).
- */
-export interface AgentPersonaPatch {
-  name?: string;
-  emoji?: string;
-  voicePrompt?: string;
-  defaultModel?: string;
-  skills?: string;
-  avatarConfig?: string;
-}
-
-/** `POST /api/agent/personas` — 프로젝트 관리자는 projectId=현재 프로젝트가 필수 */
-export interface AgentPersonaInput {
-  slug: string;
-  role: AgentRole;
-  name: string;
-  emoji?: string;
-  voicePrompt?: string;
-  projectId: string;
-  grants: AgentGrantInput[];
-}
-
-/** 토큰 종류(D-P4-3b) — HUMAN = 사람이 발급한 직원 토큰, RUN = run마다 시스템이 발급하는 임시 토큰(종료 시 철회) */
-export type AgentTokenKind = "HUMAN" | "RUN";
-
-/** `GET /api/agent/tokens?projectId=` 항목(PatSummaryResponse) — 해시·원문은 없다 */
-export interface AgentToken {
-  id: string;
-  label: string;
-  personaSlug: string;
-  createdAt: string | null;
-  /** null = 무기한(또는 구 백엔드) */
-  expiresAt: string | null;
-  lastUsedAt: string | null;
-  revoked: boolean;
-  /** P4a 이전 백엔드는 필드가 없다 — HUMAN으로 본다 */
-  kind: AgentTokenKind;
-  /** 무기한 사람용 토큰 — 화면 "무기한" 경고 */
-  noExpiry: boolean;
-  /** 7일 안 만료 — "곧 만료" 배지 */
-  expiringSoon: boolean;
-}
-
-/** `POST /api/agent/tokens` — 만료는 기간(1~365일, 생략 = 서버 기본 90일) 또는 무기한(전역 관리자만) 중 하나 */
-export interface AgentTokenIssueInput {
-  label: string;
-  personaSlug: string;
-  expiresInDays?: number;
-  noExpiry?: boolean;
-}
-
-/** `POST /api/agent/tokens` 201 — 원문 token은 이 응답에만 온다 */
-export interface AgentTokenIssued {
-  token: string;
-  id: string;
-  label: string;
-  personaSlug: string;
-  /** null = 무기한(또는 구 백엔드가 주지 않음) */
-  expiresAt?: string | null;
-}
-
-// ── 실행 위치·러너(P4a AGP-69, D-P4-1·3·4·5) ──
-
-/** SERVER = 서버(24시간, 등록된 LLM API 키 과금) · LOCAL = 사용자 PC 러너(그 PC의 Claude 구독·자기 키) */
-export type AgentExecutionSite = "SERVER" | "LOCAL";
-
-/** `GET/PUT /api/agent/execution-site/projects/{id}` */
-export interface AgentExecutionSiteSetting {
-  projectId: string;
-  /** 저장값 — null이면 전역 기본을 따른다 */
-  site: AgentExecutionSite | null;
-  effectiveSite: AgentExecutionSite;
-  defaultSite: AgentExecutionSite;
-  /** SERVER run을 서비스 프로세스 안에서 돈다(호스트 dev) — false면 PLATFORM 러너가 집는다 */
-  inProcess: boolean;
-}
-
-export type AgentRunnerKind = "PLATFORM" | "LOCAL";
-export type AgentRunnerStatus = "ONLINE" | "OFFLINE" | "NEVER_CONNECTED" | "REVOKED";
-
-/** `GET /api/agent/runners?projectId=` 항목 — 토큰 해시·원문 없음 */
-export interface AgentRunner {
-  id: string;
-  kind: AgentRunnerKind;
-  name: string;
-  /** null = 플랫폼 전역 러너 */
-  projectId: string | null;
-  issuedBy: string | null;
-  tokenPrefix: string | null;
-  createdAt: string | null;
-  revokedAt: string | null;
-  lastHeartbeatAt: string | null;
-  version: string | null;
-  os: string | null;
-  maxConcurrency: number | null;
-  status: AgentRunnerStatus;
-  currentRunIds: string[];
-}
-
-/** `POST /api/agent/runners` 201 — 원문 token(agr_)은 이 응답에만 온다 */
-export interface AgentRunnerIssued {
-  id: string;
-  kind: AgentRunnerKind;
-  name: string;
-  projectId: string | null;
-  token: string;
-  tokenPrefix: string | null;
-  createdAt: string | null;
-}
-
-export interface AgentRunnerInput {
-  name: string;
-  /** null = 플랫폼 전역(전역 관리자만) */
-  projectId: string | null;
-}
-
-/** 실제로 적용될 키의 출처(D-P3h-3) — 프로젝트 > 전역 > 서버 env > 없음 */
-export type AgentCredentialScope = "PROJECT" | "PLATFORM" | "ENV" | "NONE";
-
-/** `GET/PUT /api/agent/credentials/projects/{projectId}` — 원문 키는 어떤 응답에도 없다 */
-export interface AgentProjectCredential {
-  project: {
-    set: boolean;
-    provider: "ANTHROPIC" | null;
-    /** 키 끝 4자 */
-    keyHint: string | null;
-    updatedBy: string | null;
-    updatedAt: string | null;
-  };
-  effective: {
-    scope: AgentCredentialScope;
-    keyHint: string | null;
-  };
-}
-
-// ── 리뷰어 지정(P4b D-P4b-1, AGP-59) — `GET/PUT/DELETE /api/agent/review-settings/{projects/{id}|platform}` ──
-
-/** 실제 리뷰어가 정해진 단계 — 프로젝트 설정 > 전역 설정 > 서버 env > 자동(활성 REVIEWER 중 id 최소) > 없음 */
-export type AgentReviewerSource = "PROJECT" | "PLATFORM" | "ENV" | "AUTO" | "NONE";
-
-export interface AgentReviewerRef {
-  personaId: string;
-  /** 지정한 페르소나가 없어졌으면 null */
-  slug: string | null;
-  name: string | null;
-}
-
-export interface AgentReviewSetting {
-  /** 이 범위에 저장된 지정 — null이면 상위 설정·자동을 따른다 */
-  setting: AgentReviewerRef | null;
-  /** 지금 실제로 쓰일 리뷰어 — source가 NONE이면 personaId·slug·name 모두 null */
-  effective: {
-    personaId: string | null;
-    slug: string | null;
-    name: string | null;
-    source: AgentReviewerSource;
-  };
-}
-
-// ── 실행 중 지시(P4b D-P4b-5, AGP-67) — `POST/GET /api/agent/runs/{id}/directives` ──
-
-export interface AgentRunDirective {
-  id: string;
-  runId: string;
-  /** 본문은 run 프로젝트 관리자에게만 온다 — 그 밖의 조회자는 null */
-  text: string | null;
-  createdAt: string;
-  /** null = 아직 워커에게 전달되지 않음 */
-  deliveredAt: string | null;
-}
-
-export interface AgentCredentialInput {
-  apiKey: string;
-  /** 저장 전에 저비용 호출로 키를 검증한다(실패 400) */
-  validate: boolean;
-}
-
-export type OrgMemberStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
-
-// ── AI 사무실(agent-service P3a) — `GET /api/agent/office`, `GET /api/agent/personas/{id}/activity` ──
-// 서버 long id는 경계(jiraApi)에서 string으로 바꾼다. 시각은 ISO-8601 UTC 문자열 그대로.
-
-/** MANAGER(P3c)는 보드 순찰·보고를 맡는 매니저 — 실무 회의·회고 자동 참석에서 빠진다 */
-export type AgentRole = "PLANNER" | "DESIGNER" | "FRONTEND" | "BACKEND" | "OPS" | "REVIEWER" | "MANAGER";
-
-export type AgentRunStatus =
-  | "QUEUED"
-  | "RUNNING"
-  | "WAITING_APPROVAL"
-  | "BLOCKED"
-  | "DONE"
-  | "FAILED"
-  | "CANCELLED";
-
-/** 아직 끝나지 않은 run — 페르소나의 "현재 run"이 될 수 있는 상태 */
-export type AgentActiveRunStatus = "QUEUED" | "RUNNING" | "WAITING_APPROVAL" | "BLOCKED";
-
-/**
- * 회의 계열 run(P3b) — MEETING=착수/계획, RETRO=회고, ESCALATION=에스컬레이션, MANAGER=매니저 보고(P3c, 매니저 1명의
- * 보드 순찰 — 회의는 아니지만 서버 MEETING_TYPES에 들어 소집 API·게시판·활성 회의 가드를 공유한다)
- */
-export type AgentMeetingType = "MEETING" | "RETRO" | "ESCALATION" | "MANAGER";
-export type AgentRunType = "TASK" | "REVIEW" | AgentMeetingType;
-export type AgentRunTrigger = "SCHEDULER" | "USER";
-
-export interface AgentCurrentRun {
-  id: string;
-  status: AgentActiveRunStatus;
-  issueKey: string | null;
-  type: AgentRunType;
-  trigger: AgentRunTrigger;
-  attempt: number;
-  model: string | null;
-  startedAt: string | null;
-  /** 실행 위치(P4a) — 구 백엔드는 없다(= SERVER) */
-  executionSite?: AgentExecutionSite;
-  /** QUEUED인데 집어 갈 러너가 없다(P4a D-P4-4) — "러너 대기". 구 백엔드는 없다(= false) */
-  awaitingRunner?: boolean;
-  /**
-   * 아직 워커에게 전달되지 않은 실행 중 지시 수(P4b AGP-67). 구 백엔드는 필드가 없다(undefined) — 그 서버엔 지시 API도
-   * 없다는 신호로 쓴다(화면이 "바로 전하기"를 숨기고 코멘트로 폴백).
-   */
-  pendingDirectiveCount?: number;
-}
-
-/** 감사 출처(AGP-63) — 내부 워커 run / 사람이 발급한 페르소나 토큰으로 붙은 외부 MCP / 시스템 */
-export type AgentAuditOrigin = "WORKER" | "EXTERNAL" | "SYSTEM";
-
-/** 도구 호출 감사 한 건 — summary는 서버가 본문을 가린 값("(본문 생략)" 등)일 수 있다 */
-export interface AgentAuditEntry {
-  id: string;
-  tool: string;
-  status: "OK" | "ERROR";
-  summary: string | null;
-  createdAt: string;
-  /** null = 출처 기록 전의 과거 감사(구 백엔드 포함) — 배지를 달지 않는다 */
-  origin: AgentAuditOrigin | null;
-  /** 워커 run의 감사면 그 run id */
-  runId: string | null;
-}
-
-/** 활성 run 없이 최근 5분 안에 외부 MCP 활동이 있으면 "EXTERNAL"(AGP-63) */
-export type AgentPresence = "EXTERNAL";
-
-export interface AgentOfficePersona {
-  id: string;
-  slug: string;
-  name: string;
-  emoji: string | null;
-  role: AgentRole;
-  active: boolean;
-  currentRun: AgentCurrentRun | null;
-  /** 5분 이내 활동만 온다 — 없으면 null(말풍선 2행 생략) */
-  lastActivity: AgentAuditEntry | null;
-  todayCostUsd: number;
-  /** 렌더용 외형(AGP-62) — 구 백엔드는 필드가 없다(= 기본 외형) */
-  avatarConfig?: string | null;
-  /** 원격 접속(AGP-63) — 활성 run이 있으면 서버가 null로 준다. 구 백엔드는 필드가 없다(= null) */
-  presence?: AgentPresence | null;
-}
-
-export interface AgentRunSummary {
-  id: string;
-  issueKey: string | null;
-  status: AgentRunStatus;
-  personaId: string;
-  attempt: number;
-  model: string | null;
-  startedAt: string | null;
-  endedAt: string | null;
-  type: AgentRunType;
-  trigger: AgentRunTrigger;
-  parentRunId: string | null;
-  /** 실행 위치(P4a) — 구 백엔드는 없다(= SERVER) */
-  executionSite?: AgentExecutionSite;
-  /** 배정·고정 러너 — 인프로세스 run·구 백엔드는 null */
-  runnerId?: string | null;
-}
-
-/** `GET /api/agent/runs` 조건(P4c D-P4c-1) — 전부 선택, AND. page는 0부터, size 1~100(기본 20) */
-export interface AgentRunQuery {
-  status?: AgentRunStatus;
-  projectId?: string;
-  personaId?: string;
-  type?: AgentRunType;
-  page?: number;
-  size?: number;
-}
-
-/** run 목록 한 페이지 — id 내림차순. 구 백엔드(배열 전체)도 어댑터가 이 모양으로 접는다 */
-export interface AgentRunPage {
-  items: AgentRunSummary[];
-  page: number;
-  size: number;
-  total: number;
-  hasNext: boolean;
-}
-
-/**
- * `GET /api/agent/runs/{id}`(P4c) — 요약 + 상세. `error`·`instruction`은 run 프로젝트 관리자에게만 실린다 —
- * 그 밖은 null + `redacted: true`(값이 없어서 null인 것과 구분).
- */
-export interface AgentRunDetail extends AgentRunSummary {
-  projectId: string | null;
-  outputPageId: string | null;
-  attendeePersonaIds: string[];
-  rejectCount: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-  error: string | null;
-  instruction: string | null;
-  redacted: boolean;
-}
-
-/** 사무실 무효화 신호(P4c §15) — 데이터 없이 "다시 조회하라"만 알린다 */
-export type OfficeStreamReason = "run" | "gate" | "audit" | "directive" | "persona";
-
-export interface OfficeStreamEvent {
-  reason: OfficeStreamReason | null;
-  projectId: string | null;
-  at: string | null;
-}
-
-/**
- * 사무실 스트림 콜백 — `onOpen`은 연결 수립(200) 직후, `onActivity`는 바이트가 도착할 때마다(주석·heartbeat 포함,
- * 생존 판정용), `onEvent`는 `event: office` 프레임마다.
- */
-export interface OfficeStreamHandlers {
-  signal: AbortSignal;
-  onOpen: () => void;
-  onActivity: () => void;
-  onEvent: (event: OfficeStreamEvent) => void;
-}
-
-export type AgentGateKind = "MERGE" | "ESCALATION" | "PLAN";
-
-export interface AgentPendingGate {
-  id: string;
-  runId: string;
-  issueKey: string | null;
-  personaId: string;
-  kind: AgentGateKind;
-  requestSummary: string;
-  requestedAt: string;
-}
-
-export type AgentGateDecision = "APPROVE" | "REJECT";
-
-/** 게이트 감독 목록 한 건 — `GET /api/agent/gates`. 결정자·거절 사유는 서버가 주지 않는다 */
-export interface AgentGate {
-  id: string;
-  runId: string;
-  issueKey: string | null;
-  kind: AgentGateKind;
-  /** 요청 전문 */
-  request: string;
-  /** null = 아직 결정 전(pending) */
-  decision: AgentGateDecision | null;
-  requestedAt: string;
-}
-
-export interface AgentBudget {
-  monthlyCapUsd: number | null;
-  platformMonthToDateUsd: number;
-  killSwitch: boolean;
-}
-
-export interface AgentOffice {
-  personas: AgentOfficePersona[];
-  /** 최근 run — BLOCKED run은 personas[].currentRun과 여기 양쪽에 나온다(endedAt null) */
-  recentRuns: AgentRunSummary[];
-  pendingGateCount: number;
-  pendingGates: AgentPendingGate[];
-  budget: AgentBudget;
-  generatedAt: string;
-  /** 게시판 — 회의록이 보고된 완료 회의 run 최신 5건. 구 백엔드 응답이면 빈 배열 */
-  boardPosts: AgentBoardPost[];
-  /** 진행 중(RUNNING) 회의 계열 run(P3e) — 대기·차단 회의·회의 없음·구 백엔드 응답이면 null */
-  activeMeeting: AgentActiveMeeting | null;
-  /** 설치·키 상태로 켜지는 기능(P3g) — 구 백엔드 응답이면 전부 false */
-  features: AgentOfficeFeatures;
-  /**
-   * TASK가 끝나면 검증할 리뷰어가 있다(P4b D-P4b-1) — false면 AI 작업이 done이 되지 않는다("리뷰어 없음" 경고).
-   * 구 백엔드(필드 없음)는 true — 모르는 상태로 경고를 띄우지 않는다.
-   */
-  reviewReady: boolean;
-}
-
-export interface AgentOfficeFeatures {
-  /** 수다 API(`POST /api/agent/personas/{id}/chat`)가 동작 가능 — LLM 키 해석됨 + `CHAT_ENABLED` */
-  chat: boolean;
-}
-
-// ── AI 사무실 1:1 대화(P3g AGP-65) — 수다·대화 기록·USER run ──
-
-/** `POST /api/agent/runs` — 사람이 지시문을 붙여 run을 직접 요청한다(모델 생략 = 프로젝트 정책) */
-export interface AgentRunCreateInput {
-  issueKey: string;
-  instruction?: string;
-  model?: string;
-  personaSlug: string;
-  /** 생략 = 프로젝트 설정(없으면 전역 기본) */
-  executionSite?: AgentExecutionSite;
-}
-
-export type AgentChatMood = "NEUTRAL" | "THINKING" | "HAPPY" | "TROUBLED";
-
-export interface AgentChatInput {
-  /** 1~500자 */
-  message: string;
-  /** 첫 턴은 생략 — 서버가 발급해 응답에 싣는다 */
-  sessionId?: string;
-  projectId?: string;
-}
-
-/** `POST /api/agent/personas/{id}/chat` 200 — 수다는 일을 시키지 못한다: 작업 요청으로 보이면 suggest="DIRECTIVE" */
-export interface AgentChatReply {
-  sessionId: string;
-  reply: string;
-  mood: AgentChatMood | null;
-  suggest: "DIRECTIVE" | null;
-}
-
-export type AgentDialogSpeaker = "USER" | "PERSONA";
-/** SAY = 수다 한 턴(서버가 저장), STATUS = "지금 뭐 해?" 답, DIRECTIVE = 지시 코멘트, ASSIGN = USER run 생성 */
-export type AgentDialogKind = "SAY" | "STATUS" | "DIRECTIVE" | "ASSIGN";
-
-/** 대화 기록 한 줄 — 호출자 본인 기록만(관리자도 남의 기록은 못 본다) */
-export interface AgentDialogEntry {
-  id: string;
-  speaker: AgentDialogSpeaker;
-  kind: AgentDialogKind;
-  text: string;
-  issueKey: string | null;
-  runId: string | null;
-  commentId: string | null;
-  createdAt: string;
-}
-
-/** `GET /api/agent/personas/{id}/dialog` — entries는 시간순(오래된 것 먼저), 더 이전은 entries[0].id를 before로 */
-export interface AgentDialogPage {
-  entries: AgentDialogEntry[];
-  hasMore: boolean;
-}
-
-export interface AgentDialogEntryInput {
-  speaker: AgentDialogSpeaker;
-  kind: AgentDialogKind;
-  text: string;
-  issueKey?: string | null;
-  runId?: string | null;
-  commentId?: string | null;
-}
-
-/** 사무실 회의실에 앉힐 진행 중 회의(P3e). 매니저 보고는 매니저 1명 */
-export interface AgentActiveMeeting {
-  runId: string;
-  type: AgentMeetingType;
-  status: AgentRunStatus;
-  /** 안건 이슈 키 — 안건 이슈 없는 회의면 서버 합성 키 `PROJECT-<projectId>` */
-  issueKey: string | null;
-  projectId: string;
-  hostPersonaId: string;
-  /** 진행자 먼저 */
-  attendeePersonaIds: string[];
-  startedAt: string | null;
-}
-
-/**
- * 게시판 게시물(P3b D-P3b-7). 제목은 서버가 위키를 조회하지 않아 없다 — 화면은 종류 라벨 + 시각으로 그린다.
- */
-export interface AgentBoardPost {
-  runId: string;
-  type: AgentMeetingType;
-  /** 안건 이슈 키 — 안건 이슈 없는 회의(서버 합성 키 `PROJECT-<projectId>`)면 null */
-  agendaIssueKey: string | null;
-  projectId: string;
-  pageId: string;
-  /** 회의록 스페이스(서버 설정값) — 구 백엔드이거나 미설정이면 null: 위키 링크 없이 라벨만 */
-  spaceId: string | null;
-  endedAt: string;
-}
-
-/** `POST /api/agent/meetings` 요청 — MEETING·ESCALATION은 안건 이슈나 안건 지시 중 하나가 필요하다 */
-export interface AgentMeetingInput {
-  type: AgentMeetingType;
-  projectId: string;
-  agendaIssueKey?: string;
-  agenda?: string;
-  /** 생략하면 서버의 롤 기본 참석 규칙 */
-  personaSlugs?: string[];
-  /** 생략 = 프로젝트 설정(없으면 전역 기본) */
-  executionSite?: AgentExecutionSite;
-}
-
-export interface AgentMeetingAttendee {
-  personaId: string;
-  slug: string;
-  name: string;
-  role: AgentRole;
-  emoji: string | null;
-}
-
-export interface AgentMeetingCreated {
-  run: AgentRunSummary;
-  /** 첫 번째가 진행자 */
-  attendees: AgentMeetingAttendee[];
-}
-
-export interface AgentPersonaActivity {
-  personaId: string;
-  /** 최근 run 20 */
-  runs: AgentRunSummary[];
-  /** 오늘 감사 ≤ 50, 최신 먼저 */
-  todayAudits: AgentAuditEntry[];
-  todayCostUsd: number;
-}
+//
+// 도메인별 정의는 ./model/*.ts — 이 파일은 공개 표면(배럴)만 유지한다. 화면·스토어는 계속 "./types"로 import한다.
+export type {
+  User,
+  ProjectDefaultAssignee,
+  Project,
+  ComponentDefaultAssignee,
+  Component,
+  GadgetType,
+  GadgetConfig,
+  DashboardGadget,
+  Dashboard,
+  ProjectWorklogRow,
+  ProjectShortcut,
+  NotificationPreferences,
+  AutoWatchPreferences,
+  StartPage,
+  UserPreferences,
+  UserPreferencesPatch,
+  AnnouncementBanner,
+} from "./model/project";
+export type {
+  Sprint,
+  IssueStatus,
+  StatusKind,
+  StatusColor,
+  StatusCategory,
+  StatusDef,
+  BuiltinIssuePriority,
+  IssuePriority,
+  PriorityDef,
+  BuiltinIssueType,
+  IssueType,
+  IssueTypeLevel,
+  IssueTypeDef,
+  IssueResolution,
+  Issue,
+  Comment,
+  Activity,
+  Worklog,
+  ProjectRole,
+  ProjectMember,
+  VersionStatus,
+  ProjectVersion,
+  Attachment,
+  ChangeField,
+  IssueChange,
+  BuiltinIssueLinkType,
+  IssueLinkType,
+  LinkTypeDef,
+  IssueLink,
+} from "./model/issue";
+export type {
+  BoardType,
+  BoardSwimlane,
+  BoardColumn,
+  BoardFilter,
+  Board,
+} from "./model/board";
+export {
+  WORKFLOW_ANY_NODE,
+  ISSUE_FIELD_IDS,
+  ISSUE_FIELD_NAMES,
+} from "./model/settings";
+export type {
+  WorkflowStatus,
+  WorkflowTransition,
+  WorkflowLayout,
+  IssueFieldId,
+  IssueFieldConfig,
+  SettingsBody,
+  SettingsScheme,
+  ProjectSettingsEntry,
+} from "./model/settings";
+export type {
+  AuditEntry,
+  SystemStats,
+  IssueWatcher,
+  Notification,
+} from "./model/activity";
+export type {
+  JiraData,
+} from "./model/mockData";
+export type {
+  OrgProfile,
+  OrgMemberStatus,
+} from "./model/org";
+export type {
+  AgentPersona,
+  AgentPermissions,
+  AgentGrantResourceType,
+  AgentGrantRole,
+  AgentGrantInput,
+  AgentTeamPersona,
+  AgentPersonaDetail,
+  AgentPersonaPatch,
+  AgentPersonaInput,
+  AgentTokenKind,
+  AgentToken,
+  AgentTokenIssueInput,
+  AgentTokenIssued,
+  AgentExecutionSite,
+  AgentExecutionSiteSetting,
+  AgentRunnerKind,
+  AgentRunnerStatus,
+  AgentRunner,
+  AgentRunnerIssued,
+  AgentRunnerInput,
+  AgentCredentialScope,
+  AgentProjectCredential,
+  AgentReviewerSource,
+  AgentReviewerRef,
+  AgentReviewSetting,
+  AgentRunDirective,
+  AgentCredentialInput,
+} from "./model/aiTeam";
+export type {
+  AgentRole,
+  AgentRunStatus,
+  AgentActiveRunStatus,
+  AgentMeetingType,
+  AgentRunType,
+  AgentRunTrigger,
+  AgentCurrentRun,
+  AgentAuditOrigin,
+  AgentAuditEntry,
+  AgentPresence,
+  AgentOfficePersona,
+  AgentRunSummary,
+  AgentRunQuery,
+  AgentRunPage,
+  AgentRunDetail,
+  OfficeStreamReason,
+  OfficeStreamEvent,
+  OfficeStreamHandlers,
+  AgentGateKind,
+  AgentPendingGate,
+  AgentGateDecision,
+  AgentGate,
+  AgentBudget,
+  AgentOffice,
+  AgentOfficeFeatures,
+  AgentRunCreateInput,
+  AgentChatMood,
+  AgentChatInput,
+  AgentChatReply,
+  AgentDialogSpeaker,
+  AgentDialogKind,
+  AgentDialogEntry,
+  AgentDialogPage,
+  AgentDialogEntryInput,
+  AgentActiveMeeting,
+  AgentBoardPost,
+  AgentMeetingInput,
+  AgentMeetingAttendee,
+  AgentMeetingCreated,
+  AgentPersonaActivity,
+} from "./model/office";
