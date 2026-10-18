@@ -50,6 +50,10 @@ export type {
   IssueLinkType,
   LinkTypeDef,
   IssueLink,
+  WebLink,
+  WebLinkKind,
+  WebLinkInput,
+  WebLinkAdded,
 } from "./model/issue";
 export type {
   BoardType,

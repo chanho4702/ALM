@@ -223,6 +223,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     boards,
     // 데모 링크: ALM-3(상세 모달)이 ALM-2(보드 UI)를 차단
     links: [{ id: "l1", sourceId: "i3", targetId: "i2", type: "blocks" as const }],
+    webLinks: [{ id: "wl1", issueId: "i2", url: "https://github.com/chanho4702/alm-front/pull/42", title: "칸반 보드 UI PR", kind: "PR" as const, createdBy: "u2", createdAt: now }],
     // 데모 워크로그: ALM-2(예상 8h)에 2건 = 5h 기록
     worklogs: [
       { id: "w1", issueId: "i2", authorId: "u2", hours: 3, comment: "컬럼 드래그 구현", workedOn: now.slice(0, 10), at: now },

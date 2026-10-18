@@ -133,4 +133,38 @@ describe("IssueDetailModal 조회 범위 — 프로젝트 전체 이슈를 읽�
     const links = await within(copyDialog).findByTestId("issue-links");
     expect(await within(links).findByText("ALM-5")).toBeInTheDocument();
   });
+
+  it("웹 링크: 편집자는 URL·표시 이름·종류로 붙이고 새 탭으로 열린다, 같은 URL은 '이미 연결됨' (F-08)", async () => {
+    const user = userEvent.setup();
+    renderModal("ALM-1");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    const section = await within(dialog).findByTestId("issue-web-links");
+    await user.click(within(section).getByRole("button", { name: "웹 링크" }));
+    await user.type(within(section).getByLabelText("URL"), "https://wiki.example.com/design");
+    await user.type(within(section).getByLabelText("표시 이름"), "설계 문서");
+    await user.click(within(section).getByRole("button", { name: "추가" }));
+    expect(await screen.findByText("웹 링크를 추가했습니다")).toBeInTheDocument();
+    const link = await within(section).findByRole("link", { name: /설계 문서/ });
+    expect(link).toHaveAttribute("href", "https://wiki.example.com/design");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(within(link).getByTestId("web-link-kind-WEB")).toBeInTheDocument();
+    expect(link).toHaveTextContent("웹");
+
+    await user.click(within(section).getByRole("button", { name: "웹 링크" }));
+    await user.type(within(section).getByLabelText("URL"), "https://wiki.example.com/design");
+    await user.click(within(section).getByRole("button", { name: "추가" }));
+    expect(await screen.findByText("이미 연결된 링크입니다")).toBeInTheDocument();
+    expect(within(section).getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("웹 링크: 읽기 권한만 있으면 목록은 보이고 추가·삭제는 없다 (F-08)", async () => {
+    await store.updateProjectMemberRole("p1", "u2", "admin");
+    await store.updateProjectMemberRole("p1", "u1", "viewer");
+    renderModal("ALM-2"); // 시드: ALM-2에 PR 링크 1건
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    const section = await within(dialog).findByTestId("issue-web-links");
+    expect(await within(section).findByRole("link", { name: /칸반 보드 UI PR/ })).toBeInTheDocument();
+    await waitFor(() => expect(within(section).queryByRole("button", { name: "웹 링크" })).not.toBeInTheDocument());
+    expect(within(section).queryByRole("button", { name: /웹 링크 제거/ })).not.toBeInTheDocument();
+  });
 });

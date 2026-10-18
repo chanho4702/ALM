@@ -1,5 +1,5 @@
 // alm-backend REST 어댑터 — collab (jiraApi.ts에서 분할, 동작 불변)
-import type { Comment, Worklog, IssueLinkType, IssueLink, Activity, Issue, BoardType, BoardFilter, BoardColumn, BoardSwimlane, Board } from "../types";
+import type { Comment, Worklog, IssueLinkType, IssueLink, Activity, Issue, BoardType, BoardFilter, BoardColumn, BoardSwimlane, Board, WebLink, WebLinkAdded, WebLinkInput } from "../types";
 import { toBackendId, type IssueDto, mapIssue } from "../mapping";
 import { extractMentionIds } from "../richText";
 import type { IssueLinkView } from "../jiraMock";
@@ -323,4 +323,50 @@ export async function listBoardIssues(boardId: string): Promise<Issue[]> {
     await sharedApiFetch(`/api/alm/boards/${toBackendId(boardId)}/issues`),
   );
   return rows.map((row, index) => mapIssue(row, index + 1));
+}
+
+// ── 웹 링크(F-08) — `GET/POST /api/alm/issues/{id}/web-links`, `DELETE /api/alm/web-links/{id}` ──
+
+interface WebLinkDto {
+  id: number;
+  issueId: number;
+  url: string;
+  title: string | null;
+  kind: string;
+  createdBy: number;
+  createdAt: string;
+}
+
+const WEB_KINDS = ["PR", "COMMIT", "WEB"] as const;
+
+function mapWebLink(dto: WebLinkDto): WebLink {
+  return {
+    id: String(dto.id),
+    issueId: String(dto.issueId),
+    url: dto.url,
+    title: dto.title ?? null,
+    kind: (WEB_KINDS as readonly string[]).includes(dto.kind) ? (dto.kind as WebLink["kind"]) : "WEB",
+    createdBy: String(dto.createdBy),
+    createdAt: dto.createdAt,
+  };
+}
+
+export async function listWebLinks(issueId: string): Promise<WebLink[]> {
+  const rows = await json<WebLinkDto[]>(await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/web-links`));
+  return rows.map(mapWebLink);
+}
+
+/** 새 링크는 201, 같은 URL이 이미 있으면 200 + 기존 링크 → `created: false`(화면이 "이미 연결됨"을 알린다) */
+export async function addWebLink(issueId: string, input: WebLinkInput): Promise<WebLinkAdded> {
+  const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/web-links`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: input.url.trim(), title: input.title?.trim() || null, kind: input.kind ?? "WEB" }),
+  });
+  const created = response.status === 201;
+  return { link: mapWebLink(await json<WebLinkDto>(response)), created };
+}
+
+export async function removeWebLink(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/web-links/${toBackendId(id)}`, { method: "DELETE" }));
 }

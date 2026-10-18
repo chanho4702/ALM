@@ -114,6 +114,10 @@ export const listChildrenPage = impl.listChildrenPage;
 export const listIssueAncestors = impl.listIssueAncestors;
 export const addIssueLink = impl.addIssueLink;
 export const removeIssueLink = impl.removeIssueLink;
+/** 웹 링크(F-08) — PR·커밋·문서 주소. 같은 URL은 기존 것을 돌려준다(created: false) */
+export const listWebLinks = impl.listWebLinks;
+export const addWebLink = impl.addWebLink;
+export const removeWebLink = impl.removeWebLink;
 export const listIssueLinks = impl.listIssueLinks;
 export const rankIssue = impl.rankIssue;
 export const importIssues = impl.importIssues;

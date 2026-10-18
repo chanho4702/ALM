@@ -273,3 +273,30 @@ export interface IssueLink {
   targetId: string;
   type: IssueLinkType;
 }
+
+/** 웹 링크 종류(F-08) — 서버 `WEB_LINK_KINDS`. PR·커밋은 개발 도구(커밋 파서)도 붙인다 */
+export type WebLinkKind = "PR" | "COMMIT" | "WEB";
+
+/** 이슈에 붙은 외부 링크(PR·커밋·문서) — `GET /api/alm/issues/{id}/web-links` */
+export interface WebLink {
+  id: string;
+  issueId: string;
+  url: string;
+  /** 표시 이름 — 없으면 화면이 URL을 보인다 */
+  title: string | null;
+  kind: WebLinkKind;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface WebLinkInput {
+  url: string;
+  title?: string | null;
+  kind?: WebLinkKind;
+}
+
+/** 추가 결과 — 같은 URL이 이미 있으면 새로 만들지 않고 기존 것을 돌려준다(`created: false`, 서버 200) */
+export interface WebLinkAdded {
+  link: WebLink;
+  created: boolean;
+}

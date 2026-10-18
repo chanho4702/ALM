@@ -1,6 +1,6 @@
 // ALM 도메인 모델 타입 — mockData (types.ts에서 분할, 동작 불변)
 import type { User, Project, Component, Dashboard, ProjectShortcut, UserPreferences, AnnouncementBanner } from "./project";
-import type { Sprint, Issue, Comment, Activity, IssueLink, Worklog, IssueChange, ProjectMember, ProjectVersion, Attachment, StatusCategory, StatusDef, IssueTypeDef, PriorityDef, LinkTypeDef } from "./issue";
+import type { Sprint, Issue, Comment, Activity, IssueLink, WebLink, Worklog, IssueChange, ProjectMember, ProjectVersion, Attachment, StatusCategory, StatusDef, IssueTypeDef, PriorityDef, LinkTypeDef } from "./issue";
 import type { Notification, IssueWatcher } from "./activity";
 import type { Board } from "./board";
 import type { SettingsScheme, ProjectSettingsEntry } from "./settings";
@@ -16,6 +16,8 @@ export interface JiraData {
   notifications: Notification[];
   boards: Board[];
   links: IssueLink[];
+  /** 웹 링크(F-08) — 옛 저장분에는 없다(normalize가 채운다) */
+  webLinks: WebLink[];
   worklogs: Worklog[];
   /** 상태·스프린트 변경 이력 (리포트 원천) */
   changes: IssueChange[];

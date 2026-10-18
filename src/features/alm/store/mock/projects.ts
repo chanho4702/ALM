@@ -232,6 +232,7 @@ export async function purgeProject(id: string): Promise<void> {
   data.watchers = data.watchers.filter((w) => !issueIds.has(w.issueId));
   data.boards = data.boards.filter((b) => b.projectId !== id);
   data.links = data.links.filter((l) => !issueIds.has(l.sourceId) && !issueIds.has(l.targetId));
+  data.webLinks = data.webLinks.filter((w) => !issueIds.has(w.issueId));
   data.worklogs = data.worklogs.filter((w) => !issueIds.has(w.issueId));
   data.changes = data.changes.filter((c) => c.projectId !== id);
   data.members = data.members.filter((m) => m.projectId !== id);

@@ -4251,6 +4251,19 @@ th:last-child > [role="separator"] {
   gap: var(--chanho-space-100);
   align-items: end;
 }
+/* 웹 링크(F-08) — 새 탭으로 여는 외부 주소, 종류는 아이콘 + 텍스트 */
+.issue-web-link {
+  text-decoration: none;
+  color: var(--chanho-color-text-default);
+}
+.issue-web-link-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-50);
+  flex-shrink: 0;
+}
 /* 하위 이슈가 한 페이지를 넘을 때의 안내 */
 .issue-relations-more {
   margin: var(--chanho-space-50) 0 0;

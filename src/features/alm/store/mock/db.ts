@@ -306,6 +306,7 @@ function normalize(data: JiraData): JiraData {
   data.notifications ??= [];
   data.boards ??= [];
   data.links ??= [];
+  data.webLinks ??= [];
   data.worklogs ??= [];
   data.changes ??= [];
   data.members ??= [];

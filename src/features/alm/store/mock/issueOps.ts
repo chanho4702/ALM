@@ -162,6 +162,7 @@ export async function deleteIssue(id: string): Promise<void> {
   data.notifications = data.notifications.filter((n) => n.issueId !== id);
   data.watchers = data.watchers.filter((w) => w.issueId !== id);
   data.links = data.links.filter((l) => l.sourceId !== id && l.targetId !== id);
+  data.webLinks = data.webLinks.filter((w) => w.issueId !== id);
   data.worklogs = data.worklogs.filter((w) => w.issueId !== id);
   data.changes = data.changes.filter((c) => c.issueId !== id);
   data.attachments = data.attachments.filter((a) => a.issueId !== id);

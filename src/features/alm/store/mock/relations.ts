@@ -1,5 +1,5 @@
 // localStorage 목업 스토어 — relations (jiraMock.ts에서 분할, 동작 불변)
-import type { Issue, IssueLinkType, IssueLink } from "../types";
+import type { Issue, IssueLinkType, IssueLink, WebLink, WebLinkAdded, WebLinkInput, WebLinkKind } from "../types";
 import { CURRENT_USER_ID } from "../../../../mock/users";
 import { MAX_SEARCH_PAGE_SIZE } from "../issueSearch";
 import { load, clone, nextId, persist } from "./db";
@@ -208,4 +208,78 @@ export async function cloneIssue(issueId: string): Promise<Issue> {
   });
   await addIssueLink({ sourceId: copy.id, targetId: original.id, type: "clones" });
   return clone(load().issues.find((i) => i.id === copy.id) ?? copy);
+}
+
+// ── 웹 링크(F-08) — 검증 순서·문구는 alm-backend IssueLinkService(requireUrl·requireKind·normalizeTitle)와 같다 ──
+
+const WEB_LINK_KINDS: readonly WebLinkKind[] = ["PR", "COMMIT", "WEB"];
+
+function requireWebUrl(value: string): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) throw new Error("URL을 입력하세요");
+  if (trimmed.length > 500) throw new Error("URL이 너무 깁니다");
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error("URL 형식이 올바르지 않습니다");
+  }
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || !url.hostname) {
+    throw new Error("http 또는 https 주소만 붙일 수 있습니다");
+  }
+  return trimmed;
+}
+
+function requireWebKind(value: string | undefined): WebLinkKind {
+  const normalized = (value ?? "").trim().toUpperCase();
+  if (!(WEB_LINK_KINDS as readonly string[]).includes(normalized)) throw new Error(`없는 링크 종류입니다: ${value ?? ""}`);
+  return normalized as WebLinkKind;
+}
+
+function webTitle(title: string | null | undefined): string | null {
+  const trimmed = title?.trim() ?? "";
+  if (!trimmed) return null;
+  if (trimmed.length > 200) throw new Error("제목이 너무 깁니다");
+  return trimmed;
+}
+
+/** 이슈의 웹 링크(최신순) */
+export async function listWebLinks(issueId: string): Promise<WebLink[]> {
+  const data = load();
+  if (!data.issues.some((i) => i.id === issueId)) throw new Error("이슈를 찾을 수 없습니다");
+  return clone(data.webLinks.filter((w) => w.issueId === issueId).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)));
+}
+
+/** 같은 이슈에 같은 URL이 이미 있으면 새로 만들지 않고 그것을 돌려준다(`created: false`) */
+export async function addWebLink(issueId: string, input: WebLinkInput): Promise<WebLinkAdded> {
+  const data = load();
+  const issue = data.issues.find((i) => i.id === issueId);
+  if (!issue) throw new Error("이슈를 찾을 수 없습니다");
+  assertCanEdit(data, issue.projectId);
+  const url = requireWebUrl(input.url);
+  const kind = requireWebKind(input.kind ?? "WEB");
+  const existing = data.webLinks.find((w) => w.issueId === issueId && w.url === url);
+  if (existing) return { link: clone(existing), created: false };
+  const link: WebLink = {
+    id: nextId(),
+    issueId,
+    url,
+    title: webTitle(input.title),
+    kind,
+    createdBy: CURRENT_USER_ID,
+    createdAt: new Date().toISOString(),
+  };
+  data.webLinks.push(link);
+  persist();
+  return { link: clone(link), created: true };
+}
+
+export async function removeWebLink(id: string): Promise<void> {
+  const data = load();
+  const link = data.webLinks.find((w) => w.id === id);
+  if (!link) throw new Error("웹 링크를 찾을 수 없습니다");
+  const issue = data.issues.find((i) => i.id === link.issueId);
+  if (issue) assertCanEdit(data, issue.projectId);
+  data.webLinks = data.webLinks.filter((w) => w.id !== id);
+  persist();
 }

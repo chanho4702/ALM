@@ -61,6 +61,7 @@ import { Copy, Lock, Plus, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
+import { IssueWebLinks } from "./IssueWebLinks";
 import { WatchButton } from "./WatchButton";
 import { UserAvatar } from "./UserAvatar";
 import { RichTextEditor } from "./editor/RichTextEditor";
@@ -1048,6 +1049,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             ) : null}
           </section>
           ) : null}
+          {fields.links.visible ? <IssueWebLinks issueId={issue.id} canEdit={canEdit} /> : null}
         </div>
         <aside className="issue-props">
           {isBlocked ? (
