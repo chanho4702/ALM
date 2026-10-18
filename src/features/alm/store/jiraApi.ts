@@ -33,6 +33,7 @@ export {
   updateSprint,
   startSprint,
   completeSprint,
+  deleteSprint,
 } from "./api/sprints";
 export {
   listVersions,

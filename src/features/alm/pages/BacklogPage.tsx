@@ -11,13 +11,15 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Badge, Button, Spinner, TextField, useToast } from "@chanho/react";
+import { Badge, Button, ConfirmDialog, Spinner, TextField, useToast } from "@chanho/react";
 import type { Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   completeSprint,
   createIssue,
   createSprint,
   deleteIssue,
+  deleteSprint,
+  getMyProjectRole,
   listIssues,
   listProjectStatuses,
   listSprints,
@@ -62,6 +64,9 @@ export function BacklogPage() {
   /** 계획 저장 중 — 모달 입력을 잠가 저장 완료(모달 닫힘)로 그 사이 입력을 잃지 않게 한다 */
   const [sprintSaving, setSprintSaving] = useState(false);
   const [completingSprint, setCompletingSprint] = useState<Sprint | null>(null);
+  /** 스프린트 삭제(F-10)는 프로젝트 관리자만 — 서버도 403으로 막는다 */
+  const [isProjectAdmin, setIsProjectAdmin] = useState(false);
+  const [deletingSprint, setDeletingSprint] = useState<Sprint | null>(null);
   const toast = useToast();
 
   // 행 클릭(상세)과 드래그 구분: 5px 이상 움직여야 드래그 시작
@@ -85,6 +90,22 @@ export function BacklogPage() {
     void listUsers().then(setUsers);
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    let alive = true;
+    void getMyProjectRole(projectId).then(
+      (role) => {
+        if (alive) setIsProjectAdmin(role === "admin");
+      },
+      () => {
+        if (alive) setIsProjectAdmin(false);
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [projectId]);
 
   const { openIssue, issueModal } = useIssueModal(reload);
 
@@ -299,6 +320,21 @@ export function BacklogPage() {
           );
         }}
       />
+      <ConfirmDialog
+        open={deletingSprint !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingSprint(null);
+        }}
+        title={deletingSprint ? `${deletingSprint.name}을(를) 삭제할까요?` : "스프린트 삭제"}
+        description={`들어 있는 이슈 ${deletingSprint ? issues.filter((i) => i.sprintId === deletingSprint.id).length : 0}개는 원래 순서대로 백로그 맨 위로 돌아갑니다. 되돌릴 수 없습니다.`}
+        confirmLabel="삭제"
+        danger
+        onConfirm={() => {
+          const target = deletingSprint;
+          setDeletingSprint(null);
+          if (target) void run("스프린트 삭제 실패", `${target.name}을(를) 삭제했습니다`, () => deleteSprint(target.id));
+        }}
+      />
       <SprintEditModal
         sprint={editingSprint}
         conflict={sprintConflict}
@@ -329,6 +365,7 @@ export function BacklogPage() {
             onStart={(s) => void run("스프린트 시작 실패", "스프린트를 시작했습니다", () => startSprint(s.id))}
             onComplete={setCompletingSprint}
             onEditPlan={setEditingSprint}
+            onDeleteSprint={isProjectAdmin ? setDeletingSprint : undefined}
             onMove={handleMove}
             onDelete={handleDelete}
             onOpen={openIssue}

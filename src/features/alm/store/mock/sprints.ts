@@ -2,7 +2,7 @@
 import type { Sprint } from "../types";
 import { ApiError } from "../mapping";
 import { clone, load, nextId, persist } from "./db";
-import { assertCanEdit } from "./members";
+import { assertCanAdmin, assertCanEdit } from "./members";
 import { STALE_EDIT_MESSAGE } from "./issues";
 import { statusKindOf, logChange } from "./rules";
 
@@ -135,4 +135,37 @@ export async function completeSprint(
   sprint.version += 1;
   persist();
   return clone(sprint);
+}
+
+/** 서버 409 문구와 같다 — 진행 중·완료 스프린트는 지우지 않는다 */
+export const SPRINT_DELETE_PLANNED_ONLY = "예정 스프린트만 삭제할 수 있습니다";
+
+/**
+ * 예정 스프린트 삭제(F-10) — 프로젝트 관리자만. 들어 있던 이슈는 원래 순서 그대로 백로그 맨 위로 간다
+ * (서버 `DELETE /api/alm/sprints/{id}`와 같은 규칙: 204, 진행 중·완료 409, 관리자 아님 403).
+ */
+export async function deleteSprint(id: string): Promise<void> {
+  const data = load();
+  const sprint = data.sprints.find((s) => s.id === id);
+  if (!sprint) throw new ApiError(404, "스프린트를 찾을 수 없습니다");
+  assertCanAdmin(data, sprint.projectId);
+  if (sprint.state !== "planned") throw new ApiError(409, SPRINT_DELETE_PLANNED_ONLY);
+  const now = new Date().toISOString();
+  const moved = data.issues
+    .filter((i) => i.sprintId === id)
+    .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
+  const backlog = data.issues
+    .filter((i) => i.projectId === sprint.projectId && i.sprintId === null)
+    .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
+  moved.forEach((issue, index) => {
+    issue.sprintId = null;
+    issue.order = index + 1;
+    issue.updatedAt = now;
+    logChange(data, issue, "sprint", id, null, now);
+  });
+  backlog.forEach((issue, index) => {
+    issue.order = moved.length + index + 1;
+  });
+  data.sprints = data.sprints.filter((s) => s.id !== id);
+  persist();
 }

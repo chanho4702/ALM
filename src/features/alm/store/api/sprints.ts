@@ -75,3 +75,8 @@ export async function completeSprint(
   });
   return mapSprint(await json(response));
 }
+
+/** 예정 스프린트 삭제(F-10) — 204. 진행 중·완료는 409, 프로젝트 관리자가 아니면 403(서버 문구 그대로) */
+export async function deleteSprint(id: string): Promise<void> {
+  await json(await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}`, { method: "DELETE" }));
+}

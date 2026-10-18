@@ -44,7 +44,8 @@ type MockOnly =
   | "__setMockOfficeStream"
   | "__versionForTest"
   | "ISSUE_CONFLICT_MESSAGE"
-  | "AVATAR_MAX_BYTES";
+  | "AVATAR_MAX_BYTES"
+  | "SPRINT_DELETE_PLANNED_ONLY";
 
 /** 파사드 계약 = 목업 모듈의 공개 표면(테스트 훅 제외) */
 type StoreContract = Omit<typeof mock, MockOnly> & { AVATAR_MAX_BYTES: number };
@@ -85,6 +86,8 @@ export const createSprint = impl.createSprint;
 export const updateSprint = impl.updateSprint;
 export const startSprint = impl.startSprint;
 export const completeSprint = impl.completeSprint;
+/** 예정 스프린트 삭제(F-10) — 관리자만, 이슈는 백로그 맨 위로 */
+export const deleteSprint = impl.deleteSprint;
 export const listIssues = impl.listIssues;
 /** 교차 프로젝트 검색(스마트/기본 쿼리) — 서버 페이징, total은 조건 전체 건수 */
 export const queryIssuesPage = impl.queryIssuesPage;

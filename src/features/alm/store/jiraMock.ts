@@ -56,6 +56,8 @@ export {
   updateSprint,
   startSprint,
   completeSprint,
+  deleteSprint,
+  SPRINT_DELETE_PLANNED_ONLY,
 } from "./mock/sprints";
 export type {
   SprintPlanPatch,

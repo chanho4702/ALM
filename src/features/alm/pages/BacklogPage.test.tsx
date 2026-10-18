@@ -364,3 +364,42 @@ describe("BacklogPage", () => {
     expect(await screen.findByRole("dialog", { name: "ALM-6" })).toBeInTheDocument();
   });
 });
+
+describe("스프린트 삭제 (F-10)", () => {
+  it("관리자는 예정 스프린트의 ⋯ → 스프린트 삭제 → 확인으로 지우고, 이슈는 백로그 맨 위로 간다", async () => {
+    const sprint = await store.createSprint("p1");
+    await store.createIssue({ projectId: "p1", title: "예정 스프린트 이슈", sprintId: sprint.id });
+    const user = userEvent.setup();
+    renderBacklog();
+
+    const panel = await screen.findByRole("region", { name: sprint.name });
+    await user.click(within(panel).getByRole("button", { name: `${sprint.name} 메뉴` }));
+    await user.click(await screen.findByRole("menuitem", { name: /스프린트 삭제/ }));
+    const confirm = await screen.findByRole("dialog", { name: /삭제할까요/ });
+    expect(confirm).toHaveTextContent("1개는 원래 순서대로 백로그 맨 위로");
+    await user.click(within(confirm).getByRole("button", { name: "삭제" }));
+
+    expect(await screen.findByText(`${sprint.name}을(를) 삭제했습니다`)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("region", { name: sprint.name })).not.toBeInTheDocument());
+    const backlog = screen.getByRole("region", { name: "백로그 목록" });
+    expect(within(backlog).getByText("예정 스프린트 이슈")).toBeInTheDocument();
+  });
+
+  it("진행 중 스프린트의 삭제 항목은 비활성이다", async () => {
+    const user = userEvent.setup();
+    renderBacklog();
+    const panel = await screen.findByRole("region", { name: "Sprint 1" }); // 시드: 진행 중
+    await user.click(within(panel).getByRole("button", { name: "Sprint 1 메뉴" }));
+    const item = await screen.findByRole("menuitem", { name: /스프린트 삭제/ });
+    expect(item).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("관리자가 아니면 ⋯ 메뉴 자체가 없다", async () => {
+    await store.updateProjectMemberRole("p1", "u2", "admin");
+    await store.updateProjectMemberRole("p1", "u1", "editor");
+    renderBacklog();
+    const panel = await screen.findByRole("region", { name: "Sprint 1" });
+    await screen.findByText("ALM-1");
+    expect(within(panel).queryByRole("button", { name: "Sprint 1 메뉴" })).not.toBeInTheDocument();
+  });
+});

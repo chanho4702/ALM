@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -189,6 +189,8 @@ export interface SprintPanelProps {
   onComplete: (sprint: Sprint) => void;
   /** 계획 메타(이름·목표·기간) 편집 열기 */
   onEditPlan: (sprint: Sprint) => void;
+  /** 스프린트 삭제(F-10) — 프로젝트 관리자에게만 넘긴다. 없으면 ⋯ 메뉴가 없다 */
+  onDeleteSprint?: (sprint: Sprint) => void;
   onMove: (issue: Issue, sprintId: string | null) => void;
   onDelete: (issue: Issue) => void;
   onOpen: (key: string) => void;
@@ -204,6 +206,7 @@ export function SprintPanel({
   onStart,
   onComplete,
   onEditPlan,
+  onDeleteSprint,
   onMove,
   onDelete,
   onOpen,
@@ -235,6 +238,25 @@ export function SprintPanel({
             <Button size="small" variant="secondary" onClick={() => onComplete(sprint)}>
               스프린트 완료
             </Button>
+          ) : null}
+          {onDeleteSprint ? (
+            <Dropdown
+              trigger={
+                <Button variant="subtle" size="small" iconOnly aria-label={`${sprint.name} 메뉴`}>
+                  <MoreHorizontal size={16} />
+                </Button>
+              }
+              items={[
+                {
+                  label: "스프린트 삭제",
+                  description: sprint.state === "planned" ? "이슈는 백로그 맨 위로 돌아갑니다" : "예정 스프린트만 삭제할 수 있습니다",
+                  icon: <Trash2 size={14} />,
+                  danger: true,
+                  disabled: sprint.state !== "planned",
+                  onSelect: () => onDeleteSprint(sprint),
+                },
+              ]}
+            />
           ) : null}
         </div>
       </header>
