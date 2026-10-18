@@ -298,3 +298,11 @@ export async function updateIssue(id: string, patch: IssuePatch, expectedVersion
   });
   return mapIssue(await json(response));
 }
+
+/**
+ * 이슈 복제(F-11) — `POST /api/alm/issues/{id}/clone`(본문 없음) → 201 새 이슈. 무엇을 복사할지는 서버가 정한다
+ * (제목 "복제: " 접두·처음 상태, 담당자·스프린트·마감·추정·수정 버전·댓글·워크로그·첨부 제외, 원본과 clones 링크).
+ */
+export async function cloneIssue(issueId: string): Promise<Issue> {
+  return mapIssue(await json(await sharedApiFetch(`/api/alm/issues/${toBackendId(issueId)}/clone`, { method: "POST" })));
+}

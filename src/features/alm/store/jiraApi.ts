@@ -21,6 +21,7 @@ export {
   queryIssuesPage,
   createIssue,
   updateIssue,
+  cloneIssue,
 } from "./api/issues";
 export type {
   IssueFilter,

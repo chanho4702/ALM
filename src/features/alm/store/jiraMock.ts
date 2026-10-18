@@ -83,6 +83,8 @@ export {
   listChildrenPage,
   listChildren,
   addIssueLink,
+  cloneIssue,
+  CLONE_TITLE_PREFIX,
   removeIssueLink,
   listIssueLinks,
   rankIssue,

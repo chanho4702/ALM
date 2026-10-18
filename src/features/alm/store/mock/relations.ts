@@ -3,7 +3,7 @@ import type { Issue, IssueLinkType, IssueLink } from "../types";
 import { CURRENT_USER_ID } from "../../../../mock/users";
 import { MAX_SEARCH_PAGE_SIZE } from "../issueSearch";
 import { load, clone, nextId, persist } from "./db";
-import { assertIssueVersion } from "./issues";
+import { assertIssueVersion, createIssue } from "./issues";
 import { assertParentAllowed, linkTypeDefOf, isSymmetric, recordChanges } from "./rules";
 import type { IssuePage } from "./search";
 import { assertCanEdit } from "./members";
@@ -183,4 +183,29 @@ export async function rankIssue(
   recordChanges(data, before, issue, issue.updatedAt); // sprint 변경 활동로그
   persist();
   return clone(issue);
+}
+
+/** 복제본 제목 접두 — 서버와 같다 */
+export const CLONE_TITLE_PREFIX = "복제: ";
+
+/**
+ * 이슈 복제(F-11) — 서버 `POST /api/alm/issues/{id}/clone`과 같은 규칙. 복사: 제목("복제: " 접두)·타입·본문·우선순위·
+ * 라벨·컴포넌트·부모. 복사하지 않음: 담당자·스프린트·마감·추정·수정 버전·댓글·워크로그·첨부, 상태는 워크플로 첫 상태.
+ * 원본과 "복제" 링크(source = 복제본)로 잇는다. 편집 권한이 필요하다.
+ */
+export async function cloneIssue(issueId: string): Promise<Issue> {
+  const original = load().issues.find((i) => i.id === issueId);
+  if (!original) throw new Error("이슈를 찾을 수 없습니다");
+  const copy = await createIssue({
+    projectId: original.projectId,
+    title: `${CLONE_TITLE_PREFIX}${original.title}`,
+    description: original.description,
+    type: original.type,
+    priority: original.priority,
+    labels: [...original.labels],
+    componentIds: [...(original.componentIds ?? [])],
+    parentId: original.parentId,
+  });
+  await addIssueLink({ sourceId: copy.id, targetId: original.id, type: "clones" });
+  return clone(load().issues.find((i) => i.id === copy.id) ?? copy);
 }

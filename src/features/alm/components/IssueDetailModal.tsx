@@ -26,6 +26,7 @@ import {
   deleteComment,
   deleteIssue,
   archiveIssue,
+  cloneIssue,
   deleteWorklog,
   getCurrentUser,
   getIssueByKey,
@@ -56,7 +57,7 @@ import { PriorityGlyph } from "./PriorityGlyph";
 import { ResolutionGlyph } from "./ResolutionGlyph";
 import { StatusGlyph } from "./StatusGlyph";
 import { useIssueTypes } from "./useIssueTypes";
-import { Lock, Plus, UserRound } from "lucide-react";
+import { Copy, Lock, Plus, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
@@ -1327,6 +1328,31 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             <dd>{formatDateTime(issue.updatedAt)}</dd>
           </dl>
           <div className="issue-danger-actions">
+            {canEdit ? (
+              <Button
+                variant="secondary"
+                size="small"
+                iconBefore={<Copy size={14} />}
+                onClick={() =>
+                  void (async () => {
+                    try {
+                      const copy = await cloneIssue(issue.id);
+                      toast({ title: `${issue.key}을(를) ${copy.key}(으)로 복제했습니다`, appearance: "success" });
+                      await onIssueChanged();
+                      switchIssue(copy.key);
+                    } catch (error) {
+                      toast({
+                        title: "복제 실패",
+                        description: error instanceof Error ? error.message : String(error),
+                        appearance: "danger",
+                      });
+                    }
+                  })()
+                }
+              >
+                복제
+              </Button>
+            ) : null}
             <Button
               variant="secondary"
               size="small"

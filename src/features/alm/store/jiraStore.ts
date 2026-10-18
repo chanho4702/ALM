@@ -45,7 +45,8 @@ type MockOnly =
   | "__versionForTest"
   | "ISSUE_CONFLICT_MESSAGE"
   | "AVATAR_MAX_BYTES"
-  | "SPRINT_DELETE_PLANNED_ONLY";
+  | "SPRINT_DELETE_PLANNED_ONLY"
+  | "CLONE_TITLE_PREFIX";
 
 /** 파사드 계약 = 목업 모듈의 공개 표면(테스트 훅 제외) */
 type StoreContract = Omit<typeof mock, MockOnly> & { AVATAR_MAX_BYTES: number };
@@ -99,6 +100,8 @@ export const searchIssues = impl.searchIssues;
 export const getIssueByKey = impl.getIssueByKey;
 export const createIssue = impl.createIssue;
 export const updateIssue = impl.updateIssue;
+/** 이슈 복제(F-11) — 새 이슈를 돌려준다(처음 상태, 원본과 "복제" 링크) */
+export const cloneIssue = impl.cloneIssue;
 export const moveIssue = impl.moveIssue;
 export const listWorklogs = impl.listWorklogs;
 export const addWorklog = impl.addWorklog;

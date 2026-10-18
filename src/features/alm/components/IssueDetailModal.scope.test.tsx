@@ -112,4 +112,25 @@ describe("IssueDetailModal 조회 범위 — 프로젝트 전체 이슈를 읽�
     expect(children).toHaveTextContent("(완료 150/450)");
     expect(aggregate).toHaveBeenCalledWith({ parentId: "i4" }, "statusCategory");
   });
+
+  it("복제하면 새 이슈로 넘어가고, 원본과 '복제' 링크로 이어진다 (F-11)", async () => {
+    const user = userEvent.setup();
+    let current = "ALM-5";
+    const view = render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/projects/p1/board?issue=ALM-5"]}>
+          <IssueDetailModal issueKey={current} onClose={() => undefined} onIssueChanged={() => undefined} />
+        </MemoryRouter>
+      </ToastProvider>,
+    );
+    const dialog = await screen.findByRole("dialog", { name: "ALM-5" });
+    await user.click(await within(dialog).findByRole("button", { name: "복제" }));
+    const toast = await screen.findByText(/ALM-5을\(를\) ALM-\d+\(으\)로 복제했습니다/);
+    current = /(ALM-\d+)\(으\)로/.exec(toast.textContent ?? "")![1];
+    view.unmount();
+    renderModal(current);
+    const copyDialog = await screen.findByRole("dialog", { name: current });
+    const links = await within(copyDialog).findByTestId("issue-links");
+    expect(await within(links).findByText("ALM-5")).toBeInTheDocument();
+  });
 });
