@@ -3,12 +3,9 @@ import type { AgentGate, AgentRunSummary } from "../store/types";
 import {
   canCancel,
   canResume,
-  filterRuns,
   gatesForPersona,
-  issueProjectKey,
   personaDisplay,
   runLineage,
-  sortRunsNewestFirst,
 } from "./runModel";
 
 function run(id: string, extra: Partial<AgentRunSummary> = {}): AgentRunSummary {
@@ -37,50 +34,6 @@ describe("runModel — 액션 노출(서버 CANCELLABLE·RESUMABLE과 같음)", 
     expect(canResume("FAILED")).toBe(true);
     expect(canResume("RUNNING")).toBe(false);
     expect(canResume("WAITING_APPROVAL")).toBe(false);
-  });
-});
-
-describe("runModel — 필터", () => {
-  const runs = [
-    run("1", { issueKey: "ALM-4", status: "RUNNING" }),
-    run("2", { issueKey: "ALM-12", status: "BLOCKED" }),
-    run("3", { issueKey: "WEB-2", status: "DONE" }),
-    run("4", { issueKey: null, status: "CANCELLED" }),
-    run("5", { issueKey: "ALM-7", status: "FAILED" }),
-  ];
-
-  it("이슈키 접두어로 프로젝트 키를 뽑는다", () => {
-    expect(issueProjectKey("ALM-12")).toBe("ALM");
-    expect(issueProjectKey("MY-APP-3")).toBe("MY-APP");
-    expect(issueProjectKey("nokey")).toBeNull();
-    expect(issueProjectKey(null)).toBeNull();
-  });
-
-  it("프로젝트 범위는 접두어가 맞는 run만(이슈 없는 run 제외), 전체면 모두", () => {
-    expect(filterRuns(runs, { group: "all", projectKey: "ALM" }).map((r) => r.id)).toEqual(["1", "2", "5"]);
-    expect(filterRuns(runs, { group: "all", projectKey: null })).toHaveLength(5);
-    // 안건 이슈 없는 회의(합성 키)는 라우트 projectId와 정확히 같을 때만 이 프로젝트 run
-    const wide = [
-      { ...runs[0], id: "w1", type: "RETRO" as const, issueKey: "PROJECT-3" },
-      { ...runs[0], id: "w2", type: "RETRO" as const, issueKey: "PROJECT-4" },
-    ];
-    expect(filterRuns(wide, { group: "all", projectKey: "ALM", projectId: "3" }).map((r) => r.id)).toEqual(["w1"]);
-    expect(filterRuns(wide, { group: "all", projectKey: "ALM" })).toHaveLength(0);
-  });
-
-  it("활성 = 끝나지 않은 run(BLOCKED 포함), 종결 = DONE·FAILED·CANCELLED", () => {
-    expect(filterRuns(runs, { group: "active", projectKey: null }).map((r) => r.id)).toEqual(["1", "2"]);
-    expect(filterRuns(runs, { group: "finished", projectKey: null }).map((r) => r.id)).toEqual(["3", "4", "5"]);
-  });
-
-  it("최신 먼저 — 시작 전(대기열) run이 맨 위, 같으면 id 큰 것", () => {
-    const sorted = sortRunsNewestFirst([
-      run("10", { startedAt: "2026-09-26T01:00:00Z" }),
-      run("11", { startedAt: null }),
-      run("12", { startedAt: "2026-09-26T02:00:00Z" }),
-      run("13", { startedAt: "2026-09-26T01:00:00Z" }),
-    ]);
-    expect(sorted.map((r) => r.id)).toEqual(["11", "12", "13", "10"]);
   });
 });
 

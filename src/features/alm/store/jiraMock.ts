@@ -39,6 +39,11 @@ import type {
   AgentPersonaActivity,
   AgentRunSummary,
   AgentRunStatus,
+  AgentRunDetail,
+  AgentRunPage,
+  AgentRunQuery,
+  OfficeStreamHandlers,
+  OfficeStreamReason,
   AgentCurrentRun,
   AgentGate,
   AgentGateDecision,
@@ -104,7 +109,8 @@ import {
   type IssueSearchCriteria,
   type IssueSort,
 } from "./issueSearch";
-import { projectWideIssueKey } from "./agentMapping";
+import { AGENT_RUN_PAGE_SIZE, projectWideIssueKey } from "./agentMapping";
+import { OfficeStreamError } from "./officeStream";
 import { ApiError } from "./mapping";
 import { getTemplate } from "./projectTemplates";
 import { assertAttachmentSize } from "./attachmentLimits";
@@ -575,6 +581,8 @@ export function __resetForTest(): void {
   cache = null;
   agentState = freshAgentState();
   teamState = freshTeamState();
+  mockOfficeStreamOn = false;
+  mockOfficeListeners.clear();
 }
 
 /** 저장된 아바타(dataURL)를 붙여 돌려준다 — 없으면 null(화면은 이니셜 아바타로 떨어진다) */
@@ -2612,11 +2620,13 @@ interface AgentMockState {
   decisions: Map<string, AgentGateDecision>;
   /** 프로젝트 → 소집된 회의 run id — 그 run이 아직 활성이면 같은 프로젝트 재소집은 409 */
   meetings: Map<string, string>;
+  /** 사람 지시문(USER run) — 상세 API는 관리자에게만 싣는다 */
+  instructions: Map<string, string>;
   seq: number;
 }
 
 function freshAgentState(): AgentMockState {
-  return { closed: new Map(), added: [], decisions: new Map(), meetings: new Map(), seq: 9100 };
+  return { closed: new Map(), added: [], decisions: new Map(), meetings: new Map(), instructions: new Map(), seq: 9100 };
 }
 
 let agentState: AgentMockState = freshAgentState();
@@ -2712,6 +2722,7 @@ function mockGates(now: number): AgentGate[] {
 }
 
 function closeRun(run: AgentRunSummary, now: number): void {
+  notifyMockOffice("run");
   agentState.closed.set(run.id, { status: "CANCELLED", endedAt: new Date(now).toISOString() });
 }
 
@@ -2733,9 +2744,103 @@ function requireRun(now: number, runId: string): AgentRunSummary {
   return run;
 }
 
-export async function fetchAgentRuns(status?: AgentRunStatus): Promise<AgentRunSummary[]> {
-  const runs = mockAllRuns(Date.now());
-  return status ? runs.filter((r) => r.status === status) : runs;
+/** 목업 run의 프로젝트 — 서버는 run.project_id로 거르지만 목업 run에는 없어 이슈키 접두어·합성 키로 맞춘다 */
+function mockRunInProject(run: AgentRunSummary, projectId: string): boolean {
+  if (run.issueKey === projectWideIssueKey(projectId)) return true;
+  const key = load().projects.find((p) => p.id === projectId)?.key;
+  const dash = run.issueKey?.lastIndexOf("-") ?? -1;
+  return !!key && !!run.issueKey && dash > 0 && run.issueKey.slice(0, dash).toUpperCase() === key.toUpperCase();
+}
+
+/** 서버 `GET /api/agent/runs` — 조건 AND, id 내림차순, size 1~100 밖이면 400 */
+export async function fetchAgentRuns(query: AgentRunQuery = {}): Promise<AgentRunPage> {
+  const page = query.page ?? 0;
+  const size = query.size ?? AGENT_RUN_PAGE_SIZE;
+  if (size < 1 || size > 100) throw new ApiError(400, "size는 1~100이어야 합니다");
+  if (page < 0) throw new ApiError(400, "page는 0 이상이어야 합니다");
+  const all = mockAllRuns(Date.now()).filter(
+    (r) =>
+      (!query.status || r.status === query.status) &&
+      (!query.personaId || r.personaId === query.personaId) &&
+      (!query.type || r.type === query.type) &&
+      (!query.projectId || mockRunInProject(r, query.projectId)),
+  );
+  return {
+    items: all.slice(page * size, (page + 1) * size),
+    page,
+    size,
+    total: all.length,
+    hasNext: (page + 1) * size < all.length,
+  };
+}
+
+/** 목업 run 오류 로그 — 실패·차단 run만 */
+const MOCK_RUN_ERRORS: Record<string, string> = {
+  "9004": "claude 워커 종료 코드 1 — 테스트 3건 실패(IssueSearchTest)\n재시도 전 사람 확인이 필요합니다",
+  "8983": "빌드 실패: gradle compileJava — 심볼을 찾을 수 없습니다(IssueRepository.findByKey)",
+  "8982": "워커 시간 초과(45분)",
+};
+
+/** 서버 `GET /api/agent/runs/{id}` — error·instruction은 관리자에게만(그 밖은 null + redacted) */
+export async function fetchAgentRun(runId: string): Promise<AgentRunDetail> {
+  const now = Date.now();
+  const run = mockAllRuns(now).find((r) => r.id === runId);
+  if (!run) throw new ApiError(404, `run을 찾을 수 없습니다: ${runId}`);
+  const manager = teamState.permissions.canManage;
+  const meeting = agentState.meetings.size > 0 ? [...agentState.meetings.entries()].find(([, id]) => id === runId) : undefined;
+  return {
+    ...run,
+    projectId: meeting ? meeting[0] : "p1",
+    outputPageId: null,
+    attendeePersonaIds: [],
+    rejectCount: 0,
+    createdAt: run.startedAt,
+    updatedAt: run.endedAt ?? run.startedAt,
+    error: manager ? (MOCK_RUN_ERRORS[runId] ?? null) : null,
+    instruction: manager ? (agentState.instructions.get(runId) ?? null) : null,
+    redacted: !manager,
+  };
+}
+
+// ── 사무실 무효화 스트림(목업, P4c §15) — 목업 변경(취소·재개·결정·요청·지시)마다 신호를 흉내 낸다 ──
+// 테스트는 기본으로 스트림이 없는 환경(= 폴링)이다. 목업 dev 서버는 실시간으로 보인다.
+
+const mockOfficeListeners = new Set<(reason: OfficeStreamReason) => void>();
+let mockOfficeStreamOn = import.meta.env.MODE !== "test";
+
+function notifyMockOffice(reason: OfficeStreamReason): void {
+  // 서버처럼 커밋 뒤에 흐른다 — 변경을 마친 다음 틱
+  setTimeout(() => {
+    for (const listener of mockOfficeListeners) listener(reason);
+  }, 0);
+}
+
+/** 테스트 전용 — 목업 스트림을 켜고 끈다(`__resetForTest`가 끈다) */
+export function __setMockOfficeStream(on: boolean): void {
+  mockOfficeStreamOn = on;
+}
+
+export async function streamOffice(_projectId: string | undefined, handlers: OfficeStreamHandlers): Promise<void> {
+  if (!mockOfficeStreamOn) throw new OfficeStreamError("unsupported", 404);
+  const { signal } = handlers;
+  if (signal.aborted) throw new DOMException("aborted", "AbortError");
+  handlers.onOpen();
+  handlers.onActivity();
+  const listener = (reason: OfficeStreamReason) => {
+    handlers.onActivity();
+    handlers.onEvent({ reason, projectId: null, at: new Date().toISOString() });
+  };
+  mockOfficeListeners.add(listener);
+  // 서버 heartbeat(15초) — 생존 판정(45초)이 목업 스트림을 죽이지 않게
+  const heartbeat = setInterval(() => handlers.onActivity(), 15_000);
+  try {
+    await new Promise<never>((_, reject) => {
+      signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    });
+  } finally {
+    clearInterval(heartbeat);
+    mockOfficeListeners.delete(listener);
+  }
 }
 
 export async function cancelRun(runId: string): Promise<void> {
@@ -2853,6 +2958,7 @@ export async function createMeeting(input: AgentMeetingInput): Promise<AgentMeet
   };
   agentState.added.push(run);
   agentState.meetings.set(input.projectId, run.id);
+  notifyMockOffice("run");
   return {
     run: { ...run },
     attendees: attendees.map((p) => ({ personaId: p.id, slug: p.slug, name: p.name, role: p.role, emoji: p.emoji })),
@@ -3628,6 +3734,7 @@ export async function sendRunDirective(runId: string, text: string): Promise<Age
   const list = teamState.directives.get(runId) ?? [];
   list.push(directive);
   teamState.directives.set(runId, list);
+  notifyMockOffice("directive");
   return directiveView(directive, true);
 }
 
@@ -3672,6 +3779,9 @@ export async function createAgentRun(input: AgentRunCreateInput): Promise<AgentR
     runnerId: null,
   };
   agentState.added.push(run);
+  const instruction = input.instruction?.trim();
+  if (instruction) agentState.instructions.set(run.id, instruction);
+  notifyMockOffice("run");
   return { ...run };
 }
 

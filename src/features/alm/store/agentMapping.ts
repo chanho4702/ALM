@@ -34,7 +34,10 @@ import type {
   AgentReviewerSource,
   AgentReviewSetting,
   AgentRole,
+  AgentRunDetail,
   AgentRunDirective,
+  AgentRunPage,
+  AgentRunQuery,
   AgentRunStatus,
   AgentRunSummary,
   AgentRunTrigger,
@@ -45,6 +48,8 @@ import type {
   AgentTeamPersona,
   AgentToken,
   AgentTokenIssued,
+  OfficeStreamEvent,
+  OfficeStreamReason,
 } from "./types";
 
 type Id = number | string;
@@ -107,6 +112,28 @@ export interface AgentRunSummaryDto {
   /** P4a — 구 백엔드는 없다 */
   executionSite?: string | null;
   runnerId?: Id | null;
+}
+
+/** P4c `GET /api/agent/runs` 페이지 객체 — 그 이전 서버는 배열 전체 */
+export interface AgentRunPageDto {
+  items?: AgentRunSummaryDto[] | null;
+  page?: number | null;
+  size?: number | null;
+  total?: number | null;
+  hasNext?: boolean | null;
+}
+
+/** P4c `GET /api/agent/runs/{id}` */
+export interface AgentRunDetailDto extends AgentRunSummaryDto {
+  projectId?: Id | null;
+  outputPageId?: Id | null;
+  attendeePersonaIds?: Id[] | null;
+  rejectCount?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  error?: string | null;
+  instruction?: string | null;
+  redacted?: boolean | null;
 }
 
 export interface AgentPendingGateDto {
@@ -289,6 +316,88 @@ export function mapAgentRunSummary(dto: AgentRunSummaryDto): AgentRunSummary {
     parentRunId: dto.parentRunId === null || dto.parentRunId === undefined ? null : String(dto.parentRunId),
     executionSite: executionSiteOf(dto.executionSite),
     runnerId: dto.runnerId === null || dto.runnerId === undefined ? null : String(dto.runnerId),
+  };
+}
+
+/** run 목록 한 페이지 기본 크기 — 서버 기본(20)과 같다 */
+export const AGENT_RUN_PAGE_SIZE = 20;
+
+const optionalId = (value: Id | null | undefined): string | null =>
+  value === null || value === undefined ? null : String(value);
+
+const count = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+
+/**
+ * `GET /api/agent/runs` 응답 → 한 페이지. P4c 서버는 `{items, page, size, total, hasNext}`, 그 이전 서버는 배열 전체를
+ * 준다 — 배포 순서와 무관하게 화면이 같은 모양을 받도록 둘 다 읽는다. 배열이면 구 서버가 보지 않던 조건(persona·type)을
+ * 여기서 거르고 id 내림차순으로 잘라 페이지를 만든다. 구 서버는 프로젝트 축이 없어 projectId는 거르지 못한다(전역 목록).
+ */
+export function mapAgentRunPage(body: unknown, query: AgentRunQuery = {}): AgentRunPage {
+  const page = Math.max(0, query.page ?? 0);
+  const size = query.size ?? AGENT_RUN_PAGE_SIZE;
+  if (Array.isArray(body)) {
+    const all = (body as AgentRunSummaryDto[])
+      .map(mapAgentRunSummary)
+      .filter(
+        (r) =>
+          (!query.status || r.status === query.status) &&
+          (!query.personaId || r.personaId === query.personaId) &&
+          (!query.type || r.type === query.type),
+      )
+      .sort((a, b) => Number(b.id) - Number(a.id));
+    const items = all.slice(page * size, (page + 1) * size);
+    return { items, page, size, total: all.length, hasNext: (page + 1) * size < all.length };
+  }
+  const dto = (body ?? {}) as AgentRunPageDto;
+  const items = (Array.isArray(dto.items) ? dto.items : []).map(mapAgentRunSummary);
+  const resolvedPage = count(dto.page, page);
+  const resolvedSize = count(dto.size, size) || size;
+  const total = count(dto.total, items.length);
+  return {
+    items,
+    page: resolvedPage,
+    size: resolvedSize,
+    total,
+    hasNext: typeof dto.hasNext === "boolean" ? dto.hasNext : (resolvedPage + 1) * resolvedSize < total,
+  };
+}
+
+/** `GET /api/agent/runs/{id}` — 가림(`redacted`)은 서버 판정 그대로. 필드가 빠진 응답은 안전한 빈 값으로 */
+export function mapAgentRunDetail(dto: AgentRunDetailDto): AgentRunDetail {
+  return {
+    ...mapAgentRunSummary(dto),
+    projectId: optionalId(dto.projectId),
+    outputPageId: optionalId(dto.outputPageId),
+    attendeePersonaIds: Array.isArray(dto.attendeePersonaIds) ? dto.attendeePersonaIds.map(String) : [],
+    rejectCount: count(dto.rejectCount, 0),
+    createdAt: dto.createdAt ?? null,
+    updatedAt: dto.updatedAt ?? null,
+    error: typeof dto.error === "string" ? dto.error : null,
+    instruction: typeof dto.instruction === "string" ? dto.instruction : null,
+    redacted: dto.redacted === true,
+  };
+}
+
+const OFFICE_REASONS: readonly OfficeStreamReason[] = ["run", "gate", "audit", "directive", "persona"];
+
+/** 사무실 스트림 `data:` 한 건 — JSON이 아니면 null(그래도 "뭔가 바뀌었다"로 보고 재조회할지는 호출측이 정한다) */
+export function mapOfficeStreamEvent(data: string): OfficeStreamEvent | null {
+  let body: unknown;
+  try {
+    body = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  if (!body || typeof body !== "object") return null;
+  const dto = body as { reason?: unknown; projectId?: unknown; at?: unknown };
+  return {
+    reason: OFFICE_REASONS.includes(dto.reason as OfficeStreamReason) ? (dto.reason as OfficeStreamReason) : null,
+    projectId:
+      typeof dto.projectId === "number" || (typeof dto.projectId === "string" && dto.projectId)
+        ? String(dto.projectId)
+        : null,
+    at: typeof dto.at === "string" ? dto.at : null,
   };
 }
 

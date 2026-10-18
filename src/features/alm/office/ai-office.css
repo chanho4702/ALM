@@ -2279,3 +2279,11 @@ button.office-attendee:focus-visible {
 .office-panel-directive {
   color: var(--chanho-color-text-warning);
 }
+
+/* 갱신 방식 표지(P4c) — 실시간/폴링 */
+.ai-office-stream {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-regular);
+}

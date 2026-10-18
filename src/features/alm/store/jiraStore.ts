@@ -120,6 +120,10 @@ export const fetchAgentPersonas = impl.fetchAgentPersonas;
 export const fetchOffice = impl.fetchOffice;
 export const fetchPersonaActivity = impl.fetchPersonaActivity;
 export const fetchAgentRuns = impl.fetchAgentRuns;
+/** run 단건(P4c) — 구 백엔드는 404/405라 화면이 목록 조회로 폴백한다 */
+export const fetchAgentRun = impl.fetchAgentRun;
+/** 사무실 무효화 스트림(P4c) — 목업 테스트는 스트림 없음(`unsupported`)이 기본 */
+export const streamOffice = impl.streamOffice;
 export const cancelRun = impl.cancelRun;
 export const resumeRun = impl.resumeRun;
 export const fetchAgentGates = impl.fetchAgentGates;
@@ -160,6 +164,7 @@ export const savePersonaDialog = impl.savePersonaDialog;
 export const __setAgentMockScenario = mock.__setAgentMockScenario;
 /** 테스트 전용 — 목업에 저장된 현재 편집 버전(동시 편집과 무관한 테스트의 저장용) */
 export const __versionForTest = mock.__versionForTest;
+export const __setMockOfficeStream = mock.__setMockOfficeStream;
 export type { AgentMockScenario } from "./jiraMock";
 export const listIssuesPage = impl.listIssuesPage;
 export const listWatchers = impl.listWatchers;

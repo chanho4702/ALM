@@ -1,9 +1,10 @@
 import { useCallback, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { Button, EmptyState } from "@chanho/react";
-import { CornerDownRight, GitFork, Inbox, Play, CircleSlash } from "lucide-react";
-import type { AgentRunSummary } from "../store/types";
-import { cancelRun, fetchAgentRuns, resumeRun } from "../store/jiraStore";
+import { CornerDownRight, FileText, GitFork, Inbox, Lock, Play, CircleSlash } from "lucide-react";
+import type { AgentRunDetail, AgentRunSummary } from "../store/types";
+import { cancelRun, fetchAgentRun, fetchAgentRuns, resumeRun } from "../store/jiraStore";
+import { errorStatus } from "../store/mapping";
 import {
   AGENT_RUN_STATUS_LABEL,
   AGENT_RUN_TYPE_LABEL,
@@ -15,7 +16,7 @@ import {
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
 import { useAgentPermissions } from "../components/useAgentPermissions";
-import { canCancel, canResume, personaDisplay, runLineage } from "./runModel";
+import { canCancel, canResume, personaDisplay, runLineage, RUN_LOOKUP_SIZE } from "./runModel";
 import { linkableIssueKey, PROJECT_WIDE_LABEL } from "./officeModel";
 import {
   AiTeamGate,
@@ -28,8 +29,10 @@ import { usePolledLoad } from "./usePolledLoad";
 import { RunDirectivesSection } from "./RunDirectives";
 
 /**
- * 실행 상세(P3a AGP-12) — `/projects/:projectId/ai-office/runs/:runId`. 상세 전용 API가 없어 목록 요약에서
- * 찾는다(요약 필드 전부 + 계보). 서버가 주지 않는 에러 로그·산출물 링크는 그리지 않는다.
+ * 실행 상세(P3a AGP-12 · P4c D-P4c-1) — `/projects/:projectId/ai-office/runs/:runId`. 단건 API(`GET /runs/{id}`)로
+ * 요약 + 지시문·오류 로그를 받고, 계보(부모·파생·같은 이슈 시도)는 최신 run 목록 한 페이지(100건)에서 맞춘다.
+ * 구 백엔드(단건 경로 없음 → 404/405)면 목록에서 찾는다 — 그때는 지시·오류 구획을 그리지 않는다.
+ * 지시문·오류는 서버가 run 프로젝트 관리자에게만 싣는다(그 밖은 `redacted` → "(관리자만 볼 수 있음)").
  * 관리자 액션(취소·재개)은 이 프로젝트를 관리할 수 있는 사람(`canManage` — 전역 관리자 또는 프로젝트 ADMIN)에게만
  * 보이고, 최종 판정은 서버가 run의 프로젝트로 다시 한다(403·409 → 토스트).
  */
@@ -58,14 +61,51 @@ function durationText(run: AgentRunSummary): string | null {
   return minutes < 60 ? `${minutes}분` : `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
 }
 
+interface RunDetailData {
+  run: AgentRunSummary | null;
+  /** 단건 API 응답 — 구 백엔드면 null */
+  detail: AgentRunDetail | null;
+  runs: AgentRunSummary[];
+}
+
+const REDACTED_LABEL = "(관리자만 볼 수 있음)";
+
+/** 지시문·오류 칸 — 가림(서버 판정)과 값 없음을 구분해 보여 준다 */
+function RedactableText({ value, redacted, empty }: { value: string | null; redacted: boolean; empty: string }) {
+  if (redacted) {
+    return (
+      <span className="agent-sup-subtle status-cell">
+        <Lock size={12} aria-hidden />
+        {REDACTED_LABEL}
+      </span>
+    );
+  }
+  if (!value) return <span className="agent-sup-subtle">{empty}</span>;
+  return <pre className="agent-run-log">{value}</pre>;
+}
+
 function AgentRunDetail() {
   const { projectId = "", runId = "" } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { canManage } = useAgentPermissions(projectId);
   const personas = usePersonaDirectory();
-  const loadRuns = useCallback(() => fetchAgentRuns(), []);
-  const load = usePolledLoad(loadRuns);
+  const loadDetail = useCallback(async (): Promise<RunDetailData> => {
+    const [detail, list] = await Promise.all([
+      fetchAgentRun(runId).catch((e: unknown) => {
+        // 없는 run(404)·구 백엔드(경로 없음 404/405)는 목록 조회로 판정한다 — 그 밖의 실패는 오류 상태로
+        const status = errorStatus(e);
+        if (status === 404 || status === 405) return null;
+        throw e;
+      }),
+      fetchAgentRuns({ size: RUN_LOOKUP_SIZE }),
+    ]);
+    const run = detail ?? list.items.find((r) => r.id === runId) ?? null;
+    // 계보 계산은 목록 기준 — 오래된 run이라 첫 페이지에 없으면 자기 자신을 넣어 타임라인이 비지 않게
+    const runs = run && !list.items.some((r) => r.id === run.id) ? [...list.items, run] : list.items;
+    return { run, detail, runs };
+  }, [runId]);
+  const load = usePolledLoad(loadDetail);
   const { issueModal } = useIssueModal(() => undefined);
   const action = useConfirmedAction(load.refresh);
 
@@ -77,8 +117,9 @@ function AgentRunDetail() {
     return `?${next.toString()}`;
   };
 
-  const runs = load.data ?? [];
-  const run = runs.find((r) => r.id === runId) ?? null;
+  const runs = load.data?.runs ?? [];
+  const run = load.data?.run ?? null;
+  const detail = load.data?.detail ?? null;
 
   const runLink = (r: AgentRunSummary) => (
     <Link to={runHref(r.id)} aria-label={`실행 #${r.id} 상세`}>
@@ -225,6 +266,32 @@ function AgentRunDetail() {
             </dd>
           </div>
         </dl>
+
+        {detail ? (
+          <section className="agent-run-lineage" aria-labelledby="agent-run-diag-title">
+            <h3 id="agent-run-diag-title" className="agent-sup-subtitle">
+              <FileText size={16} aria-hidden /> 지시·오류
+            </h3>
+            <dl className="agent-run-fields agent-run-fields-wide">
+              <div>
+                <dt>사람 지시문</dt>
+                <dd>
+                  <RedactableText value={detail.instruction} redacted={detail.redacted} empty="없음" />
+                </dd>
+              </div>
+              <div>
+                <dt>오류 로그</dt>
+                <dd>
+                  <RedactableText value={detail.error} redacted={detail.redacted} empty="없음" />
+                </dd>
+              </div>
+              <div>
+                <dt>리뷰 반려</dt>
+                <dd>{detail.rejectCount > 0 ? `${detail.rejectCount}회` : <span className="agent-sup-subtle">없음</span>}</dd>
+              </div>
+            </dl>
+          </section>
+        ) : null}
 
         <RunDirectivesSection key={run.id} run={run} canManage={canManage} onStale={() => void load.refresh()} />
 

@@ -12,7 +12,9 @@ import {
   LayoutGrid,
   OctagonX,
   Power,
+  Radio,
   RefreshCw,
+  Timer,
   TriangleAlert,
   UsersRound,
   Wallet,
@@ -28,7 +30,7 @@ import { REVIEWER_ANCHOR } from "./AiTeamReviewer";
 import { MeetingConveneModal } from "./MeetingConveneModal";
 import { OfficePanel, type GoalsView, type OfficeLinks, type PanelTarget } from "./OfficePanel";
 import { TeamCards } from "./TeamCards";
-import { useOfficeData, type OfficeData } from "./useOfficeData";
+import { OFFICE_POLL_LIVE_MS, OFFICE_POLL_MS, useOfficeData, type OfficeData } from "./useOfficeData";
 import { useEpicGoals } from "./useEpicGoals";
 import { OfficeDialog, type DialogCloseResult } from "./OfficeDialog";
 import { DialogMemory, useDialogLog } from "./useDialogLog";
@@ -67,8 +69,9 @@ import "./ai-office.css";
  */
 const DOCK_MIN_WIDTH = 1380;
 const NO_BUDGET = { monthlyCapUsd: null, platformMonthToDateUsd: 0, killSwitch: false } as const;
-/** "마지막 갱신"이 이만큼 지나면 경고색 */
+/** "마지막 갱신"이 이만큼 지나면 경고색 — 스트림이 살아 있으면 폴링이 60초라 기준도 늦춘다 */
 const STALE_AFTER_MS = 30_000;
+const STALE_AFTER_LIVE_MS = 90_000;
 
 type View = "office" | "team";
 type PanelState = { kind: "persona"; id: string } | { kind: "board" } | { kind: "meeting" } | null;
@@ -499,7 +502,9 @@ function AiOffice({ projectId }: { projectId: string }) {
       ) : null}
       {data.stale ? (
         <Banner variant="warning" action={{ label: "지금 다시 시도", onClick: data.refresh }}>
-          사무실 상태를 새로 고치지 못했습니다. 마지막으로 받은 상태를 보여 주고 있습니다 (10초 뒤 다시 시도)
+          {`사무실 상태를 새로 고치지 못했습니다. 마지막으로 받은 상태를 보여 주고 있습니다 (${
+            (data.streamMode === "live" ? OFFICE_POLL_LIVE_MS : OFFICE_POLL_MS) / 1000
+          }초 뒤 다시 시도)`}
         </Banner>
       ) : null}
       <OfficeBody
@@ -733,7 +738,9 @@ function OfficeSummary({ data, office, gatesHref }: { data: OfficeData; office: 
   const counts = officeCounts(office.personas);
   const cap = office.budget.monthlyCapUsd;
   const updatedIso = data.lastUpdated ? new Date(data.lastUpdated).toISOString() : office.generatedAt;
-  const late = data.stale || (data.lastUpdated !== null && now - data.lastUpdated > STALE_AFTER_MS);
+  const live = data.streamMode === "live";
+  const late =
+    data.stale || (data.lastUpdated !== null && now - data.lastUpdated > (live ? STALE_AFTER_LIVE_MS : STALE_AFTER_MS));
 
   return (
     <dl className="ai-office-summary" aria-label="AI 팀 요약">
@@ -770,6 +777,7 @@ function OfficeSummary({ data, office, gatesHref }: { data: OfficeData; office: 
         )}
       </SummaryItem>
       <SummaryItem icon={<Clock size={16} aria-hidden />} label="마지막 갱신">
+        <StreamIndicator live={live} />
         <span className={late ? "ai-office-summary-warn" : undefined}>{relTimeFine(updatedIso, now)}</span>
         <Button
           variant="ghost"
@@ -784,6 +792,21 @@ function OfficeSummary({ data, office, gatesHref }: { data: OfficeData; office: 
         </Button>
       </SummaryItem>
     </dl>
+  );
+}
+
+/** 갱신 방식(P4c) — 실시간(무효화 스트림 연결됨) / 폴링(끊김·미지원). 아이콘 + 텍스트, 색만으로 구분하지 않는다 */
+function StreamIndicator({ live }: { live: boolean }) {
+  const title = live
+    ? `실시간 — 변경이 생기면 바로 반영합니다(${OFFICE_POLL_LIVE_MS / 1000}초마다 확인)`
+    : `폴링 — ${OFFICE_POLL_MS / 1000}초마다 새로 고칩니다`;
+  return (
+    <span className="ai-office-stream" title={title}>
+      <Lozenge appearance={live ? "success" : "neutral"} className={`agent-lozenge is-${live ? "success" : "neutral"}`}>
+        {live ? <Radio size={12} strokeWidth={2.25} aria-hidden /> : <Timer size={12} strokeWidth={2.25} aria-hidden />}
+        {live ? "실시간" : "폴링"}
+      </Lozenge>
+    </span>
   );
 }
 

@@ -1010,6 +1010,61 @@ export interface AgentRunSummary {
   runnerId?: string | null;
 }
 
+/** `GET /api/agent/runs` 조건(P4c D-P4c-1) — 전부 선택, AND. page는 0부터, size 1~100(기본 20) */
+export interface AgentRunQuery {
+  status?: AgentRunStatus;
+  projectId?: string;
+  personaId?: string;
+  type?: AgentRunType;
+  page?: number;
+  size?: number;
+}
+
+/** run 목록 한 페이지 — id 내림차순. 구 백엔드(배열 전체)도 어댑터가 이 모양으로 접는다 */
+export interface AgentRunPage {
+  items: AgentRunSummary[];
+  page: number;
+  size: number;
+  total: number;
+  hasNext: boolean;
+}
+
+/**
+ * `GET /api/agent/runs/{id}`(P4c) — 요약 + 상세. `error`·`instruction`은 run 프로젝트 관리자에게만 실린다 —
+ * 그 밖은 null + `redacted: true`(값이 없어서 null인 것과 구분).
+ */
+export interface AgentRunDetail extends AgentRunSummary {
+  projectId: string | null;
+  outputPageId: string | null;
+  attendeePersonaIds: string[];
+  rejectCount: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  error: string | null;
+  instruction: string | null;
+  redacted: boolean;
+}
+
+/** 사무실 무효화 신호(P4c §15) — 데이터 없이 "다시 조회하라"만 알린다 */
+export type OfficeStreamReason = "run" | "gate" | "audit" | "directive" | "persona";
+
+export interface OfficeStreamEvent {
+  reason: OfficeStreamReason | null;
+  projectId: string | null;
+  at: string | null;
+}
+
+/**
+ * 사무실 스트림 콜백 — `onOpen`은 연결 수립(200) 직후, `onActivity`는 바이트가 도착할 때마다(주석·heartbeat 포함,
+ * 생존 판정용), `onEvent`는 `event: office` 프레임마다.
+ */
+export interface OfficeStreamHandlers {
+  signal: AbortSignal;
+  onOpen: () => void;
+  onActivity: () => void;
+  onEvent: (event: OfficeStreamEvent) => void;
+}
+
 export type AgentGateKind = "MERGE" | "ESCALATION" | "PLAN";
 
 export interface AgentPendingGate {

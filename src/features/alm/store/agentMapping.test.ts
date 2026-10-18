@@ -193,9 +193,9 @@ describe("REST 어댑터 — run·게이트 감독(AGP-12/13)", () => {
         },
       ]),
     );
-    const runs = await fetchAgentRuns("BLOCKED");
+    const runs = await fetchAgentRuns({ status: "BLOCKED" });
     expect(spy).toHaveBeenCalledWith("/api/agent/runs?status=BLOCKED");
-    expect(runs[0]).toMatchObject({ id: "9004", personaId: "104", parentRunId: "8990", status: "BLOCKED" });
+    expect(runs.items[0]).toMatchObject({ id: "9004", personaId: "104", parentRunId: "8990", status: "BLOCKED" });
     await fetchAgentRuns();
     expect(spy).toHaveBeenLastCalledWith("/api/agent/runs");
   });

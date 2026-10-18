@@ -8,7 +8,7 @@ import { AGENT_GATE_KIND_LABEL, AgentGateKindGlyph, AgentRunStatusLozenge } from
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
 import { useAgentPermissions } from "../components/useAgentPermissions";
-import { gatesForPersona, personaDisplay } from "./runModel";
+import { gatesForPersona, personaDisplay, RUN_LOOKUP_SIZE } from "./runModel";
 import {
   AiTeamGate,
   SupervisionBody,
@@ -75,8 +75,12 @@ function AgentGates() {
   const personaId = searchParams.get("persona");
 
   const loadInbox = useCallback(async (): Promise<GateInbox> => {
-    const [gates, runs] = await Promise.all([fetchAgentGates({ pending: !showArchive }), fetchAgentRuns()]);
-    return { gates, runs };
+    // 게이트 → 페르소나 대조용 run — 최신 100건(서버 상한). 더 오래된 run의 게이트는 페르소나 칸이 폴백 표기로 남는다
+    const [gates, runs] = await Promise.all([
+      fetchAgentGates({ pending: !showArchive }),
+      fetchAgentRuns({ size: RUN_LOOKUP_SIZE }),
+    ]);
+    return { gates, runs: runs.items };
   }, [showArchive]);
   const load = usePolledLoad(loadInbox);
   const action = useConfirmedAction(load.refresh);

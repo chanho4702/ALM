@@ -416,7 +416,7 @@ describe("회의 소집 목업 — 서버 규칙 미러", () => {
     await expect(store.createMeeting({ type: "RETRO", projectId: "p1" })).rejects.toThrow(
       "이 프로젝트에 이미 진행 중인 회의 run이 있습니다: projectId=p1",
     );
-    expect((await store.fetchAgentRuns()).some((r) => r.id === retro.run.id && r.type === "RETRO")).toBe(true);
+    expect((await store.fetchAgentRuns({ size: 100 })).items.some((r) => r.id === retro.run.id && r.type === "RETRO")).toBe(true);
   });
 
   it("매니저 보고는 안건 없이 통과하지만 매니저 롤 1명만 — 실무 롤·여럿 지정은 서버 문구로 거부", async () => {

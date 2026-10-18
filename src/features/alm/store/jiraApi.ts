@@ -3,6 +3,7 @@
 import { getTemplate, type ProjectTemplateId } from "./projectTemplates";
 import { ATTACHMENT_TOO_LARGE_MESSAGE, assertAttachmentSize } from "./attachmentLimits";
 import { sharedApiFetch as transportFetch, sharedAuthClient } from "./apiClient";
+import { OfficeStreamError, readOfficeStream } from "./officeStream";
 import type { IssueQuery } from "./searchQuery";
 import {
   MAX_SEARCH_PAGE_SIZE,
@@ -51,8 +52,11 @@ import type {
   AgentPersonaActivity,
   AgentPersonaDetail,
   AgentPersonaPatch,
-  AgentRunStatus,
+  AgentRunDetail,
+  AgentRunPage,
+  AgentRunQuery,
   AgentRunSummary,
+  OfficeStreamHandlers,
   AgentGate,
   AgentMeetingCreated,
   AgentMeetingInput,
@@ -151,6 +155,8 @@ import {
   mapAgentPersonaDetail,
   mapAgentPermissions,
   mapAgentProjectCredential,
+  mapAgentRunDetail,
+  mapAgentRunPage,
   mapAgentRunSummary,
   mapAgentTeamPersona,
   mapAgentToken,
@@ -176,6 +182,7 @@ import {
   type AgentPersonaDetailDto,
   type AgentPersonaDto,
   type AgentProjectCredentialDto,
+  type AgentRunDetailDto,
   type AgentRunSummaryDto,
   type AgentTeamPersonaDto,
   type AgentTokenDto,
@@ -1184,11 +1191,52 @@ export async function fetchPersonaActivity(personaId: string): Promise<AgentPers
 // ── run·게이트 감독(P3a AGP-12/13) — 목록은 인증 사용자, 결정·취소·재개는 ADMIN(서버가 403) ──
 // 상태 전이 거부는 409 {"error"} — `json()`이 그 문구를 그대로 Error로 올린다(화면이 토스트로 보여 준다).
 
-/** run 요약 목록 — 서버에 프로젝트 축이 없어 전역 목록이다(프로젝트 필터는 화면이 이슈키로 한다) */
-export async function fetchAgentRuns(status?: AgentRunStatus): Promise<AgentRunSummary[]> {
-  const query = status ? `?status=${status}` : "";
-  const body = await json<AgentRunSummaryDto[] | null>(await sharedApiFetch(`/api/agent/runs${query}`));
-  return (body ?? []).map(mapAgentRunSummary);
+/**
+ * run 목록 한 페이지(P4c D-P4c-1) — 조건은 서버가 AND로 거르고 id 내림차순. 구 서버(배열 전체)도 `mapAgentRunPage`가
+ * 같은 페이지 모양으로 접는다(배포 순서 무관).
+ */
+export async function fetchAgentRuns(query: AgentRunQuery = {}): Promise<AgentRunPage> {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.projectId) params.set("projectId", String(toBackendId(query.projectId)));
+  if (query.personaId) params.set("personaId", query.personaId);
+  if (query.type) params.set("type", query.type);
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.size !== undefined) params.set("size", String(query.size));
+  const qs = params.toString();
+  const body = await json<unknown>(await sharedApiFetch(`/api/agent/runs${qs ? `?${qs}` : ""}`));
+  return mapAgentRunPage(body, query);
+}
+
+/**
+ * run 단건(P4c) — 없는 id는 404(ApiError). 구 서버는 이 경로가 없어 404/405 — 화면이 목록 조회로 폴백한다.
+ * `error`·`instruction`은 관리자에게만 실리고 그 밖은 `redacted: true`.
+ */
+export async function fetchAgentRun(runId: string): Promise<AgentRunDetail> {
+  return mapAgentRunDetail(
+    await json<AgentRunDetailDto>(await sharedApiFetch(`/api/agent/runs/${encodeURIComponent(runId)}`)),
+  );
+}
+
+/**
+ * 사무실 무효화 스트림(P4c §15) — fetch 스트리밍이라 Authorization 헤더가 실린다(EventSource는 못 싣는다).
+ * `sharedApiFetch`가 401이면 refresh 후 한 번 더 시도하고, 그래도 401이면 `unauthorized`로 올린다.
+ * 서버가 닫으면 resolve, 끊기면 reject — 재연결은 호출측(`useOfficeStream`).
+ */
+export async function streamOffice(projectId: string | undefined, handlers: OfficeStreamHandlers): Promise<void> {
+  const query = projectId ? `?projectId=${toBackendId(projectId)}` : "";
+  let response: Response;
+  try {
+    response = await sharedApiFetch(`/api/agent/office/stream${query}`, {
+      headers: { Accept: "text/event-stream" },
+      cache: "no-store",
+      signal: handlers.signal,
+    });
+  } catch (e) {
+    if (handlers.signal.aborted) throw e;
+    throw new OfficeStreamError("network", null, e instanceof Error ? e.message : String(e));
+  }
+  await readOfficeStream(response, handlers);
 }
 
 export async function cancelRun(runId: string): Promise<void> {

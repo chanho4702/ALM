@@ -4939,6 +4939,15 @@ th:last-child > [role="separator"] {
   color: var(--chanho-color-text-subtle);
 }
 
+/* 실행 기록 — 건수 + 페이지 이동(P4c) */
+.agent-sup-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+}
+
 .agent-sup-issue,
 .agent-sup-code {
   font-family: var(--chanho-font-family-mono);
@@ -5015,6 +5024,24 @@ th:last-child > [role="separator"] {
   margin: 0;
   font-size: var(--chanho-font-size-100);
   color: var(--chanho-color-text-default);
+  overflow-wrap: anywhere;
+}
+
+/* 지시·오류(P4c) — 긴 본문이라 한 줄에 한 칸 */
+.agent-run-fields-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.agent-run-log {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: var(--chanho-space-100);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-subtle);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 

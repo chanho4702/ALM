@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AgentOffice, AgentPersonaActivity } from "../store/types";
 import { fetchOffice, fetchPersonaActivity } from "../store/jiraStore";
 import { transitionAnnouncements } from "./officeModel";
+import { useOfficeStream, type OfficeStreamMode } from "./useOfficeStream";
 
-/** 사무실 폴링 주기(D-P3a-1) — 실시간 푸시(SSE)는 이번 웨이브 밖 */
+/** 사무실 폴링 주기(D-P3a-1) — 무효화 스트림(P4c)이 끊겨 있을 때 */
 export const OFFICE_POLL_MS = 10_000;
+/** 스트림이 건강할 때의 폴링 — 신호를 놓쳐도 이만큼 뒤엔 맞춰진다(D-P4c-2) */
+export const OFFICE_POLL_LIVE_MS = 60_000;
 
 export type LoadStatus = "loading" | "ready" | "error";
 
@@ -20,11 +23,14 @@ export interface OfficeData {
   activityStatus: LoadStatus | "idle";
   /** 새로 승인 대기·차단이 된 페르소나 알림(aria-live) — 폴링마다 갈아 끼운다 */
   announcement: string;
+  /** 무효화 스트림 상태 — live면 신호 즉시 재조회 + 60초 폴링, polling이면 10초 폴링 */
+  streamMode: OfficeStreamMode;
   refresh: () => void;
 }
 
 /**
- * 사무실 + (열려 있으면) 개인 오피스 활동을 같은 타이머로 10초마다 함께 조회한다.
+ * 사무실 + (열려 있으면) 개인 오피스 활동을 같은 타이머로 함께 조회한다 — 무효화 스트림(`useOfficeStream`)이
+ * 살아 있으면 신호마다 즉시 + 60초 폴링, 아니면 10초 폴링.
  * 탭이 숨겨지면(`document.hidden`) 멈추고, 다시 보이면 즉시 1회 조회 후 재개한다.
  */
 export function useOfficeData(projectId: string, personaId: string | null): OfficeData {
@@ -41,6 +47,9 @@ export function useOfficeData(projectId: string, personaId: string | null): Offi
   const officeRef = useRef<AgentOffice | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
+  /** 조회 중에 온 스트림 신호 — 끝나자마자 한 번 더 조회한다(신호를 버리지 않게) */
+  const pendingRef = useRef(false);
+  const liveRef = useRef(false);
   const aliveRef = useRef(true);
 
   const clearTimer = () => {
@@ -86,8 +95,28 @@ export function useOfficeData(projectId: string, personaId: string | null): Offi
     }
 
     setRefreshing(false);
-    if (!document.hidden) timerRef.current = setTimeout(() => void tick(), OFFICE_POLL_MS);
+    if (document.hidden) return;
+    if (pendingRef.current) {
+      pendingRef.current = false;
+      void tick();
+      return;
+    }
+    timerRef.current = setTimeout(() => void tick(), liveRef.current ? OFFICE_POLL_LIVE_MS : OFFICE_POLL_MS);
   }, [projectId]);
+
+  const onSignal = useCallback(() => {
+    if (inFlightRef.current) pendingRef.current = true;
+    else void tick();
+  }, [tick]);
+  const streamMode = useOfficeStream(projectId, onSignal);
+
+  // 스트림이 붙거나 끊기면 걸려 있는 다음 폴링을 새 주기로 다시 건다
+  useEffect(() => {
+    liveRef.current = streamMode === "live";
+    if (timerRef.current === null) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => void tick(), liveRef.current ? OFFICE_POLL_LIVE_MS : OFFICE_POLL_MS);
+  }, [streamMode, tick]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -143,6 +172,7 @@ export function useOfficeData(projectId: string, personaId: string | null): Offi
     activity,
     activityStatus,
     announcement,
+    streamMode,
     refresh,
   };
 }

@@ -3,60 +3,15 @@
  * 액션 노출 규칙은 agent-service(Run.CANCELLABLE, RunResumeService.RESUMABLE)와 같다 — 서버가 최종 판정(409).
  */
 import type { AgentGate, AgentPersona, AgentRunStatus, AgentRunSummary } from "../store/types";
-import { isProjectWideMeeting, projectWideIssueKey } from "../store/agentMapping";
-import { isTerminal } from "./officeModel";
 
-export type RunGroup = "all" | "active" | "finished";
+/** 계보·게이트 대조용으로 한 번에 받는 run 수 — 서버 size 상한(100). 그보다 오래된 run은 링크만 남는다 */
+export const RUN_LOOKUP_SIZE = 100;
 
 const CANCELLABLE: readonly AgentRunStatus[] = ["QUEUED", "RUNNING", "WAITING_APPROVAL", "BLOCKED", "FAILED"];
 const RESUMABLE: readonly AgentRunStatus[] = ["BLOCKED", "FAILED"];
 
 export const canCancel = (status: AgentRunStatus): boolean => CANCELLABLE.includes(status);
 export const canResume = (status: AgentRunStatus): boolean => RESUMABLE.includes(status);
-
-/** 활성 = 아직 끝나지 않은 run(BLOCKED 포함), 종결 = DONE·FAILED·CANCELLED */
-export function inGroup(status: AgentRunStatus, group: RunGroup): boolean {
-  if (group === "all") return true;
-  return group === "active" ? !isTerminal(status) : isTerminal(status);
-}
-
-/** 이슈키의 프로젝트 키 부분 — "ALM-12" → "ALM". 형식이 아니면 null */
-export function issueProjectKey(issueKey: string | null): string | null {
-  if (!issueKey) return null;
-  const dash = issueKey.lastIndexOf("-");
-  return dash > 0 ? issueKey.slice(0, dash) : null;
-}
-
-/**
- * 프로젝트 축은 클라이언트 필터 — runs API에 projectId가 없어 이슈키 접두어로 맞춘다.
- * projectKey가 null이면 전체(이슈 없는 run 포함). 이슈 없는 run은 프로젝트 범위에서 빠진다.
- */
-export function inProject(issueKey: string | null, projectKey: string | null): boolean {
-  if (projectKey === null) return true;
-  return issueProjectKey(issueKey)?.toUpperCase() === projectKey.toUpperCase();
-}
-
-/**
- * 안건 이슈 없는 회의 run은 이슈키가 합성 키 `PROJECT-<projectId>`라 접두어로는 어느 프로젝트에도 안 걸린다 —
- * 라우트의 projectId(서버 id와 같은 값)와 그 합성 키가 정확히 같으면 이 프로젝트 run으로 본다.
- */
-export function filterRuns(
-  runs: readonly AgentRunSummary[],
-  { group, projectKey, projectId }: { group: RunGroup; projectKey: string | null; projectId?: string },
-): AgentRunSummary[] {
-  const wideKey = projectId ? projectWideIssueKey(projectId) : null;
-  return runs.filter(
-    (r) =>
-      inGroup(r.status, group) &&
-      (inProject(r.issueKey, projectKey) || (projectKey !== null && isProjectWideMeeting(r) && r.issueKey === wideKey)),
-  );
-}
-
-/** 최신 먼저 — 시작 시각(없으면 대기열이라 가장 최근 취급), 같으면 id 큰 것 */
-export function sortRunsNewestFirst(runs: readonly AgentRunSummary[]): AgentRunSummary[] {
-  const stamp = (r: AgentRunSummary) => (r.startedAt ? Date.parse(r.startedAt) : Number.POSITIVE_INFINITY);
-  return [...runs].sort((a, b) => stamp(b) - stamp(a) || Number(b.id) - Number(a.id));
-}
 
 export interface RunLineage {
   parent: AgentRunSummary | null;

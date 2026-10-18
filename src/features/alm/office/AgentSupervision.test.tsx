@@ -126,30 +126,92 @@ describe("실행 기록(AGP-12) — 목록·필터", () => {
     expect(table).not.toHaveTextContent("Invalid Date");
   });
 
-  it("상태 필터(활성/종결)와 범위(전체 프로젝트)가 URL 쿼리에 남는다", async () => {
+  it("상태·범위 필터는 서버 조건으로 넘어가고 URL 쿼리에 남는다", async () => {
     const user = userEvent.setup();
+    const spy = vi.spyOn(store, "fetchAgentRuns");
     renderApp(`${BASE}/runs`);
     await runsTable();
+    expect(spy).toHaveBeenLastCalledWith({ status: undefined, personaId: undefined, projectId: "p1", page: 0, size: 20 });
 
     await user.click(screen.getByRole("combobox", { name: "상태" }));
-    await user.click(await screen.findByRole("option", { name: "활성" }));
-    expect(screen.getByText("6건")).toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent("group=active");
-    const active = await runsTable();
-    expect(dataRows(active)).toHaveLength(6);
-    expect(within(active).queryByText("완료")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("option", { name: "실패" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("status=FAILED");
+    // ALM의 실패 run — 8988(ALM-7)·8983·8982(ALM-5)
+    expect(await screen.findByText("3건")).toBeInTheDocument();
+    const failed = await runsTable();
+    expect(dataRows(failed)).toHaveLength(3);
+    expect(within(failed).queryByText("완료")).not.toBeInTheDocument();
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ status: "FAILED", projectId: "p1" }));
 
     await user.click(screen.getByRole("combobox", { name: "상태" }));
-    await user.click(await screen.findByRole("option", { name: "종결" }));
-    expect(screen.getByText("6건")).toBeInTheDocument();
+    await user.click(await screen.findByRole("option", { name: "완료" }));
+    await waitFor(() => expect(within(screen.getByRole("table", { name: "실행 기록" })).queryByText("실패")).not.toBeInTheDocument());
 
     await user.click(screen.getByRole("combobox", { name: "범위" }));
     await user.click(await screen.findByRole("option", { name: "전체 프로젝트" }));
     expect(screen.getByTestId("location")).toHaveTextContent("scope=all");
-    const all = await runsTable();
-    expect(within(all).getByText("WEB-2")).toBeInTheDocument();
-    expect(within(all).getByText("이슈 없음")).toBeInTheDocument();
-    expect(screen.getByText("8건")).toBeInTheDocument();
+    expect(await screen.findByText("WEB-2")).toBeInTheDocument();
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ status: "DONE", projectId: undefined }));
+  });
+
+  it("페르소나 필터 — ?persona=가 서버 조건으로, '전체 페르소나'로 풀린다", async () => {
+    const user = userEvent.setup();
+    const spy = vi.spyOn(store, "fetchAgentRuns");
+    renderApp(`${BASE}/runs?persona=104`);
+    const table = await runsTable();
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ personaId: "104" }));
+    await waitFor(() => expect(dataRows(table).every((row) => within(row).queryByText("백엔드봇") !== null)).toBe(true));
+    await user.click(screen.getByRole("combobox", { name: "페르소나" }));
+    await user.click(await screen.findByRole("option", { name: "전체 페르소나" }));
+    expect(screen.getByTestId("location")).not.toHaveTextContent("persona=");
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ personaId: undefined })));
+  });
+
+  it("페이지 — 20건씩, 이전·다음으로 넘기고 ?page=(1부터)가 URL에 남는다. 필터를 바꾸면 첫 페이지로", async () => {
+    const user = userEvent.setup();
+    // 45건짜리 서버 응답을 흉내 낸다(목업 run은 12건이라 페이지가 안 넘어간다)
+    const all = Array.from({ length: 45 }, (_, i) => ({
+      id: String(9500 - i), issueKey: `ALM-${i + 1}`, status: "DONE" as const, personaId: "103", attempt: 1, model: null,
+      startedAt: null, endedAt: null, type: "TASK" as const, trigger: "SCHEDULER" as const, parentRunId: null,
+    }));
+    const spy = vi.spyOn(store, "fetchAgentRuns").mockImplementation(async (query = {}) => {
+      const page = query.page ?? 0;
+      const size = query.size ?? 20;
+      return { items: all.slice(page * size, (page + 1) * size), page, size, total: all.length, hasNext: (page + 1) * size < all.length };
+    });
+    renderApp(`${BASE}/runs`);
+    const table = await runsTable();
+    const pager = screen.getByRole("navigation", { name: "실행 기록 페이지" });
+    expect(screen.getByText("45건")).toBeInTheDocument();
+    expect(within(pager).getByText("1–20")).toBeInTheDocument();
+    expect(dataRows(table)).toHaveLength(20);
+    expect(within(pager).getByRole("button", { name: "이전" })).toBeDisabled();
+
+    await user.click(within(pager).getByRole("button", { name: "다음" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("page=2");
+    expect(await screen.findByText("21–40")).toBeInTheDocument();
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, size: 20 }));
+
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    expect(await screen.findByText("41–45")).toBeInTheDocument();
+    expect(dataRows(await runsTable())).toHaveLength(5);
+    expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "이전" }));
+    expect(await screen.findByText("21–40")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "상태" }));
+    await user.click(await screen.findByRole("option", { name: "완료" }));
+    expect(screen.getByTestId("location")).not.toHaveTextContent("page=");
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ status: "DONE", page: 0 })));
+  });
+
+  it("범위를 넘은 ?page=면 빈 상태 + 첫 페이지로", async () => {
+    const user = userEvent.setup();
+    renderApp(`${BASE}/runs?page=9`);
+    expect(await screen.findByText("이 페이지에는 실행이 없습니다")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "첫 페이지로" }));
+    expect(await screen.findByText("12건")).toBeInTheDocument();
   });
 
   it("run 조회가 처음부터 실패하면 오류 상태 + 다시 시도(빈 목록으로 삼키지 않는다)", async () => {
@@ -380,14 +442,15 @@ describe("안건 이슈 없는 회의 run — 목록·상세", () => {
 
   it("매니저 보고 run(P3c) — 종류 칸이 클립보드 아이콘 + '매니저 보고', 이슈 칸은 '프로젝트 전반'", async () => {
     const original = store.fetchAgentRuns;
-    vi.spyOn(store, "fetchAgentRuns").mockImplementation(async (status) => [
-      ...(await original(status)),
-      {
-        id: "8996", issueKey: "PROJECT-1", status: "DONE", personaId: "101", attempt: 1, model: null,
+    vi.spyOn(store, "fetchAgentRuns").mockImplementation(async (query) => {
+      const page = await original(query);
+      const manager = {
+        id: "8996", issueKey: "PROJECT-1", status: "DONE" as const, personaId: "101", attempt: 1, model: null,
         startedAt: new Date(Date.now() - 20 * 60_000).toISOString(), endedAt: new Date(Date.now() - 12 * 60_000).toISOString(),
-        type: "MANAGER", trigger: "SCHEDULER", parentRunId: null,
-      },
-    ]);
+        type: "MANAGER" as const, trigger: "SCHEDULER" as const, parentRunId: null,
+      };
+      return { ...page, items: [...page.items, manager], total: page.total + 1 };
+    });
     renderApp(`${BASE}/runs`);
     const table = await runsTable();
     const row = within(table).getByRole("link", { name: "실행 #8996 상세" }).closest("tr")!;

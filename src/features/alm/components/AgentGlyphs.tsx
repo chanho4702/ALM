@@ -172,6 +172,12 @@ export function AgentRunStatusLozenge({ status }: { status: AgentRunStatus }) {
   );
 }
 
+/** run 상태 아이콘만(장식) — Select 옵션처럼 옆에 라벨 텍스트가 따로 있는 자리 */
+export function AgentRunStatusIcon({ status, size = 14 }: { status: AgentRunStatus; size?: 12 | 14 | 16 }) {
+  const Icon = RUN_STATES[status].icon;
+  return <Icon size={size} aria-hidden />;
+}
+
 /** 롤 아이콘만(장식) — Select 옵션처럼 옆에 라벨 텍스트가 따로 있는 자리 */
 export function AgentRoleIcon({ role, size = 14 }: { role: AgentRole; size?: 12 | 14 | 16 }) {
   const Icon = ROLES[role].icon;
