@@ -1,8 +1,8 @@
 # 백엔드 의존 기능 백로그
 
-프론트만으로는 목업 수준을 넘을 수 없어 **jira-service(백엔드) 도입 시** 진행하기로 기록해 둔 항목.
-현재 화면은 전부 `src/features/alm/store/jiraStore.ts`(localStorage 목업)만 호출하므로,
-백엔드가 생기면 이 파일 내부를 fetch로 교체하는 것이 시작점이다.
+프론트만으로는 목업 수준을 넘을 수 없어 백엔드가 필요하다고 기록해 둔 항목(대부분 해소됨).
+화면은 `src/features/alm/store/jiraStore.ts` 파사드만 호출하고, 프로덕션 빌드는 alm-backend REST(`jiraApi.ts`),
+테스트·목업 개발은 localStorage 목업(`jiraMock.ts`)을 쓴다 — 구현은 빌드 시점에 고른다(docs/areas/store.md).
 
 관련: `roadmap/2026-08-28-jira-parity-requirements.md` — 아래 1~6번 항목은 그 문서에서
 지라 갭 인벤토리의 Should/Could 항목으로 편성돼 있다.
@@ -29,7 +29,7 @@
 ## 3. 알림 푸시/영속 — 🔶 부분 해소(2026-08-30 서버 저장 V9, @멘션 MENTIONED 추가)
 
 - 해소: 사용자별 알림 저장(V9 `notification`) + 코멘트/상태/배정/멘션 알림, 개인 설정으로 끄기
-- 해소(2026-09-04): **이메일 알림** — 서버 V19 `EmailNotifier`(`ALM_MAIL_HOST`가 비면 발송 없이 알림함만),
+- 해소(2026-09-04): **이메일 알림** — 서버 V19 `EmailNotifier` — 2026-09-07부터 발송은 org-service 메일 허브(`OrgMailClient`, 설치 옵션 `MAIL_MODE`)로 한다(메일이 꺼져 있으면 알림함만),
   개인 설정 "이메일로도 받기"(`emailEnabled`) + 서버 구성 여부(`mailConfigured`) 안내. 주소는 발송 시점에
   org-service 디렉터리(`GetMembers`)에서 읽고(2026-09-05), 못 읽으면 JWT email 스냅샷으로 폴백한다 —
   둘 다 없으면 생략. 비활성(DEACTIVATED) 계정에는 보내지 않는다. 프론트 계약(`emailEnabled`·`mailConfigured`)은 그대로다.

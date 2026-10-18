@@ -8,7 +8,8 @@ ALM 특색(한국어 스마트 검색, 필터 URL 공유, 저장 필터 사이�
 
 1. **화면은 `src/features/alm/store/jiraStore.ts`의 async 함수만 호출한다.**
    localStorage 접근·데이터 가공을 화면에 두지 않는다. `jiraStore.ts`는 파사드 — 목업(`jiraMock.ts`)과
-   REST(`jiraApi.ts`)를 `USE_REST`로 고른다(프로덕션 = REST). 목업에 함수를 추가하면 파사드 export도 추가한다.
+   REST(`jiraApi.ts`) 중 하나를 빌드 시점 별칭(`@alm-store-impl`, vite.config.ts)으로 고른다(프로덕션 = REST, 번들에 목업 없음).
+   구현은 `api/*`·`mock/*`·`model/*` 도메인 모듈, 세 파일은 배럴. 목업에 함수를 추가하면 REST·파사드 export도 추가한다.
 2. **UI는 100% `@chanho/react` 디자인 시스템.** 다른 UI 라이브러리 금지. 커스텀 마크업은
    디자인 토큰(`--chanho-*`)만 사용. 함정 목록: `docs/areas/design-system.md` (특히
    Checkbox/Switch는 `onCheckedChange`, Select는 빈 문자열 value 금지 → 센티널).

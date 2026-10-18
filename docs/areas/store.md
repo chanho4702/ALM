@@ -2,20 +2,35 @@
 
 ## 파사드 · 목업/REST 전환 (2026-08-30)
 
-`jiraStore.ts`는 **파사드**다 — `jiraMock.ts`(localStorage, 시그니처의 정본)와 `jiraApi.ts`(alm-backend)를
-`USE_REST`로 고른다: 테스트(vitest)는 항상 목업, 프로덕션 빌드는 REST, 개발은 `VITE_ALM_DATA=rest`.
-REST에 아직 없는 함수는 목업으로 떨어진다(혼합 모드). 코멘트·활동·보드·이슈 링크·하위/부모·워크로그는
+`jiraStore.ts`는 **파사드**다 — `jiraMock.ts`(localStorage, 시그니처의 정본)와 `jiraApi.ts`(alm-backend) 중
+하나를 **빌드 시점에** 고른다(2026-10-18, 감사 A-12): 파사드는 `@alm-store-impl` 별칭을 import하고
+`vite.config.ts`가 `vite build` 또는 `VITE_ALM_DATA=rest`면 jiraApi, 그 밖엔 jiraMock으로 푼다(vitest는 `vitest.config.ts`가
+항상 목업). 그래서 프로덕션 번들에는 목업·시드가 없다(CI가 `alm.jira.v1` 문자열로 검사). 런타임 혼합(`{...mock, ...rest}`)은
+없고, REST가 목업 계약을 전부 만족하는지는 `jiraStore.ts`의 `RestConformsToStoreContract` 타입 검사가 본다.
+`USE_REST`는 구현 모듈의 `STORE_MODE`로 판정한다. 두 어댑터 공용 상수·사전 검증은 `shared.ts`.
+
+**모듈 구조(2026-10-18 분할, 감사 A-22)**: `jiraApi.ts`·`jiraMock.ts`·`types.ts`는 공개 표면만 다시 내보내는 배럴이고
+구현은 `api/*.ts`(http·issues·sprints·settings·office…), `mock/*.ts`(db·rules·issues·officeRuns·aiTeam…),
+`model/*.ts`(도메인 타입)에 있다. 목업 상태(localStorage 캐시)는 `mock/db.ts` 한 곳, 모듈별 목업 상태는 그 모듈의
+reset 함수로 `__resetForTest`가 초기화한다. 새 함수는 해당 도메인 모듈에 두고 배럴·파사드에 export를 더한다.
+
+코멘트·활동·보드·이슈 링크·하위/부모·워크로그는
 서버 V12(`/api/alm/issues/{id}/{comments,worklogs,links,activity}`, `/api/alm/boards`)로 옮겼다.
 프로젝트 멤버·역할·사용자 디렉터리는 org-service REST(`/api/org/members`, `/api/org/grants`,
-`/api/org/me/permissions`)를 어댑터가 직접 부른다 — 역할 변경은 grant 삭제 후 재생성, 마지막 관리자 가드는
+`/api/org/me/permissions`)를 어댑터가 직접 부른다 — 역할 변경은 grant `PATCH`, 마지막 관리자 가드는
 클라이언트에서 목업과 같은 문구로 막는다. 프로젝트 템플릿은 서버 개념이 아니라 프론트 합성이다(REST도 목업과 같은 순서: 기본 보드 갱신 → Sprint 1 → 샘플 이슈).
-**REST 미구현 함수는 이제 없다** — 새 목업 함수를 추가하면 REST도 같이 채운다. 파사드는
-`scratchpad/facade.py`처럼 export 이름을 긁어 만든다 — 목업에 함수를 추가하면 파사드에도 줄을 추가한다.
+**REST 미구현 함수는 없다** — 새 목업 함수를 추가하면 REST도 같이 채운다(빠지면 typecheck가 깨진다).
+목업에 함수를 추가하면 파사드에도 줄을 추가한다.
 
-**파일**: `src/features/alm/store/jiraStore.ts` (~1400줄, 현재 localStorage 구현),
-`jiraApi.ts`(Project/Issue REST 어댑터, 아직 런타임 미연결), `apiClient.ts`(AuthGate와 공유하는
-인증 클라이언트), `mapping.ts`(DTO 변환), `types.ts`(도메인 타입), `uiStore.ts`(내비 UI 상태),
+**파일**: `jiraStore.ts`(파사드), `jiraApi.ts`+`api/*`(REST 어댑터), `jiraMock.ts`+`mock/*`(목업),
+`shared.ts`(공용 상수·검증), `concurrency.ts`(동시성 상한 병렬), `apiClient.ts`(AuthGate와 공유하는
+인증 클라이언트), `mapping.ts`(DTO 변환), `types.ts`+`model/*`(도메인 타입), `uiStore.ts`(내비 UI 상태),
 `searchQuery.ts`(스마트 쿼리), `src/mock/seed.ts`(시드).
+
+**2026-10-18 계약(alm-backend)**: 상태 맵은 `GET /api/alm/projects/statuses` 한 번(+60초 세션 캐시, 설정 쓰기 시 무효화),
+일괄 편집은 `POST /api/alm/issues/bulk`(행별 결과, 실패 행 키가 없으면 "볼 수 없는 이슈"), 링크 `restricted`(잠금 표시),
+검색 페이지 `truncated`(하위 이슈 "N건 중 M건"), 변경 이력 `since·until·limit`+`X-Result-Truncated`(리포트는 since 필수 —
+창 앞에 창설된 이슈는 `stateAt`이 현재 값에서 거꾸로 되돌린다), 댓글·워크로그 삭제는 작성자 또는 프로젝트 관리자.
 
 ## 구조 원칙
 

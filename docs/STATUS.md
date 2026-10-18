@@ -1,4 +1,4 @@
-# ALM Front 현황 (2026-08-16 기준)
+# ALM Front 현황 (2026-10-18 갱신)
 
 한눈에 보는 "어디까지 했고, 무엇이 남았나". 상세 설계는 `superpowers/specs/`, 태스크별
 계획은 `superpowers/plans/`, 백엔드 의존 항목은 `BACKLOG.md`, **부위별 개발 가이드·알려진
