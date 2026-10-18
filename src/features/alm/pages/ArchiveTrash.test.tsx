@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ToastProvider } from "@chanho/react";
@@ -33,6 +33,9 @@ describe("이슈 보관함 (지라 보관된 업무 항목)", () => {
     await user.click(within(dialog).getByRole("button", { name: "보관" }));
     expect(await screen.findByText("ALM-2을(를) 보관했습니다")).toBeInTheDocument();
     expect((await listIssues("p1")).some((i) => i.key === "ALM-2")).toBe(false);
+    // 보관하면 상세 모달이 닫힌다. 닫힐 때 무거운 이슈 목록이 다시 그려져 부하에서는 수 초가 걸리고, 그동안 모달이
+    // 배경을 접근성 트리에서 가린다(뷰 탭을 못 찾는다) — 닫힘을 먼저 확인하고 넘어간다(측정: 0.8~3.7초)
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "ALM-2" })).not.toBeInTheDocument(), { timeout: 15_000 });
 
     await user.click(await screen.findByRole("button", { name: "보관함" }));
     const list = await screen.findByRole("list", { name: "보관된 이슈 목록" });
