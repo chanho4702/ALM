@@ -208,17 +208,27 @@ const inflightGets = new Map<string, Promise<unknown>>();
  * 저장 **전**에 시작된 GET(옛 제목·옛 버전)에 합류하지 못하게 한다.
  */
 let mutationGeneration = 0;
+/**
+ * 설정 세대 — 상태 해석에 영향을 주는 쓰기(설정·스킴·상태 레지스트리·프로젝트 생성/삭제/보관)에서만 올린다.
+ * `statusMetaByProject` 캐시가 이 값으로 무효화된다(이슈 저장 같은 쓰기로는 지우지 않는다).
+ */
+let settingsGeneration = 0;
+
+const SETTINGS_WRITE_PATH = /\/api\/alm\/(settings\/|projects(\/\d+)?(\/(settings|archive|unarchive|restore|permanent)(\/|$)|$|\?))/;
 
 /** 어댑터의 모든 요청이 지나는 길 — GET이 아니면 쓰기로 보고 세대를 앞뒤로 올린다 */
 async function sharedApiFetch(...args: Parameters<typeof transportFetch>): Promise<Response> {
   // 인자는 그대로 넘긴다(받은 모양 그대로 — 호출 계약을 바꾸지 않는다)
   const method = (args[1]?.method ?? "GET").toUpperCase();
   if (method === "GET" || method === "HEAD") return transportFetch(...args);
+  const touchesSettings = SETTINGS_WRITE_PATH.test(String(args[0]));
   mutationGeneration += 1;
+  if (touchesSettings) settingsGeneration += 1;
   try {
     return await transportFetch(...args);
   } finally {
     mutationGeneration += 1;
+    if (touchesSettings) settingsGeneration += 1;
   }
 }
 
@@ -1774,8 +1784,14 @@ export async function listProjectStatuses(projectId: string): Promise<WorkflowSt
   return [...resolved.body.statuses].sort((a, b) => a.order - b.order);
 }
 
-/** projectId → (statusId → WorkflowStatus) — 접근 가능한 프로젝트 전부를 해석한다 */
-export async function statusMetaByProject(): Promise<Record<string, Record<string, WorkflowStatus>>> {
+/** projectId → (statusId → WorkflowStatus) */
+export type StatusMetaByProject = Record<string, Record<string, WorkflowStatus>>;
+
+/**
+ * 상태 맵을 서버에서 읽는 방법 — 지금 서버에는 프로젝트별 해석 설정(`/projects/{id}/settings`)뿐이라 1+N으로 모은다.
+ * 접근 가능한 프로젝트 전부를 한 번에 해석하는 일괄 엔드포인트가 생기면 같은 반환 모양의 로더로 이 자리만 바꾼다.
+ */
+async function loadStatusMetaPerProject(): Promise<StatusMetaByProject> {
   const projects = await listProjects();
   const entries = await Promise.all(
     projects.map(async (project) => {
@@ -1784,6 +1800,35 @@ export async function statusMetaByProject(): Promise<Record<string, Record<strin
     }),
   );
   return Object.fromEntries(entries);
+}
+
+const loadStatusMeta: () => Promise<StatusMetaByProject> = loadStatusMetaPerProject;
+
+/** 다른 사용자가 바꾼 스킴을 놓치지 않는 상한 — 이 탭의 설정 쓰기는 세대로 즉시 무효화된다 */
+const STATUS_META_TTL_MS = 60_000;
+let statusMetaCache: { generation: number; at: number; value: Promise<StatusMetaByProject> } | null = null;
+
+/** 테스트 전용 — 캐시를 비운다 */
+export function __clearStatusMetaCache(): void {
+  statusMetaCache = null;
+}
+
+/**
+ * 접근 가능한 프로젝트 전부의 상태 맵 — 홈·검색·⌘K 모달이 열릴 때마다 부른다. 같은 세션 안에서는 진행 중 요청을
+ * 나눠 쓰고 결과를 60초 캐시한다(설정 쓰기가 있으면 즉시 버린다). 실패는 캐시하지 않는다. 호출자마다 사본을 준다.
+ */
+export async function statusMetaByProject(): Promise<StatusMetaByProject> {
+  const now = Date.now();
+  const cached = statusMetaCache;
+  if (!cached || cached.generation !== settingsGeneration || now - cached.at >= STATUS_META_TTL_MS) {
+    const entry = { generation: settingsGeneration, at: now, value: loadStatusMeta() };
+    statusMetaCache = entry;
+    entry.value.catch(() => {
+      if (statusMetaCache === entry) statusMetaCache = null;
+    });
+    return structuredClone(await entry.value);
+  }
+  return structuredClone(await cached.value);
 }
 
 export async function listAllStatuses(): Promise<{ id: string; name: string }[]> {
