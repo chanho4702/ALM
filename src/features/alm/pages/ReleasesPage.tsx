@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useParams } from "react-router";
 import {
@@ -14,21 +14,34 @@ import {
 } from "@chanho/react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import type { Issue, ProjectVersion, VersionStatus, WorkflowStatus } from "../store/types";
+
+interface VersionProgress {
+  total: number;
+  done: number;
+}
+
+/** 버전 진행률 — 이슈 본문을 받지 않고 서버 집계로 센다(전체·미완료 건수). 완료 판정은 상태 분류(서버) */
+async function versionProgressOf(version: ProjectVersion): Promise<VersionProgress> {
+  const [all, open] = await Promise.all([
+    aggregateIssues({ fixVersionId: version.id }, "statusCategory"),
+    aggregateIssues({ fixVersionId: version.id, openOnly: true }, "statusCategory"),
+  ]);
+  return { total: all.total, done: all.total - open.total };
+}
 import {
+  aggregateIssues,
   archiveVersion,
   createVersion,
   deleteVersion,
-  listIssues,
+  findIssues,
   listProjectStatuses,
   listVersions,
   releaseVersion,
   updateVersion,
 } from "../store/jiraStore";
 import { errorStatus } from "../store/mapping";
-import {
-  formatPlannedRange,
-  statusKind,
-} from "../components/labels";
+import { settleWithConcurrency } from "../store/concurrency";
+import { formatPlannedRange } from "../components/labels";
 import { VersionReleaseModal } from "../components/VersionReleaseModal";
 import { VersionEditModal, type VersionDraft } from "../components/VersionEditModal";
 
@@ -51,7 +64,9 @@ const STATUS_APPEARANCE: Record<VersionStatus, "neutral" | "success" | "info"> =
 export function ReleasesPage() {
   const { projectId } = useParams();
   const [versions, setVersions] = useState<ProjectVersion[] | null>(null);
-  const [issues, setIssues] = useState<Issue[]>([]);
+  const [progress, setProgress] = useState<Record<string, VersionProgress>>({});
+  /** 릴리스 확인에 보일 미완료 이슈 — 모달을 열 때 그 버전 것만 읽는다 */
+  const [unresolved, setUnresolved] = useState<Issue[]>([]);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [name, setName] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
@@ -69,15 +84,19 @@ export function ReleasesPage() {
   const reload = useCallback(async () => {
     if (!projectId) return;
     const mine = ++generation.current;
-    const [versionList, issueList, statusList] = await Promise.all([
-      listVersions(projectId),
-      listIssues(projectId),
-      listProjectStatuses(projectId),
-    ]);
+    const [versionList, statusList] = await Promise.all([listVersions(projectId), listProjectStatuses(projectId)]);
+    const counted = await settleWithConcurrency(versionList, versionProgressOf);
     if (mine !== generation.current) return;
     setVersions(versionList);
-    setIssues(issueList);
     setStatuses(statusList);
+    setProgress(
+      Object.fromEntries(
+        versionList.map((version, index) => {
+          const result = counted[index];
+          return [version.id, result.status === "fulfilled" ? result.value : { total: 0, done: 0 }];
+        }),
+      ),
+    );
   }, [projectId]);
 
   useEffect(() => {
@@ -163,17 +182,26 @@ export function ReleasesPage() {
     }
   };
 
-  const progressOf = useMemo(() => {
-    const byVersion = new Map<string, { total: number; done: number }>();
-    for (const issue of issues) {
-      if (!issue.fixVersionId) continue;
-      const entry = byVersion.get(issue.fixVersionId) ?? { total: 0, done: 0 };
-      entry.total += 1;
-      if (statusKind(statuses, issue.status) === "complete") entry.done += 1;
-      byVersion.set(issue.fixVersionId, entry);
+  const progressOf = (id: string): VersionProgress => progress[id] ?? { total: 0, done: 0 };
+
+  /** 릴리스 확인 — 그 버전의 미완료 이슈를 먼저 읽고 연다(빈 목록이 잠깐 보였다 바뀌지 않게) */
+  const openRelease = async (version: ProjectVersion) => {
+    try {
+      const page = await findIssues(
+        { fixVersionId: version.id, openOnly: true },
+        { page: 0, size: 200 },
+        { field: "key", dir: "asc" },
+      );
+      setUnresolved(page.items);
+      setReleasing(version);
+    } catch (error) {
+      toast({
+        title: "미완료 이슈를 불러오지 못했습니다",
+        description: error instanceof Error ? error.message : String(error),
+        appearance: "danger",
+      });
     }
-    return (id: string) => byVersion.get(id) ?? { total: 0, done: 0 };
-  }, [issues, statuses]);
+  };
 
   if (versions === null) {
     return (
@@ -185,11 +213,6 @@ export function ReleasesPage() {
 
   // 최신이 위 — 릴리스 허브는 "다음에 나갈 것"을 먼저 본다
   const ordered = [...versions].reverse();
-  const unresolvedOf = (version: ProjectVersion) =>
-    issues.filter(
-      (issue) =>
-        issue.fixVersionId === version.id && statusKind(statuses, issue.status) !== "complete",
-    );
 
   return (
     <>
@@ -261,7 +284,7 @@ export function ReleasesPage() {
                       <Button
                         size="small"
                         aria-label={`${version.name} 릴리스`}
-                        onClick={() => setReleasing(version)}
+                        onClick={() => void openRelease(version)}
                       >
                         릴리스
                       </Button>
@@ -328,7 +351,7 @@ export function ReleasesPage() {
 
       <VersionReleaseModal
         version={releasing}
-        unresolved={releasing ? unresolvedOf(releasing) : []}
+        unresolved={releasing ? unresolved : []}
         targets={versions.filter((v) => v.status === "unreleased" && v.id !== releasing?.id)}
         statuses={statuses}
         onClose={() => setReleasing(null)}
