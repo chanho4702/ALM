@@ -58,6 +58,25 @@ describe("run 목록 — 두 응답 모양(P4c 페이지 객체 / 구 서버 배
     expect(mapAgentRunPage(rows, { status: "FAILED" }).total).toBe(0);
   });
 
+  it("구 서버 배열은 projectId를 무시하므로 페이지를 자르기 전에 이슈키 접두어·프로젝트 전체 키로 그 프로젝트 run만 남긴다", () => {
+    const rows = [
+      summary(1, { issueKey: "ALM-1" }),
+      summary(2, { issueKey: "OPS-7" }),
+      summary(3, { issueKey: "alm-9" }),
+      summary(4, { issueKey: "PROJECT-3" }),
+      summary(5, { issueKey: "PROJECT-8" }),
+      summary(6, { issueKey: null }),
+      summary(7, { issueKey: "OPS-8" }),
+    ];
+    const page = mapAgentRunPage(rows, { projectId: "3", projectKey: "ALM", size: 2 });
+    expect(page.items.map((r) => r.id)).toEqual(["4", "3"]);
+    expect(page).toMatchObject({ total: 3, hasNext: true });
+    // 키를 모르면 남의 프로젝트 run을 보이느니 프로젝트 전체 회의만 남긴다
+    expect(mapAgentRunPage(rows, { projectId: "3" }).items.map((r) => r.id)).toEqual(["4"]);
+    // 프로젝트 조건이 없으면(전체 범위) 그대로
+    expect(mapAgentRunPage(rows, {}).total).toBe(7);
+  });
+
   it("필드가 빠진 페이지 객체·null은 빈 페이지로 접는다(화면이 깨지지 않게)", () => {
     expect(mapAgentRunPage(null)).toEqual({ items: [], page: 0, size: 20, total: 0, hasNext: false });
     expect(mapAgentRunPage({ items: [summary(1)] }, { page: 0, size: 20 })).toMatchObject({ total: 1, hasNext: false });

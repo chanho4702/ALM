@@ -64,9 +64,12 @@ const STATUS_APPEARANCE: Record<VersionStatus, "neutral" | "success" | "info"> =
 export function ReleasesPage() {
   const { projectId } = useParams();
   const [versions, setVersions] = useState<ProjectVersion[] | null>(null);
-  const [progress, setProgress] = useState<Record<string, VersionProgress>>({});
+  /** 버전별 진행률 — null은 집계 실패(알 수 없음). 0건으로 보이게 하지 않는다 */
+  const [progress, setProgress] = useState<Record<string, VersionProgress | null>>({});
   /** 릴리스 확인에 보일 미완료 이슈 — 모달을 열 때 그 버전 것만 읽는다 */
   const [unresolved, setUnresolved] = useState<Issue[]>([]);
+  /** 미완료 이슈 전체 건수 — 목록은 한 페이지(200건)만 받아도 확인하면 서버는 전부 옮긴다 */
+  const [unresolvedTotal, setUnresolvedTotal] = useState(0);
   const [statuses, setStatuses] = useState<WorkflowStatus[]>([]);
   const [name, setName] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
@@ -93,7 +96,7 @@ export function ReleasesPage() {
       Object.fromEntries(
         versionList.map((version, index) => {
           const result = counted[index];
-          return [version.id, result.status === "fulfilled" ? result.value : { total: 0, done: 0 }];
+          return [version.id, result.status === "fulfilled" ? result.value : null];
         }),
       ),
     );
@@ -182,7 +185,7 @@ export function ReleasesPage() {
     }
   };
 
-  const progressOf = (id: string): VersionProgress => progress[id] ?? { total: 0, done: 0 };
+  const progressOf = (id: string): VersionProgress | null => (id in progress ? progress[id] : { total: 0, done: 0 });
 
   /** 릴리스 확인 — 그 버전의 미완료 이슈를 먼저 읽고 연다(빈 목록이 잠깐 보였다 바뀌지 않게) */
   const openRelease = async (version: ProjectVersion) => {
@@ -193,6 +196,7 @@ export function ReleasesPage() {
         { field: "key", dir: "asc" },
       );
       setUnresolved(page.items);
+      setUnresolvedTotal(page.total);
       setReleasing(version);
     } catch (error) {
       toast({
@@ -268,7 +272,7 @@ export function ReleasesPage() {
           <ul className="release-list" aria-label="버전 목록">
             {ordered.map((version) => {
               const progress = progressOf(version.id);
-              const percent = progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100);
+              const percent = !progress || progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100);
               return (
                 <li key={version.id} className={`release-row is-${version.status}`}>
                   <div className="release-row-head">
@@ -322,16 +326,27 @@ export function ReleasesPage() {
                   {version.description ? (
                     <p className="dash-sprint-goal">{version.description}</p>
                   ) : null}
-                  <p className="dash-sprint-progress">
-                    {progress.total === 0
-                      ? "달린 이슈가 없습니다"
-                      : `${progress.total}개 중 ${progress.done}개 완료`}
-                  </p>
-                  <ProgressBar
-                    label={`${version.name} 완료율`}
-                    value={percent}
-                    variant={version.status === "released" ? "success" : "default"}
-                  />
+                  {progress === null ? (
+                    <div className="dash-sprint-progress" role="alert">
+                      진행률을 불러오지 못했습니다{" "}
+                      <Button size="small" variant="subtle" onClick={() => void reload()}>
+                        다시 시도
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="dash-sprint-progress">
+                        {progress.total === 0
+                          ? "달린 이슈가 없습니다"
+                          : `${progress.total}개 중 ${progress.done}개 완료`}
+                      </p>
+                      <ProgressBar
+                        label={`${version.name} 완료율`}
+                        value={percent}
+                        variant={version.status === "released" ? "success" : "default"}
+                      />
+                    </>
+                  )}
                 </li>
               );
             })}
@@ -352,6 +367,7 @@ export function ReleasesPage() {
       <VersionReleaseModal
         version={releasing}
         unresolved={releasing ? unresolved : []}
+        unresolvedTotal={releasing ? unresolvedTotal : 0}
         targets={versions.filter((v) => v.status === "unreleased" && v.id !== releasing?.id)}
         statuses={statuses}
         onClose={() => setReleasing(null)}

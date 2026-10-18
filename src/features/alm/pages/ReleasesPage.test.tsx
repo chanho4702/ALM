@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -7,6 +7,7 @@ import { App } from "../../../app/App";
 // 이 화면은 App에서 lazy()로 쪼개져 있다 — 수집 시점에 미리 올려 병렬 실행에서 청크 대기가 한도를 넘지 않게
 import "./ReleasesPage";
 import { __versionForTest } from "../store/jiraStore";
+import * as store from "../store/jiraStore";
 import { __resetForTest, createVersion, getIssueByKey, listVersions, updateIssue, updateVersion } from "../store/jiraStore";
 
 function renderReleases() {
@@ -144,4 +145,34 @@ describe("ReleasesPage", () => {
     expect(await screen.findByText("버전을 수정했습니다")).toBeInTheDocument();
     expect((await listVersions("p1"))[0]).toMatchObject({ name: "1.0", description: "내 설명" });
   });
+
+  it("미완료가 한 페이지를 넘으면 목록 길이가 아니라 전체 건수를 보이고 일부만 표시라고 알린다 (Codex)", async () => {
+    const user = userEvent.setup();
+    await createVersion("p1", { name: "1.0" });
+    const open = (await getIssueByKey("ALM-5"))!;
+    vi.spyOn(store, "findIssues").mockResolvedValue({ items: [open], page: 0, size: 200, total: 250, truncated: true });
+    renderReleases();
+    const list = await screen.findByRole("list", { name: "버전 목록" });
+    await user.click(within(list).getByRole("button", { name: "1.0 릴리스" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("미완료 이슈 250건");
+    expect(dialog).toHaveTextContent("일부만 표시 — 총 250건 중 1건");
+    expect(dialog).toHaveTextContent("외 245건");
+  });
+
+  it("진행률 집계가 실패하면 0건으로 속이지 않고 오류와 다시 시도를 보인다 (Codex)", async () => {
+    const user = userEvent.setup();
+    await createVersion("p1", { name: "1.0" });
+    const aggregate = vi.spyOn(store, "aggregateIssues").mockRejectedValue(new Error("ALM 서비스를 사용할 수 없습니다"));
+    renderReleases();
+    const list = await screen.findByRole("list", { name: "버전 목록" });
+    const row = within(list).getByText("1.0").closest("li")!;
+    expect(await within(row).findByRole("alert")).toHaveTextContent("진행률을 불러오지 못했습니다");
+    expect(within(row).queryByText("달린 이슈가 없습니다")).not.toBeInTheDocument();
+    aggregate.mockRestore();
+    await user.click(within(row).getByRole("button", { name: "다시 시도" }));
+    expect(await within(row).findByText("달린 이슈가 없습니다")).toBeInTheDocument();
+  });
 });
+
+afterEach(() => vi.restoreAllMocks());

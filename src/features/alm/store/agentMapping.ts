@@ -337,6 +337,14 @@ export function mapAgentRunCost(dto: AgentRunCostDto | null | undefined): AgentR
   return { costUsd: dto.costUsd, inputTokens: n(dto.inputTokens), outputTokens: n(dto.outputTokens), entries: n(dto.entries) };
 }
 
+/** 구 백엔드 배열 응답의 프로젝트 판정 — 이슈키 접두어(대소문자 무시) 또는 프로젝트 전체 합성 키 */
+function legacyRunInProject(run: AgentRunSummary, projectId: string, projectKey: string | undefined): boolean {
+  if (!run.issueKey) return false;
+  if (run.issueKey === projectWideIssueKey(projectId)) return true;
+  const dash = run.issueKey.lastIndexOf("-");
+  return !!projectKey && dash > 0 && run.issueKey.slice(0, dash).toUpperCase() === projectKey.toUpperCase();
+}
+
 /** run 목록 한 페이지 기본 크기 — 서버 기본(20)과 같다 */
 export const AGENT_RUN_PAGE_SIZE = 20;
 
@@ -348,8 +356,9 @@ const count = (value: unknown, fallback: number): number =>
 
 /**
  * `GET /api/agent/runs` 응답 → 한 페이지. P4c 서버는 `{items, page, size, total, hasNext}`, 그 이전 서버는 배열 전체를
- * 준다 — 배포 순서와 무관하게 화면이 같은 모양을 받도록 둘 다 읽는다. 배열이면 구 서버가 보지 않던 조건(persona·type)을
- * 여기서 거르고 id 내림차순으로 잘라 페이지를 만든다. 구 서버는 프로젝트 축이 없어 projectId는 거르지 못한다(전역 목록).
+ * 준다 — 배포 순서와 무관하게 화면이 같은 모양을 받도록 둘 다 읽는다. 배열이면 구 서버가 보지 않던 조건(status·persona·
+ * type·프로젝트)을 여기서 **페이지를 자르기 전에** 거르고 id 내림차순으로 잘라 페이지를 만든다. 구 서버는 프로젝트 축이 없어
+ * projectId 쿼리를 무시하므로, 프로젝트는 예전 화면처럼 이슈키 접두어(`query.projectKey`)와 프로젝트 전체 합성 키로 거른다.
  */
 export function mapAgentRunPage(body: unknown, query: AgentRunQuery = {}): AgentRunPage {
   const page = Math.max(0, query.page ?? 0);
@@ -361,7 +370,8 @@ export function mapAgentRunPage(body: unknown, query: AgentRunQuery = {}): Agent
         (r) =>
           (!query.status || r.status === query.status) &&
           (!query.personaId || r.personaId === query.personaId) &&
-          (!query.type || r.type === query.type),
+          (!query.type || r.type === query.type) &&
+          (!query.projectId || legacyRunInProject(r, query.projectId, query.projectKey)),
       )
       .sort((a, b) => Number(b.id) - Number(a.id));
     const items = all.slice(page * size, (page + 1) * size);

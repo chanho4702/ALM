@@ -71,10 +71,11 @@ function AgentRuns() {
         status: status ?? undefined,
         personaId: personaId ?? undefined,
         projectId: scopeAll ? undefined : projectId,
+        projectKey: scopeAll ? undefined : (projectKey ?? undefined),
         page,
         size: RUNS_PAGE_SIZE,
       }),
-    [status, personaId, scopeAll, projectId, page],
+    [status, personaId, scopeAll, projectId, projectKey, page],
   );
   const load = usePolledLoad(loadRuns);
 

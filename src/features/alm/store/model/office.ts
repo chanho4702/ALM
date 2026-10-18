@@ -120,6 +120,11 @@ export interface AgentRunCost {
 export interface AgentRunQuery {
   status?: AgentRunStatus;
   projectId?: string;
+  /**
+   * projectId 프로젝트의 키(예: "ALM") — 서버로 보내지 않는다. 프로젝트 축이 없는 구 백엔드(배열 응답)일 때 어댑터가
+   * 이슈키 접두어로 그 프로젝트 run만 남기는 데 쓴다. 없으면 프로젝트 전체 회의(`PROJECT-<id>`)만 남긴다(남의 run 노출 방지).
+   */
+  projectKey?: string;
   personaId?: string;
   type?: AgentRunType;
   page?: number;
