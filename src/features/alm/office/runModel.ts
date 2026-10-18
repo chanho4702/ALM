@@ -2,7 +2,22 @@
  * run 목록·상세·게이트 인박스의 순수 계산 — 필터·계보·액션 노출 규칙. 화면과 분리해 단위 테스트한다.
  * 액션 노출 규칙은 agent-service(Run.CANCELLABLE, RunResumeService.RESUMABLE)와 같다 — 서버가 최종 판정(409).
  */
-import type { AgentGate, AgentPersona, AgentRunStatus, AgentRunSummary } from "../store/types";
+import type { AgentGate, AgentPersona, AgentRunCost, AgentRunStatus, AgentRunSummary } from "../store/types";
+
+/** 원장 기록이 없는 run의 표기 — 0원으로 보이게 하지 않는다(F-16) */
+export const RUN_COST_NONE = "기록 없음";
+
+/** run 비용 "$0.1234" — 1센트 미만도 보이게 소수 넷째 자리까지. 없으면 null */
+export function formatRunCost(cost: AgentRunCost | null | undefined): string | null {
+  if (!cost) return null;
+  return `$${cost.costUsd.toFixed(4)}`;
+}
+
+/** 토큰 "입력 12,345 · 출력 1,234" — 없으면 null */
+export function formatRunTokens(cost: AgentRunCost | null | undefined): string | null {
+  if (!cost) return null;
+  return `입력 ${cost.inputTokens.toLocaleString("ko-KR")} · 출력 ${cost.outputTokens.toLocaleString("ko-KR")}`;
+}
 
 /** 계보·게이트 대조용으로 한 번에 받는 run 수 — 서버 size 상한(100). 그보다 오래된 run은 링크만 남는다 */
 export const RUN_LOOKUP_SIZE = 100;

@@ -13,7 +13,7 @@ import {
 } from "../components/AgentGlyphs";
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
-import { personaDisplay } from "./runModel";
+import { formatRunCost, personaDisplay, RUN_COST_NONE } from "./runModel";
 import { linkableIssueKey, PROJECT_WIDE_LABEL } from "./officeModel";
 import {
   AiTeamGate,
@@ -166,6 +166,12 @@ function AgentRuns() {
     },
     { key: "startedAt", header: "시작", render: (run) => <TimeCell iso={run.startedAt} /> },
     { key: "endedAt", header: "종료", render: (run) => <TimeCell iso={run.endedAt} /> },
+    {
+      key: "cost",
+      header: "비용",
+      align: "right",
+      render: (run) => formatRunCost(run.cost) ?? <span className="agent-sup-subtle">{RUN_COST_NONE}</span>,
+    },
   ];
 
   return (

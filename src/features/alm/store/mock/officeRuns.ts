@@ -173,11 +173,31 @@ export async function fetchAgentRuns(query: AgentRunQuery = {}): Promise<AgentRu
       (!query.projectId || mockRunInProject(r, query.projectId)),
   );
   return {
-    items: all.slice(page * size, (page + 1) * size),
+    items: all.slice(page * size, (page + 1) * size).map(withMockCost),
     page,
     size,
     total: all.length,
     hasNext: (page + 1) * size < all.length,
+  };
+}
+
+/**
+ * 목업 run 비용(F-16) — 서버처럼 run 목록·단건에만 붙는다. 끝난 run 대부분은 원장 합계가 있고, 일부(id 끝자리 0)와
+ * 아직 원장이 없는 진행 전 run은 null("기록 없음")이다.
+ */
+function withMockCost<T extends AgentRunSummary>(run: T): T {
+  const seed = Number(run.id) || 0;
+  const hasLedger = run.startedAt !== null && seed % 10 !== 0;
+  return {
+    ...run,
+    cost: hasLedger
+      ? {
+          costUsd: Math.round(((seed % 37) + 3) * 0.0137 * 10000) / 10000,
+          inputTokens: 12000 + (seed % 50) * 811,
+          outputTokens: 1800 + (seed % 23) * 97,
+          entries: 1 + (seed % 4),
+        }
+      : null,
   };
 }
 
@@ -196,7 +216,7 @@ export async function fetchAgentRun(runId: string): Promise<AgentRunDetail> {
   const manager = teamState.permissions.canManage;
   const meeting = agentState.meetings.size > 0 ? [...agentState.meetings.entries()].find(([, id]) => id === runId) : undefined;
   return {
-    ...run,
+    ...withMockCost(run),
     projectId: meeting ? meeting[0] : "p1",
     outputPageId: null,
     attendeePersonaIds: [],

@@ -128,6 +128,7 @@ export type {
   AgentPresence,
   AgentOfficePersona,
   AgentRunSummary,
+  AgentRunCost,
   AgentRunQuery,
   AgentRunPage,
   AgentRunDetail,

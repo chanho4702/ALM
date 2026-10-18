@@ -101,6 +101,19 @@ export interface AgentRunSummary {
   executionSite?: AgentExecutionSite;
   /** 배정·고정 러너 — 인프로세스 run·구 백엔드는 null */
   runnerId?: string | null;
+  /**
+   * 이 run의 원장 합계(F-16) — run 목록·단건에만 실린다. null(또는 없음)은 "기록 없음"이지 0원이 아니다.
+   * USER run 생성 응답·사무실 요약 run은 늘 null이다.
+   */
+  cost?: AgentRunCost | null;
+}
+
+/** run 비용 합계 — 원장(usage_ledger) 항목들의 합. `entries`는 합친 원장 행 수 */
+export interface AgentRunCost {
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  entries: number;
 }
 
 /** `GET /api/agent/runs` 조건(P4c D-P4c-1) — 전부 선택, AND. page는 0부터, size 1~100(기본 20) */

@@ -36,6 +36,7 @@ import type {
   AgentRole,
   AgentRunDetail,
   AgentRunDirective,
+  AgentRunCost,
   AgentRunPage,
   AgentRunQuery,
   AgentRunStatus,
@@ -112,6 +113,15 @@ export interface AgentRunSummaryDto {
   /** P4a — 구 백엔드는 없다 */
   executionSite?: string | null;
   runnerId?: Id | null;
+  /** F-16 — run 목록·단건만. null = 원장 기록 없음 */
+  cost?: AgentRunCostDto | null;
+}
+
+export interface AgentRunCostDto {
+  costUsd?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  entries?: number | null;
 }
 
 /** P4c `GET /api/agent/runs` 페이지 객체 — 그 이전 서버는 배열 전체 */
@@ -316,7 +326,15 @@ export function mapAgentRunSummary(dto: AgentRunSummaryDto): AgentRunSummary {
     parentRunId: dto.parentRunId === null || dto.parentRunId === undefined ? null : String(dto.parentRunId),
     executionSite: executionSiteOf(dto.executionSite),
     runnerId: dto.runnerId === null || dto.runnerId === undefined ? null : String(dto.runnerId),
+    cost: mapAgentRunCost(dto.cost),
   };
+}
+
+/** run 비용(F-16) — 없거나 모양이 낯설면 null("기록 없음"). 0으로 메우지 않는다 */
+export function mapAgentRunCost(dto: AgentRunCostDto | null | undefined): AgentRunCost | null {
+  if (!dto || typeof dto !== "object" || typeof dto.costUsd !== "number" || !Number.isFinite(dto.costUsd)) return null;
+  const n = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0);
+  return { costUsd: dto.costUsd, inputTokens: n(dto.inputTokens), outputTokens: n(dto.outputTokens), entries: n(dto.entries) };
 }
 
 /** run 목록 한 페이지 기본 크기 — 서버 기본(20)과 같다 */

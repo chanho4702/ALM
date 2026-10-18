@@ -16,7 +16,16 @@ import {
 import { formatDateTime, relTime } from "../components/time";
 import { useIssueModal } from "../components/useIssueModal";
 import { useAgentPermissions } from "../components/useAgentPermissions";
-import { canCancel, canResume, personaDisplay, runLineage, RUN_LOOKUP_SIZE } from "./runModel";
+import {
+  canCancel,
+  canResume,
+  formatRunCost,
+  formatRunTokens,
+  personaDisplay,
+  runLineage,
+  RUN_COST_NONE,
+  RUN_LOOKUP_SIZE,
+} from "./runModel";
 import { linkableIssueKey, PROJECT_WIDE_LABEL } from "./officeModel";
 import {
   AiTeamGate,
@@ -264,6 +273,14 @@ function AgentRunDetail() {
               {when(run.endedAt)}
               {duration ? <span className="agent-sup-subtle"> · {duration} 걸림</span> : null}
             </dd>
+          </div>
+          <div>
+            <dt>비용</dt>
+            <dd>{formatRunCost(run.cost) ?? <span className="agent-sup-subtle">{RUN_COST_NONE}</span>}</dd>
+          </div>
+          <div>
+            <dt>토큰</dt>
+            <dd>{formatRunTokens(run.cost) ?? <span className="agent-sup-subtle">{RUN_COST_NONE}</span>}</dd>
           </div>
         </dl>
 
