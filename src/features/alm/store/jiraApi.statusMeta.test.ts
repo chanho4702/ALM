@@ -12,19 +12,16 @@ const body = (name: string): SettingsBody =>
     enabledTypes: ["task"],
   }) as unknown as SettingsBody;
 
-const scheme = { id: "default", name: "기본", isDefault: true, body: body("할 일") };
 
-/** /projects → 프로젝트 3개, /projects/{id}/settings → 해석된 본문. 그 밖(쓰기)은 빈 200 */
+/** 일괄 상태 API(`/projects/statuses`) → 프로젝트 3개의 상태 목록. 그 밖(쓰기)은 빈 200 */
 function fakeServer(statusName = () => "할 일") {
   return vi.spyOn(client, "sharedApiFetch").mockImplementation(async (input, init) => {
     const path = String(input);
     const method = (init?.method ?? "GET").toUpperCase();
     if (method !== "GET") return json({});
-    if (path === "/api/alm/projects") {
-      return json([1, 2, 3].map((id) => ({ id, key: `P${id}`, name: `프로젝트 ${id}`, leadId: 1, createdAt: "2026-10-01T00:00:00Z" })));
+    if (path === "/api/alm/projects/statuses") {
+      return json(Object.fromEntries(["1", "2", "3"].map((id) => [id, body(statusName()).statuses])));
     }
-    const settings = /\/api\/alm\/projects\/(\d+)\/settings$/.exec(path);
-    if (settings) return json({ body: body(statusName()), source: "scheme", scheme });
     if (/\/api\/alm\/issues\/\d+$/.test(path)) {
       return json({ id: 9, key: "P1-9", projectId: 1, title: "t", description: "", type: "task", status: "todo", priority: "medium", assigneeId: null, reporterId: 1, labels: [], version: 1, createdAt: "", updatedAt: "" });
     }
@@ -32,8 +29,11 @@ function fakeServer(statusName = () => "할 일") {
   });
 }
 
-const settingsCalls = (spy: ReturnType<typeof fakeServer>) =>
-  spy.mock.calls.filter(([input, init]) => /\/settings$/.test(String(input)) && !init?.method).length;
+/** 상태 맵 조회 횟수 — 일괄 API 한 번이 한 조회다. 프로젝트별 설정(1+N)은 부르면 안 된다 */
+const settingsCalls = (spy: ReturnType<typeof fakeServer>) => {
+  expect(spy.mock.calls.some(([input]) => /\/projects\/\d+\/settings$/.test(String(input)))).toBe(false);
+  return spy.mock.calls.filter(([input]) => String(input) === "/api/alm/projects/statuses").length;
+};
 
 beforeEach(() => __clearStatusMetaCache());
 afterEach(() => {
@@ -41,12 +41,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("statusMetaByProject — 1+N 팬아웃을 세션 캐시로 줄인다 (A-10)", () => {
-  it("동시에 여러 화면이 불러도, 곧이어 다시 불러도 팬아웃은 한 번이다", async () => {
+describe("statusMetaByProject — 일괄 API 한 번 + 세션 캐시 (A-10)", () => {
+  it("동시에 여러 화면이 불러도, 곧이어 다시 불러도 일괄 조회 한 번이다 — 프로젝트별 설정은 부르지 않는다", async () => {
     const spy = fakeServer();
     const [a, b] = await Promise.all([statusMetaByProject(), statusMetaByProject()]);
     const c = await statusMetaByProject();
-    expect(settingsCalls(spy)).toBe(3);
+    expect(settingsCalls(spy)).toBe(1);
     expect(a["1"].todo.name).toBe("할 일");
     expect(b).toEqual(a);
     expect(c).toEqual(a);
@@ -61,12 +61,12 @@ describe("statusMetaByProject — 1+N 팬아웃을 세션 캐시로 줄인다 (A
     await statusMetaByProject();
     await updateIssue("9", { title: "새 제목" }, 1);
     await statusMetaByProject();
-    expect(settingsCalls(spy)).toBe(3);
+    expect(settingsCalls(spy)).toBe(1);
 
     name = "대기";
     await assignScheme("1", "other");
     expect((await statusMetaByProject())["1"].todo.name).toBe("대기");
-    expect(settingsCalls(spy)).toBe(6);
+    expect(settingsCalls(spy)).toBe(2);
   });
 
   it("다른 사람이 바꾼 스킴은 유효 시간(60초)이 지나면 다시 읽는다", async () => {
@@ -76,10 +76,10 @@ describe("statusMetaByProject — 1+N 팬아웃을 세션 캐시로 줄인다 (A
     await statusMetaByProject();
     vi.setSystemTime(new Date("2026-10-18T00:00:59Z"));
     await statusMetaByProject();
-    expect(settingsCalls(spy)).toBe(3);
+    expect(settingsCalls(spy)).toBe(1);
     vi.setSystemTime(new Date("2026-10-18T00:01:01Z"));
     await statusMetaByProject();
-    expect(settingsCalls(spy)).toBe(6);
+    expect(settingsCalls(spy)).toBe(2);
   });
 
   it("실패한 조회는 캐시하지 않는다 — 다음 호출이 다시 묻는다", async () => {
@@ -88,6 +88,6 @@ describe("statusMetaByProject — 1+N 팬아웃을 세션 캐시로 줄인다 (A
     spy.mockRestore();
     const next = fakeServer();
     await statusMetaByProject();
-    expect(settingsCalls(next)).toBe(3);
+    expect(settingsCalls(next)).toBe(1);
   });
 });

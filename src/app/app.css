@@ -4240,6 +4240,17 @@ th:last-child > [role="separator"] {
   gap: var(--chanho-space-100);
   align-items: end;
 }
+/* 하위 이슈가 한 페이지를 넘을 때의 안내 */
+.issue-relations-more {
+  margin: var(--chanho-space-50) 0 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-50);
+}
+/* 볼 수 없는 링크 반대편 — 누를 수 없는 행, 잠금 아이콘 + 흐린 글자 */
+.issue-relation-row.is-restricted {
+  cursor: default;
+  color: var(--chanho-color-text-subtle);
+}
 .shortcut-edit-form {
   flex: 1;
   min-width: 0;

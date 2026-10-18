@@ -3,6 +3,7 @@ import * as client from "./apiClient";
 import {
   completeSprint,
   listProjectChanges,
+  listProjectChangeWindow,
   updateSprint,
   createIssue,
   createProject,
@@ -438,6 +439,23 @@ describe("jiraApi changes", () => {
     await listProjectChanges("3");
 
     expect(spy.mock.calls[0][0]).toBe("/api/alm/projects/3/changes");
+  });
+
+  it("기간 창(since·until)·상한(limit)을 보내고, 서버의 X-Result-Truncated 헤더를 truncated로 올린다", async () => {
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      new Response("[]", { status: 200, headers: { "Content-Type": "application/json", "X-Result-Truncated": "true" } }),
+    );
+
+    const window = await listProjectChangeWindow("3", {
+      since: "2026-08-01T00:00:00Z",
+      until: "2026-09-01T00:00:00Z",
+      limit: 500,
+    });
+
+    expect(spy.mock.calls[0][0]).toBe(
+      "/api/alm/projects/3/changes?since=2026-08-01T00%3A00%3A00Z&until=2026-09-01T00%3A00%3A00Z&limit=500",
+    );
+    expect(window).toEqual({ items: [], truncated: true });
   });
 });
 

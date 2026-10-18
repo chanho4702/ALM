@@ -98,6 +98,7 @@ import type {
 } from "./types";
 import { CURRENT_USER_ID } from "../../../mock/users";
 import {
+  CHANGE_HISTORY_MAX_LIMIT,
   DEFAULT_PREFERENCES,
   assertAvatarFile,
   notifyAvatarChanged,
@@ -1368,6 +1369,13 @@ function assertCanAdmin(data: JiraData, projectId: string): void {
   assertNotArchived(data, projectId);
 }
 
+/** 댓글·워크로그 삭제 — 작성자 또는 그 이슈 프로젝트의 관리자(서버 감사 A-17 규칙과 같다) */
+function canDeleteOwnedEntry(data: JiraData, authorId: string, issueId: string): boolean {
+  if (authorId === CURRENT_USER_ID) return true;
+  const projectId = data.issues.find((i) => i.id === issueId)?.projectId;
+  return projectId !== undefined && myRole(data, projectId) === "admin";
+}
+
 function myRole(data: JiraData, projectId: string): ProjectRole | null {
   return (
     data.members.find((m) => m.projectId === projectId && m.userId === CURRENT_USER_ID)?.role ??
@@ -2131,7 +2139,7 @@ export async function deleteWorklog(id: string): Promise<void> {
   const data = load();
   const index = data.worklogs.findIndex((w) => w.id === id);
   if (index === -1) throw new Error("워크로그를 찾을 수 없습니다");
-  if (data.worklogs[index].authorId !== CURRENT_USER_ID) {
+  if (!canDeleteOwnedEntry(data, data.worklogs[index].authorId, data.worklogs[index].issueId)) {
     throw new Error("본인 워크로그만 삭제할 수 있습니다");
   }
   data.worklogs.splice(index, 1);
@@ -2183,6 +2191,18 @@ export async function listIssueAncestors(issueId: string, parentId?: string | nu
     cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
   }
   return clone(ancestors);
+}
+
+/** 자식 한 페이지(서버와 같은 상한 200건) — `truncated`면 더 있다 */
+export async function listChildrenPage(issueId: string): Promise<IssuePage> {
+  const all = await listChildren(issueId);
+  return {
+    items: all.slice(0, MAX_SEARCH_PAGE_SIZE),
+    page: 0,
+    size: MAX_SEARCH_PAGE_SIZE,
+    total: all.length,
+    truncated: all.length > MAX_SEARCH_PAGE_SIZE,
+  };
 }
 
 export async function listChildren(issueId: string): Promise<Issue[]> {
@@ -2247,6 +2267,11 @@ export interface IssueLinkView {
   other: Issue;
   /** blocks: outward=차단함, inward=차단됨 / relates: 항상 outward(관련) */
   direction: "outward" | "inward";
+  /**
+   * 반대편 프로젝트를 볼 수 없다 — `other`는 키·id·타입·상태만 남은 축약본(제목은 "볼 수 없는 이슈", 나머지 비움).
+   * 화면은 잠금 표시로 그리고 열지 않는다. 목업은 프로젝트 권한 경계가 없어 늘 false다.
+   */
+  restricted: boolean;
 }
 
 export async function listIssueLinks(issueId: string): Promise<IssueLinkView[]> {
@@ -2260,7 +2285,7 @@ export async function listIssueLinks(issueId: string): Promise<IssueLinkView[]> 
     const def = linkTypeDefOf(data, link.type);
     const direction: IssueLinkView["direction"] =
       (def && isSymmetric(def)) || link.sourceId === issueId ? "outward" : "inward";
-    views.push({ link: clone(link), other: clone(other), direction });
+    views.push({ link: clone(link), other: clone(other), direction, restricted: false });
   }
   return views;
 }
@@ -3880,6 +3905,8 @@ export interface IssuePage {
   page: number;
   size: number;
   total: number;
+  /** 이 페이지 뒤에 결과가 더 있다 — 한 페이지만 읽는 화면이 "더 있음"을 그린다(서버 `truncated`와 같다) */
+  truncated: boolean;
 }
 
 /**
@@ -4070,7 +4097,13 @@ export async function findIssues(
   const sorted = sortIssues(data, issues, sort, statusOf);
   const size = Math.min(MAX_SEARCH_PAGE_SIZE, Math.max(1, paging.size));
   const page = Math.max(0, paging.page);
-  return { items: clone(sorted.slice(page * size, page * size + size)), page, size, total: sorted.length };
+  return {
+    items: clone(sorted.slice(page * size, page * size + size)),
+    page,
+    size,
+    total: sorted.length,
+    truncated: (page + 1) * size < sorted.length,
+  };
 }
 
 /** 한 축 집계 — 나온 값만, 건수 내림차순·키 오름차순(서버와 같다) */
@@ -4332,7 +4365,7 @@ export async function deleteComment(id: string): Promise<void> {
   const data = load();
   const index = data.comments.findIndex((c) => c.id === id);
   if (index === -1) throw new Error("코멘트를 찾을 수 없습니다");
-  if (data.comments[index].authorId !== CURRENT_USER_ID) {
+  if (!canDeleteOwnedEntry(data, data.comments[index].authorId, data.comments[index].issueId)) {
     throw new Error("본인 댓글만 삭제할 수 있습니다");
   }
   data.comments.splice(index, 1);
@@ -5531,15 +5564,28 @@ export async function markAllNotificationsRead(
  * 스프린트 필터는 **전이의 양쪽**을 잡는다(서버와 같은 규칙) — 떠난 줄을 놓치면 원래 스프린트의
  * "빠진 이슈"를 셀 수 없다.
  */
-export async function listProjectChanges(
-  projectId: string,
-  filter: { field?: ChangeField; sprintId?: string; since?: string } = {},
-): Promise<IssueChange[]> {
+/** 변경 이력 조회 조건 — since 포함·until 배타(ISO-8601), limit은 서버와 같은 기본·최대 20000 */
+export interface ChangeFilter {
+  field?: ChangeField;
+  sprintId?: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+}
+
+/** 이력 한 묶음 — truncated면 기간 안에 limit보다 많아 오래된 쪽이 잘렸다(서버 `X-Result-Truncated`) */
+export interface ChangeWindow {
+  items: IssueChange[];
+  truncated: boolean;
+}
+
+export async function listProjectChangeWindow(projectId: string, filter: ChangeFilter = {}): Promise<ChangeWindow> {
   const data = load();
   const rows = data.changes.filter((change) => {
     if (change.projectId !== projectId) return false;
     if (filter.field && change.field !== filter.field) return false;
     if (filter.since && change.at < filter.since) return false;
+    if (filter.until && change.at >= filter.until) return false;
     if (filter.sprintId) {
       const touchesSprint =
         change.sprintId === filter.sprintId ||
@@ -5551,7 +5597,15 @@ export async function listProjectChanges(
   });
   // 같은 밀리초에 쌓인 줄은 **기록 순서**로 남긴다. id는 UUID라 문자열 비교가 무작위가 되고,
   // 그러면 "마지막 변경"이 실행마다 달라진다. Array.sort는 안정 정렬이라 동률은 삽입 순서를 지킨다.
-  return clone(rows.sort((a, b) => a.at.localeCompare(b.at)));
+  const sorted = rows.sort((a, b) => a.at.localeCompare(b.at));
+  const cap = Math.min(CHANGE_HISTORY_MAX_LIMIT, Math.max(1, filter.limit ?? CHANGE_HISTORY_MAX_LIMIT));
+  const truncated = sorted.length > cap;
+  return { items: clone(truncated ? sorted.slice(sorted.length - cap) : sorted), truncated };
+}
+
+/** 변경 이력(시간 오름차순) — 잘림 여부가 필요하면 listProjectChangeWindow */
+export async function listProjectChanges(projectId: string, filter: ChangeFilter = {}): Promise<IssueChange[]> {
+  return (await listProjectChangeWindow(projectId, filter)).items;
 }
 
 export async function listActivity(issueId: string): Promise<Activity[]> {
@@ -5781,6 +5835,7 @@ export async function queryIssuesAql(
     page,
     size,
     total: rows.length,
+    truncated: (page + 1) * size < rows.length,
   };
 }
 
@@ -5848,3 +5903,4 @@ export {
   formatAvatarLimit,
   notifyAvatarChanged,
 } from "./shared";
+export { CHANGE_HISTORY_MAX_LIMIT } from "./shared";

@@ -22,7 +22,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("디렉터리 조회와 복구", () => {
   it("이슈 본문 전체 대신 작은 페이지의 total을 개수로 사용한다", async () => {
     const projects = await store.listProjects();
-    const page = vi.spyOn(store, "listIssuesPage").mockResolvedValue({ items: [], page: 0, size: 1, total: 1250 });
+    const page = vi.spyOn(store, "listIssuesPage").mockResolvedValue({ items: [], page: 0, size: 1, total: 1250, truncated: true });
     const all = vi.spyOn(store, "listIssues");
     renderPage(<ProjectListPage projects={projects} onProjectsChanged={() => {}} />);
     expect(await screen.findByText("1250개")).toBeInTheDocument();

@@ -77,4 +77,39 @@ describe("IssueDetailModal 조회 범위 — 프로젝트 전체 이슈를 읽�
     expect(await screen.findByRole("option", { name: /ALM-5/ })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /ALM-3 / })).not.toBeInTheDocument();
   });
+
+  it("볼 수 없는 프로젝트의 링크 반대편은 잠금 표시로 — 제목 대신 '볼 수 없는 이슈', 열 수 없다", async () => {
+    const real = await store.listIssueLinks("i2");
+    vi.spyOn(store, "listIssueLinks").mockResolvedValue([
+      ...real,
+      {
+        link: { id: "lx", sourceId: "i2", targetId: "x9", type: "relates" },
+        other: { ...real[0].other, id: "x9", key: "SEC-9", title: "볼 수 없는 이슈", description: "" },
+        direction: "outward",
+        restricted: true,
+      },
+    ]);
+    renderModal("ALM-2");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    const links = await within(dialog).findByTestId("issue-links");
+    const row = await within(links).findByTestId("issue-link-restricted");
+    expect(row).toHaveTextContent("SEC-9");
+    expect(row).toHaveTextContent("볼 수 없는 이슈");
+    expect(within(links).queryByRole("button", { name: /SEC-9 볼 수 없는/ })).not.toBeInTheDocument();
+    expect(within(links).getByRole("button", { name: "SEC-9 링크 제거" })).toBeInTheDocument();
+  });
+
+  it("하위 이슈가 한 페이지를 넘으면 'N건 중 M건'을 알리고, 완료 수·전체 수는 서버 집계로 센다", async () => {
+    const page = await store.listChildrenPage("i4"); // 시드: 에픽 ALM-4의 하위
+    vi.spyOn(store, "listChildrenPage").mockResolvedValue({ ...page, total: 450, truncated: true });
+    const aggregate = vi
+      .spyOn(store, "aggregateIssues")
+      .mockImplementation(async (criteria) => ({ total: criteria.openOnly ? 300 : 450, buckets: [] }));
+    renderModal("ALM-4");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
+    const children = within(dialog).getByTestId("issue-children");
+    expect(await within(children).findByRole("note")).toHaveTextContent(`하위 이슈 450건 중 ${page.items.length}건만 보입니다`);
+    expect(children).toHaveTextContent("(완료 150/450)");
+    expect(aggregate).toHaveBeenCalledWith({ parentId: "i4" }, "statusCategory");
+  });
 });

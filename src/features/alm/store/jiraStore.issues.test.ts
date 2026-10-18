@@ -296,9 +296,19 @@ describe("updateComment / deleteComment", () => {
     expect(await listComments(issue.id)).toHaveLength(0);
   });
 
-  it("타인 댓글은 수정/삭제할 수 없다 (시드 c2는 u2 작성)", async () => {
+  it("타인 댓글은 관리자가 아니면 삭제할 수 없고, 수정은 관리자도 못 한다 (시드 c2는 u2 작성)", async () => {
+    const { updateProjectMemberRole } = await import("./jiraStore");
     await expect(updateComment("c2", "해킹")).rejects.toThrow("본인 댓글만 수정할 수 있습니다");
+    // 현재 사용자(u1)를 편집자로 내린다 — 관리자 자리는 u2에게
+    await updateProjectMemberRole("p1", "u2", "admin");
+    await updateProjectMemberRole("p1", "u1", "editor");
     await expect(deleteComment("c2")).rejects.toThrow("본인 댓글만 삭제할 수 있습니다");
+  });
+
+  it("프로젝트 관리자는 남의 댓글을 지울 수 있다 — 부적절한 댓글 정리(서버 규칙과 같다)", async () => {
+    const two = await getIssueByKey("ALM-2"); // 시드: u1은 p1 관리자
+    await deleteComment("c2");
+    expect((await listComments(two!.id)).map((c) => c.id)).not.toContain("c2");
   });
 
   it("빈 본문 수정과 없는 댓글은 거부한다", async () => {
@@ -503,9 +513,16 @@ describe("worklogs (시간 추적)", () => {
     );
   });
 
-  it("본인 워크로그만 삭제할 수 있다 (시드 w1은 u2 작성)", async () => {
-    const { deleteWorklog, listWorklogs } = await import("./jiraStore");
+  it("워크로그는 본인 또는 프로젝트 관리자만 삭제할 수 있다 (시드 w1은 u2 작성)", async () => {
+    const { deleteWorklog, listWorklogs, updateProjectMemberRole } = await import("./jiraStore");
     const two = await getIssueByKey("ALM-2");
+    await deleteWorklog("w1"); // u1은 p1 관리자 — 남의 기록도 지운다
+    expect(await listWorklogs(two!.id)).toHaveLength(1);
+
+    __resetForTest();
+    localStorage.clear();
+    await updateProjectMemberRole("p1", "u2", "admin");
+    await updateProjectMemberRole("p1", "u1", "editor");
     await expect(deleteWorklog("w1")).rejects.toThrow("본인 워크로그만 삭제할 수 있습니다");
     await deleteWorklog("w2"); // u1 본인
     expect(await listWorklogs(two!.id)).toHaveLength(1);

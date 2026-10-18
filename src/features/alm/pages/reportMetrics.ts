@@ -78,7 +78,22 @@ export function daysBetween(from: string, to: string): number {
 }
 
 /**
- * 해당 시각까지의 이력을 재생한 이슈 상태. 이력이 창설 기록부터 없으면 현재 값으로 대신한다.
+ * 리포트가 받을 변경 이력의 시작 시각(since) — 시작한 스프린트 중 가장 이른 시작(없으면 계획 시작일)과
+ * 프로젝트 기준 리포트의 기간 시작(`rangeFromDay`) 중 이른 쪽, 하루 여유를 둔다. 이 시각 앞의 이력은
+ * `stateAt`이 현재 값에서 거꾸로 되돌려 메우므로 받지 않아도 된다.
+ */
+export function historySince(sprints: Sprint[], rangeFromDay: string): string {
+  const starts = sprints
+    .filter((sprint) => sprint.state !== "planned")
+    .map((sprint) => sprint.startedAt ?? (sprint.plannedStart ? startOfLocalDay(sprint.plannedStart) : null))
+    .filter((at): at is string => at !== null);
+  const earliest = [startOfLocalDay(rangeFromDay), ...starts].sort()[0];
+  return new Date(new Date(earliest).getTime() - DAY_MS).toISOString();
+}
+
+/**
+ * 해당 시각까지의 이력을 재생한 이슈 상태. 창설 기록이 있으면 앞으로 재생하고, 창설이 조회 창 앞이라 없으면
+ * 현재 값에서 거꾸로 되돌린다. 이력이 아예 없으면 현재 값으로 대신한다.
  *
  * `ignoreSprintMovesAt`은 "완료 처리로 한꺼번에 옮긴 순간"을 재생에서 뺀다 — 완료된 스프린트
  * 리포트는 이관 직전의 소속으로 이슈를 세야 미완료 목록이 비지 않는다.
@@ -99,8 +114,27 @@ export function stateAt(
     (change) => change.issueId === issue.id && change.field === "status" && change.fromValue === null,
   );
   if (!creation) {
-    // 이력이 없는 이슈(예: 기능 도입 전 데이터) — 현재 값을 그대로 쓴다. 선이 평평해지지만 거짓은 아니다.
-    return { status: issue.status, sprintId: issue.sprintId, replayed: false };
+    const all = changes.filter((change) => change.issueId === issue.id);
+    if (all.length === 0) {
+      // 이력이 없는 이슈(예: 기능 도입 전 데이터) — 현재 값을 그대로 쓴다. 선이 평평해지지만 거짓은 아니다.
+      return { status: issue.status, sprintId: issue.sprintId, replayed: false };
+    }
+    // 창설 기록이 조회 창(since) 앞에 있다 — 현재 값에서 그 시각 뒤의 변경을 거꾸로 되돌린다. 리포트가 이력을
+    // 기간으로 잘라 받아도(감사 A-08) 창 안의 시각이면 앞으로 재생한 것과 같은 결과다.
+    let status = issue.status;
+    let sprintId: string | null = issue.sprintId;
+    const undo = all
+      .filter(
+        (change) =>
+          change.at > atExclusiveEnd ||
+          (change.field === "sprint" && ignoreSprintMovesAt !== undefined && change.at === ignoreSprintMovesAt),
+      )
+      .reverse();
+    for (const change of undo) {
+      if (change.field === "status") status = change.fromValue ?? status;
+      else if (change.field === "sprint") sprintId = change.fromValue;
+    }
+    return { status, sprintId, replayed: true };
   }
   let status = creation.toValue ?? issue.status;
   let sprintId: string | null = null;

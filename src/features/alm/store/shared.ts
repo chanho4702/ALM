@@ -59,3 +59,8 @@ export function assertAvatarFile(file: File, maxBytes: number): void {
     throw new Error(`아바타는 ${formatAvatarLimit(maxBytes)} 이하 이미지여야 합니다`);
   }
 }
+
+// ── 변경 이력 ──
+
+/** 변경 이력 한 번 조회의 상한(서버 `IssueChangeLogService`와 같은 기본·최대) */
+export const CHANGE_HISTORY_MAX_LIMIT = 20_000;

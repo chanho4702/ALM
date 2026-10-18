@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Issue, IssueChange, Sprint, WorkflowStatus } from "../store/types";
-import { burndownSeries, sprintReport } from "./reportMetrics";
+import { burndownSeries, sprintReport, stateAt } from "./reportMetrics";
 
 const STATUSES: WorkflowStatus[] = [
   { id: "todo", name: "할 일", category: "todo", order: 1 },
@@ -359,5 +359,41 @@ describe("sprintReport 스코프", () => {
 
     expect(report.added.map((i) => i.id)).toEqual(["1"]);
     expect(report.removed).toEqual([]);
+  });
+});
+
+describe("stateAt — 기간으로 잘린 이력(since 창, 감사 A-08)", () => {
+  // 08-01 생성(할 일·백로그) → 08-20 스프린트 s1 편입 → 08-25 진행 중 → 08-28 완료 → 08-30 백로그로
+  const current = issue({ id: "9", status: "done", sprintId: null });
+  const full = [
+    change({ issueId: "9", field: "status", fromValue: null, toValue: "todo", sprintId: null, at: "2026-08-01T00:00:00.000Z" }),
+    change({ issueId: "9", field: "sprint", fromValue: null, toValue: "s1", at: "2026-08-20T00:00:00.000Z" }),
+    change({ issueId: "9", field: "status", fromValue: "todo", toValue: "inprogress", at: "2026-08-25T00:00:00.000Z" }),
+    change({ issueId: "9", field: "status", fromValue: "inprogress", toValue: "done", at: "2026-08-28T00:00:00.000Z" }),
+    change({ issueId: "9", field: "sprint", fromValue: "s1", toValue: null, sprintId: null, at: "2026-08-30T00:00:00.000Z" }),
+  ];
+  const since = "2026-08-15T00:00:00.000Z";
+  const windowed = full.filter((c) => c.at >= since);
+
+  it("창설 기록이 창 앞에 있어도 창 안의 시각이면 전체 이력을 앞으로 재생한 것과 같다", () => {
+    for (const at of [
+      "2026-08-16T00:00:00.000Z",
+      "2026-08-21T00:00:00.000Z",
+      "2026-08-26T00:00:00.000Z",
+      "2026-08-29T00:00:00.000Z",
+      "2026-08-31T00:00:00.000Z",
+    ]) {
+      expect(stateAt(current, windowed, at), at).toEqual(stateAt(current, full, at));
+    }
+  });
+
+  it("완료 처리로 옮긴 순간을 빼는 옵션도 같다", () => {
+    const at = "2026-08-30T00:00:00.000Z";
+    expect(stateAt(current, windowed, at, at)).toEqual(stateAt(current, full, at, at));
+    expect(stateAt(current, windowed, at, at)).toMatchObject({ status: "done", sprintId: "s1", replayed: true });
+  });
+
+  it("이력이 아예 없으면 현재 값(재생 안 함)", () => {
+    expect(stateAt(current, [], "2026-08-21T00:00:00.000Z")).toEqual({ status: "done", sprintId: null, replayed: false });
   });
 });

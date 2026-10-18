@@ -34,6 +34,8 @@ export type { ProjectPatch,
   BulkDeleteTarget,
   BulkResult,
   ResolvedSettings,
+  ChangeFilter,
+  ChangeWindow,
 } from "./jiraMock";
 
 /** 목업에만 있는 테스트 훅·내부 값 — REST 계약에서 뺀다(REST 빌드에서 이 이름들은 undefined다) */
@@ -100,6 +102,8 @@ export const addWorklog = impl.addWorklog;
 export const deleteWorklog = impl.deleteWorklog;
 export const setIssueParent = impl.setIssueParent;
 export const listChildren = impl.listChildren;
+/** 자식 한 페이지 + truncated — 이슈 상세의 "N건 중 M건" 표시용 */
+export const listChildrenPage = impl.listChildrenPage;
 /** 상위 항목 경로(루트 먼저) — 이슈 상세의 경로 표시용, 프로젝트 전체를 읽지 않는다 */
 export const listIssueAncestors = impl.listIssueAncestors;
 export const addIssueLink = impl.addIssueLink;
@@ -209,6 +213,9 @@ export const listNotifications = impl.listNotifications;
 export const markNotificationRead = impl.markNotificationRead;
 export const markAllNotificationsRead = impl.markAllNotificationsRead;
 export const listProjectChanges = impl.listProjectChanges;
+/** 변경 이력 + 잘림 여부(서버 상한 20000) — 리포트가 since 창으로 부른다 */
+export const listProjectChangeWindow = impl.listProjectChangeWindow;
+export const CHANGE_HISTORY_MAX_LIMIT = impl.CHANGE_HISTORY_MAX_LIMIT;
 export const listActivity = impl.listActivity;
 export const DEFAULT_PREFERENCES = impl.DEFAULT_PREFERENCES;
 export const getMyPreferences = impl.getMyPreferences;

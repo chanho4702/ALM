@@ -47,7 +47,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("ReportsPage 로드 실패", () => {
   it("조회가 하나라도 실패하면 스피너에 멈추지 않고 서버 문구로 오류를 보이며, 다시 시도로 회복한다", async () => {
-    vi.spyOn(store, "listProjectChanges").mockRejectedValueOnce(new Error("ALM 서비스를 사용할 수 없습니다"));
+    vi.spyOn(store, "listProjectChangeWindow").mockRejectedValueOnce(new Error("ALM 서비스를 사용할 수 없습니다"));
     const user = userEvent.setup();
     renderReports();
 

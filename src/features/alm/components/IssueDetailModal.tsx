@@ -32,7 +32,9 @@ import {
   findIssues,
   getMyProjectRole,
   listActivity,
+  aggregateIssues,
   listChildren,
+  listChildrenPage,
   listComments,
   listIssueAncestors,
   listIssueLinks,
@@ -54,7 +56,7 @@ import { PriorityGlyph } from "./PriorityGlyph";
 import { ResolutionGlyph } from "./ResolutionGlyph";
 import { StatusGlyph } from "./StatusGlyph";
 import { useIssueTypes } from "./useIssueTypes";
-import { Plus, UserRound } from "lucide-react";
+import { Lock, Plus, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
@@ -151,6 +153,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [users, setUsers] = useState<User[]>([]);
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [canEdit, setCanEdit] = useState(true);
+  /** 프로젝트 관리자 — 남의 댓글·워크로그도 지울 수 있다(서버 규칙: 작성자 또는 프로젝트 ADMIN) */
+  const [isProjectAdmin, setIsProjectAdmin] = useState(false);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -162,6 +166,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [ancestors, setAncestors] = useState<Issue[]>([]);
   /** 하위의 하위 — 하위 이슈마다 그 자식만 읽는다 */
   const [grandChildren, setGrandChildren] = useState<Record<string, Issue[]>>({});
+  /** 하위 이슈가 한 페이지(200건)를 넘을 때만 — 전체 건수·완료 수는 서버 집계로 센다 */
+  const [childSummary, setChildSummary] = useState<{ total: number; done: number } | null>(null);
   const [parentQuery, setParentQuery] = useState("");
   const [linkQuery, setLinkQuery] = useState("");
   const [componentOptions, setComponentOptions] = useState<Component[]>([]);
@@ -227,12 +233,22 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
    * 하위의 하위는 하위 이슈마다 자식 검색 1번(동시성 상한)이다. 하나가 실패해도 나머지는 그린다.
    */
   const refreshRelations = async (issueId: string) => {
-    const [childList, linkList, worklogList] = await Promise.all([
-      listChildren(issueId),
+    const [childPage, linkList, worklogList] = await Promise.all([
+      listChildrenPage(issueId),
       listIssueLinks(issueId),
       listWorklogs(issueId),
     ]);
+    const childList = childPage.items;
     setChildren(childList);
+    if (childPage.truncated) {
+      const [all, open] = await Promise.all([
+        aggregateIssues({ parentId: issueId }, "statusCategory"),
+        aggregateIssues({ parentId: issueId, openOnly: true }, "statusCategory"),
+      ]).catch(() => [null, null] as const);
+      setChildSummary(all && open ? { total: all.total, done: all.total - open.total } : { total: childPage.total, done: 0 });
+    } else {
+      setChildSummary(null);
+    }
     setLinks(linkList);
     setWorklogs(worklogList);
     const nested = await settleWithConcurrency(childList, (child) => listChildren(child.id));
@@ -258,6 +274,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       if (cancelled) return;
       setVersions(list);
       setCanEdit(role !== null && role !== "viewer");
+      setIsProjectAdmin(role === "admin");
       setComponentOptions(componentList);
     });
     return () => {
@@ -818,7 +835,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   하위 이슈{" "}
                   {children.length > 0 ? (
                     <span className="issue-relations-count">
-                      (완료 {doneChildren}/{children.length})
+                      (완료 {childSummary ? childSummary.done : doneChildren}/{childSummary ? childSummary.total : children.length})
                     </span>
                   ) : null}
                 </h4>
@@ -876,6 +893,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   </li>
                 ))}
               </ul>
+              {childSummary ? (
+                <p className="issue-relations-more" role="note">
+                  하위 이슈 {childSummary.total}건 중 {children.length}건만 보입니다 — 나머지는 검색에서 찾아 주세요.
+                </p>
+              ) : null}
               {subtaskFormOpen ? (
                 <form
                   className="issue-relation-add"
@@ -936,8 +958,16 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                 <div key={group.title} className="issue-link-group">
                   <span className="issue-link-group-title">{group.title}</span>
                   <ul className="issue-relation-list">
-                    {group.items.map(({ link, other }) => (
+                    {group.items.map(({ link, other, restricted }) => (
                       <li key={link.id} className="issue-link-item">
+                        {restricted ? (
+                          /* 반대편 프로젝트를 볼 수 없다 — 서버가 키·타입·상태만 남긴 축약본이라 열지 않고 잠금으로 표시한다 */
+                          <span className="issue-relation-row is-restricted" data-testid="issue-link-restricted">
+                            <Lock size={14} aria-hidden />
+                            <span className="issue-key-cell">{other.key}</span>
+                            <span className="issue-relation-title">볼 수 없는 이슈</span>
+                          </span>
+                        ) : (
                         <button
                           type="button"
                           className="issue-relation-row"
@@ -953,6 +983,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                             </Lozenge>
                           </span>
                         </button>
+                        )}
                         <Button
                           variant="ghost"
                           size="small"
@@ -1377,18 +1408,18 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                           ? `${formatDateTime(comment.createdAt)} (수정됨)`
                           : formatDateTime(comment.createdAt)
                       }
-                      // 본인 댓글에만 수정/삭제 노출. 수정 중엔 편집 폼의 저장/취소가 대신한다
+                      // 수정은 본인만, 삭제는 본인 또는 프로젝트 관리자. 수정 중엔 편집 폼의 저장/취소가 대신한다
                       actions={
-                        mine && !editing
-                          ? [
-                              { label: "수정", onClick: () => startCommentEdit(comment) },
+                        editing || !(mine || isProjectAdmin)
+                          ? undefined
+                          : [
+                              ...(mine ? [{ label: "수정", onClick: () => startCommentEdit(comment) }] : []),
                               {
                                 label: "삭제",
                                 danger: true,
                                 onClick: () => void handleCommentDelete(comment.id),
                               },
                             ]
-                          : undefined
                       }
                     >
                       {editing ? (
@@ -1484,7 +1515,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                         <span className="issue-worklog-date">{worklog.workedOn}</span>
                         <strong className="issue-worklog-hours">{worklog.hours}h</strong>
                         <span className="issue-worklog-comment">{worklog.comment}</span>
-                        {me !== null && worklog.authorId === me.id ? (
+                        {(me !== null && worklog.authorId === me.id) || isProjectAdmin ? (
                           <Button
                             variant="ghost"
                             size="small"

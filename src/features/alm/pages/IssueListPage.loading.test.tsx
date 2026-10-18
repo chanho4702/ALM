@@ -161,7 +161,7 @@ describe("IssueListPage 조회 수명주기", () => {
     }]);
     const pages = vi.spyOn(store, "listIssuesPage").mockImplementation(async (_id, filter, paging) => (
       filter?.componentId
-        ? { items: [], total: 0, ...paging }
+        ? { items: [], total: 0, truncated: false, ...paging }
         : { ...initial, total: 51, ...paging, items: paging.page === 0 ? initial.items : [initial.items[0]] }
     ));
     const user = userEvent.setup();

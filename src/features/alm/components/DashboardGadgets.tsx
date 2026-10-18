@@ -24,6 +24,7 @@ import { priorityAppearance, priorityName, statusAppearance } from "./labels";
 import { usePriorities } from "./usePriorities";
 import { burnupSeries } from "../pages/reportMetricsExt";
 import { todayKey } from "../pages/dashboardMetrics";
+import { historySince } from "../pages/reportMetrics";
 import { recentRange, worklogSummary, type WorklogSummary } from "../pages/worklogMetrics";
 import { BurnupCard } from "./ReportCharts";
 
@@ -214,13 +215,15 @@ export function SprintBurnupGadget({ gadget }: GadgetProps) {
   // 좁히면 값이 틀어진다 — 프로젝트 이슈 전량을 그대로 읽는다(reportMetrics.candidates)
   const { data, error } = useAsync(
     async () => {
-      const [issues, sprints, statuses, changes] = await Promise.all([
-        listIssues(projectId),
-        listSprints(projectId),
-        listProjectStatuses(projectId),
-        listProjectChanges(projectId),
-      ]);
+      const sprints = await listSprints(projectId);
       const sprint: Sprint | undefined = sprints.find((s) => s.state === "active") ?? sprints.find((s) => s.state === "planned");
+      // 변경 이력은 이 스프린트 기간만(감사 A-08) — 시작 전 이력은 stateAt이 현재 값에서 거꾸로 메운다
+      const since = historySince(sprint && sprint.state !== "planned" ? [sprint] : [], todayKey());
+      const [issues, statuses, changes] = await Promise.all([
+        listIssues(projectId),
+        listProjectStatuses(projectId),
+        listProjectChanges(projectId, { since }),
+      ]);
       return { issues, sprint, statuses: statuses as WorkflowStatus[], changes };
     },
     [projectId],

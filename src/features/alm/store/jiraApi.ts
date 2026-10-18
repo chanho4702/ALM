@@ -37,7 +37,6 @@ import {
 } from "./mapping";
 import type {
   Attachment,
-  ChangeField,
   OrgMemberStatus,
   OrgProfile,
   Issue,
@@ -116,7 +115,7 @@ import type {
   UserPreferencesPatch,
   AnnouncementBanner,
 } from "./types";
-import type { IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock";
+import type { ChangeFilter, ChangeWindow, IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock";
 import {
   assertAvatarFile,
   notifyAvatarChanged,
@@ -386,6 +385,8 @@ interface IssuePageDto {
   page: number;
   size: number;
   total: number;
+  /** 이 페이지 뒤에 결과가 더 있다(2026-10-18 서버 추가) */
+  truncated?: boolean;
 }
 
 export interface IssuePage {
@@ -393,6 +394,19 @@ export interface IssuePage {
   page: number;
   size: number;
   total: number;
+  /** 이 페이지 뒤에 결과가 더 있다 — 한 페이지만 읽는 화면이 "더 있음"을 그린다 */
+  truncated: boolean;
+}
+
+/** 검색 페이지 응답 → 화면 모델. truncated가 없는 응답(구 서버)은 total로 계산한다 */
+function mapIssuePage(dto: IssuePageDto): IssuePage {
+  return {
+    items: dto.items.map((row, index) => mapIssue(row, dto.page * dto.size + index + 1)),
+    page: dto.page,
+    size: dto.size,
+    total: dto.total,
+    truncated: dto.truncated ?? dto.page * dto.size + dto.items.length < dto.total,
+  };
 }
 
 /** 서버 검색 파라미터 — 목록 값은 반복 파라미터로 보낸다 */
@@ -448,12 +462,7 @@ export async function findIssues(
     size: String(Math.min(MAX_SEARCH_PAGE_SIZE, Math.max(1, paging.size))),
   });
   const dto = await sharedGet<IssuePageDto>(`/api/alm/issues/search?${query}`);
-  return {
-    items: dto.items.map((row, index) => mapIssue(row, dto.page * dto.size + index + 1)),
-    page: dto.page,
-    size: dto.size,
-    total: dto.total,
-  };
+  return mapIssuePage(dto);
 }
 
 /** 한 축 집계 — 이슈 본문을 받지 않고 서버가 GROUP BY로 센다 */
@@ -608,14 +617,7 @@ function assertPatchFieldsSupported(_patch: IssuePatch): void {
 export async function updateIssue(id: string, patch: IssuePatch, expectedVersion: number): Promise<Issue> {
   assertPatchFieldsSupported(patch);
   if (!Number.isInteger(expectedVersion)) throw new Error("편집을 시작한 이슈 버전이 필요합니다");
-  return putIssue(id, await issueDto(id), patch, expectedVersion);
-}
-
-/**
- * PUT은 전체 교체라 보내지 않은 필드는 `current`(방금 읽은 본문)로 채운다. 대량 변경처럼 본문을 이미 읽은 호출은
- * 여기로 바로 와서 GET을 한 번 아낀다 — 충돌 판정은 여전히 `expectedVersion`(화면이 본 버전)으로 한다.
- */
-async function putIssue(id: string, current: IssueDto, patch: IssuePatch, expectedVersion: number): Promise<Issue> {
+  const current = await issueDto(id);
   const response = await sharedApiFetch(`/api/alm/issues/${toBackendId(id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -864,21 +866,27 @@ export async function deleteAttachment(id: string): Promise<void> {
 // ── 변경 이력 ────────────────────────────────────────────────
 
 /** 리포트 원천. 필터는 서버와 같은 의미이며 스프린트 필터는 전이 양쪽을 잡는다(서버 규칙). */
-export async function listProjectChanges(
-  projectId: string,
-  filter: { field?: ChangeField; sprintId?: string; since?: string } = {},
-): Promise<IssueChange[]> {
+/**
+ * 변경 이력 — 기간(since 포함 ~ until 배타)과 상한(limit, 서버 기본·최대 20000) 안을 시간 오름차순으로.
+ * 상한에 걸려 오래된 쪽이 잘렸으면 서버가 `X-Result-Truncated: true`를 붙인다 → `truncated`.
+ */
+export async function listProjectChangeWindow(projectId: string, filter: ChangeFilter = {}): Promise<ChangeWindow> {
   const params = new URLSearchParams();
   if (filter.field) params.set("field", toApiChangeField(filter.field));
   if (filter.sprintId) params.set("sprintId", String(toBackendId(filter.sprintId)));
   if (filter.since) params.set("since", filter.since);
+  if (filter.until) params.set("until", filter.until);
+  if (filter.limit !== undefined) params.set("limit", String(filter.limit));
   const query = params.toString();
-  const rows = await json<IssueChangeDto[]>(
-    await sharedApiFetch(
-      `/api/alm/projects/${toBackendId(projectId)}/changes${query ? `?${query}` : ""}`,
-    ),
+  const response = await sharedApiFetch(
+    `/api/alm/projects/${toBackendId(projectId)}/changes${query ? `?${query}` : ""}`,
   );
-  return rows.map(mapIssueChange);
+  const rows = await json<IssueChangeDto[]>(response);
+  return { items: rows.map(mapIssueChange), truncated: response.headers.get("X-Result-Truncated") === "true" };
+}
+
+export async function listProjectChanges(projectId: string, filter: ChangeFilter = {}): Promise<IssueChange[]> {
+  return (await listProjectChangeWindow(projectId, filter)).items;
 }
 
 // ── 순서 ─────────────────────────────────────────────────────
@@ -950,34 +958,71 @@ export interface BulkResult {
   failed: { id: string; key: string; reason: string }[];
 }
 
+/** 서버 일괄 편집 한 요청의 최대 이슈 수(`IssueBulkUpdateRequest.MAX_ITEMS`) — 넘으면 나눠 보낸다 */
+export const BULK_UPDATE_MAX_ITEMS = 200;
+/** 서버가 키를 주지 않은 실패 행(볼 수 없거나 없는 이슈)의 표시 */
+export const BULK_HIDDEN_ISSUE_LABEL = "볼 수 없는 이슈";
+
+interface BulkUpdateRowDto {
+  issueId: number;
+  key: string | null;
+  ok: boolean;
+  code: "OK" | "CONFLICT" | "FORBIDDEN" | "NOT_FOUND" | "INVALID" | "UNAVAILABLE" | "ERROR";
+  error: string | null;
+  currentVersion: number | null;
+}
+
+interface BulkUpdateResponseDto {
+  updated: number;
+  failed: number;
+  results: BulkUpdateRowDto[];
+}
+
+/** 보낸 키만 바뀐다 — assigneeId·sprintId·fixVersionId의 null은 "비우기" */
+function bulkChanges(patch: BulkIssuePatch): Record<string, unknown> {
+  const optionalId = (value: string | null) => (value === null ? null : toBackendId(value));
+  return {
+    ...(patch.status !== undefined ? { status: patch.status } : {}),
+    ...(patch.priority !== undefined ? { priority: toApiIssuePriority(patch.priority) } : {}),
+    ...(patch.assigneeId !== undefined ? { assigneeId: optionalId(patch.assigneeId) } : {}),
+    ...(patch.sprintId !== undefined ? { sprintId: optionalId(patch.sprintId) } : {}),
+    ...(patch.fixVersionId !== undefined ? { fixVersionId: optionalId(patch.fixVersionId) } : {}),
+    ...(patch.addLabels !== undefined ? { addLabels: patch.addLabels } : {}),
+    ...(patch.removeLabels !== undefined ? { removeLabels: patch.removeLabels } : {}),
+  };
+}
+
 /**
- * 대상마다 화면이 본 버전으로 저장한다 — 그 사이 남이 고친 이슈는 409로 실패 목록에 남는다.
- * 서버 일괄 API가 없어 이슈마다 GET(라벨 병합·전체 교체용 본문) + PUT 두 번을 보내되, 동시성 상한 안에서 병렬로 돈다.
+ * 일괄 편집 — `POST /api/alm/issues/bulk` 한 요청(200건 넘으면 나눠서). 행마다 서버 트랜잭션이고 낙관적 락 기준은
+ * 화면이 본 버전이다(남이 고친 이슈는 그 행만 CONFLICT). 응답은 늘 200이고 행별 결과를 요청 순서로 준다.
+ * 400(빈 선택·중복·빈 변경)은 서버 문구 그대로 던진다.
  */
 export async function bulkUpdateIssues(targets: BulkIssueTarget[], patch: BulkIssuePatch): Promise<BulkResult> {
   if (targets.length === 0) throw new Error("선택한 이슈가 없습니다");
-  const remove = new Set(patch.removeLabels ?? []);
-  const keys = new Map<string, string>();
-  const results = await settleWithConcurrency(targets, async ({ id, version }) => {
-    const current = await issueDto(id);
-    keys.set(id, current.key);
-    const labels =
-      patch.addLabels || patch.removeLabels
-        ? [...new Set([...(current.labels ?? []).filter((l) => !remove.has(l)), ...(patch.addLabels ?? [])])]
-        : undefined;
-    return putIssue(id, current, {
-      ...(patch.status !== undefined ? { status: patch.status } : {}),
-      ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
-      ...(patch.assigneeId !== undefined ? { assigneeId: patch.assigneeId } : {}),
-      ...(patch.sprintId !== undefined ? { sprintId: patch.sprintId } : {}),
-      ...(patch.fixVersionId !== undefined ? { fixVersionId: patch.fixVersionId } : {}),
-      ...(labels ? { labels } : {}),
-    }, version);
-  });
-  return {
-    updated: results.filter((r) => r.status === "fulfilled").length,
-    failed: failedRows(targets, results, keys),
-  };
+  const changes = bulkChanges(patch);
+  let updated = 0;
+  const failed: BulkResult["failed"] = [];
+  for (let start = 0; start < targets.length; start += BULK_UPDATE_MAX_ITEMS) {
+    const chunk = targets.slice(start, start + BULK_UPDATE_MAX_ITEMS);
+    const body = await json<BulkUpdateResponseDto>(
+      await sharedApiFetch("/api/alm/issues/bulk", postJson({
+        items: chunk.map(({ id, version }) => ({ issueId: toBackendId(id), expectedVersion: version })),
+        changes,
+      })),
+    );
+    for (const row of body.results ?? []) {
+      if (row.ok) {
+        updated += 1;
+        continue;
+      }
+      failed.push({
+        id: String(row.issueId),
+        key: row.key ?? BULK_HIDDEN_ISSUE_LABEL,
+        reason: row.error ?? row.code,
+      });
+    }
+  }
+  return { updated, failed };
 }
 
 export async function bulkDeleteIssues(
@@ -988,21 +1033,12 @@ export async function bulkDeleteIssues(
   const results = await settleWithConcurrency(normalized, ({ id }) => deleteIssue(id));
   return {
     deleted: results.filter((r) => r.status === "fulfilled").length,
-    failed: failedRows(normalized, results, new Map()),
+    failed: results.flatMap((result, index) => {
+      if (result.status === "fulfilled") return [];
+      const { id, key } = normalized[index];
+      return [{ id, key: key ?? id, reason: reasonText(result.reason) }];
+    }),
   };
-}
-
-/** 실패 행 — 키는 읽어 둔 본문 → 화면이 넘긴 키 → (둘 다 없을 때만) id 순으로 */
-function failedRows(
-  targets: { id: string; key?: string }[],
-  results: PromiseSettledResult<unknown>[],
-  readKeys: Map<string, string>,
-): BulkResult["failed"] {
-  return results.flatMap((result, index) => {
-    if (result.status === "fulfilled") return [];
-    const { id, key } = targets[index];
-    return [{ id, key: readKeys.get(id) ?? key ?? id, reason: reasonText(result.reason) }];
-  });
 }
 
 // ── CSV/이관 가져오기 — 서버 일괄 API(키 보존·행 단위 실패)로 한 번에 보낸다 ──
@@ -1788,21 +1824,18 @@ export async function listProjectStatuses(projectId: string): Promise<WorkflowSt
 export type StatusMetaByProject = Record<string, Record<string, WorkflowStatus>>;
 
 /**
- * 상태 맵을 서버에서 읽는 방법 — 지금 서버에는 프로젝트별 해석 설정(`/projects/{id}/settings`)뿐이라 1+N으로 모은다.
- * 접근 가능한 프로젝트 전부를 한 번에 해석하는 일괄 엔드포인트가 생기면 같은 반환 모양의 로더로 이 자리만 바꾼다.
+ * 상태 맵을 서버에서 한 번에 읽는다 — `GET /api/alm/projects/statuses`(접근 가능한 프로젝트 → order 순 상태, 휴지통 제외).
+ * 항목 shape은 `/projects/{id}/settings`의 `body.statuses`와 같다. 프로젝트마다 설정을 부르던 1+N을 대체한다.
  */
-async function loadStatusMetaPerProject(): Promise<StatusMetaByProject> {
-  const projects = await listProjects();
-  const entries = await Promise.all(
-    projects.map(async (project) => {
-      const statuses = await listProjectStatuses(project.id);
-      return [project.id, Object.fromEntries(statuses.map((s) => [s.id, s]))] as const;
-    }),
+async function loadStatusMeta(): Promise<StatusMetaByProject> {
+  const rows = await json<Record<string, WorkflowStatus[]> | null>(await sharedApiFetch("/api/alm/projects/statuses"));
+  return Object.fromEntries(
+    Object.entries(rows ?? {}).map(([projectId, statuses]) => [
+      projectId,
+      Object.fromEntries((statuses ?? []).map((s) => [s.id, s])),
+    ]),
   );
-  return Object.fromEntries(entries);
 }
-
-const loadStatusMeta: () => Promise<StatusMetaByProject> = loadStatusMetaPerProject;
 
 /** 다른 사용자가 바꾼 스킴을 놓치지 않는 상한 — 이 탭의 설정 쓰기는 세대로 즉시 무효화된다 */
 const STATUS_META_TTL_MS = 60_000;
@@ -2555,6 +2588,8 @@ interface LinkViewDto {
   link: LinkDto;
   other: IssueDto;
   direction: IssueLinkView["direction"];
+  /** 반대편 프로젝트를 볼 수 없어 other가 축약본이다(2026-10-18, 감사 A-01) */
+  restricted?: boolean;
 }
 
 function mapLink(dto: LinkDto): IssueLink {
@@ -2574,6 +2609,7 @@ export async function listIssueLinks(issueId: string): Promise<IssueLinkView[]> 
     link: mapLink(row.link),
     other: mapIssue(row.other),
     direction: row.direction,
+    restricted: row.restricted === true,
   }));
 }
 
@@ -2647,16 +2683,16 @@ export async function listIssueAncestors(issueId: string, parentId?: string | nu
   return ancestors;
 }
 
-/** 서버 검색으로 자식을 찾는다 — 키 오름차순 */
+/**
+ * 자식 한 페이지(키 오름차순, 최대 200건) — `truncated`면 더 있다. 화면은 "N건 중 M건"을 그리고 개수는 집계로 센다.
+ */
+export async function listChildrenPage(issueId: string): Promise<IssuePage> {
+  return findIssues({ parentId: issueId }, { page: 0, size: MAX_SEARCH_PAGE_SIZE }, { field: "key", dir: "asc" });
+}
+
+/** 자식 목록(첫 페이지) — 하위의 하위처럼 개수가 중요하지 않은 자리용. 잘림 여부가 필요하면 listChildrenPage */
 export async function listChildren(issueId: string): Promise<Issue[]> {
-  const query = searchParams({
-    parentId: toBackendId(issueId).toString(),
-    sort: "key",
-    dir: "asc",
-    size: "200",
-  });
-  const dto = await json<IssuePageDto>(await sharedApiFetch(`/api/alm/issues/search?${query}`));
-  return dto.items.map((row, index) => mapIssue(row, index + 1));
+  return (await listChildrenPage(issueId)).items;
 }
 
 /** 링크·부모 선택기용 텍스트 검색 — 접근 가능한 모든 프로젝트 */
@@ -3241,12 +3277,7 @@ export async function queryIssuesAql(
   const response = await postAql("/api/alm/issues/query", { aql: requireLength(aql), page, size });
   if (!response.ok) throw await aqlError(response);
   const dto = (await response.json()) as IssuePageDto;
-  return {
-    items: dto.items.map((row, index) => mapIssue(row, dto.page * dto.size + index + 1)),
-    page: dto.page,
-    size: dto.size,
-    total: dto.total,
-  };
+  return mapIssuePage(dto);
 }
 
 /** `POST /api/alm/issues/query/validate` — 400으로 오든 200 `{ ok:false }`로 오든 같은 모양으로 돌려준다 */
@@ -3324,3 +3355,5 @@ export {
   formatAvatarLimit,
   notifyAvatarChanged,
 } from "./shared";
+
+export { CHANGE_HISTORY_MAX_LIMIT } from "./shared";

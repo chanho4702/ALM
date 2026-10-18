@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import {
+  Banner,
   Card,
   EmptyState,
   Lozenge,
@@ -24,7 +25,7 @@ import { WorklogTable } from "../components/DashboardGadgets";
 import { recentRange, worklogSummary } from "./worklogMetrics";
 import {
   listIssues,
-  listProjectChanges,
+  listProjectChangeWindow,
   listProjectStatuses,
   listSprints,
   listUsers,
@@ -34,11 +35,12 @@ import type { User } from "../store/types";
 import { useIssueModal } from "../components/useIssueModal";
 import { useTokenColors } from "../components/useTokenColors";
 import { IssueMiniList, type IssueMiniRow } from "../components/DashboardCards";
+import { CHANGE_HISTORY_MAX_LIMIT } from "../store/jiraStore";
 import { estimateSummary, formatPlannedRange, RESOLUTION_LABELS } from "../components/labels";
 import { ResolutionGlyph } from "../components/ResolutionGlyph";
 import { ValueWithIcon } from "../components/ValueWithIcon";
 import { todayKey } from "./dashboardMetrics";
-import { burndownSeries, sprintReport, type BurndownUnit } from "./reportMetrics";
+import { burndownSeries, historySince, sprintReport, type BurndownUnit } from "./reportMetrics";
 import { burnupSeries, controlChart, cumulativeFlow, velocitySeries } from "./reportMetricsExt";
 import {
   BurnupCard,
@@ -61,6 +63,13 @@ const SPRINT_SCOPED = new Set<ReportKind>(["burndown", "burnup"]);
 const RANGE_DAYS = 30;
 
 const UNIT_LABELS: Record<BurndownUnit, string> = { hours: "예상 시간", count: "이슈 수" };
+
+/** 오늘 포함 최근 `days`일의 첫날(YYYY-MM-DD, 로컬) — 누적 흐름·컨트롤 차트의 기간 시작 */
+function rangeStartDay(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - (days - 1));
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 /** 스프린트 선택 우선순위 — 진행 중 → 가장 최근 완료 → 가장 최근 계획 */
 function defaultSprint(sprints: Sprint[]): Sprint | null {
@@ -91,6 +100,8 @@ export function ReportsPage() {
 
   /** 로드 실패 문구 — 스피너에 멈추지 않고 서버가 준 문구(예: 503)로 드러낸다 */
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** 기간 안 변경 이력이 서버 상한을 넘어 오래된 쪽이 잘렸다 — 선이 그만큼 부정확할 수 있다고 알린다 */
+  const [historyTruncated, setHistoryTruncated] = useState(false);
 
   const generation = useRef(0);
   const reload = useCallback(async () => {
@@ -98,14 +109,17 @@ export function ReportsPage() {
     const mine = ++generation.current;
     let loaded;
     try {
-      loaded = await Promise.all([
+      const sprintList = await listSprints(projectId);
+      // 변경 이력은 리포트에 필요한 기간만 — 서버도 상한(20000)을 둔다(감사 A-08)
+      const since = historySince(sprintList, rangeStartDay(RANGE_DAYS));
+      const [issueList, statusList, changeWindow, userList, worklogList] = await Promise.all([
         listIssues(projectId),
-        listSprints(projectId),
         listProjectStatuses(projectId),
-        listProjectChanges(projectId),
+        listProjectChangeWindow(projectId, { since }),
         listUsers(),
         listProjectWorklogs(projectId, recentRange(RANGE_DAYS)),
       ]);
+      loaded = [issueList, sprintList, statusList, changeWindow, userList, worklogList] as const;
     } catch (error) {
       if (mine === generation.current) {
         setLoadError(error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.");
@@ -113,7 +127,9 @@ export function ReportsPage() {
       return;
     }
     if (mine !== generation.current) return;
-    const [issueList, sprintList, statusList, changeList, userList, worklogList] = loaded;
+    const [issueList, sprintList, statusList, changeWindow, userList, worklogList] = loaded;
+    const changeList = changeWindow.items;
+    setHistoryTruncated(changeWindow.truncated);
     setLoadError(null);
     setIssues(issueList);
     setSprints(sprintList);
@@ -187,11 +203,7 @@ export function ReportsPage() {
         : null,
     [sprints, issues, changes, statuses, effectiveUnit, kind],
   );
-  const rangeFrom = useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - (RANGE_DAYS - 1));
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  }, []);
+  const rangeFrom = useMemo(() => rangeStartDay(RANGE_DAYS), []);
   const flow = useMemo(
     () =>
       issues && kind === "cfd"
@@ -236,6 +248,12 @@ export function ReportsPage() {
     );
   }
 
+  const truncatedBanner = historyTruncated ? (
+    <Banner variant="warning">
+      변경 이력이 많아 최근 {CHANGE_HISTORY_MAX_LIMIT.toLocaleString()}건만 반영했습니다 — 오래된 구간의 선은 부정확할 수 있습니다.
+    </Banner>
+  ) : null;
+
   // 라벨은 접근성 이름으로 남기고 시각적으로만 감춘다 — 툴바를 한 줄로
   const kindSelect = (
     <Select
@@ -264,6 +282,7 @@ export function ReportsPage() {
               <Radio value="count" label={UNIT_LABELS.count} />
             </RadioGroup>
           </div>
+          {truncatedBanner}
           {velocity ? <VelocityCard rows={velocity} unit={effectiveUnit} /> : null}
           {worklog ? (
             <Card padding="lg" title={`워크로그 (최근 ${RANGE_DAYS}일)`} data-testid="worklog-report">
@@ -322,6 +341,7 @@ export function ReportsPage() {
             {sprint.goal ? ` · ${sprint.goal}` : ""}
           </p>
         </div>
+        {truncatedBanner}
 
         {kind === "burnup" && burnup ? (
           <>

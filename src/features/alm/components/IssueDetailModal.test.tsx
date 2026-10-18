@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
-import { __resetForTest } from "../store/jiraStore";
+import { __resetForTest, updateProjectMemberRole } from "../store/jiraStore";
 
 /** 현재 pathname+search를 노출하는 테스트 프로브 */
 function LocationProbe() {
@@ -283,7 +283,18 @@ describe("IssueDetailModal 확장 (마감일·라벨·생성/수정일·삭제)"
 });
 
 describe("IssueDetailModal 댓글 수정/삭제", () => {
-  it("본인 댓글에만 수정/삭제 버튼이 보인다 (시드: c1=김찬호 본인, c2=이서연)", async () => {
+  it("수정은 본인 댓글에만, 삭제는 프로젝트 관리자에게 모든 댓글에 보인다 (시드: c1=김찬호 본인·관리자, c2=이서연)", async () => {
+    renderBoard("/projects/p1/board?issue=ALM-2");
+
+    const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
+    const comments = await within(dialog).findByTestId("issue-comments");
+    expect(within(comments).getAllByRole("button", { name: "수정" })).toHaveLength(1);
+    await waitFor(() => expect(within(comments).getAllByRole("button", { name: "삭제" })).toHaveLength(2));
+  });
+
+  it("관리자가 아니면 남의 댓글에는 삭제 버튼이 없다", async () => {
+    await updateProjectMemberRole("p1", "u2", "admin");
+    await updateProjectMemberRole("p1", "u1", "editor");
     renderBoard("/projects/p1/board?issue=ALM-2");
 
     const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
@@ -313,6 +324,9 @@ describe("IssueDetailModal 댓글 수정/삭제", () => {
 
   it("본인 댓글을 삭제하면 목록에서 사라진다", async () => {
     const user = userEvent.setup();
+    // 편집자로 내려 본인 댓글에만 삭제 버튼이 있게 한다(관리자는 남의 댓글도 지운다)
+    await updateProjectMemberRole("p1", "u2", "admin");
+    await updateProjectMemberRole("p1", "u1", "editor");
     renderBoard("/projects/p1/board?issue=ALM-2");
 
     const dialog = await screen.findByRole("dialog", { name: "ALM-2" });
@@ -535,8 +549,8 @@ describe("IssueDetailModal 워크로그", () => {
     await user.click(within(dialog).getByRole("tab", { name: "워크로그 (2)" }));
     const worklogs = within(dialog).getByTestId("issue-worklogs");
     expect(within(worklogs).getByText("컬럼 드래그 구현")).toBeInTheDocument();
-    // 본인(u1) 것만 삭제 버튼
-    expect(within(worklogs).getAllByRole("button", { name: "워크로그 삭제" })).toHaveLength(1);
+    // u1은 프로젝트 관리자 — 본인 것과 남의 것 모두 삭제 버튼(서버 규칙: 작성자 또는 프로젝트 ADMIN)
+    await waitFor(() => expect(within(worklogs).getAllByRole("button", { name: "워크로그 삭제" })).toHaveLength(2));
   });
 
   it("작업 시간을 기록하면 목록·탭 카운트·진행률이 갱신되고, 예상 초과 시 danger", async () => {
