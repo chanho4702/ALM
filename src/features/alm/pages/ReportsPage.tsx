@@ -89,19 +89,32 @@ export function ReportsPage() {
   const [unit, setUnit] = useState<BurndownUnit | null>(null);
   const [kind, setKind] = useState<ReportKind>("burndown");
 
+  /** 로드 실패 문구 — 스피너에 멈추지 않고 서버가 준 문구(예: 503)로 드러낸다 */
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const generation = useRef(0);
   const reload = useCallback(async () => {
     if (!projectId) return;
     const mine = ++generation.current;
-    const [issueList, sprintList, statusList, changeList, userList, worklogList] = await Promise.all([
-      listIssues(projectId),
-      listSprints(projectId),
-      listProjectStatuses(projectId),
-      listProjectChanges(projectId),
-      listUsers(),
-      listProjectWorklogs(projectId, recentRange(RANGE_DAYS)),
-    ]);
+    let loaded;
+    try {
+      loaded = await Promise.all([
+        listIssues(projectId),
+        listSprints(projectId),
+        listProjectStatuses(projectId),
+        listProjectChanges(projectId),
+        listUsers(),
+        listProjectWorklogs(projectId, recentRange(RANGE_DAYS)),
+      ]);
+    } catch (error) {
+      if (mine === generation.current) {
+        setLoadError(error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.");
+      }
+      return;
+    }
     if (mine !== generation.current) return;
+    const [issueList, sprintList, statusList, changeList, userList, worklogList] = loaded;
+    setLoadError(null);
     setIssues(issueList);
     setSprints(sprintList);
     setStatuses(statusList);
@@ -114,6 +127,7 @@ export function ReportsPage() {
   useEffect(() => {
     setIssues(null);
     setSprintId(null);
+    setLoadError(null);
     void reload();
   }, [reload]);
 
@@ -192,6 +206,27 @@ export function ReportsPage() {
         : null,
     [issues, changes, statuses, rangeFrom, today, kind],
   );
+
+  if (loadError !== null) {
+    return (
+      <div className="dashboard">
+        <div role="alert">
+          <EmptyState
+            title="리포트를 불러오지 못했습니다"
+            description={loadError}
+            primaryAction={{
+              label: "다시 시도",
+              onClick: () => {
+                setLoadError(null);
+                setIssues(null);
+                void reload();
+              },
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (issues === null) {
     return (

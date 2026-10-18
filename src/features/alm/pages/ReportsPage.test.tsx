@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -7,6 +7,7 @@ import { App } from "../../../app/App";
 // 이 화면은 App에서 lazy()로 쪼개져 있다. 전체 스위트를 병렬로 돌릴 때 첫 findBy가 청크 로딩까지
 // 기다리다 한도(5s)를 넘기므로, 수집 시점에 미리 올려 lazy 해석이 즉시 끝나게 한다.
 import "./ReportsPage";
+import * as store from "../store/jiraStore";
 import { __versionForTest } from "../store/jiraStore";
 import {
   __resetForTest,
@@ -40,6 +41,24 @@ function renderReports() {
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
+});
+
+afterEach(() => vi.restoreAllMocks());
+
+describe("ReportsPage 로드 실패", () => {
+  it("조회가 하나라도 실패하면 스피너에 멈추지 않고 서버 문구로 오류를 보이며, 다시 시도로 회복한다", async () => {
+    vi.spyOn(store, "listProjectChanges").mockRejectedValueOnce(new Error("ALM 서비스를 사용할 수 없습니다"));
+    const user = userEvent.setup();
+    renderReports();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("리포트를 불러오지 못했습니다");
+    expect(alert).toHaveTextContent("ALM 서비스를 사용할 수 없습니다");
+    expect(screen.queryByRole("status", { name: "리포트 불러오는 중" })).not.toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByRole("region", { name: "번다운" })).toBeInTheDocument();
+  });
 });
 
 describe("ReportsPage", () => {
