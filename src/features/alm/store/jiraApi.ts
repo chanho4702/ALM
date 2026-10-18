@@ -120,10 +120,11 @@ import type { IssueLinkView, ProjectMemberView, ProjectPatch } from "./jiraMock"
 import {
   assertAvatarFile,
   notifyAvatarChanged,
+  notifyIssueTypesChanged,
+  notifyLinkTypesChanged,
+  notifyPrioritiesChanged,
   DEFAULT_PREFERENCES,
-  LINK_TYPES_CHANGED_EVENT,
-  PRIORITIES_CHANGED_EVENT,
-} from "./jiraMock";
+} from "./shared";
 import {
   UI_CHANGED_EVENT,
   clearLocalSavedFilters,
@@ -1909,10 +1910,6 @@ export async function deleteStatusDef(id: string): Promise<void> {
 }
 
 // 이슈 타입 레지스트리
-export const ISSUE_TYPES_CHANGED_EVENT = "alm:issue-types-changed";
-const notifyIssueTypesChanged = () => {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(ISSUE_TYPES_CHANGED_EVENT));
-};
 
 export async function listIssueTypes(): Promise<IssueTypeDef[]> {
   return (await json(await sharedApiFetch("/api/alm/settings/issue-types"))) as IssueTypeDef[];
@@ -2145,9 +2142,6 @@ export async function purgeProject(id: string): Promise<void> {
 
 // ── 링크 타입 레지스트리 (서버 V15) ──
 
-function notifyLinkTypesChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(LINK_TYPES_CHANGED_EVENT));
-}
 
 export async function listLinkTypes(): Promise<LinkTypeDef[]> {
   return (await json(await sharedApiFetch("/api/alm/settings/link-types"))) as LinkTypeDef[];
@@ -2186,9 +2180,6 @@ export async function deleteLinkType(id: string): Promise<void> {
 
 // ── 우선순위 레지스트리 (서버 V14) ──
 
-function notifyPrioritiesChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(PRIORITIES_CHANGED_EVENT));
-}
 
 export async function listPriorities(): Promise<PriorityDef[]> {
   return (await json(await sharedApiFetch("/api/alm/settings/priorities"))) as PriorityDef[];
@@ -3317,3 +3308,19 @@ export async function aqlFields(): Promise<AqlFieldsInfo> {
     keywords: body.keywords && body.keywords.length > 0 ? body.keywords : keywordList(),
   };
 }
+
+/** 이 모듈이 파사드 구현일 때의 데이터 출처 — `jiraStore.USE_REST`가 읽는다 */
+export const STORE_MODE = "rest" as "mock" | "rest";
+
+// 공용 상수·사전 검증(shared.ts) — 파사드 계약에 같이 실린다
+export {
+  AVATAR_CHANGED_EVENT,
+  AVATAR_CONTENT_TYPES,
+  DEFAULT_PREFERENCES,
+  ISSUE_TYPES_CHANGED_EVENT,
+  LINK_TYPES_CHANGED_EVENT,
+  PRIORITIES_CHANGED_EVENT,
+  assertAvatarFile,
+  formatAvatarLimit,
+  notifyAvatarChanged,
+} from "./shared";

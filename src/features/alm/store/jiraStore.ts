@@ -2,14 +2,16 @@
  * 데이터 계층 파사드 — 화면은 이 모듈만 import한다(불변 규칙 1).
  *
  * - 목업(`jiraMock.ts`, localStorage): 테스트·목업 개발의 기본.
- * - REST(`jiraApi.ts`, alm-backend): 프로덕션 빌드 또는 `VITE_ALM_DATA=rest`.
- *   REST 어댑터에 아직 없는 함수(코멘트·보드·링크·워크로그·멤버·사용자·활동)는 목업으로 떨어진다 —
- *   그 기능들의 서버화가 남은 백엔드 과제다(docs/areas/store.md "REST 미구현").
+ * - REST(`jiraApi.ts`, alm-backend): 프로덕션 빌드 또는 `VITE_ALM_DATA=rest`. 파사드의 모든 함수가 REST로 간다.
  *
- * 시그니처는 목업이 정본이다(`typeof mock`). REST는 같은 이름·같은 계약으로 미러한다.
+ * 구현은 **빌드 시점에** 고른다 — `@alm-store-impl` 별칭을 vite.config.ts가 둘 중 하나로 푼다(vitest는 항상 목업).
+ * 그래서 프로덕션 번들에는 목업·시드·샘플 데이터가 실리지 않는다. 런타임에 섞어 쓰던 `{...mock, ...rest}` 폴백은 없다.
+ *
+ * 시그니처는 목업이 정본이다(`typeof mock`). REST가 같은 이름·같은 계약을 갖는지는 아래 타입 검사가 전부 본다 —
+ * REST에 함수가 빠지거나 시그니처가 갈라지면 typecheck가 깨진다.
  */
-import * as mock from "./jiraMock";
-import * as rest from "./jiraApi";
+import * as impl from "@alm-store-impl";
+import type * as mock from "./jiraMock";
 
 export type { SavedFilter, SavedFilterInput } from "./uiStore";
 export type {
@@ -29,41 +31,28 @@ export type { ProjectPatch,
   WatchersView,
   BulkIssuePatch,
   BulkIssueTarget,
+  BulkDeleteTarget,
   BulkResult,
   ResolvedSettings,
 } from "./jiraMock";
 
+/** 목업에만 있는 테스트 훅·내부 값 — REST 계약에서 뺀다(REST 빌드에서 이 이름들은 undefined다) */
+type MockOnly =
+  | "__setAgentMockScenario"
+  | "__setMockOfficeStream"
+  | "__versionForTest"
+  | "ISSUE_CONFLICT_MESSAGE"
+  | "AVATAR_MAX_BYTES";
+
+/** 파사드 계약 = 목업 모듈의 공개 표면(테스트 훅 제외) */
+type StoreContract = Omit<typeof mock, MockOnly> & { AVATAR_MAX_BYTES: number };
+type Conforms<T extends StoreContract> = T;
+/** 컴파일 타임 검사 — REST 어댑터가 목업 계약을 전부 만족해야 한다(값 없음) */
+export type RestConformsToStoreContract = Conforms<typeof import("./jiraApi")>;
+
 /** 테스트(vitest)는 항상 목업. 프로덕션 빌드는 REST, 개발은 `VITE_ALM_DATA=rest`로 백엔드에 붙인다 */
-export const USE_REST =
-  import.meta.env.MODE !== "test" &&
-  (import.meta.env.PROD || import.meta.env.VITE_ALM_DATA === "rest");
+export const USE_REST = impl.STORE_MODE === "rest";
 
-// REST에 없는 함수는 목업이 채운다 — 계약 타입은 목업 것을 쓴다
-const impl = (USE_REST ? { ...mock, ...rest } : mock) as unknown as typeof mock;
-
-/**
- * 위 캐스트는 REST 시그니처를 검사하지 않는다 — 동시 편집 버전·서버 검색 계약처럼 두 어댑터가 반드시 같아야 하는
- * 함수는 여기서 컴파일 타임에 REST가 목업 계약을 만족하는지 확인한다(어긋나면 typecheck가 깨진다).
- */
-rest satisfies Pick<
-  typeof mock,
-  | "updateIssue"
-  | "setIssueParent"
-  | "bulkUpdateIssues"
-  | "updateSprint"
-  | "updateProject"
-  | "listIssuesPage"
-  | "queryIssuesPage"
-  | "findIssues"
-  | "aggregateIssues"
-  | "listProjectLabels"
-  | "listIssueAncestors"
-  | "updateVersion"
-  | "updateProjectShortcut"
-  | "uploadAttachment"
->;
-
-export const defaultBoard = impl.defaultBoard;
 export const __resetForTest = impl.__resetForTest;
 export const listUsers = impl.listUsers;
 export const getCurrentUser = impl.getCurrentUser;
@@ -165,10 +154,10 @@ export const sendPersonaChat = impl.sendPersonaChat;
 export const fetchPersonaDialog = impl.fetchPersonaDialog;
 export const savePersonaDialog = impl.savePersonaDialog;
 /** 테스트 전용 — 목업의 권한·키 시나리오 전환(REST에는 없다) */
-export const __setAgentMockScenario = mock.__setAgentMockScenario;
+export const __setAgentMockScenario = impl.__setAgentMockScenario;
 /** 테스트 전용 — 목업에 저장된 현재 편집 버전(동시 편집과 무관한 테스트의 저장용) */
-export const __versionForTest = mock.__versionForTest;
-export const __setMockOfficeStream = mock.__setMockOfficeStream;
+export const __versionForTest = impl.__versionForTest;
+export const __setMockOfficeStream = impl.__setMockOfficeStream;
 export type { AgentMockScenario } from "./jiraMock";
 export const listIssuesPage = impl.listIssuesPage;
 export const listWatchers = impl.listWatchers;
@@ -221,7 +210,7 @@ export const markNotificationRead = impl.markNotificationRead;
 export const markAllNotificationsRead = impl.markAllNotificationsRead;
 export const listProjectChanges = impl.listProjectChanges;
 export const listActivity = impl.listActivity;
-export const DEFAULT_PREFERENCES = mock.DEFAULT_PREFERENCES;
+export const DEFAULT_PREFERENCES = impl.DEFAULT_PREFERENCES;
 export const getMyPreferences = impl.getMyPreferences;
 export const saveMyPreferences = impl.saveMyPreferences;
 export const AVATAR_CHANGED_EVENT = impl.AVATAR_CHANGED_EVENT;
@@ -236,14 +225,14 @@ export const updateProjectShortcut = impl.updateProjectShortcut;
 export const removeProjectShortcut = impl.removeProjectShortcut;
 export const getBanner = impl.getBanner;
 export const saveBanner = impl.saveBanner;
-export const PRIORITIES_CHANGED_EVENT = mock.PRIORITIES_CHANGED_EVENT;
+export const PRIORITIES_CHANGED_EVENT = impl.PRIORITIES_CHANGED_EVENT;
 export const listPriorities = impl.listPriorities;
 export const priorityUsage = impl.priorityUsage;
 export const createPriority = impl.createPriority;
 export const updatePriority = impl.updatePriority;
 export const movePriority = impl.movePriority;
 export const deletePriority = impl.deletePriority;
-export const LINK_TYPES_CHANGED_EVENT = mock.LINK_TYPES_CHANGED_EVENT;
+export const LINK_TYPES_CHANGED_EVENT = impl.LINK_TYPES_CHANGED_EVENT;
 export const listLinkTypes = impl.listLinkTypes;
 export const linkTypeUsage = impl.linkTypeUsage;
 export const createLinkType = impl.createLinkType;

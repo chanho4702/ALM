@@ -7,6 +7,8 @@ export default defineConfig({
     // 라우터·리액트 인스턴스를 하나로 묶는다. `@chanho/org-admin`이 자기 사본을 들고 오면
     // 컨텍스트가 갈라져 "useLocation() may be used only in the context of a <Router>"가 난다.
     dedupe: ["react", "react-dom", "react-router"],
+    // 테스트는 항상 목업 — 파사드의 빌드 시점 구현 선택(vite.config.ts)과 같은 별칭
+    alias: { "@alm-store-impl": "/src/features/alm/store/jiraMock.ts" },
   },
   test: {
     environment: "jsdom",

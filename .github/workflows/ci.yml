@@ -35,6 +35,14 @@ jobs:
           pnpm test
           pnpm build
 
+      # 프로덕션 번들에 목업(localStorage 키·시드)이 실리지 않았는지 — 파사드는 빌드 시점에 REST만 묶는다(A-12)
+      - name: No mock store in bundle
+        run: |
+          if grep -l 'alm.jira.v1' dist/assets/*.js; then
+            echo "::error::목업 스토어(jiraMock)가 프로덕션 번들에 들어갔습니다"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist

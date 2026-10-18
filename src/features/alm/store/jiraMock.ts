@@ -97,6 +97,14 @@ import type {
   Worklog,
 } from "./types";
 import { CURRENT_USER_ID } from "../../../mock/users";
+import {
+  DEFAULT_PREFERENCES,
+  assertAvatarFile,
+  notifyAvatarChanged,
+  notifyIssueTypesChanged,
+  notifyLinkTypesChanged,
+  notifyPrioritiesChanged,
+} from "./shared";
 import { createSeedData } from "../../../mock/seed";
 import { ISSUE_FIELD_IDS, ISSUE_FIELD_NAMES, WORKFLOW_ANY_NODE } from "./types";
 import type { IssueQuery } from "./searchQuery";
@@ -368,7 +376,7 @@ function cloneBody(body: SettingsBody): SettingsBody {
 }
 
 /** 기본 3컬럼(할 일/진행 중/완료, WIP 없음)의 보드를 만든다 */
-export function defaultBoard(
+function defaultBoard(
   projectId: string,
   name = "메인 보드",
   type: BoardType = "scrum",
@@ -876,11 +884,6 @@ const BUILTIN_ISSUE_TYPES: IssueTypeDef[] = [
   { id: "subtask", name: "하위 작업", icon: "list-tree", color: "neutral", level: "subtask", description: "", order: 5, builtIn: true },
 ];
 
-/** 레지스트리 변경 알림 — 화면의 useIssueTypes가 듣는다 */
-export const ISSUE_TYPES_CHANGED_EVENT = "alm:issue-types-changed";
-function notifyIssueTypesChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(ISSUE_TYPES_CHANGED_EVENT));
-}
 
 function typeDefOf(data: JiraData, id: string): IssueTypeDef | undefined {
   return data.issueTypes.find((t) => t.id === id) ?? BUILTIN_ISSUE_TYPES.find((t) => t.id === id);
@@ -909,10 +912,6 @@ const BUILTIN_LINK_TYPES: LinkTypeDef[] = [
   { id: "clones", name: "복제", outward: "복제함", inward: "복제됨", order: 5, builtIn: true },
 ];
 
-export const LINK_TYPES_CHANGED_EVENT = "alm:link-types-changed";
-function notifyLinkTypesChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(LINK_TYPES_CHANGED_EVENT));
-}
 
 function linkTypeDefOf(data: JiraData, id: string): LinkTypeDef | undefined {
   return data.linkTypes.find((t) => t.id === id) ?? BUILTIN_LINK_TYPES.find((t) => t.id === id);
@@ -920,10 +919,6 @@ function linkTypeDefOf(data: JiraData, id: string): LinkTypeDef | undefined {
 
 const isSymmetric = (def: LinkTypeDef) => def.outward === def.inward;
 
-export const PRIORITIES_CHANGED_EVENT = "alm:priorities-changed";
-function notifyPrioritiesChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(PRIORITIES_CHANGED_EVENT));
-}
 
 function priorityDefOf(data: JiraData, id: string): PriorityDef | undefined {
   return data.priorities.find((p) => p.id === id) ?? BUILTIN_PRIORITIES.find((p) => p.id === id);
@@ -5569,15 +5564,6 @@ export async function listActivity(issueId: string): Promise<Activity[]> {
 
 // ── 개인 설정 · 바로 가기 · 공지 배너 (지라 메뉴 대조 2026-08-30) ────────────
 
-export const DEFAULT_PREFERENCES: UserPreferences = {
-  notifications: { assigned: true, statusChanged: true, commented: true, mentioned: true },
-  autoWatch: { created: true, commented: true, edited: false },
-  startPage: "home",
-  emailEnabled: false,
-  // 목업에는 메일 서버가 없다 — 화면이 "구성되지 않음" 안내를 그리는 경로를 그대로 탄다
-  mailConfigured: false,
-};
-
 const START_PAGES: readonly string[] = ["home", "projects", "last-project"];
 
 function preferencesOf(data: JiraData, userId: string): UserPreferences {
@@ -5603,37 +5589,6 @@ export async function getMyPreferences(): Promise<UserPreferences> {
 
 /** 목업 상한. REST 어댑터는 서버와 같은 2MB를 쓴다 — 화면은 이 값을 읽어 안내 문구를 만든다 */
 export const AVATAR_MAX_BYTES = 200 * 1024;
-
-/** 사진을 바꾸면 이미 그려진 아바타(상단바 등)가 갱신되도록 알린다 — 우선순위 레지스트리와 같은 방식 */
-export const AVATAR_CHANGED_EVENT = "alm:avatar-changed";
-export function notifyAvatarChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(AVATAR_CHANGED_EVENT));
-}
-export const AVATAR_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
-
-/** 상한 문구용 — 서버가 "2MB"라고 말하므로 MB 단위가 떨어지면 MB로 쓴다 */
-export function formatAvatarLimit(maxBytes: number): string {
-  const mb = maxBytes / (1024 * 1024);
-  return Number.isInteger(mb) ? `${mb}MB` : `${Math.round(maxBytes / 1024)}KB`;
-}
-
-/**
- * 목업·REST 공통 사전 검증. **문구는 서버(alm-backend V20)와 글자까지 같다** — 같은 파일이
- * 모드에 따라 다른 문장으로 거부되면 안 된다.
- *
- * 이건 어디까지나 사전 검증이다. 서버는 확장자·MIME이 아니라 **매직 바이트**로 판별하므로
- * (이름만 .png인 GIF, SVG 등) 여기를 통과해도 400이 날 수 있다 — 화면은 서버 `{error}`를
- * 항상 그대로 띄워야 한다.
- */
-export function assertAvatarFile(file: File, maxBytes: number): void {
-  if (file.size === 0) throw new Error("빈 파일은 올릴 수 없습니다");
-  if (!(AVATAR_CONTENT_TYPES as readonly string[]).includes(file.type)) {
-    throw new Error("아바타는 PNG·JPG·WebP 이미지만 올릴 수 있습니다");
-  }
-  if (file.size > maxBytes) {
-    throw new Error(`아바타는 ${formatAvatarLimit(maxBytes)} 이하 이미지여야 합니다`);
-  }
-}
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -5877,3 +5832,19 @@ export function __versionForTest(kind: "issue" | "sprint" | "project", id: strin
   // 없는 대상은 0 — "찾을 수 없습니다" 거부는 스토어 함수가 내야 테스트가 그 의미를 본다
   return row?.version ?? 0;
 }
+
+/** 이 모듈이 파사드 구현일 때의 데이터 출처 — `jiraStore.USE_REST`가 읽는다 */
+export const STORE_MODE = "mock" as "mock" | "rest";
+
+// 공용 상수·사전 검증(shared.ts) — 파사드 계약에 같이 실린다
+export {
+  AVATAR_CHANGED_EVENT,
+  AVATAR_CONTENT_TYPES,
+  DEFAULT_PREFERENCES,
+  ISSUE_TYPES_CHANGED_EVENT,
+  LINK_TYPES_CHANGED_EVENT,
+  PRIORITIES_CHANGED_EVENT,
+  assertAvatarFile,
+  formatAvatarLimit,
+  notifyAvatarChanged,
+} from "./shared";

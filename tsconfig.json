@@ -12,7 +12,9 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    // 파사드 구현 별칭(vite.config.ts) — 타입은 계약의 정본인 목업으로 본다. REST 적합성은 jiraStore의 타입 검사가 본다
+    "paths": { "@alm-store-impl": ["./src/features/alm/store/jiraMock.ts"] }
   },
   "include": ["src", "vite.config.ts", "vitest.config.ts", "vitest.setup.ts"]
 }
