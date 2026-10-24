@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- 스펙: `docs/superpowers/specs/2026-07-06-jira-clone-design.md` — 스토어 시그니처는 §5를 글자 그대로 따른다
+- 스펙: `docs/superpowers/specs/2026-07-06-issue-tracker-design.md` — 스토어 시그니처는 §5를 글자 그대로 따른다
 - 앱 루트: `C:\MSA_TEMPLATE\alm-front` (모든 명령은 이 디렉터리에서 실행)
 - **UI는 100% 디자인 시스템** — `@chanho/react`·`@chanho/tokens`만 사용, MUI 등 타 UI 라이브러리 금지
 - 라우터: `react-router` ^7 단일 패키지 — `react-router-dom` 설치 금지

@@ -1,4 +1,4 @@
-# Jira Clone 요구사항 갭 구현 계획
+# 이슈 트래커(ALM) 요구사항 갭 구현 계획
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

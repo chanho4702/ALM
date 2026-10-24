@@ -1,8 +1,10 @@
 # ALM Front
 
-**직접 호스팅하는 지라 대체 이슈 트래커 프론트엔드 — 스크럼·칸반 보드, 스프린트 백로그, 한국어 스마트 검색을 React 19로.**
+**직접 호스팅하는 이슈 트래커(ALM) 프론트엔드 — 스크럼·칸반 보드, 스프린트 백로그, 한국어 스마트 검색을 React 19로.**
 
-*A self-hosted Jira alternative: scrum and kanban boards, sprint backlogs, and Korean smart search in React 19.*
+*A self-hosted issue tracker: scrum and kanban boards, sprint backlogs, and Korean smart search in React 19.*
+
+<sub>Jira, Confluence, Atlassian은 Atlassian Pty Ltd의 상표이며 본 제품은 Atlassian과 무관합니다.</sub>
 
 [![CI](https://github.com/chanho4702/ALM/actions/workflows/ci.yml/badge.svg)](https://github.com/chanho4702/ALM/actions/workflows/ci.yml)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
