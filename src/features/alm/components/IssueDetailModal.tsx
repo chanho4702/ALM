@@ -92,6 +92,7 @@ import { branchName } from "./branchName";
 import { favoriteOfIssue, useFavorites } from "./useFavorites";
 import { StoryPointsInput } from "./StoryPointsInput";
 import { usePlanningSettings } from "./usePlanningSettings";
+import { decideIssueEvent, useProjectRealtime } from "./realtime/ProjectRealtime";
 import "./favorites.css";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -760,6 +761,36 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   });
   const { isPinned: isFavorite, toggle: toggleFavorite } = useFavorites();
   const planningSettings = usePlanningSettings(issue?.projectId);
+
+  // 실시간 동기화 — 열어 둔 이슈를 남이 바꾸면 최신 값으로 갈아 끼우고 "방금 바뀜"을 잠깐 보인다.
+  // 쓰던 설명 초안은 건드리지 않는다(초안이 옛 본문과 같을 때만 새 본문으로 따라간다)
+  const [remoteNote, setRemoteNote] = useState<string | null>(null);
+  const issueRef = useRef(issue);
+  issueRef.current = issue;
+  const draftRef = useRef(descriptionDraft);
+  draftRef.current = descriptionDraft;
+  const { meId: realtimeMe } = useProjectRealtime((event) => {
+    const current = issueRef.current;
+    if (event.kind !== "issue" || !current || event.issueId !== current.id) return;
+    const decision = decideIssueEvent(event, current.version, realtimeMe);
+    if (decision === "ignore") return;
+    if (decision === "remove") {
+      setRemoteNote("다른 사용자가 이 이슈를 지웠거나 보관했습니다");
+      return;
+    }
+    void getIssueByKey(current.key).then((latest) => {
+      if (!latest || issueRef.current?.id !== latest.id) return;
+      const before = issueRef.current;
+      setIssue(latest);
+      if (draftRef.current === before.description) setDescriptionDraft(latest.description);
+      void refreshLogs(latest.id);
+      if (event.actorId !== realtimeMe) {
+        const who = users.find((u) => u.id === event.actorId)?.name ?? "다른 사용자";
+        setRemoteNote(`${who} 님이 방금 바꿨습니다`);
+        setTimeout(() => setRemoteNote(null), 6_000);
+      }
+    });
+  });
   useIssueCommandScope(
     issue
       ? {
@@ -861,6 +892,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <span className="issue-ancestor-current">{issue.key}</span>
         </nav>
         <div className="issue-detail-toolbar">
+          {remoteNote ? (
+            <span className="realtime-detail-note" role="status" data-remote-flash="">
+              {remoteNote}
+            </span>
+          ) : null}
           <Button
             variant="ghost"
             size="small"

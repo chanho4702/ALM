@@ -6,11 +6,14 @@
  * - `:`로 시작하는 줄은 주석(`:connected`·`:hb`) — `onComment`로만 알린다.
  * - `field:value`(콜론 뒤 공백 1칸은 버린다), 콜론이 없으면 필드명만(값 빈 문자열).
  * - `data`가 여러 줄이면 `\n`으로 잇는다. data가 한 줄도 없는 이벤트는 내보내지 않는다.
- * - `event`가 없으면 `message`. `id`·`retry`는 이 플랫폼이 쓰지 않아 무시한다.
+ * - `event`가 없으면 `message`. `id`는 "마지막 이벤트 id"로 기억해 그 뒤 프레임마다 싣는다(표준: 다음 id가 올 때까지
+ *   이어진다 — 재연결 `Last-Event-ID`의 원천). NUL이 든 id는 버린다. `retry`는 재연결을 훅이 정하므로 무시한다.
  */
 export interface SseFrame {
   event: string;
   data: string;
+  /** 마지막으로 받은 id — 한 번도 없었으면 생략 */
+  id?: string;
 }
 
 export interface SseParser {
@@ -23,9 +26,14 @@ export function createSseParser(onFrame: (frame: SseFrame) => void, onComment?: 
   let pendingCr = false;
   let event = "";
   let data: string[] = [];
+  let lastId: string | undefined;
 
   const dispatch = () => {
-    if (data.length > 0) onFrame({ event: event || "message", data: data.join("\n") });
+    if (data.length > 0) {
+      const frame: SseFrame = { event: event || "message", data: data.join("\n") };
+      if (lastId !== undefined) frame.id = lastId;
+      onFrame(frame);
+    }
     event = "";
     data = [];
   };
@@ -45,6 +53,7 @@ export function createSseParser(onFrame: (frame: SseFrame) => void, onComment?: 
     if (value.startsWith(" ")) value = value.slice(1);
     if (field === "event") event = value;
     else if (field === "data") data.push(value);
+    else if (field === "id" && !value.includes("\0")) lastId = value;
   };
 
   return {

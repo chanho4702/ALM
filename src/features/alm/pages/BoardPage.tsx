@@ -49,6 +49,7 @@ import { useIssueActions } from "../components/useIssueActions";
 import { useIssueInteractions } from "../components/useIssueInteractions";
 import { BoardSkeleton } from "../components/Skeletons";
 import { useSprintCompletion } from "../components/useSprintCompletion";
+import { useRealtimeIssueSync } from "../components/realtime/ProjectRealtime";
 
 const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
 
@@ -123,6 +124,13 @@ export function BoardPage() {
 
   /** ?issue=ALM-1 → 상세 모달 (URL 공유 가능) — 세 페이지 공용 훅 */
   const { openIssue, issueModal } = useIssueModal(reload);
+
+  // 실시간 동기화 — 남의 변경은 그 카드만 다시 읽어 갈아 끼우고 하이라이트. 보드 필터가 걸린 보드는 들고 나는 카드를
+  // 서버가 정하게 다시 읽는다(필터 판정을 화면에 복제하지 않는다)
+  const boardFiltered = Boolean(
+    board && (board.filter.assigneeIds.length > 0 || board.filter.types.length > 0 || board.filter.labels.length > 0),
+  );
+  useRealtimeIssueSync({ issues, setIssues, reload, mode: boardFiltered ? "reload" : "patch" });
 
   /** userId → 사용자. 카드·스윔레인 아바타가 프로필 사진을 여기서 읽는다 */
   const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);

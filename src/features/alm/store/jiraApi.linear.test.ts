@@ -133,3 +133,58 @@ describe("계획 설정(V39)·스프린트 완료 이월", () => {
     expect(bodyOf(spy, 2)).toEqual({});
   });
 });
+
+describe("프로젝트 실시간 스트림 — fetch 스트리밍", () => {
+  function streamResponse(chunks: string[], status = 200): Response {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const c of chunks) controller.enqueue(encoder.encode(c));
+        controller.close();
+      },
+    });
+    return new Response(body, { status, headers: { "Content-Type": "text/event-stream" } });
+  }
+
+  it("경로·Accept·Last-Event-ID 헤더, 프레임을 화면 이벤트로(조각 경계와 무관)", async () => {
+    const { streamProject } = await import("./jiraApi");
+    const spy = vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(
+      streamResponse([
+        "retry:3000\n:connected\n\nid:1729-0\nevent:ready\ndata:{\"projectId\":7,\"replayed\":2,\"reset\":false}\n\n",
+        "id:1729-1\nevent:iss",
+        'ue\ndata:{"type":"issue.transitioned","projectId":7,"issueId":123,"issueKey":"ALM-12","version":6,"changedFields":["status"],"actorId":42}\n\n:hb\n\n',
+      ]),
+    );
+    const events: unknown[] = [];
+    const controller = new AbortController();
+    const onOpen = vi.fn();
+    await streamProject("7", { signal: controller.signal, lastEventId: "1728-9", onOpen, onActivity: vi.fn(), onEvent: (e) => events.push(e) });
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/projects/7/stream");
+    const headers = new Headers((spy.mock.calls[0][1] as RequestInit).headers);
+    expect(headers.get("Accept")).toBe("text/event-stream");
+    expect(headers.get("Last-Event-ID")).toBe("1728-9");
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([
+      { kind: "ready", projectId: "7", replayed: 2, reset: false, eventId: "1729-0" },
+      expect.objectContaining({ kind: "issue", type: "issue.transitioned", issueId: "123", version: 6, actorId: "42", eventId: "1729-1" }),
+    ]);
+  });
+
+  it.each([
+    [403, "unauthorized"],
+    [404, "unsupported"],
+    [429, "rate-limited"],
+    [503, "network"],
+  ] as const)("%i → %s(재연결 판단)", async (status, kind) => {
+    const { streamProject } = await import("./jiraApi");
+    vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(response(status, { error: "x" }));
+    const error = await streamProject("7", {
+      signal: new AbortController().signal,
+      lastEventId: null,
+      onOpen: vi.fn(),
+      onActivity: vi.fn(),
+      onEvent: vi.fn(),
+    }).catch((e: unknown) => e);
+    expect((error as { kind: string }).kind).toBe(kind);
+  });
+});

@@ -52,6 +52,7 @@ import { useIssueActions } from "../components/useIssueActions";
 import { useIssueInteractions } from "../components/useIssueInteractions";
 import { BacklogSkeleton } from "../components/Skeletons";
 import { useSprintCompletion } from "../components/useSprintCompletion";
+import { useRealtimeIssueSync } from "../components/realtime/ProjectRealtime";
 
 export function BacklogPage() {
   const { projectId } = useParams();
@@ -121,6 +122,9 @@ export function BacklogPage() {
     if (loading || !hash.startsWith("#sprint-")) return;
     document.getElementById(hash.slice(1))?.scrollIntoView?.({ block: "start" });
   }, [loading, hash]);
+
+  // 실시간 동기화 — 남의 변경은 그 행만 다시 읽어 갈아 끼우고 하이라이트, 순서·스프린트 신호는 다시 읽는다
+  useRealtimeIssueSync({ issues, setIssues, reload });
 
   /** 스프린트 완료(V39) — 결과 토스트 + 상단 배너(새 스프린트 보기 → 그 패널로 스크롤) */
   const completion = useSprintCompletion({

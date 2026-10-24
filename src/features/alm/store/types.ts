@@ -243,3 +243,14 @@ export type {
   SprintCompletion,
   CompleteSprintOptions,
 } from "./model/cycles";
+export type {
+  IssueStreamType,
+  SprintStreamType,
+  IssueStreamEvent,
+  SprintStreamEvent,
+  ReadyStreamEvent,
+  ResetStreamEvent,
+  RevokedStreamEvent,
+  ProjectStreamEvent,
+  ProjectStreamHandlers,
+} from "./model/realtime";

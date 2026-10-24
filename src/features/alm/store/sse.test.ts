@@ -46,9 +46,20 @@ describe("SSE 파서(P4c 사무실 스트림)", () => {
     expect(frames).toEqual([{ event: "office", data: "첫 줄\n 둘째(공백 하나 남음)\n" }]);
   });
 
-  it("data 없는 이벤트는 내보내지 않고, event가 없으면 message, 모르는 필드(id·retry)는 무시", () => {
-    const { frames } = collect(["event:office\n\n", "id:3\nretry:1000\ndata:plain\n\n"]);
+  it("data 없는 이벤트는 내보내지 않고, event가 없으면 message, retry는 무시", () => {
+    const { frames } = collect(["event:office\n\n", "retry:1000\ndata:plain\n\n"]);
     expect(frames).toEqual([{ event: "message", data: "plain" }]);
+  });
+
+  it("id는 마지막 이벤트 id로 이어진다 — 다음 id가 올 때까지 뒤 프레임에도 실리고, NUL이 든 id는 버린다", () => {
+    const { frames } = collect([
+      "id:1729-0\nevent:ready\ndata:{}\n\n",
+      "event:issue\ndata:a\n\n",
+      "id:1730-1\nevent:issue\ndata:b\n\n",
+      "id:bad\0id\nevent:issue\ndata:c\n\n",
+    ]);
+    expect(frames.map((f) => f.id)).toEqual(["1729-0", "1729-0", "1730-1", "1730-1"]);
+    expect(frames[0]).toEqual({ event: "ready", data: "{}", id: "1729-0" });
   });
 
   it("빈 줄이 오기 전 조각은 내보내지 않는다(다음 조각을 기다린다)", () => {

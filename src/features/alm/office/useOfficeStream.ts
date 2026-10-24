@@ -1,31 +1,28 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { streamOffice } from "../store/jiraStore";
-import { OfficeStreamError } from "../store/officeStream";
+import type { OfficeStreamEvent } from "../store/types";
+import { useReconnectingStream } from "../components/useReconnectingStream";
+import type { StreamConnection } from "../components/useReconnectingStream";
 
 /**
  * 사무실 무효화 스트림 클라이언트(P4c D-P4c-2 · agent-service §15). 신호에는 데이터가 없다 — 받으면 `onSignal`로
  * 사무실을 다시 조회하게 하고, 스트림이 건강한지(`live`)만 알려 준다(폴링 주기는 `useOfficeData`가 정한다).
  *
+ * 재연결 규칙(백오프·429 60초·45초 무응답·탭 숨김 닫기·401/404 멈춤)은 공용 `useReconnectingStream`이 맡는다 —
+ * 프로젝트 실시간 스트림과 같은 부품이다. 여기는 사무실 고유 규칙만:
  * - 신호 재조회는 1초에 1번까지(감사 신호가 도구 호출마다 온다) — 창 안 신호는 뒤끝(trailing) 1회로 모은다.
- * - 끊기면 1초 → 30초 지수 백오프(지터 = 기준의 50~100%)로 다시 붙는다. 연결되면 백오프를 처음부터.
- * - 401(refresh까지 실패)·403은 다시 붙지 않는다. 429(사용자당 5개)는 폴링으로 두고 60초 뒤 다시 시도.
- *   스트림이 없는 환경(구 백엔드 404·목업 테스트)도 폴링만.
- * - 45초 동안 바이트가 하나도 없으면(heartbeat 15초) 죽은 연결로 보고 끊은 뒤 다시 붙는다.
- * - 탭이 숨으면 닫고, 다시 보이면 곧바로 연다. 재연결로 다시 열리면 놓친 신호가 있을 수 있어 1회 재조회한다.
+ * - 재연결로 다시 열리면 놓친 신호가 있을 수 있어 1회 재조회한다(사무실 스트림은 재생이 없다).
  */
 export type OfficeStreamMode = "live" | "polling";
 
-export const STREAM_BACKOFF_MIN_MS = 1_000;
-export const STREAM_BACKOFF_MAX_MS = 30_000;
-export const STREAM_RATE_LIMIT_RETRY_MS = 60_000;
-export const STREAM_DEAD_AFTER_MS = 45_000;
+export {
+  STREAM_BACKOFF_MIN_MS,
+  STREAM_BACKOFF_MAX_MS,
+  STREAM_RATE_LIMIT_RETRY_MS,
+  STREAM_DEAD_AFTER_MS,
+  streamBackoffMs,
+} from "../components/useReconnectingStream";
 export const STREAM_SIGNAL_THROTTLE_MS = 1_000;
-
-/** attempt번째(0부터) 재연결 대기 — 기준 min(30초, 1초·2^attempt)의 50~100% */
-export function streamBackoffMs(attempt: number, random: () => number = Math.random): number {
-  const base = Math.min(STREAM_BACKOFF_MAX_MS, STREAM_BACKOFF_MIN_MS * 2 ** Math.max(0, attempt));
-  return Math.round(base / 2 + (random() * base) / 2);
-}
 
 export interface OfficeStreamOptions {
   /** 지터 난수(테스트 주입용) */
@@ -37,133 +34,55 @@ export function useOfficeStream(
   onSignal: () => void,
   { random = Math.random }: OfficeStreamOptions = {},
 ): OfficeStreamMode {
-  const [mode, setMode] = useState<OfficeStreamMode>("polling");
   const signalRef = useRef(onSignal);
   useEffect(() => {
     signalRef.current = onSignal;
   }, [onSignal]);
 
-  useEffect(() => {
-    let disposed = false;
-    /** 지금 살아 있는 연결 — 의도적으로 닫으면 null로 먼저 비워, 뒤늦은 reject를 실패로 세지 않는다 */
-    let controller: AbortController | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let deadTimer: ReturnType<typeof setTimeout> | null = null;
-    let trailingTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempt = 0;
-    /** 다시 붙지 않는다(401·스트림 없음) */
-    let stopped = false;
-    let everOpened = false;
-    let lastSignalAt = Number.NEGATIVE_INFINITY;
+  const throttle = useRef<{ last: number; timer: ReturnType<typeof setTimeout> | null }>({
+    last: Number.NEGATIVE_INFINITY,
+    timer: null,
+  });
+  // 프로젝트가 바뀌거나 화면을 떠나면 뒤끝 재조회를 버린다
+  useEffect(
+    () => () => {
+      const state = throttle.current;
+      if (state.timer !== null) clearTimeout(state.timer);
+      state.timer = null;
+      state.last = Number.NEGATIVE_INFINITY;
+    },
+    [projectId],
+  );
 
+  const signal = useCallback(() => {
+    const state = throttle.current;
+    if (state.timer !== null) return;
     const fire = () => {
-      lastSignalAt = Date.now();
+      state.last = Date.now();
       signalRef.current();
     };
-    const signal = () => {
-      if (trailingTimer !== null) return;
-      const wait = lastSignalAt + STREAM_SIGNAL_THROTTLE_MS - Date.now();
-      if (wait <= 0) fire();
-      else
-        trailingTimer = setTimeout(() => {
-          trailingTimer = null;
-          if (!disposed) fire();
-        }, wait);
-    };
+    const wait = state.last + STREAM_SIGNAL_THROTTLE_MS - Date.now();
+    if (wait <= 0) fire();
+    else
+      state.timer = setTimeout(() => {
+        state.timer = null;
+        fire();
+      }, wait);
+  }, []);
 
-    const clearDead = () => {
-      if (deadTimer !== null) clearTimeout(deadTimer);
-      deadTimer = null;
-    };
-    const clearRetry = () => {
-      if (retryTimer !== null) clearTimeout(retryTimer);
-      retryTimer = null;
-    };
+  const connect = useCallback(
+    ({ signal: abort, onOpen, onActivity, onEvent }: StreamConnection<OfficeStreamEvent>) =>
+      streamOffice(projectId || undefined, { signal: abort, onOpen, onActivity, onEvent }),
+    [projectId],
+  );
 
-    const failed = (ctrl: AbortController, error: unknown) => {
-      if (controller !== ctrl) return;
-      controller = null;
-      clearDead();
-      setMode("polling");
-      if (disposed) return;
-      const kind = error instanceof OfficeStreamError ? error.kind : "network";
-      if (kind === "unauthorized" || kind === "unsupported") {
-        stopped = true;
-        return;
-      }
-      const delay = kind === "rate-limited" ? STREAM_RATE_LIMIT_RETRY_MS : streamBackoffMs(attempt++, random);
-      clearRetry();
-      retryTimer = setTimeout(() => {
-        retryTimer = null;
-        connect();
-      }, delay);
-    };
+  const state = useReconnectingStream<OfficeStreamEvent>({
+    key: `office:${projectId}`,
+    connect,
+    onEvent: () => signal(),
+    onReopen: () => signal(),
+    random,
+  });
 
-    const armDead = (ctrl: AbortController) => {
-      clearDead();
-      deadTimer = setTimeout(() => {
-        deadTimer = null;
-        if (controller !== ctrl) return;
-        ctrl.abort();
-        failed(ctrl, new OfficeStreamError("network", null, "사무실 스트림 응답 없음(45초)"));
-      }, STREAM_DEAD_AFTER_MS);
-    };
-
-    function connect() {
-      if (disposed || stopped || controller !== null || document.hidden) return;
-      clearRetry();
-      const ctrl = new AbortController();
-      controller = ctrl;
-      armDead(ctrl);
-      streamOffice(projectId || undefined, {
-        signal: ctrl.signal,
-        onOpen: () => {
-          if (controller !== ctrl) return;
-          attempt = 0;
-          setMode("live");
-          if (everOpened) signal();
-          everOpened = true;
-          armDead(ctrl);
-        },
-        onActivity: () => {
-          if (controller === ctrl) armDead(ctrl);
-        },
-        onEvent: () => {
-          if (controller === ctrl) signal();
-        },
-      }).then(
-        // 서버가 닫았다(30분 타임아웃 등) — 새 토큰으로 다시 붙는다
-        () => failed(ctrl, new OfficeStreamError("network", null, "사무실 스트림 종료")),
-        (error: unknown) => failed(ctrl, error),
-      );
-    }
-
-    const close = () => {
-      const ctrl = controller;
-      controller = null;
-      ctrl?.abort();
-      clearDead();
-      clearRetry();
-      setMode("polling");
-    };
-
-    const onVisibility = () => {
-      if (document.hidden) close();
-      else {
-        attempt = 0;
-        connect();
-      }
-    };
-
-    connect();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      disposed = true;
-      document.removeEventListener("visibilitychange", onVisibility);
-      close();
-      if (trailingTimer !== null) clearTimeout(trailingTimer);
-    };
-  }, [projectId, random]);
-
-  return mode;
+  return state === "live" ? "live" : "polling";
 }

@@ -42,6 +42,9 @@ export type { ProjectPatch,
 type MockOnly =
   | "__setAgentMockScenario"
   | "__setMockOfficeStream"
+  | "__emitProjectStreamEvent"
+  | "__simulateRemoteIssueChange"
+  | "__setMockProjectStream"
   | "__versionForTest"
   | "ISSUE_CONFLICT_MESSAGE"
   | "AVATAR_MAX_BYTES"
@@ -174,6 +177,12 @@ export const __setAgentMockScenario = impl.__setAgentMockScenario;
 /** 테스트 전용 — 목업에 저장된 현재 편집 버전(동시 편집과 무관한 테스트의 저장용) */
 export const __versionForTest = impl.__versionForTest;
 export const __setMockOfficeStream = impl.__setMockOfficeStream;
+/** 프로젝트 실시간 스트림(SSE, fetch 스트리밍) — 무효화 신호만, 재연결은 화면 훅(useReconnectingStream) */
+export const streamProject = impl.streamProject;
+/** 목업 전용(REST 빌드에서는 undefined) — 테스트·개발 화면에서 "다른 사람의 변경"을 흉내 낸다 */
+export const __emitProjectStreamEvent = (impl as Partial<typeof mock>).__emitProjectStreamEvent;
+export const __simulateRemoteIssueChange = (impl as Partial<typeof mock>).__simulateRemoteIssueChange;
+export const __setMockProjectStream = (impl as Partial<typeof mock>).__setMockProjectStream;
 export type { AgentMockScenario } from "./jiraMock";
 export const listIssuesPage = impl.listIssuesPage;
 export const listWatchers = impl.listWatchers;

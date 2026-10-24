@@ -367,3 +367,5 @@ export {
   listProjectAutomationRuns,
 } from "./mock/automation";
 export { getPlanningSettings, updatePlanningSettings } from "./mock/cycles";
+export { streamProject } from "./mock/realtime";
+export { __emitProjectStreamEvent, __simulateRemoteIssueChange, __setMockProjectStream } from "./mock/realtime";

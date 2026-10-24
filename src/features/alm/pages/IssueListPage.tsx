@@ -47,6 +47,7 @@ import { usePriorities } from "../components/usePriorities";
 import { useTablePrefs } from "../components/useTablePrefs";
 import { ColumnPicker } from "../components/ColumnPicker";
 import { useKeyboardShortcuts } from "../components/useKeyboardShortcuts";
+import { useRealtimeIssueSync } from "../components/realtime/ProjectRealtime";
 import { UserAvatar } from "../components/UserAvatar";
 import { useIssueActions } from "../components/useIssueActions";
 import { useIssueInteractions } from "../components/useIssueInteractions";
@@ -160,6 +161,13 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
   };
 
   const reload = useCallback(() => setRefreshVersion((version) => version + 1), []);
+  // 실시간 동기화 — 목록은 필터·정렬·페이지를 서버가 다시 정하게 한 페이지를 다시 읽고, 남이 바꾼 행은 하이라이트
+  useRealtimeIssueSync({
+    issues,
+    setIssues: (update) => setIssues((prev) => (prev ? update(prev) : prev)),
+    reload,
+    mode: "reload",
+  });
 
   // 필터 변경 시에는 현재 페이지 하나만 조회한다. 취소된 응답은 최신 결과를 덮지 못한다.
   useEffect(() => {

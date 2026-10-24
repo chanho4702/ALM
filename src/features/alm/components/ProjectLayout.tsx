@@ -1,3 +1,4 @@
+import { ProjectRealtimeProvider, RealtimeStatusBadge } from "./realtime/ProjectRealtime";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { Button, Dropdown, Lozenge } from "@chanho/react";
@@ -63,6 +64,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
   const starred = starredIds.includes(current.id);
 
   return (
+    <ProjectRealtimeProvider key={current.id} projectId={current.id}>
     <div className="jira-main">
       {/* 지라 브레드크럼: "프로젝트 / 프로젝트명" — 현재 뷰는 탭이 보여준다 */}
       <nav aria-label="브레드크럼" className="breadcrumbs">
@@ -106,6 +108,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
             { label: "이슈 목록", onSelect: () => navigate(`/projects/${current.id}/issues`) },
           ]}
         />
+        <RealtimeStatusBadge />
         {shortcuts.length > 0 ? (
           <nav aria-label="바로 가기" className="project-shortcuts">
             {shortcuts.map((shortcut) => (
@@ -128,6 +131,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
         <Outlet context={{ projects, onProjectsChanged } satisfies JiraOutletContext} />
       </main>
     </div>
+    </ProjectRealtimeProvider>
   );
 }
 

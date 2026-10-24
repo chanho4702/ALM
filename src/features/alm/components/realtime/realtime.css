@@ -1,0 +1,45 @@
+/* 프로젝트 실시간 동기화 — 연결 표시·남의 변경 하이라이트(모션 토큰) */
+
+.realtime-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+}
+
+.realtime-status.is-live {
+  color: var(--chanho-color-text-subtle);
+}
+
+.realtime-status.is-live svg {
+  color: var(--chanho-color-text-success);
+}
+
+.realtime-status .lucide {
+  vertical-align: -2px;
+}
+
+/* 남이 바꾼 카드·행 — 강조 배경이 들어왔다가 빠진다. 동작 줄이기면 토큰이 1ms라 깜빡임 없이 끝난다 */
+[data-remote-flash] {
+  animation: realtime-flash var(--chanho-motion-duration-slow) var(--chanho-motion-easing-standard) 0s 3 alternate;
+}
+
+tr[data-remote-flash] > td {
+  animation: realtime-flash var(--chanho-motion-duration-slow) var(--chanho-motion-easing-standard) 0s 3 alternate;
+}
+
+@keyframes realtime-flash {
+  from {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  to {
+    background-color: var(--chanho-color-background-brand-subtle);
+    box-shadow: 0 0 0 2px var(--chanho-color-border-brand);
+  }
+}
+
+.realtime-detail-note {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}

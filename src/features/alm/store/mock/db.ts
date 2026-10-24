@@ -1,4 +1,5 @@
 // localStorage 목업 스토어 — db (jiraMock.ts에서 분할, 동작 불변)
+import { resetMockProjectStream } from "./realtime";
 import { type JiraData, type IssueFieldId, type IssueFieldConfig, ISSUE_FIELD_IDS, type SettingsBody, type WorkflowTransition, type TypeWorkflow, ISSUE_FIELD_NAMES, type StatusCategory, type StatusKind, type WorkflowStatus, type SettingsScheme, type BoardType, type Board, type User } from "../types";
 import { CURRENT_USER_ID } from "../../../../mock/users";
 import { createSeedData } from "../../../../mock/seed";
@@ -509,6 +510,7 @@ export function __resetForTest(): void {
   resetTeamMockState();
   resetMockOfficeStream();
   resetAutomationMockState();
+  resetMockProjectStream();
 }
 
 /**
