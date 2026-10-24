@@ -310,7 +310,8 @@ describe("BacklogPage", () => {
     const sprint = screen.getByRole("region", { name: "Sprint 1" });
     await user.click(within(sprint).getByRole("button", { name: "스프린트 완료" }));
     const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("radio", { name: "Sprint 2" }));
+    // 예정 스프린트가 있으면 "다음 스프린트로"가 그 스프린트를 가리킨다(V39 사이클)
+    await user.click(within(dialog).getByRole("radio", { name: "다음 스프린트로 (Sprint 2)" }));
     await user.click(within(dialog).getByRole("button", { name: "완료 처리" }));
 
     await waitFor(() => {

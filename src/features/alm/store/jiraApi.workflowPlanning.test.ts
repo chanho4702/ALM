@@ -97,11 +97,15 @@ describe("REST — 이슈 응답의 계획 필드(V30·V35)", () => {
     expect(bodyOf(spy, lastPut).planning).toEqual({ startDate: null });
   });
 
-  it("listIssues(보드·백로그용)는 트리아지 대기열을 뺀다 — 검색 API에 트리아지 조건이 없어서", async () => {
-    fetchSpy(() =>
-      response(200, { items: [{ ...ISSUE, triageState: null }, { ...ISSUE, id: 1025, key: "ALM-43", triageState: "PENDING" }], page: 0, size: 200, total: 2 }),
+  it("listIssues(보드·백로그용)는 서버에 triage=false로 묻는다 — 거른 뒤의 total로 끝까지 읽는다", async () => {
+    const spy = fetchSpy((path) =>
+      path.includes("page=0")
+        ? response(200, { items: [{ ...ISSUE, triageState: null }], page: 0, size: 200, total: 2 })
+        : response(200, { items: [{ ...ISSUE, id: 1025, key: "ALM-43", triageState: null }], page: 1, size: 200, total: 2 }),
     );
-    expect((await listIssues("7")).map((i) => i.key)).toEqual(["ALM-42"]);
+    expect((await listIssues("7")).map((i) => i.key)).toEqual(["ALM-42", "ALM-43"]);
+    expect(String(spy.mock.calls[0][0])).toContain("triage=false");
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });
 

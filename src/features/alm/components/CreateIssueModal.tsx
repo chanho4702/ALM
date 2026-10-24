@@ -1,3 +1,5 @@
+import { StoryPointsInput } from "./StoryPointsInput";
+import { usePlanningSettings } from "./usePlanningSettings";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Checkbox, Modal, Select, TextField, useToast } from "@chanho/react";
@@ -72,6 +74,7 @@ export function CreateIssueModal({
   const [me, setMe] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [projectId, setProjectId] = useState(defaultProjectId ?? projects[0]?.id ?? "");
+  const planningSettings = usePlanningSettings(projectId || undefined);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<IssueType>("task");
@@ -574,16 +577,11 @@ export function CreateIssueModal({
         {show("storyPoints") ? (
           <div className="alm-field">
             <FieldLabel field="storyPoints" required={required("storyPoints")}>스토리 포인트</FieldLabel>
-            <TextField
+            <StoryPointsInput
               label={fieldLabel("storyPoints", "스토리 포인트")}
-              className="visually-hidden-label"
-              type="number"
-              min={0}
-              max={9999}
-              step={0.5}
-              placeholder="미지정"
-              value={storyPoints}
-              onChange={(e) => setStoryPoints(e.target.value)}
+              value={storyPoints.trim() === "" || Number.isNaN(Number(storyPoints)) ? null : Number(storyPoints)}
+              settings={planningSettings}
+              onChange={(next) => setStoryPoints(next === null ? "" : String(next))}
             />
           </div>
         ) : null}

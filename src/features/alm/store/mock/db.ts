@@ -343,6 +343,7 @@ function normalize(data: JiraData): JiraData {
   data.triageEntries ??= [];
   data.automationRules ??= [];
   data.automationRuns ??= [];
+  data.planningSettings ??= {};
   data.notifications ??= [];
   data.boards ??= [];
   data.links ??= [];

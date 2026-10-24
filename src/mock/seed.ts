@@ -329,6 +329,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     banner: { enabled: false, level: "info", message: "" },
     views: [],
     triageProjects: [],
+    planningSettings: {},
     triageEntries: [],
     automationRules: [],
     automationRuns: [],

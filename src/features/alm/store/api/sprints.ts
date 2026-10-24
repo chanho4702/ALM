@@ -1,6 +1,7 @@
 // alm-backend REST 어댑터 — sprints (jiraApi.ts에서 분할, 동작 불변)
-import type { Sprint } from "../types";
+import type { CompleteSprintOptions, Sprint, SprintCompletion } from "../types";
 import { type SprintDto, toBackendId, mapSprint } from "../mapping";
+import { mapCarryOver, type SprintCarryOverDto } from "./cycles";
 import { json, sharedApiFetch } from "./http";
 
 // ── sprints ──────────────────────────────────────────────────
@@ -60,20 +61,22 @@ export async function startSprint(id: string): Promise<Sprint> {
 /**
  * 무엇을 완료로 볼지는 서버가 워크플로 의미(complete)로 판단한다. 완료가 아닌 이슈는 백로그(또는 지정 스프린트)로 돌아간다.
  */
-export async function completeSprint(
-  id: string,
-  options: { moveUnfinishedTo?: string | null } = {},
-): Promise<Sprint> {
+export async function completeSprint(id: string, options: CompleteSprintOptions = {}): Promise<SprintCompletion> {
   // 완료 판정(doneStatuses)은 보내지 않는다 — V11부터 서버가 워크플로 의미(complete)로 스스로 판단한다.
   // 목업과 같은 시그니처라 화면(백로그·보드·릴리스)이 어댑터를 구분하지 않는다.
   const target = options.moveUnfinishedTo ?? null;
+  // 우선순위(서버와 같다): 스프린트 id > moveUnfinishedTo(next·backlog) > 프로젝트 설정 기본값.
+  // 아무것도 안 보내면 서버가 설정 기본값을 쓴다(설정이 없으면 예전처럼 백로그).
+  const body: Record<string, unknown> = {};
+  if (target !== null) body.moveUnfinishedToSprintId = toBackendId(target);
+  else if (options.carryOver) body.moveUnfinishedTo = options.carryOver;
   const response = await sharedApiFetch(`/api/alm/sprints/${toBackendId(id)}/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    // 대상이 없으면 필드를 빼서 서버 기본값(백로그)에 맡긴다.
-    body: JSON.stringify(target === null ? {} : { moveUnfinishedToSprintId: toBackendId(target) }),
+    body: JSON.stringify(body),
   });
-  return mapSprint(await json(response));
+  const dto = (await json(response)) as SprintDto & { carryOver?: SprintCarryOverDto | null };
+  return { ...mapSprint(dto), carryOver: mapCarryOver(dto.carryOver) };
 }
 
 /** 예정 스프린트 삭제(F-10) — 204. 진행 중·완료는 409, 프로젝트 관리자가 아니면 403(서버 문구 그대로) */

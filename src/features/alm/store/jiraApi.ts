@@ -321,3 +321,4 @@ export {
   listAutomationRuleRuns,
   listProjectAutomationRuns,
 } from "./api/automation";
+export { getPlanningSettings, updatePlanningSettings } from "./api/cycles";

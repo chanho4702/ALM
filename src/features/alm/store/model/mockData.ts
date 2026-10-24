@@ -5,6 +5,7 @@ import type { Notification, IssueWatcher } from "./activity";
 import type { Board } from "./board";
 import type { SettingsScheme, ProjectSettingsEntry } from "./settings";
 import type { SavedView, AutomationRule, AutomationRun } from "./planning";
+import type { PlanningSettings } from "./cycles";
 
 /** 트리아지 대기열 한 줄(목업 전용 저장 — 서버는 issue.triage_* 컬럼) */
 export interface MockTriageEntry {
@@ -71,4 +72,6 @@ export interface JiraData {
   /** 자동화 규칙·실행 이력(V36·V37) */
   automationRules: AutomationRule[];
   automationRuns: AutomationRun[];
+  /** 프로젝트 계획 설정(V39) — 없으면 기본값(자동 생성 끔·이월 백로그·수직선 척도) */
+  planningSettings: Record<string, PlanningSettings>;
 }

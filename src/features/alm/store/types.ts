@@ -232,3 +232,14 @@ export type {
   AgentMeetingCreated,
   AgentPersonaActivity,
 } from "./model/office";
+export type {
+  CarryOverTarget,
+  EstimationScale,
+  TshirtSize,
+  SprintAutomationSettings,
+  PlanningSettings,
+  PlanningSettingsPatch,
+  SprintCarryOver,
+  SprintCompletion,
+  CompleteSprintOptions,
+} from "./model/cycles";

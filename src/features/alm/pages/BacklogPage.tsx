@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 import { Plus } from "lucide-react";
 import {
   DndContext,
@@ -14,7 +14,6 @@ import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Badge, Button, ConfirmDialog, TextField, useToast } from "@chanho/react";
 import type { Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
-  completeSprint,
   createIssue,
   createSprint,
   deleteIssue,
@@ -52,6 +51,7 @@ import { usePriorities } from "../components/usePriorities";
 import { useIssueActions } from "../components/useIssueActions";
 import { useIssueInteractions } from "../components/useIssueInteractions";
 import { BacklogSkeleton } from "../components/Skeletons";
+import { useSprintCompletion } from "../components/useSprintCompletion";
 
 export function BacklogPage() {
   const { projectId } = useParams();
@@ -114,6 +114,35 @@ export function BacklogPage() {
   }, [projectId]);
 
   const { openIssue, issueModal } = useIssueModal(reload);
+
+  // 보드의 "새 스프린트 보기"(#sprint-<id>) — 그려진 뒤 그 패널로 스크롤
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (loading || !hash.startsWith("#sprint-")) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView?.({ block: "start" });
+  }, [loading, hash]);
+
+  /** 스프린트 완료(V39) — 결과 토스트 + 상단 배너(새 스프린트 보기 → 그 패널로 스크롤) */
+  const completion = useSprintCompletion({
+    projectId,
+    reload,
+    onShowSprint: (sprintId) =>
+      setTimeout(() => document.getElementById(`sprint-${sprintId}`)?.scrollIntoView?.({ block: "start", behavior: "smooth" }), 0),
+  });
+
+  /** 스프린트 패널 인라인 만들기(Linear) — 제목만, 그 스프린트로 */
+  const createInSprint = async (sprint: Sprint, title: string): Promise<boolean> => {
+    if (!projectId) return false;
+    try {
+      const created = await createIssue({ projectId, title, sprintId: sprint.id });
+      toast({ title: `${created.key}를 ${sprint.name}에 만들었습니다`, appearance: "success" });
+      await reload();
+      return true;
+    } catch (error) {
+      toast({ title: "이슈 생성 실패", description: error instanceof Error ? error.message : String(error), appearance: "danger" });
+      return false;
+    }
+  };
 
   /** userId → 사용자. 행·카드 아바타가 프로필 사진을 여기서 읽는다 */
   const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
@@ -340,11 +369,9 @@ export function BacklogPage() {
         )}
         statuses={statuses}
         onClose={() => setCompletingSprint(null)}
-        onConfirm={(sprint, moveUnfinishedTo) => {
+        onConfirm={(sprint, options) => {
           setCompletingSprint(null);
-          void run("스프린트 완료 실패", "스프린트를 완료했습니다", () =>
-            completeSprint(sprint.id, { moveUnfinishedTo }),
-          );
+          void completion.complete(sprint, options);
         }}
       />
       <ConfirmDialog
@@ -373,6 +400,7 @@ export function BacklogPage() {
         onSave={(sprint, draft) => void saveSprintPlan(sprint, draft, sprint.version)}
         onResolveConflict={(sprint, draft, mode) => void resolveSprintConflict(sprint, draft, mode)}
       />
+      {completion.notice}
       {interactions.withContextMenu(
       <section className="backlog-page" {...interactions.containerProps}>
         <DndContext
@@ -398,6 +426,7 @@ export function BacklogPage() {
             onDelete={handleDelete}
             onOpen={openIssue}
             selectedIds={interactions.selected}
+            onCreateIssue={createInSprint}
           />
         ))}
 

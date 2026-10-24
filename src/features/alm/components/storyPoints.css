@@ -1,0 +1,17 @@
+/* 스토리 포인트 척도 칩(Linear Estimates) — 토큰만 */
+.story-points {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}
+
+.story-points-chip {
+  min-width: 36px;
+  justify-content: center;
+}
+
+.story-points-sum {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}

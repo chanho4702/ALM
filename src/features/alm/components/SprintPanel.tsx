@@ -1,3 +1,4 @@
+import { InlineIssueCreate } from "./InlineIssueCreate";
 import type { ReactNode } from "react";
 import { Check, MoreHorizontal, Trash2 } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
@@ -203,6 +204,8 @@ export function PanelEstimateSummary({ issues }: { issues: Issue[] }) {
 }
 
 export interface SprintPanelProps {
+  /** 패널 끝 인라인 만들기(Linear) — 제목만으로 이 스프린트에 만든다. 성공이면 true */
+  onCreateIssue?: (sprint: Sprint, title: string) => Promise<boolean>;
   sprint: Sprint;
   /** 이 스프린트의 이슈 (order 오름차순) */
   issues: Issue[];
@@ -239,10 +242,11 @@ export function SprintPanel({
   onDelete,
   onOpen,
   selectedIds,
+  onCreateIssue,
 }: SprintPanelProps) {
   const period = formatPlannedRange(sprint.plannedStart, sprint.plannedEnd);
   return (
-    <section className="sprint-panel" aria-label={sprint.name}>
+    <section className="sprint-panel" aria-label={sprint.name} id={`sprint-${sprint.id}`}>
       <header className="sprint-panel-header">
         <h3>{sprint.name}</h3>
         {period ? <span className="sprint-panel-period">{period}</span> : null}
@@ -306,6 +310,9 @@ export function SprintPanel({
         ))}
         {issues.length === 0 ? <p className="sprint-panel-empty">이슈가 없습니다</p> : null}
       </BacklogDropZone>
+      {onCreateIssue && sprint.state !== "done" ? (
+        <InlineIssueCreate where={sprint.name} onCreate={(title) => onCreateIssue(sprint, title)} />
+      ) : null}
     </section>
   );
 }

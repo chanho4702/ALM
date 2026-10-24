@@ -38,6 +38,11 @@ export interface IssueSearchCriteria {
   dueFrom?: string;
   dueTo?: string;
   updatedSince?: string;
+  /**
+   * 트리아지 대기열(V35) — true면 대기열만, false면 대기열 제외, 생략하면 둘 다(검색·AQL의 기본).
+   * 보드·백로그·스프린트 목록은 false로 묻는다(서버 `triage=false` — total도 그 기준으로 정확하다).
+   */
+  triage?: boolean;
 }
 
 export type IssueAggregateGroup = "status" | "priority" | "assignee" | "type" | "statusCategory";

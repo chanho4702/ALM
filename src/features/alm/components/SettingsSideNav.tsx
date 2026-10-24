@@ -20,6 +20,7 @@ export const PROJECT_SETTINGS_SECTIONS = [
   { id: "workflow", label: "워크플로" },
   { id: "types", label: "이슈 타입" },
   { id: "fields", label: "필드" },
+  { id: "planning", label: "계획(사이클·추정)" },
   { id: "triage", label: "트리아지" },
   { id: "automation", label: "자동화" },
   { id: "import", label: "가져오기" },

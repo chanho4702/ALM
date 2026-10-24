@@ -11,6 +11,7 @@ import { resolvedBody, typeLevelOf, typeDefOf, typeNameOf, assertVersionAssignab
 import { assertCanEdit, myProjectRole } from "./members";
 import { assertNotInTriage, applyPostFunctions, assertStatusInWorkflow, assertValidators, chooseTransition, defaultResolution, defaultStatusFor, mappedStatus, workflowFor, type EvaluatedTransition } from "./workflow";
 import { emitIssueEvent, snapshotForAutomation } from "./automation";
+import { assertPointsInScale } from "./cycles";
 import { assertPlanning, enterTriage } from "./planning";
 import { validateComponentIds, resolveDefaultAssigneeFor } from "./components";
 import { preferencesOf } from "./personal";
@@ -146,6 +147,8 @@ export async function createIssue(input: {
   const toTriage = external || Boolean(input.triage);
   if (input.status !== undefined) assertStatusInWorkflow(data, project.id, resolvedType, input.status);
   assertPlanning(input.startDate, input.storyPoints, input.dueDate ?? null);
+  // 추정 척도(V39) — 포인트를 줄 때만
+  assertPointsInScale(data, project.id, input.storyPoints);
   const componentIdsForCreate = validateComponentIds(data, project.id, input.componentIds);
   if (input.fixVersionId) assertVersionAssignable(data, input.fixVersionId, project.id);
   // 필드 구성의 필수 검사 — 만들기에서만 한다(수정은 기존 이슈를 갑자기 막지 않으려고 검사하지 않는다).
@@ -261,6 +264,10 @@ export async function updateIssue(
     patch.storyPoints === undefined ? issue.storyPoints : patch.storyPoints,
     patch.dueDate === undefined ? issue.dueDate : patch.dueDate,
   );
+  // 추정 척도(V39) — 포인트가 **바뀔 때만** 본다(척도를 바꿔도 손대지 않은 옛 값은 그대로 저장된다)
+  if (patch.storyPoints !== undefined && patch.storyPoints !== issue.storyPoints) {
+    assertPointsInScale(data, issue.projectId, patch.storyPoints);
+  }
   if (patch.estimateHours !== undefined && patch.estimateHours !== null && !(patch.estimateHours > 0)) {
     throw new Error("예상 시간은 0보다 커야 합니다");
   }

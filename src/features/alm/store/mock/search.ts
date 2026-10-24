@@ -86,6 +86,7 @@ function matchesCriteria(
 ): boolean {
   const has = (list?: string[]): list is string[] => list !== undefined && list.length > 0;
   if (has(criteria.projectIds) && !criteria.projectIds.includes(issue.projectId)) return false;
+  if (criteria.triage !== undefined && Boolean(issue.triageState) !== criteria.triage) return false;
   const text = criteria.text?.trim().toLowerCase();
   if (
     text &&

@@ -68,6 +68,7 @@ function criteriaParams(criteria: IssueSearchCriteria): Record<string, string | 
     dueFrom: criteria.dueFrom,
     dueTo: criteria.dueTo,
     updatedSince: criteria.updatedSince,
+    triage: criteria.triage === undefined ? undefined : String(criteria.triage),
   };
 }
 
@@ -133,17 +134,19 @@ export async function listIssuesPage(
 
 /**
  * 전량이 필요한 화면(보드·백로그·리포트)용 — 서버 최대 페이지 크기로 끝까지 읽는다.
- * 트리아지 대기열(V35)은 빼고 돌려준다 — 서버 `/projects/{id}/issues`(보드·백로그 목록)와 같은 의미.
- * 검색 API(`/issues/search`)에 트리아지 조건이 없어 여기서 거른다(백엔드에 `triage` 파라미터 요청함).
+ * 트리아지 대기열(V35)은 서버가 뺀다(`triage=false`) — 서버 `/projects/{id}/issues`(보드·백로그 목록)와 같은 의미이고,
+ * 거른 뒤의 `total`이라 끝까지 읽기 판정이 정확하다(예전엔 여기서 거르느라 total과 받은 건수가 어긋났다).
  */
 export async function listIssues(projectId: string, filter?: IssueFilter): Promise<Issue[]> {
   const all: Issue[] = [];
-  let seen = 0;
   for (let page = 0; ; page += 1) {
-    const chunk = await listIssuesPage(projectId, filter, { page, size: MAX_SEARCH_PAGE_SIZE });
-    seen += chunk.items.length;
-    all.push(...chunk.items.filter((issue) => !issue.triageState));
-    if (seen >= chunk.total || chunk.items.length === 0) break;
+    const chunk = await findIssues(
+      { ...filterCriteria(projectId, filter), triage: false },
+      { page, size: MAX_SEARCH_PAGE_SIZE },
+      { field: "key", dir: "asc" },
+    );
+    all.push(...chunk.items);
+    if (all.length >= chunk.total || chunk.items.length === 0) break;
   }
   return all;
 }

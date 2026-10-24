@@ -278,6 +278,8 @@ describe("jiraApi issues", () => {
       startedAt: "2026-08-20T00:00:00Z",
       completedAt: "2026-08-23T00:00:00Z",
       version: 3,
+      // 옛 서버(이월 결과 없음)는 null — 화면은 결과 배너를 띄우지 않는다
+      carryOver: null,
     });
   });
 

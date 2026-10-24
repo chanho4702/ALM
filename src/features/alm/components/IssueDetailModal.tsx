@@ -90,6 +90,8 @@ import { useIssueActions } from "./useIssueActions";
 import { useIssueCommandScope } from "./commandScope";
 import { branchName } from "./branchName";
 import { favoriteOfIssue, useFavorites } from "./useFavorites";
+import { StoryPointsInput } from "./StoryPointsInput";
+import { usePlanningSettings } from "./usePlanningSettings";
 import "./favorites.css";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -210,8 +212,6 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [worklogComment, setWorklogComment] = useState("");
   const [estimateDraft, setEstimateDraft] = useState("");
-  /** 스토리 포인트 입력 초안(V30) — 흐림(blur)에 저장 */
-  const [pointsDraft, setPointsDraft] = useState("");
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [childType, setChildType] = useState<IssueType>("subtask");
   const [linkKind, setLinkKind] = useState<LinkKind>(LINK_KIND_DEFAULT);
@@ -353,7 +353,6 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       setIssue(found);
       setDescriptionDraft(found.description);
       setEstimateDraft(found.estimateHours === null ? "" : String(found.estimateHours));
-      setPointsDraft(found.storyPoints === null || found.storyPoints === undefined ? "" : String(found.storyPoints));
       setUsers(userList);
       setSprints(sprintList);
       setComments(commentList);
@@ -760,6 +759,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     statuses,
   });
   const { isPinned: isFavorite, toggle: toggleFavorite } = useFavorites();
+  const planningSettings = usePlanningSettings(issue?.projectId);
   useIssueCommandScope(
     issue
       ? {
@@ -1438,18 +1438,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           {fields.storyPoints.visible ? (
           <div className="alm-field">
             <FieldLabel field="storyPoints">스토리 포인트</FieldLabel>
-            <TextField
+            {/* 프로젝트 추정 척도(V39)에 맞는 선택 — 피보나치·직접 정의는 숫자 칩, T셔츠는 XS~XL, 수직선은 숫자 입력 */}
+            <StoryPointsInput
               label="스토리 포인트"
-              className="visually-hidden-label"
-              type="number"
-              min={0}
-              max={9999}
-              step={0.5}
-              placeholder="미지정"
-              value={pointsDraft}
-              onChange={(e) => setPointsDraft(e.target.value)}
-              onBlur={() => {
-                const next = pointsDraft.trim() === "" ? null : Number(pointsDraft);
+              value={issue.storyPoints ?? null}
+              settings={planningSettings}
+              onChange={(next) => {
                 if (next === (issue.storyPoints ?? null)) return;
                 void applyPatch({ storyPoints: next }, "스토리 포인트를 저장했습니다");
               }}

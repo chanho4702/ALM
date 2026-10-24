@@ -1,5 +1,6 @@
 // localStorage 목업 스토어 — sprints (jiraMock.ts에서 분할, 동작 불변)
-import type { Sprint } from "../types";
+import type { CompleteSprintOptions, Sprint, SprintCompletion } from "../types";
+import { autoCreateNextSprint, planningSettingsOf } from "./cycles";
 import { ApiError } from "../mapping";
 import { clone, load, nextId, persist } from "./db";
 import { assertCanAdmin, assertCanEdit } from "./members";
@@ -103,10 +104,7 @@ export async function startSprint(id: string): Promise<Sprint> {
  * 스프린트 완료. 미완료 이슈는 `moveUnfinishedTo`가 가리키는 스프린트로, 지정이 없으면
  * 백로그로 옮긴다(지라와 같은 선택지). 대상 검증이 실패하면 완료 자체가 일어나지 않는다.
  */
-export async function completeSprint(
-  id: string,
-  options: { moveUnfinishedTo?: string | null } = {},
-): Promise<Sprint> {
+export async function completeSprint(id: string, options: CompleteSprintOptions = {}): Promise<SprintCompletion> {
   const data = load();
   const sprint = data.sprints.find((s) => s.id === id);
   if (!sprint) throw new Error("스프린트를 찾을 수 없습니다");
@@ -122,19 +120,40 @@ export async function completeSprint(
     if (target.state === "done") throw new Error("완료된 스프린트로는 이관할 수 없습니다");
   }
 
-  const now = new Date().toISOString();
-  for (const issue of data.issues) {
-    if (issue.sprintId === id && statusKindOf(data, issue.projectId, issue.status) !== "complete") {
-      issue.sprintId = targetId; // null = 백로그
-      issue.updatedAt = now;
-      logChange(data, issue, "sprint", id, targetId, now);
-    }
-  }
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
   sprint.state = "done";
   sprint.completedAt = now;
   sprint.version += 1;
+  // 사이클(V39): 예정 스프린트가 없고 자동 생성이 켜져 있으면 다음 스프린트를 만든다(이관 선택과 무관)
+  const created = autoCreateNextSprint(data, sprint, nowMs);
+  const nextPlanned = created ?? data.sprints.find((s) => s.projectId === sprint.projectId && s.state === "planned") ?? null;
+  // 이관 대상: 스프린트 id > 요청(next·backlog) > 설정 기본값. next인데 다음 예정 스프린트가 없으면 백로그
+  let destination: string | null = targetId;
+  if (destination === null) {
+    const wanted = options.carryOver ?? planningSettingsOf(data, sprint.projectId).sprintAutomation.defaultCarryOver;
+    destination = wanted === "next" ? (nextPlanned?.id ?? null) : null;
+  }
+  let moved = 0;
+  for (const issue of data.issues) {
+    if (issue.sprintId === id && statusKindOf(data, issue.projectId, issue.status) !== "complete") {
+      issue.sprintId = destination; // null = 백로그
+      issue.updatedAt = now;
+      logChange(data, issue, "sprint", id, destination, now);
+      moved += 1;
+    }
+  }
   persist();
-  return clone(sprint);
+  return clone({
+    ...sprint,
+    carryOver: {
+      target: destination === null ? "backlog" : "sprint",
+      sprintId: destination,
+      movedCount: moved,
+      nextSprintId: nextPlanned?.id ?? null,
+      nextSprintAutoCreated: created !== null,
+    },
+  });
 }
 
 /** 서버 409 문구와 같다 — 진행 중·완료 스프린트는 지우지 않는다 */

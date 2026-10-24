@@ -12,9 +12,8 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Button, Dropdown, EmptyState, Lozenge, Select, useToast } from "@chanho/react";
-import type { Board, BoardSwimlane, Issue, IssueTransitionOption, Sprint, User, WorkflowStatus } from "../store/types";
+import type { Board, BoardSwimlane, CompleteSprintOptions, Issue, IssueTransitionOption, Sprint, User, WorkflowStatus } from "../store/types";
 import {
-  completeSprint,
   createIssue,
   getBoard,
   listBoardIssues,
@@ -49,6 +48,7 @@ import { usePriorities } from "../components/usePriorities";
 import { useIssueActions } from "../components/useIssueActions";
 import { useIssueInteractions } from "../components/useIssueInteractions";
 import { BoardSkeleton } from "../components/Skeletons";
+import { useSprintCompletion } from "../components/useSprintCompletion";
 
 const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
 
@@ -237,20 +237,13 @@ export function BoardPage() {
     await reload();
   };
 
-  /** 스프린트 완료 — 백로그 화면과 같은 스토어 호출·Toast 규약 */
-  const handleCompleteSprint = async (target: Sprint, moveUnfinishedTo: string | null) => {
-    try {
-      await completeSprint(target.id, { moveUnfinishedTo });
-      toast({ title: "스프린트를 완료했습니다", appearance: "success" });
-    } catch (error) {
-      toast({
-        title: "스프린트 완료 실패",
-        description: error instanceof Error ? error.message : String(error),
-        appearance: "danger",
-      });
-    }
-    await reload();
-  };
+  /** 스프린트 완료 — 백로그와 같은 흐름(결과 토스트·배너). "새 스프린트 보기"는 백로그의 그 패널로 */
+  const completion = useSprintCompletion({
+    projectId,
+    reload,
+    onShowSprint: (sprintId) => navigate(`/projects/${projectId}/backlog#sprint-${sprintId}`),
+  });
+  const handleCompleteSprint = (target: Sprint, options: CompleteSprintOptions) => completion.complete(target, options);
 
   /** 드래그 중인 이슈의 가용 전환 — 같은 이슈는 요청 하나를 나눠 쓴다 */
   const optionsFor = (issueId: string): Promise<IssueTransitionOption[]> => {
@@ -464,6 +457,7 @@ export function BoardPage() {
 
   return (
     <>
+      {completion.notice}
       <div className="board-toolbar">
         <div className="board-toolbar-title">
           <strong className="board-name">{board.name}</strong>
@@ -556,9 +550,9 @@ export function BoardPage() {
         targets={sprints.filter((s) => s.id !== completingSprint?.id && s.state !== "done")}
         statuses={statuses}
         onClose={() => setCompletingSprint(null)}
-        onConfirm={(target, moveUnfinishedTo) => {
+        onConfirm={(target, options) => {
           setCompletingSprint(null);
-          void handleCompleteSprint(target, moveUnfinishedTo);
+          void handleCompleteSprint(target, options);
         }}
       />
       <BulkEditModal

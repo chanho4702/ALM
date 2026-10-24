@@ -1,0 +1,63 @@
+/* 인라인 이슈 만들기(Linear) — 백로그 하단 생성과 같은 톤, 토큰만 */
+.inline-create-form {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding-top: var(--chanho-space-100);
+}
+
+.inline-create-form > div {
+  flex: 1;
+}
+
+.inline-create-toggle {
+  align-self: flex-start;
+  justify-content: flex-start;
+  gap: var(--chanho-space-50);
+  color: var(--chanho-color-text-subtle);
+}
+
+.inline-create-toggle.is-compact {
+  margin-left: auto;
+}
+
+/* 스프린트 완료 결과 배너 — 백로그·보드 상단 */
+.sprint-completion-notice {
+  margin-bottom: var(--chanho-space-150);
+}
+
+.planning-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--chanho-space-200);
+  align-items: end;
+  margin: var(--chanho-space-150) 0;
+}
+
+.planning-settings-grid button[role="combobox"] {
+  width: 100%;
+}
+
+.planning-settings-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.planning-settings-fieldset legend {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  margin-bottom: var(--chanho-space-50);
+}
+
+.planning-tshirt {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--chanho-space-100);
+}
+
+.planning-settings-error {
+  color: var(--chanho-color-text-danger);
+  margin: 0 0 var(--chanho-space-100);
+}
