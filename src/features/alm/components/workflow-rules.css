@@ -1,0 +1,104 @@
+/* 워크플로 규칙(C1~C5) — 전환 규칙 편집·요약, 타입별 워크플로. 토큰만 */
+.transition-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.transition-rules-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+  margin: 0;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+}
+
+.transition-rules-group > legend {
+  padding: 0 var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.transition-rules-hint {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.transition-rules-radios.transition-rules-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-150);
+}
+
+.transition-rules-resolution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-150);
+}
+
+.transition-rules-target {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.transition-rules-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.workflow-rule-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-25);
+}
+
+.type-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  padding-top: var(--chanho-space-150);
+  border-top: 1px solid var(--chanho-color-border-default);
+}
+
+.type-workflow-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--chanho-space-150);
+}
+
+.type-workflow-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-200);
+}
+
+.type-workflow-note {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.type-workflow-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-150);
+}
+
+.type-workflow-overrides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-75);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

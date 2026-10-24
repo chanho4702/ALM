@@ -58,6 +58,7 @@ import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PriorityGlyph } from "./PriorityGlyph";
 import { ResolutionGlyph } from "./ResolutionGlyph";
 import { StatusGlyph } from "./StatusGlyph";
+import { StatusTransitionButton } from "./transitions/StatusTransitionButton";
 import { useIssueTypes } from "./useIssueTypes";
 import { Copy, Lock, Plus, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
@@ -155,8 +156,7 @@ export interface IssueDetailModalProps {
 
 /** 담당자 Select 트리거 id — 단축키 `a`가 찾는다 */
 const ASSIGNEE_TRIGGER_ID = "issue-detail-assignee";
-/** 단축키 s·p가 펼치는 상태·우선순위 선택 트리거 */
-const STATUS_TRIGGER_ID = "issue-detail-status";
+/** 단축키 p가 펼치는 우선순위 선택 트리거(s는 상태 전환 버튼이 연다) */
 const PRIORITY_TRIGGER_ID = "issue-detail-priority";
 
 export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDetailModalProps) {
@@ -226,6 +226,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     successTitle: string;
   } | null>(null);
   const [resolvingConflict, setResolvingConflict] = useState(false);
+  /** `s` 단축키가 올리는 신호 — 상태 버튼이 전환 목록을 연다 */
+  const [statusMenuSignal, setStatusMenuSignal] = useState(0);
   const toast = useToast();
 
   useEffect(() => {
@@ -716,12 +718,13 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     {
       e: () => inDialog("button[aria-label='제목 편집']")?.click(),
       a: () => openSelect(ASSIGNEE_TRIGGER_ID),
-      s: () => openSelect(STATUS_TRIGGER_ID),
       p: () => openSelect(PRIORITY_TRIGGER_ID),
       i: () => {
         if (!issue || !me || !fields.assignee.visible || issue.assigneeId === me.id) return;
         void applyPatch({ assigneeId: me.id }, "나에게 할당했습니다");
       },
+      // 상태 전환 목록을 연다(A2) — 지라·Linear의 상태 키
+      s: () => setStatusMenuSignal((n) => n + 1),
       l: () => inDialog(".issue-labels-field input")?.focus(),
       m: () => {
         setHistoryTab("comments");
@@ -1147,21 +1150,15 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               onValueChange={(v) => void applyPatch({ type: v }, "타입을 변경했습니다")}
             />
           </div>
-          {/* 글리프는 DS Select의 옵션 icon 슬롯이 목록·트리거 양쪽에 그린다(react 0.11.0) —
-              전엔 트리거 왼쪽에 손으로 세웠다(.issue-status-field) */}
+          {/* 지라 이슈 뷰의 상태 버튼(A2) — 모든 상태가 아니라 지금 갈 수 있는 전환만, 못 하는 전환은 이유와 함께
+              흐리게. 전환 화면이 있는 전환은 창을 띄운다(A4). 저장은 서버 워크플로 엔진이 한다(조건·검증·후처리) */}
           <div className="alm-field">
             <FieldLabel field="status">상태</FieldLabel>
-            <Select
-              id={STATUS_TRIGGER_ID}
-              label="상태"
-              className="visually-hidden-label"
-              value={issue.status}
-              options={statuses.map((s) => ({
-                value: s.id,
-                label: s.name,
-                icon: <StatusGlyph status={s.id} statuses={statuses} variant="icon" />,
-              }))}
-              onValueChange={(v) => void applyPatch({ status: v }, "상태를 변경했습니다")}
+            <StatusTransitionButton
+              issue={issue}
+              statuses={statuses}
+              openSignal={statusMenuSignal}
+              onTransitioned={(updated) => afterSaved(updated, "상태를 변경했습니다")}
             />
           </div>
           {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}

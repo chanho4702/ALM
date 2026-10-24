@@ -2,11 +2,13 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Check } from "lucide-react";
 import { Card, Lozenge, Tag } from "@chanho/react";
+import { Flag } from "lucide-react";
 import type { Issue, User } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PriorityGlyph } from "./PriorityGlyph";
 import { usePriorities } from "./usePriorities";
 import { UserAvatar } from "./UserAvatar";
+import "./board-workflow.css";
 
 export interface IssueCardProps {
   issue: Issue;
@@ -23,8 +25,9 @@ export function IssueCard({ issue, assignee, epicName, onOpen }: IssueCardProps)
   return (
     // interactive Card는 <button>으로 렌더 — hover elevation은 Card가 제공한다.
     // 내부는 phrasing 콘텐츠(span)만 둔다.
-    <Card interactive padding="sm" className="issue-card" onClick={onOpen}>
+    <Card interactive padding="sm" className={issue.flagged ? "issue-card is-flagged" : "issue-card"} onClick={onOpen}>
       <span className="issue-card-title">{issue.title}</span>
+      {issue.flagged ? <IssueFlagMark /> : null}
       {epicName ? (
         <span className="issue-card-epic">
           <Lozenge appearance="warning">{epicName}</Lozenge>
@@ -41,9 +44,24 @@ export function IssueCard({ issue, assignee, epicName, onOpen }: IssueCardProps)
         <IssueTypeGlyph type={issue.type} />
         <span className="issue-card-key">{issue.key}</span>
         <PriorityGlyph defs={priorities} priority={issue.priority} />
+        {issue.storyPoints !== null && issue.storyPoints !== undefined ? (
+          <span className="issue-points" title={`스토리 포인트 ${issue.storyPoints}`} aria-label={`스토리 포인트 ${issue.storyPoints}`}>
+            {issue.storyPoints}
+          </span>
+        ) : null}
         {assignee ? <UserAvatar user={assignee} size="small" /> : null}
       </span>
     </Card>
+  );
+}
+
+/** 플래그(막힘, D2) 표시 — 아이콘 + 텍스트(색만으로 알리지 않는다). 카드·목록 행·백로그 행이 함께 쓴다 */
+export function IssueFlagMark() {
+  return (
+    <span className="issue-flag">
+      <Flag size={12} aria-hidden />
+      막힘
+    </span>
   );
 }
 

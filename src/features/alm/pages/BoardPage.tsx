@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
@@ -12,12 +12,13 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Button, Dropdown, EmptyState, Lozenge, Select, useToast } from "@chanho/react";
-import type { Board, BoardSwimlane, Issue, Sprint, User, WorkflowStatus } from "../store/types";
+import type { Board, BoardSwimlane, Issue, IssueTransitionOption, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   completeSprint,
   createIssue,
   getBoard,
   listBoardIssues,
+  listIssueTransitions,
   listIssues,
   listProjectStatuses,
   listSprints,
@@ -39,6 +40,9 @@ import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
 import { UserAvatar } from "../components/UserAvatar";
 import { resolveMove } from "./boardDnd";
+import { applyOptimisticMove, boardColumnsOf, columnAvailability, columnIssueIds } from "./boardColumns";
+import type { ColumnAvailability } from "./boardColumns";
+import { useTransitionRunner } from "../components/transitions/useTransitionRunner";
 import { BulkEditModal } from "../components/BulkEditModal";
 import { SelectionBar } from "../components/SelectionBar";
 import { usePriorities } from "../components/usePriorities";
@@ -69,6 +73,12 @@ export function BoardPage() {
   /** epicId → 이름 (카드 에픽 태그) */
   const [epicsById, setEpicsById] = useState<Record<string, string>>({});
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  /**
+   * 드래그 중인 이슈의 가용 전환(A3) — 들어 올리는 순간 서버에 묻는다. 응답 전에는 열을 흐리지 않고(모름),
+   * 응답이 오면 갈 수 없는 열을 흐리고 놓을 수 없게 한다. 놓을 때 아직 모르면 그때 기다린다.
+   */
+  const [dragOptions, setDragOptions] = useState<{ issueId: string; options: IssueTransitionOption[] } | null>(null);
+  const dragOptionsRequest = useRef<{ issueId: string; promise: Promise<IssueTransitionOption[]> } | null>(null);
   const [quick, setQuick] = useState<QuickFilter>(EMPTY_QUICK_FILTER);
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** 화면 그룹핑 — 초기값은 보드 설정(swimlane), Select로 임시 전환 */
@@ -169,12 +179,15 @@ export function BoardPage() {
     return null;
   }, [groupBy, users, visibleIssues, epicsById]);
 
+  /** 보드가 그릴 열(C4) — 열 하나에 여러 상태, 어느 열에도 없는 상태는 보드에 안 나온다 */
+  const columns = useMemo(() => (board ? boardColumnsOf(board, statuses) : []), [board, statuses]);
+
   // 웨이브 B — 다중 선택(⌘/Shift 클릭·x)·우클릭 메뉴·미리보기(Space)·속성 단축키·명령 팔레트 범위.
-  // 순서는 보이는 대로(컬럼 왼쪽부터, 컬럼 안은 위부터) — Shift 범위와 미리보기 이웃 이동의 기준
+  // 순서는 보이는 대로(열 왼쪽부터, 열 안은 위부터) — Shift 범위와 미리보기 이웃 이동의 기준
   const priorities = usePriorities();
   const orderedIssues = useMemo(
-    () => statuses.flatMap((ws) => visibleIssues.filter((issue) => issue.status === ws.id)),
-    [statuses, visibleIssues],
+    () => columns.flatMap((column) => visibleIssues.filter((issue) => column.statuses.includes(issue.status))),
+    [columns, visibleIssues],
   );
   const [bulkOpen, setBulkOpen] = useState(false);
   const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({ setIssues, reload });
@@ -188,15 +201,21 @@ export function BoardPage() {
     sprints,
   });
 
-  /** 상태 id → order순 이슈 id 배열 (resolveMove 입력) — 프로젝트 상태 전부가 키 */
-  const columnIds = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    for (const status of statuses) map[status.id] = [];
-    for (const issue of visibleIssues) (map[issue.status] ??= []).push(issue.id);
-    return map;
-  }, [visibleIssues, statuses]);
+  /** 열 id → 보드 순서 이슈 id (resolveMove 입력) */
+  const columnIds = useMemo(() => columnIssueIds(columns, visibleIssues), [columns, visibleIssues]);
 
-  /** 컬럼 하단 인라인 생성 — 스크럼: 활성 스프린트로, 칸반: 백로그로 */
+  /** 드래그 중 열마다 놓을 수 있나 — 전환 목록을 받기 전에는 비어 있다(전부 허용으로 보인다) */
+  const availability = useMemo(() => {
+    if (!activeIssue || dragOptions?.issueId !== activeIssue.id) return {} as Record<string, ColumnAvailability>;
+    return Object.fromEntries(
+      columns.map((column) => [column.id, columnAvailability(column, activeIssue, dragOptions.options)]),
+    ) as Record<string, ColumnAvailability>;
+  }, [activeIssue, dragOptions, columns]);
+
+  /** 전환 실행 공용 흐름 — 전환 화면이 있으면 창을 띄운다(A4) */
+  const { run: runTransition, element: transitionScreen } = useTransitionRunner(statuses);
+
+  /** 컬럼 하단 인라인 생성 — 스크럼: 활성 스프린트로, 칸반: 백로그로. 매핑 열은 그 열의 첫 상태로 */
   const handleColumnCreate = async (status: string, title: string) => {
     if (!projectId || !board) return;
     if (board.type === "scrum" && !sprint) return;
@@ -233,29 +252,89 @@ export function BoardPage() {
     await reload();
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveIssue(visibleIssues.find((i) => i.id === event.active.id) ?? null);
+  /** 드래그 중인 이슈의 가용 전환 — 같은 이슈는 요청 하나를 나눠 쓴다 */
+  const optionsFor = (issueId: string): Promise<IssueTransitionOption[]> => {
+    if (dragOptionsRequest.current?.issueId === issueId) return dragOptionsRequest.current.promise;
+    const promise = listIssueTransitions(issueId).then((result) => result.transitions);
+    dragOptionsRequest.current = { issueId, promise };
+    promise.then(
+      (options) => {
+        if (dragOptionsRequest.current?.promise === promise) setDragOptions({ issueId, options });
+      },
+      () => undefined,
+    );
+    return promise;
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const issue = visibleIssues.find((i) => i.id === event.active.id) ?? null;
+    setActiveIssue(issue);
+    setDragOptions(null);
+    dragOptionsRequest.current = null;
+    if (issue) void optionsFor(issue.id).catch(() => undefined);
+  };
+
+  const failMove = (error: unknown) =>
+    toast({
+      title: "이슈 이동 실패",
+      description: error instanceof Error ? error.message : String(error),
+      appearance: "danger",
+    });
+
+  /**
+   * 놓기(A3) — **낙관적**: 서버 응답 전에 카드를 새 열에 먼저 그린다. 거부(400 조건·검증)·409면 원래 자리로 돌리고
+   * 이유 토스트. 전환 화면이 있는 전환이면 창을 띄우고, 취소하면 제자리로 돌린다(A4). 끝나면 조용히 다시 읽어 맞춘다.
+   */
   const handleDragEnd = async (event: DragEndEvent) => {
+    const dragged = activeIssue;
     setActiveIssue(null);
     const { active, over } = event;
-    if (!over) return;
-    // 스윔레인 컬럼 id("밴드키:status")는 status로 정규화 — 밴드는 시각적 그룹일 뿐이다
+    if (!over || !dragged) return;
+    // 스윔레인 컬럼 id("밴드키:열")는 열 id로 정규화 — 밴드는 시각적 그룹일 뿐이다
     const rawOver = String(over.id);
     const overId = rawOver.includes(":") ? rawOver.split(":").pop()! : rawOver;
     const target = resolveMove(String(active.id), overId, columnIds);
     if (!target) return;
+    const column = columns.find((c) => c.id === target.status);
+    if (!column) return;
+    let decision: ColumnAvailability;
     try {
-      await moveIssue(String(active.id), target);
+      decision = columnAvailability(column, dragged, await optionsFor(dragged.id));
     } catch (error) {
-      toast({
-        title: "이슈 이동 실패",
-        description: error instanceof Error ? error.message : String(error),
-        appearance: "danger",
-      });
+      failMove(error);
+      return;
     }
-    await reload(); // 성공/실패 모두 스토어 기준으로 재조회
+    if (!decision.allowed) {
+      // 흐린 열에는 놓을 수 없지만(드롭 비활성), 응답 전에 놓은 경우를 여기서 막는다
+      toast({ title: "이 열로 옮길 수 없습니다", description: decision.reason, appearance: "danger" });
+      return;
+    }
+    const option = decision.option;
+    const toStatus = option ? option.to : dragged.status;
+    const previous = issues;
+    setIssues(applyOptimisticMove(issues, dragged.id, toStatus, target.beforeId, column.statuses));
+    try {
+      if (option?.hasScreen) {
+        const outcome = await runTransition(dragged, option);
+        if (outcome.kind === "cancelled") {
+          setIssues(previous);
+          return;
+        }
+        if (outcome.kind === "failed") throw outcome.error;
+        // 전환 실행은 순서를 모른다 — 놓은 자리로 순서만 맞춘다(같은 상태 안 이동은 전환이 아니다)
+        if (target.beforeId) await moveIssue(dragged.id, { status: toStatus, beforeId: target.beforeId });
+      } else {
+        await moveIssue(dragged.id, { status: toStatus, beforeId: target.beforeId });
+      }
+    } catch (error) {
+      setIssues(previous);
+      failMove(error);
+      return;
+    } finally {
+      dragOptionsRequest.current = null;
+      setDragOptions(null);
+    }
+    void reload(); // 서버 기준으로 조용히 맞춘다(화면은 이미 옮겨져 있다)
   };
 
   if (board === undefined) {
@@ -289,7 +368,11 @@ export function BoardPage() {
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveIssue(null)}
+          onDragCancel={() => {
+            setActiveIssue(null);
+            setDragOptions(null);
+            dragOptionsRequest.current = null;
+          }}
         >
           {bands ? (
             bands.map((band) => (
@@ -310,22 +393,23 @@ export function BoardPage() {
                   <span className="board-swimlane-count">{band.issues.length}개</span>
                 </header>
                 <div className="board-columns">
-                  {statuses.map((ws) => {
-                    const column = board.columns.find((c) => c.status === ws.id);
+                  {columns.map((column) => {
+                    const blocked = availability[column.id];
                     return (
                       <BoardColumn
-                        key={ws.id}
-                        status={ws.id}
-                        droppableId={`${band.key}:${ws.id}`}
-                        issues={band.issues.filter((i) => i.status === ws.id)}
+                        key={column.id}
+                        columnId={column.id}
+                        status={column.statuses[0] ?? column.id}
+                        droppableId={`${band.key}:${column.id}`}
+                        issues={band.issues.filter((i) => column.statuses.includes(i.status))}
                         usersById={usersById}
                         onOpenIssue={openIssue}
                         epicNames={epicNames}
-                        columnName={column?.name ?? ws.name}
-                        appearance={ws.color ?? "neutral"}
-                        workflowStatus={ws}
+                        columnName={column.name}
+                        workflowStatus={statuses.find((s) => s.id === column.statuses[0])}
                         // 밴드별 개수는 전체 WIP 기준과 달라 오해 소지 — 스윔레인에선 표시 생략
                         wipLimit={null}
+                        blockedReason={blocked && !blocked.allowed ? blocked.reason : null}
                         selectedIds={interactions.selected}
                       />
                     );
@@ -335,21 +419,22 @@ export function BoardPage() {
             ))
           ) : (
             <div className="board-columns">
-              {statuses.map((ws) => {
-                const column = board.columns.find((c) => c.status === ws.id);
+              {columns.map((column) => {
+                const blocked = availability[column.id];
                 return (
                   <BoardColumn
-                    key={ws.id}
-                    status={ws.id}
-                    issues={visibleIssues.filter((i) => i.status === ws.id)}
+                    key={column.id}
+                    columnId={column.id}
+                    status={column.statuses[0] ?? column.id}
+                    issues={visibleIssues.filter((i) => column.statuses.includes(i.status))}
                     usersById={usersById}
                     onOpenIssue={openIssue}
                     epicNames={epicNames}
-                    onCreateIssue={handleColumnCreate}
-                    columnName={column?.name ?? ws.name}
-                    appearance={ws.color ?? "neutral"}
-                    workflowStatus={ws}
-                    wipLimit={column?.wipLimit ?? null}
+                    onCreateIssue={column.statuses.length > 0 ? handleColumnCreate : undefined}
+                    columnName={column.name}
+                    workflowStatus={statuses.find((s) => s.id === column.statuses[0])}
+                    wipLimit={column.wipLimit ?? null}
+                    blockedReason={blocked && !blocked.allowed ? blocked.reason : null}
                     selectedIds={interactions.selected}
                   />
                 );
@@ -431,6 +516,13 @@ export function BoardPage() {
             items={[{ label: "보드 설정", onSelect: () => setSettingsOpen(true) }]}
           />
         </div>
+        {board.unmappedStatuses.length > 0 ? (
+          <p className="board-unmapped-note" role="note">
+            {`어느 열에도 없는 상태 ${board.unmappedStatuses.length}개(${board.unmappedStatuses
+              .map((id) => statuses.find((s) => s.id === id)?.name ?? id)
+              .join(", ")})의 이슈는 이 보드에 보이지 않습니다 — 보드 설정에서 열에 넣으세요.`}
+          </p>
+        ) : null}
         <BoardFilterBar
           users={users}
           labelOptions={labelOptions}
@@ -487,6 +579,7 @@ export function BoardPage() {
       {issueActionDialogs}
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
       {issueModal}
+      {transitionScreen}
     </>
   );
 }

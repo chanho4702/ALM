@@ -1,0 +1,151 @@
+/* 보드 워크플로(A3·C4)·카드 표시(D2) — 갈 수 없는 열 흐림, 미매핑 안내, 플래그·포인트 배지. 토큰만 */
+.board-column.is-unavailable {
+  opacity: 0.45;
+  border-style: dashed;
+  border-color: var(--chanho-color-border-default);
+  transition: opacity var(--chanho-transition-fast);
+}
+
+.board-column-blocked {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.board-unmapped-note {
+  margin: 0;
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-warning-subtler);
+  color: var(--chanho-color-text-warning-bolder);
+  font-size: var(--chanho-font-size-75);
+}
+
+.issue-card.is-flagged {
+  box-shadow: inset 3px 0 0 var(--chanho-color-border-danger);
+  background: var(--chanho-color-background-danger-subtler);
+}
+
+.issue-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-25);
+  color: var(--chanho-color-text-danger);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.issue-points {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 var(--chanho-space-50);
+  border-radius: var(--chanho-radius-full);
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-column.is-unavailable {
+    transition: none;
+  }
+}
+
+/* 보드 설정 › 열(C4) */
+.board-column-mode.board-column-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-200);
+}
+
+.board-column-mapping-hint {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.board-column-mapping-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.board-column-mapping-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+}
+
+.board-column-mapping-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.board-column-mapping-head > div:first-child {
+  flex: 1 1 180px;
+}
+
+.board-column-mapping-head > div:nth-child(2) {
+  flex: 0 1 120px;
+}
+
+.board-column-mapping-actions {
+  display: flex;
+  gap: var(--chanho-space-25);
+  margin-left: auto;
+}
+
+.board-column-mapping-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-75);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.board-column-mapping-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-25);
+  padding: var(--chanho-space-25) var(--chanho-space-50) var(--chanho-space-25) var(--chanho-space-100);
+  border-radius: var(--chanho-radius-full);
+  background: var(--chanho-color-background-neutral);
+  font-size: var(--chanho-font-size-75);
+}
+
+.board-column-mapping-empty {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.board-column-mapping-add {
+  max-width: 260px;
+}
+
+.board-column-unmapped {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 1px dashed var(--chanho-color-border-bold);
+  border-radius: var(--chanho-radius-medium);
+}
+
+.board-column-unmapped-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+}

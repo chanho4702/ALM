@@ -25,6 +25,7 @@ import type {
   WorkflowStatus,
   WorkflowTransition,
   WorkflowLayout,
+  TypeWorkflow,
   User,
 } from "../store/types";
 import type { ResolvedSettings } from "../store/jiraStore";
@@ -51,6 +52,8 @@ import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { PriorityGlyph } from "../components/PriorityGlyph";
 import { ValueWithIcon } from "../components/ValueWithIcon";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
+import { TypeWorkflowEditor } from "../components/TypeWorkflowEditor";
+import { pruneWorkflowRefs } from "../components/workflowRules";
 import { FieldConfigEditor } from "../components/FieldConfigEditor";
 import {
   normalizeFields,
@@ -153,6 +156,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   const [statusesDraft, setStatusesDraft] = useState<WorkflowStatus[]>([]);
   const [transitionsDraft, setTransitionsDraft] = useState<WorkflowTransition[]>([]);
   const [layoutDraft, setLayoutDraft] = useState<WorkflowLayout>({});
+  /** 이슈 타입별 워크플로(C5) 초안 — 키가 없는 타입은 프로젝트 기본 워크플로를 따른다 */
+  const [workflowsByTypeDraft, setWorkflowsByTypeDraft] = useState<Record<string, TypeWorkflow>>({});
   const [fieldsDraft, setFieldsDraft] = useState<IssueFieldConfig[]>(() => normalizeFields(null));
   /** 이슈 타입별 덮어쓰기 초안 — 키가 없는 타입은 기본 구성을 따른다 */
   const [fieldsByTypeDraft, setFieldsByTypeDraft] = useState<Record<string, IssueFieldConfig[]>>({});
@@ -173,6 +178,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     setStatusesDraft([...resolvedSettings.body.statuses].sort((a, b) => a.order - b.order));
     setTransitionsDraft(resolvedSettings.body.transitions ?? []);
     setLayoutDraft(resolvedSettings.body.layout ?? {});
+    setWorkflowsByTypeDraft(resolvedSettings.body.workflowsByType ?? {});
     setFieldsDraft(normalizeFields(resolvedSettings.body));
     setFieldsByTypeDraft(normalizeFieldsByType(resolvedSettings.body));
   }, [currentProjectId]);
@@ -521,12 +527,17 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             onSubmit={(e) => {
               e.preventDefault();
               void run("저장 실패", async () => {
-                await updateProjectCustomSettings(project.id, {
-                  ...resolved.body,
-                  statuses: statusesDraft,
-                  transitions: transitionsDraft,
-                  layout: layoutDraft,
-                });
+                // 상태를 뺐으면 그 상태를 가리키던 전이·타입 워크플로 참조를 덜어 보낸다(서버는 깨진 참조를 400으로 거부)
+                await updateProjectCustomSettings(
+                  project.id,
+                  pruneWorkflowRefs({
+                    ...resolved.body,
+                    statuses: statusesDraft,
+                    transitions: transitionsDraft,
+                    layout: layoutDraft,
+                    workflowsByType: workflowsByTypeDraft,
+                  }),
+                );
                 toast({ title: "워크플로를 저장했습니다", appearance: "success" });
               });
             }}
@@ -538,6 +549,13 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
               layout={layoutDraft}
               onChange={setTransitionsDraft}
               onLayoutChange={setLayoutDraft}
+            />
+            <TypeWorkflowEditor
+              statuses={statusesDraft}
+              transitions={transitionsDraft}
+              types={issueTypes.filter((t) => resolved.body.enabledTypes.includes(t.id))}
+              value={workflowsByTypeDraft}
+              onChange={setWorkflowsByTypeDraft}
             />
             <Button type="submit" size="small">
               저장
@@ -559,6 +577,13 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
               statuses={resolved.body.statuses}
               transitions={resolved.body.transitions ?? []}
               layout={resolved.body.layout}
+              readOnly
+            />
+            <TypeWorkflowEditor
+              statuses={resolved.body.statuses}
+              transitions={resolved.body.transitions ?? []}
+              types={issueTypes.filter((t) => resolved.body.enabledTypes.includes(t.id))}
+              value={resolved.body.workflowsByType ?? {}}
               readOnly
             />
             <p className="admin-scheme-note">

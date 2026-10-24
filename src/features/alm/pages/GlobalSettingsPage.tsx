@@ -23,6 +23,8 @@ import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { PriorityGlyph } from "../components/PriorityGlyph";
 import { ValueWithIcon } from "../components/ValueWithIcon";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
+import { TypeWorkflowEditor } from "../components/TypeWorkflowEditor";
+import { pruneWorkflowRefs } from "../components/workflowRules";
 import { FieldConfigEditor } from "../components/FieldConfigEditor";
 import {
   normalizeFields,
@@ -83,6 +85,7 @@ export function GlobalSettingsPage() {
   const [editStatuses, setEditStatuses] = useState<WorkflowStatus[]>([]);
   const [editTransitions, setEditTransitions] = useState<WorkflowTransition[]>([]);
   const [editLayout, setEditLayout] = useState<WorkflowLayout>({});
+  const [editTypeWorkflows, setEditTypeWorkflows] = useState<NonNullable<SettingsScheme["body"]["workflowsByType"]>>({});
 
   const reload = useCallback(async () => {
     const list = await listSchemes();
@@ -153,6 +156,7 @@ export function GlobalSettingsPage() {
     setEditStatuses([...scheme.body.statuses].sort((a, b) => a.order - b.order));
     setEditTransitions(scheme.body.transitions ?? []);
     setEditLayout(scheme.body.layout ?? {});
+    setEditTypeWorkflows(scheme.body.workflowsByType ?? {});
   };
 
   const handleStatusesSave = async (event: FormEvent<HTMLFormElement>) => {
@@ -160,12 +164,14 @@ export function GlobalSettingsPage() {
     if (!editingWf) return;
     await run("저장 실패", async () => {
       await updateScheme(editingWf.id, {
-        body: {
+        // 뺀 상태의 참조는 덜어 보낸다(서버는 깨진 참조를 400으로 거부)
+        body: pruneWorkflowRefs({
           ...editingWf.body,
           statuses: editStatuses,
           transitions: editTransitions,
           layout: editLayout,
-        },
+          workflowsByType: editTypeWorkflows,
+        }),
       });
       toast({ title: "워크플로 상태를 저장했습니다", appearance: "success" });
       setEditingWf(null);
@@ -495,6 +501,13 @@ export function GlobalSettingsPage() {
               layout={editLayout}
               onChange={setEditTransitions}
               onLayoutChange={setEditLayout}
+            />
+            <TypeWorkflowEditor
+              statuses={editStatuses}
+              transitions={editTransitions}
+              types={issueTypes.filter((t) => editingWf.body.enabledTypes.includes(t.id))}
+              value={editTypeWorkflows}
+              onChange={setEditTypeWorkflows}
             />
             <Button type="submit">저장</Button>
           </form>

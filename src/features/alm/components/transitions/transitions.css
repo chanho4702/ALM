@@ -1,0 +1,118 @@
+/* 상태 전환(A2·A4) — 상태 버튼 목록·전환 화면. 색·간격은 토큰만 */
+.transition-trigger-chevron {
+  margin-left: var(--chanho-space-50);
+  color: var(--chanho-color-text-subtle);
+}
+
+.transition-popover {
+  min-width: 240px;
+  max-width: 360px;
+}
+
+.transition-popover-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--chanho-space-100);
+  margin: 0;
+  padding: var(--chanho-space-150);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.transition-menu {
+  list-style: none;
+  margin: 0;
+  padding: var(--chanho-space-50) 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.transition-item {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  width: 100%;
+  min-height: 32px;
+  padding: var(--chanho-space-50) var(--chanho-space-150);
+  border: 0;
+  background: transparent;
+  color: var(--chanho-color-text-default);
+  font: inherit;
+  font-size: var(--chanho-font-size-100);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--chanho-transition-fast);
+}
+
+.transition-item:hover,
+.transition-item:focus-visible {
+  background: var(--chanho-color-background-neutral-hovered);
+  outline: none;
+}
+
+.transition-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--chanho-color-border-focused);
+}
+
+.transition-item.is-unavailable {
+  color: var(--chanho-color-text-disabled);
+  cursor: not-allowed;
+}
+
+.transition-item-name {
+  font-weight: var(--chanho-font-weight-medium);
+}
+
+.transition-item-arrow,
+.transition-item-lock,
+.transition-item-more {
+  color: var(--chanho-color-text-subtle);
+  flex: none;
+}
+
+.transition-item-target {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}
+
+.transition-item-lock {
+  margin-left: auto;
+}
+
+.transition-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.transition-screen-target {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin: 0;
+}
+
+.transition-screen-target-label {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.transition-screen-missing {
+  margin: 0;
+  color: var(--chanho-color-text-danger);
+  font-size: var(--chanho-font-size-75);
+}
+
+.transition-screen-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transition-item {
+    transition: none;
+  }
+}

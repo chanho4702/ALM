@@ -9,9 +9,12 @@ import type { Issue, IssueStatus, User, WorkflowStatus } from "../store/types";
 import { SortableIssueCard } from "./IssueCard";
 import { StatusGlyph } from "./StatusGlyph";
 import { STATUS_LABELS } from "./labels";
+import "./board-workflow.css";
 
 export interface BoardColumnProps {
-  /** 워크플로 상태 id */
+  /** 열 id — 상태 형식이면 상태 id, 매핑 형식(C4)이면 보드가 붙인 열 id. 기본: status */
+  columnId?: string;
+  /** 워크플로 상태 id — 매핑 열이면 그 열의 첫 상태(머리글 글리프·인라인 생성 대상) */
   status: string;
   /** 이 컬럼의 이슈 (order 오름차순) */
   issues: Issue[];
@@ -38,6 +41,11 @@ export interface BoardColumnProps {
   epicNames?: Record<string, string>;
   /** 다중 선택된 이슈 id (⌘/Shift 클릭·x) */
   selectedIds?: ReadonlySet<string>;
+  /**
+   * 드래그 중인 카드를 이 열에 놓을 수 없을 때의 이유(A3) — 있으면 열을 흐리고 드롭을 막는다.
+   * 이유는 머리글 아래 글로 보인다(색만으로 알리지 않는다).
+   */
+  blockedReason?: string | null;
 }
 
 export function BoardColumn({
@@ -53,6 +61,8 @@ export function BoardColumn({
   droppableId,
   epicNames = {},
   selectedIds,
+  columnId,
+  blockedReason = null,
 }: BoardColumnProps) {
   const label = columnName ?? STATUS_LABELS[status as IssueStatus] ?? status;
   // `workflowStatus`가 진짜 원천이고, 옛 `appearance`만 받은 호출부는 색·이름만이라도 살린다
@@ -65,7 +75,7 @@ export function BoardColumn({
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   // 컬럼 droppable id = status 문자열(스윔레인은 "밴드키:status") → resolveMove가 컬럼 드롭을 인식한다
-  const { setNodeRef, isOver } = useDroppable({ id: droppableId ?? status });
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId ?? columnId ?? status, disabled: Boolean(blockedReason) });
 
   const handleCreateSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -77,11 +87,17 @@ export function BoardColumn({
 
   return (
     <section
-      className={["board-column", isOver ? "is-over" : null, overWip ? "is-over-wip" : null]
+      className={[
+        "board-column",
+        isOver ? "is-over" : null,
+        overWip ? "is-over-wip" : null,
+        blockedReason ? "is-unavailable" : null,
+      ]
         .filter(Boolean)
         .join(" ")}
       aria-label={label}
-      data-testid={`board-column-${status}`}
+      aria-disabled={blockedReason ? true : undefined}
+      data-testid={`board-column-${columnId ?? status}`}
     >
       <header className="board-column-header">
         {/* 지라식 플레인 텍스트 머리글 — 아이콘은 카테고리 색으로 거들고 이름이 진짜 식별자다.
@@ -104,6 +120,11 @@ export function BoardColumn({
           </span>
         ) : null}
       </header>
+      {blockedReason ? (
+        <p className="board-column-blocked" role="note">
+          {blockedReason}
+        </p>
+      ) : null}
       <SortableContext items={issues.map((i) => i.id)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="board-column-cards">
           {issues.map((issue) => (

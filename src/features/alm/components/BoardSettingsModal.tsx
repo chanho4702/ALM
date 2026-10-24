@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Checkbox, Modal, Select, Switch, TextField, useToast } from "@chanho/react";
-import type { Board, BoardSwimlane, IssueType, User, WorkflowStatus } from "../store/types";
+import type { Board, BoardColumn, BoardColumnMode, BoardSwimlane, IssueType, User, WorkflowStatus } from "../store/types";
+import { BoardColumnMappingEditor } from "./BoardColumnMappingEditor";
+import type { ColumnDraft } from "./BoardColumnMappingEditor";
 import { deleteBoard, updateBoard } from "../store/jiraStore";
 import { UI_CHANGED_EVENT } from "../store/uiStore";
 import { useIssueTypes } from "./useIssueTypes";
@@ -44,7 +46,10 @@ export function BoardSettingsModal({
   const [types, setTypes] = useState<IssueType[]>(board.filter.types);
   const issueTypes = useIssueTypes();
   const [labels, setLabels] = useState<string[]>(board.filter.labels);
-  const [columns, setColumns] = useState(board.columns);
+  const [columns, setColumns] = useState<BoardColumn[]>(board.columns);
+  /** 열 구성(C4) — 상태 형식(상태 = 열) / 매핑 형식(열 하나에 여러 상태) */
+  const [columnMode, setColumnMode] = useState<BoardColumnMode>(board.columnMode ?? "status");
+  const [mappedColumns, setMappedColumns] = useState<ColumnDraft[]>([]);
   const [swimlane, setSwimlane] = useState<BoardSwimlane>(board.swimlane);
   const [isDefault, setIsDefault] = useState(board.isDefault);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -66,6 +71,16 @@ export function BoardSettingsModal({
           },
       ),
     );
+    setColumnMode(board.columnMode ?? "status");
+    // 매핑 초안은 지금 보드가 그리는 열에서 시작한다 — 상태 형식에서 바꾸면 상태마다 한 열(이름·WIP 유지)
+    setMappedColumns(
+      board.columnMode === "mapped"
+        ? board.resolvedColumns.map((c) => ({ id: c.id, name: c.name, statuses: [...c.statuses], wipLimit: c.wipLimit }))
+        : statuses.map((ws) => {
+            const override = board.columns.find((c) => c.status === ws.id);
+            return { name: override?.name || ws.name, statuses: [ws.id], wipLimit: override?.wipLimit ?? null };
+          }),
+    );
     setSwimlane(board.swimlane);
     setIsDefault(board.isDefault);
   }, [open, board, statuses]);
@@ -79,7 +94,17 @@ export function BoardSettingsModal({
       await updateBoard(board.id, {
         name,
         filter: { assigneeIds, types, labels },
-        columns,
+        // 매핑 형식은 모든 열에 statuses를 싣는다(서버가 형식을 이것으로 고른다), 상태 형식은 구 형식 그대로
+        columns:
+          columnMode === "mapped"
+            ? mappedColumns.map((c) => ({
+                ...(c.id ? { id: c.id } : {}),
+                status: c.statuses[0] ?? "",
+                name: c.name,
+                statuses: c.statuses,
+                wipLimit: c.wipLimit,
+              }))
+            : columns,
         swimlane,
         ...(isDefault && !board.isDefault ? { isDefault: true } : {}),
       });
@@ -166,37 +191,15 @@ export function BoardSettingsModal({
             ) : null}
           </fieldset>
 
-          <fieldset className="board-settings-fieldset">
-            <legend>컬럼 이름 · WIP 제한 (비우면 무제한)</legend>
-            {columns.map((column, index) => (
-              <div key={column.status} className="board-settings-column-row">
-                <TextField
-                  label={`${statuses.find((ws) => ws.id === column.status)?.name ?? column.status} 컬럼 이름`}
-                  value={column.name}
-                  onChange={(e) =>
-                    setColumns((prev) =>
-                      prev.map((c, i) => (i === index ? { ...c, name: e.target.value } : c)),
-                    )
-                  }
-                />
-                <TextField
-                  label={`${statuses.find((ws) => ws.id === column.status)?.name ?? column.status} WIP`}
-                  type="number"
-                  min={1}
-                  value={column.wipLimit === null ? "" : String(column.wipLimit)}
-                  onChange={(e) =>
-                    setColumns((prev) =>
-                      prev.map((c, i) =>
-                        i === index
-                          ? { ...c, wipLimit: e.target.value === "" ? null : Number(e.target.value) }
-                          : c,
-                      ),
-                    )
-                  }
-                />
-              </div>
-            ))}
-          </fieldset>
+          <BoardColumnMappingEditor
+            mode={columnMode}
+            onModeChange={setColumnMode}
+            statusColumns={columns}
+            onStatusColumnsChange={setColumns}
+            mappedColumns={mappedColumns}
+            onMappedColumnsChange={setMappedColumns}
+            statuses={statuses}
+          />
 
           <Select
             label="기본 스윔레인"

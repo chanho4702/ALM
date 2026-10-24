@@ -11,13 +11,15 @@ import {
 } from "@xyflow/react";
 import type { Connection, Edge, Node, NodeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Button, Lozenge, Select } from "@chanho/react";
+import { Badge, Button, Lozenge, Select } from "@chanho/react";
 import type { WorkflowLayout, WorkflowStatus, WorkflowTransition } from "../store/types";
 import { WORKFLOW_ANY_NODE } from "../store/types";
 import { statusAppearance } from "./labels";
 import { StatusGlyph } from "./StatusGlyph";
 import { ValueWithIcon } from "./ValueWithIcon";
 import { computeAutoLayout } from "./workflowLayout";
+import { TransitionRulesModal } from "./TransitionRulesModal";
+import { CONDITION_LABELS, POST_FUNCTION_LABELS, SCREEN_FIELD_LABELS, VALIDATOR_FIELD_LABELS, conditionKey } from "./workflowRules";
 
 const ANY = "any"; // "모든 상태" 센티널 — Select는 빈 문자열 value를 쓰지 않는다
 
@@ -60,6 +62,9 @@ function WorkflowCanvasInner({
   onLayoutChange,
 }: WorkflowCanvasProps) {
   const { fitView } = useReactFlow();
+  /** 규칙을 고치는 중인 전환 id(C1~C3) — 목록의 "규칙" 버튼이나 캔버스에서 선을 눌러 연다 */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = transitions.find((t) => t.id === editingId) ?? null;
   const [fromDraft, setFromDraft] = useState<string>(ANY);
   const [toDraft, setToDraft] = useState<string>(statuses[0]?.id ?? ANY);
 
@@ -210,7 +215,7 @@ function WorkflowCanvasInner({
         <div className="workflow-toolbar">
           <span className="workflow-hint">
             노드를 끌어 배치하고, 오른쪽 손잡이를 다른 노드에 이어 전이를 만듭니다. 선을 고르고
-            Delete로 지웁니다.
+            Delete로 지우고, 두 번 눌러 조건·검증·화면·후처리를 정합니다.
           </span>
           <Button type="button" size="small" variant="subtle" onClick={resetLayout}>
             자동 배치
@@ -237,6 +242,11 @@ function WorkflowCanvasInner({
           onNodeDragStop={handleDragStop}
           onConnect={handleConnect}
           onEdgesDelete={handleEdgesDelete}
+          onEdgeDoubleClick={(_, edge) => {
+            if (readOnly) return;
+            const id = (edge.data as { transitionId?: string } | undefined)?.transitionId;
+            if (id) setEditingId(id);
+          }}
           proOptions={{ hideAttribution: false }}
         >
           <Background />
@@ -267,6 +277,17 @@ function WorkflowCanvasInner({
                 {nameOf(transition.to)}
               </Lozenge>
             </ValueWithIcon>
+            <TransitionRuleSummary transition={transition} />
+            {readOnly ? null : (
+              <Button
+                variant="subtle"
+                size="small"
+                aria-label={`전이 ${transition.name} 규칙`}
+                onClick={() => setEditingId(transition.id)}
+              >
+                규칙
+              </Button>
+            )}
             {readOnly ? null : (
               <Button
                 variant="subtle"
@@ -306,6 +327,44 @@ function WorkflowCanvasInner({
           </Button>
         </div>
       )}
+      {editing ? (
+        <TransitionRulesModal
+          transition={editing}
+          statuses={sorted}
+          onCancel={() => setEditingId(null)}
+          onSave={(next) => {
+            onChange?.(transitions.map((t) => (t.id === next.id ? next : t)));
+            setEditingId(null);
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * 전환 규칙 요약 — 목록 행에서 "조건 2 · 검증 1 · 화면 · 후처리 1"을 한눈에. 상세는 Badge의 title과 접근 이름에.
+ * 규칙이 없으면 아무것도 그리지 않는다.
+ */
+function TransitionRuleSummary({ transition }: { transition: WorkflowTransition }) {
+  const conditions = (transition.conditions ?? []).map((c) => CONDITION_LABELS[conditionKey(c)] ?? c.type);
+  const validators = (transition.validators ?? []).map((v) => VALIDATOR_FIELD_LABELS[v] ?? v);
+  const screen = (transition.screenFields ?? []).map((f) => SCREEN_FIELD_LABELS[f] ?? f);
+  const post = (transition.postFunctions ?? []).map((f) => POST_FUNCTION_LABELS[f.type] ?? f.type);
+  if (conditions.length + validators.length + screen.length + post.length === 0) return null;
+  const parts = [
+    conditions.length ? { key: "c", text: `조건 ${conditions.length}`, detail: `조건: ${conditions.join(", ")}` } : null,
+    validators.length ? { key: "v", text: `검증 ${validators.length}`, detail: `필수: ${validators.join(", ")}` } : null,
+    screen.length ? { key: "s", text: "화면", detail: `화면: ${screen.join(", ")}` } : null,
+    post.length ? { key: "p", text: `후처리 ${post.length}`, detail: `후처리: ${post.join(", ")}` } : null,
+  ].filter((part): part is { key: string; text: string; detail: string } => part !== null);
+  return (
+    <span className="workflow-rule-summary" aria-label={parts.map((p) => p.detail).join(" · ")}>
+      {parts.map((part) => (
+        <span key={part.key} title={part.detail} aria-hidden>
+          <Badge>{part.text}</Badge>
+        </span>
+      ))}
+    </span>
   );
 }

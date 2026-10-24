@@ -27,6 +27,12 @@ function renderBoard(initialPath: string) {
   );
 }
 
+/** 상태 버튼(A2)으로 전환한다 — 목록은 팝오버(포털)라 screen에서 찾는다 */
+async function chooseStatus(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, name: string) {
+  await user.click(within(dialog).getByRole("button", { name: /^상태: / }));
+  await user.click(await screen.findByRole("menuitem", { name }));
+}
+
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
@@ -38,14 +44,13 @@ describe("IssueDetailModal 값 아이콘", () => {
     renderBoard("/projects/p1/board?issue=ALM-4"); // 시드: ALM-4 = 에픽, 할 일, 보통
     const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
 
-    // 트리거 — 고른 값의 글리프가 선택값 옆에 선다(DS가 옵션 icon을 트리거에도 그린다)
-    const statusTrigger = within(dialog).getByRole("combobox", { name: "상태" });
+    // 상태 버튼(A2) — 지금 상태의 글리프 + 이름. 접근 이름은 "상태: 할 일"
+    const statusTrigger = within(dialog).getByRole("button", { name: "상태: 할 일" });
     expect(await within(statusTrigger).findByTestId("status-glyph-todo")).toBeInTheDocument();
-    expect(statusTrigger).toHaveTextContent("할 일");
 
-    // 목록 — 열면 항목마다 글리프 + 이름. 접근 이름은 label 문자열만 남는다(아이콘은 장식)
+    // 전환 목록 — 항목마다 대상 상태 글리프 + 이름. 접근 이름은 전환 이름(기본 워크플로는 상태 이름)
     await user.click(statusTrigger);
-    const doneOption = await screen.findByRole("option", { name: "완료" });
+    const doneOption = await screen.findByRole("menuitem", { name: "완료" });
     expect(within(doneOption).getByTestId("status-glyph-done")).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
@@ -70,16 +75,15 @@ describe("IssueDetailModal", () => {
     expect(within(dialog).getByRole("button", { name: "제목 편집" })).toHaveTextContent(
       "백로그 화면 구현",
     );
-    expect(within(dialog).getByRole("combobox", { name: "상태" })).toHaveTextContent("할 일");
+    expect(within(dialog).getByRole("button", { name: "상태: 할 일" })).toBeInTheDocument();
     expect(within(dialog).getByLabelText("설명")).toBeInTheDocument();
 
     // 상태 Select: 할 일 → 완료
-    await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
-    await user.click(await screen.findByRole("option", { name: "완료" }));
+    await chooseStatus(user, dialog, "완료");
 
     // 모달 Lozenge 반영
     await waitFor(() => {
-      expect(within(dialog).getByRole("combobox", { name: "상태" })).toHaveTextContent("완료");
+      expect(within(dialog).getByRole("button", { name: "상태: 완료" })).toBeInTheDocument();
     });
     // 모달을 연 채로 보드 카드가 완료 컬럼으로 이동 (모달 뒤 보드는 aria-hidden이라 testid로 조회)
     await waitFor(() => {
@@ -199,10 +203,9 @@ describe("IssueDetailModal 코멘트/활동 탭 (W3)", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
     // 상태 변경 (활동로그는 스토어 부수효과로 기록된다)
-    await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
-    await user.click(await screen.findByRole("option", { name: "완료" }));
+    await chooseStatus(user, dialog, "완료");
     await waitFor(() => {
-      expect(within(dialog).getByRole("combobox", { name: "상태" })).toHaveTextContent("완료");
+      expect(within(dialog).getByRole("button", { name: "상태: 완료" })).toBeInTheDocument();
     });
 
     // 활동 탭으로 전환 → created + status 로그가 시간순으로 보인다
@@ -475,8 +478,7 @@ describe("IssueDetailModal 해결", () => {
     const dialog = await screen.findByRole("dialog", { name: "ALM-5" });
     expect(within(dialog).queryByRole("combobox", { name: "해결" })).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
-    await user.click(await screen.findByRole("option", { name: "완료" }));
+    await chooseStatus(user, dialog, "완료");
 
     expect(await within(dialog).findByRole("combobox", { name: "해결" })).toHaveTextContent("완료됨");
   });
@@ -488,8 +490,7 @@ describe("IssueDetailModal 해결", () => {
     const dialog = await screen.findByRole("dialog", { name: "ALM-5" });
     expect(within(dialog).queryByText("해결일")).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("combobox", { name: "상태" }));
-    await user.click(await screen.findByRole("option", { name: "완료" }));
+    await chooseStatus(user, dialog, "완료");
 
     expect(await within(dialog).findByText("해결일")).toBeInTheDocument();
     // 편집 컨트롤이 아니라 값만 — 해결 시각은 서버가 찍는다
