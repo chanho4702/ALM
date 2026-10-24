@@ -1,0 +1,347 @@
+/* 트리아지 인박스(V35)·설정 패널 — 토큰만 쓴다 */
+
+.triage-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  container-type: inline-size;
+}
+
+.triage-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+}
+
+.triage-header-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--chanho-space-150);
+}
+
+.triage-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-400);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-default);
+}
+
+.triage-count,
+.triage-hint {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-tab-badge {
+  margin-left: var(--chanho-space-75);
+}
+
+/* 목록 + 상세 2단 — 좁은 컨테이너에서는 위아래로 */
+.triage-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  gap: var(--chanho-space-200);
+  margin-top: var(--chanho-space-200);
+  align-items: start;
+}
+
+@container (max-width: 720px) {
+  .triage-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.triage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.triage-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  width: 100%;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+  color: var(--chanho-color-text-default);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--chanho-transition-fast);
+}
+
+.triage-item:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.triage-item:focus-visible {
+  outline: none;
+  box-shadow: var(--chanho-focus-ring);
+}
+
+.triage-item.is-selected {
+  border-color: var(--chanho-color-border-selected);
+  background: var(--chanho-color-background-selected);
+}
+
+.triage-item-head {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-item-key {
+  font-weight: var(--chanho-font-weight-medium);
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-item-time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.triage-item-title {
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triage-item-reporter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  min-width: 0;
+  padding: var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+}
+
+.triage-detail-empty {
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.triage-actions-spacer {
+  flex: 1 1 auto;
+}
+
+.triage-kbd {
+  margin-left: var(--chanho-space-75);
+  padding: 0 var(--chanho-space-50);
+  border: 1px solid currentColor;
+  border-radius: var(--chanho-radius-xsmall);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-50);
+  opacity: 0.7;
+}
+
+.triage-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.triage-detail-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-300);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-default);
+}
+
+.triage-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--chanho-space-150);
+  margin: 0;
+}
+
+.triage-meta dt {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  margin-bottom: var(--chanho-space-25);
+}
+
+.triage-meta dd {
+  margin: 0;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-default);
+}
+
+.triage-description {
+  border-top: 1px solid var(--chanho-color-border-default);
+  padding-top: var(--chanho-space-150);
+}
+
+.triage-empty {
+  margin-top: var(--chanho-space-400);
+}
+
+.triage-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--chanho-space-100);
+  margin-top: var(--chanho-space-200);
+  color: var(--chanho-color-text-danger);
+}
+
+.triage-error p {
+  margin: 0;
+}
+
+/* 처리 대화상자 */
+.triage-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.triage-form button[role="combobox"] {
+  width: 100%;
+}
+
+.triage-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.triage-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-small);
+}
+
+.triage-picker-item {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  width: 100%;
+  padding: var(--chanho-space-75) var(--chanho-space-100);
+  border: 0;
+  background: transparent;
+  color: var(--chanho-color-text-default);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.triage-picker-item:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.triage-picker-item:focus-visible {
+  outline: none;
+  box-shadow: var(--chanho-focus-ring);
+}
+
+.triage-picker-item.is-selected {
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-selected);
+}
+
+.triage-picker-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triage-picker-empty,
+.triage-picked {
+  margin: 0;
+  padding: var(--chanho-space-75) var(--chanho-space-100);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-snooze-presets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+}
+
+.triage-snooze-label {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.triage-snooze-at {
+  margin-left: var(--chanho-space-150);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-snooze-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+.triage-snooze-custom > div {
+  flex: 1 1 220px;
+}
+
+/* 설정 패널 */
+.triage-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.triage-settings-readonly {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  margin: 0;
+}
+
+.triage-settings-note {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.triage-settings-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  color: var(--chanho-color-text-default);
+}
