@@ -83,6 +83,8 @@ import { usePriorities } from "./usePriorities";
 import { resolveFields } from "./fieldConfig";
 import { FieldLabel } from "./FieldLabel";
 import { formatDateTime } from "./time";
+import { useIssueActions } from "./useIssueActions";
+import { useIssueCommandScope } from "./commandScope";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const NO_VERSION = "__no_version__";
@@ -153,6 +155,9 @@ export interface IssueDetailModalProps {
 
 /** 담당자 Select 트리거 id — 단축키 `a`가 찾는다 */
 const ASSIGNEE_TRIGGER_ID = "issue-detail-assignee";
+/** 단축키 s·p가 펼치는 상태·우선순위 선택 트리거 */
+const STATUS_TRIGGER_ID = "issue-detail-status";
+const PRIORITY_TRIGGER_ID = "issue-detail-priority";
 
 export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDetailModalProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
@@ -700,16 +705,19 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   // 지라 이슈 보기 단축키 — 이 모달이 유일하게 열린 모달이고 입력 중이 아닐 때만(useKeyboardShortcuts)
   const inDialog = (selector: string) =>
     shortcutAnchor.current?.closest("[role='dialog']")?.querySelector<HTMLElement>(selector) ?? null;
+  /** 선택 트리거에 포커스하고 바로 펼친다 — Radix Select 트리거는 ArrowDown으로 열린다(지라 a·리니어 s/p) */
+  const openSelect = (id: string) => {
+    const trigger = inDialog(`#${id}`);
+    if (!trigger) return;
+    trigger.focus();
+    trigger.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  };
   useKeyboardShortcuts(
     {
       e: () => inDialog("button[aria-label='제목 편집']")?.click(),
-      a: () => {
-        const trigger = inDialog(`#${ASSIGNEE_TRIGGER_ID}`);
-        if (!trigger) return;
-        trigger.focus();
-        // 지라처럼 담당자 선택지를 바로 펼친다 — Radix Select 트리거는 ArrowDown으로 열린다
-        trigger.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      },
+      a: () => openSelect(ASSIGNEE_TRIGGER_ID),
+      s: () => openSelect(STATUS_TRIGGER_ID),
+      p: () => openSelect(PRIORITY_TRIGGER_ID),
       i: () => {
         if (!issue || !me || !fields.assignee.visible || issue.assigneeId === me.id) return;
         void applyPatch({ assigneeId: me.id }, "나에게 할당했습니다");
@@ -722,6 +730,31 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       },
     },
     { dialogRef: shortcutAnchor },
+  );
+
+  // 명령 팔레트(⌘K)의 "현재 이슈" — 상세가 열려 있으면 목록·보드 범위보다 이 이슈가 먼저다(commandScope)
+  const { actions: commandActions, dialogs: commandDialogs } = useIssueActions({
+    setIssues: (update) => setIssue((prev) => (prev ? update([prev])[0] : prev)),
+    reload: async () => {
+      const latest = await getIssueByKey(issueKey);
+      if (latest) {
+        setIssue(latest);
+        await refreshLogs(latest.id);
+      }
+      await onIssueChanged();
+    },
+    onDeleted: () => onClose(),
+  });
+  useIssueCommandScope(
+    issue
+      ? {
+          source: "detail",
+          projectId: issue.projectId,
+          getTargets: () => [issue],
+          getOptions: () => ({ statuses, users, priorities, labels: issue.labels }),
+          actions: commandActions,
+        }
+      : null,
   );
 
   if (!issue) return null;
@@ -1056,6 +1089,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               />
               <Select
                 label="대상 이슈"
+                searchable
                 value={linkTargetId ?? NO_PARENT}
                 options={[
                   { value: NO_PARENT, label: "선택하세요" },
@@ -1118,6 +1152,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <div className="alm-field">
             <FieldLabel field="status">상태</FieldLabel>
             <Select
+              id={STATUS_TRIGGER_ID}
               label="상태"
               className="visually-hidden-label"
               value={issue.status}
@@ -1162,6 +1197,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               <FieldLabel field="parent">상위 항목</FieldLabel>
               <Select
                 label="상위 항목"
+                searchable
                 className="visually-hidden-label"
                 value={issue.parentId ?? NO_PARENT}
                 options={[
@@ -1202,6 +1238,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             <Select
               id={ASSIGNEE_TRIGGER_ID}
               label="담당자"
+              searchable
               className="visually-hidden-label"
               value={issue.assigneeId ?? UNASSIGNED}
               options={[
@@ -1219,6 +1256,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <div className="alm-field">
             <FieldLabel field="priority">우선순위</FieldLabel>
             <Select
+              id={PRIORITY_TRIGGER_ID}
               label="우선순위"
               className="visually-hidden-label"
               value={issue.priority}
@@ -1238,6 +1276,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             <FieldLabel field="sprint">스프린트</FieldLabel>
             <Select
               label="스프린트"
+              searchable
               className="visually-hidden-label"
               value={issue.sprintId ?? BACKLOG}
               options={[
@@ -1618,6 +1657,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           },
         ]}
       />
+      {commandDialogs}
     </Modal>
   );
 }

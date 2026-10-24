@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Banner, Button, Select, Spinner, TextArea, TextField, Tooltip } from "@chanho/react";
+import { Banner, Button, Select, TextArea, TextField, Tooltip } from "@chanho/react";
 import { ClipboardCheck, FastForward, MessageSquare, PanelRight, ScrollText, Send, Sparkles, X, Zap } from "lucide-react";
 import type {
   AgentBudget,
@@ -114,6 +114,7 @@ import {
   type StatusContext,
   type Utterance,
 } from "./officeDialogCopy";
+import { ListSkeleton } from "../components/Skeletons";
 
 /** 와이프 한 방향 — 띠 240ms + 띠마다 10ms 지연 × 8(§3.2 예외 상수) */
 const WIPE_MS = 320;
@@ -1394,7 +1395,7 @@ function AssignPickForm({
         }}
       />
       {recent === null || searching ? (
-        <Spinner size="small" label="이슈를 찾는 중" />
+        <ListSkeleton label="이슈를 찾는 중" rows={4} media="icon" />
       ) : rows.length === 0 ? (
         <p className="office-form-empty">맞는 이슈가 없어요</p>
       ) : (

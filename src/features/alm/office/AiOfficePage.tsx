@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { Badge, Banner, Button, EmptyState, Lozenge, Spinner, Tabs } from "@chanho/react";
+import { Badge, Banner, Button, EmptyState, Lozenge, Skeleton, Tabs } from "@chanho/react";
 import {
   Building2,
   CircleAlert,
@@ -62,6 +62,7 @@ import {
   todayReportCount,
 } from "./officeModel";
 import "./ai-office.css";
+import { BlockSkeleton, ListSkeleton, LoadingRegion } from "../components/Skeletons";
 
 /**
  * 패널을 밀어내기(도킹)로 둘 최소 본문 폭 — 그보다 좁으면 캔버스 위에 뜬다(스펙 §1.6, P3e §1.1 정정:
@@ -104,9 +105,7 @@ export default function AiOfficePage() {
   const status = useAiTeamStatus();
   if (status === "unknown") {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="AI 사무실 불러오는 중" />
-      </div>
+      <BlockSkeleton label="AI 사무실 불러오는 중" height={480} />
     );
   }
   if (status === "inactive") {
@@ -698,13 +697,13 @@ function OfficeBody({
       which === "office" ? (
         <section className="ai-office-stage is-placeholder" aria-label="AI 사무실 평면도">
           <div className="ai-office-room is-placeholder">
-            <Spinner size="large" label="사무실을 불러오는 중" />
+            <LoadingRegion label="사무실을 불러오는 중" className="ai-office-room-skeleton">
+              <Skeleton height="100%" radius="medium" />
+            </LoadingRegion>
           </div>
         </section>
       ) : (
-        <div className="board-loading">
-          <Spinner size="large" label="AI 팀을 불러오는 중" />
-        </div>
+        <ListSkeleton label="AI 팀을 불러오는 중" rows={6} media="avatar" lines={2} />
       );
   } else if (data.status === "error") {
     content = (

@@ -1,4 +1,4 @@
-# 디자인 시스템 (@chanho/react 0.11.0 / @chanho/tokens 0.4.0)
+# 디자인 시스템 (@chanho/react 0.14.0 / @chanho/tokens 0.6.1)
 
 GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름을 유지한다(S-03, 2026-09-04 — 전엔 `file:../design-system/artifacts/*.tgz`). 새 버전은 design-system에 `v*` 태그를 밀어 발행한 뒤 `package.json`과 `pnpm-workspace.yaml`의 `overrides` **두 곳**의 버전을 함께 올린다. Radix 기반. **다른 UI 라이브러리 금지**,
 커스텀 마크업은 토큰(`--chanho-*`)만.
@@ -60,6 +60,29 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
   자체가 이름을 만드는 자리에서만 `ariaHidden={false}`.
 - 필수 `*`는 **텍스트 노드 안에** 넣는다(`withRequiredMark`). 아이콘과 글자를 갈라 놓으면
   `getByText("연결 이슈 *")`가 무너진다.
+
+## 0.13.0·0.14.0 소비 규칙 (2026-10-24 웨이브 B)
+
+- **로딩은 스켈레톤.** 페이지·목록 로딩은 `components/Skeletons.tsx`(DS `Skeleton`·`SkeletonText`·`SkeletonAvatar`·
+  `SkeletonListItem` 조합)를 쓴다. 블록은 장식이고 **영역 하나(`LoadingRegion`)가 `role="status"` + `aria-label`**로 알린다 —
+  DS `label` prop은 숨김 글자를 자식으로 넣을 뿐 status의 접근 이름이 되지 않아(`getByRole("status", { name })`가 못 찾는다)
+  앱이 감싼다. 자리는 실제 레이아웃과 같은 크기로(보드는 `.board-columns`/`.board-column`을 그대로 쓴다). 버튼 안·"업데이트 중"
+  같은 인라인 표시는 `Spinner` 그대로. 표 첫 로딩은 `Table loading`(헤더 유지) — 다만 결과 표와 **이름을 다르게**
+  둔다("이슈 목록 (불러오는 중)"). 같은 이름이면 `findByRole("table", { name })`가 사라질 자리 표를 문다.
+- **CommandPalette는 앱에 하나**(`CommandPaletteHost`, AppShell). 열기 키(⌘K/Ctrl+K)는 앱이 바인딩한다(`isCommandPaletteKey`).
+  하위 페이지 `items`는 들어갈 때 **스냅숏**이라 검색어로 바뀌는 항목(새 라벨)은 그 필드로 바로 연 루트 목록(`fieldPageItems`)에서만 쓴다.
+  입력이 `role="combobox"`라 화면 단축키는 자동으로 멈춘다.
+- **ContextMenu 트리거는 영역 하나**로 감싸고(`useIssueInteractions().withContextMenu`), 대상은 `contextmenu` 캡처 단계에서
+  `data-issue-key`로 찾는다. 이슈 밖이면 캡처에서 `stopPropagation` → 브라우저 기본 메뉴. 하위 메뉴 트리거에는
+  `aria-keyshortcuts`가 없다(일반 항목만 있다 — 키 글자는 `kbd`로 보인다). jsdom에서 하위 메뉴 항목은 `fireEvent.click`으로
+  누른다(레이아웃이 없어 Radix 포인터 유예 영역이 메뉴를 닫는다).
+- **InlineEdit 저장·취소는 포털 팝오버**(0.13.0) — 모달 안 편집이어도 버튼은 `document.body` 아래다. 테스트는 `screen`으로 찾는다.
+  Esc는 편집만 취소하고 모달은 닫지 않는다.
+- **Select `searchable`**은 옵션이 8개를 넘을 수 있는 자리(사람·프로젝트·스프린트·버전·이슈 후보)에 켠다.
+  필터 줄의 `Select`·`TextField`는 `size="compact"`(32px)로 버튼·필터 트리거와 높이를 맞춘다. 기본 입력은 40px다.
+- **Checkbox `indeterminate`**(0.14.0) — 목록 머리글 "모두 선택"의 일부 선택이 대시로 보인다(위 0.9.0 절의 "중간 상태 그림 없음" 갭 해소).
+- **Popover·MultiSelect**(0.14.0) — 앱 팝오버(`usePopoverPanel` + FilterDropdown/ColumnPicker)를 대신할 DS 부품. 교체는
+  아래 "남은 일"을 본다.
 
 ## 2026-10-24 UI/UX 정비에서 정한 것
 

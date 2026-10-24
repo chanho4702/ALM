@@ -1,6 +1,5 @@
 import { lazy, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
-import { Spinner } from "@chanho/react";
 import type { Project } from "../features/alm/store/types";
 import { listProjects } from "../features/alm/store/jiraStore";
 import { AppShell } from "../features/alm/components/AppShell";
@@ -12,6 +11,14 @@ import { HomePage } from "../features/alm/pages/HomePage";
 import { OrgAccountGate } from "../features/alm/components/OrgAccountGate";
 import { LazyPage } from "../features/alm/components/LazyContent";
 import { ORG_ADMIN_BASE } from "../features/alm/components/SettingsSideNav";
+import {
+  BacklogSkeleton,
+  BlockSkeleton,
+  BoardSkeleton,
+  GadgetsSkeleton,
+  ListSkeleton,
+  ShellSkeleton,
+} from "../features/alm/components/Skeletons";
 
 /** 홈·프로젝트 목록 외 화면은 방문할 때 내려받는다(DnD·워크플로·편집기 포함). */
 const BoardPage = lazy(() =>
@@ -106,9 +113,7 @@ function AppRoutes() {
 
   if (projects === null) {
     return (
-      <div className="app-loading">
-        <Spinner size="large" label="불러오는 중" />
-      </div>
+      <ShellSkeleton label="불러오는 중" />
     );
   }
 
@@ -138,7 +143,7 @@ function AppRoutes() {
         <Route
           path="/dashboards/:dashboardId"
           element={
-            <LazyPage label="대시보드">
+            <LazyPage label="대시보드" skeleton={<GadgetsSkeleton label="대시보드 불러오는 중" />}>
               <DashboardViewPage />
             </LazyPage>
           }
@@ -194,7 +199,7 @@ function AppRoutes() {
           <Route
             path="dashboard"
             element={
-              <LazyPage label="요약">
+              <LazyPage label="요약" skeleton={<GadgetsSkeleton label="요약 불러오는 중" />}>
                 <DashboardPage />
               </LazyPage>
             }
@@ -210,7 +215,7 @@ function AppRoutes() {
           <Route
             path="reports"
             element={
-              <LazyPage label="리포트">
+              <LazyPage label="리포트" skeleton={<BlockSkeleton label="리포트 불러오는 중" height={360} actions={2} />}>
                 <ReportsPage />
               </LazyPage>
             }
@@ -218,7 +223,7 @@ function AppRoutes() {
           <Route
             path="timeline"
             element={
-              <LazyPage label="타임라인">
+              <LazyPage label="타임라인" skeleton={<BlockSkeleton label="타임라인 불러오는 중" height={520} actions={2} />}>
                 <TimelinePage />
               </LazyPage>
             }
@@ -227,7 +232,7 @@ function AppRoutes() {
           <Route
             path="boards/:boardId"
             element={
-              <LazyPage label="보드">
+              <LazyPage label="보드" skeleton={<BoardSkeleton label="보드 불러오는 중" />}>
                 <BoardPage />
               </LazyPage>
             }
@@ -235,7 +240,7 @@ function AppRoutes() {
           <Route
             path="backlog"
             element={
-              <LazyPage label="백로그">
+              <LazyPage label="백로그" skeleton={<BacklogSkeleton label="백로그 불러오는 중" />}>
                 <BacklogPage />
               </LazyPage>
             }
@@ -243,7 +248,7 @@ function AppRoutes() {
           <Route
             path="issues"
             element={
-              <LazyPage label="이슈 목록">
+              <LazyPage label="이슈 목록" skeleton={<ListSkeleton label="이슈 목록 불러오는 중" rows={10} />}>
                 <IssueListPage />
               </LazyPage>
             }

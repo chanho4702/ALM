@@ -11,7 +11,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Badge, Button, ConfirmDialog, Spinner, TextField, useToast } from "@chanho/react";
+import { Badge, Button, ConfirmDialog, TextField, useToast } from "@chanho/react";
 import type { Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   completeSprint,
@@ -46,6 +46,12 @@ import {
   statusKind,
 } from "../components/labels";
 import { BACKLOG_PANEL, resolveBacklogMove } from "./backlogDnd";
+import { BulkEditModal } from "../components/BulkEditModal";
+import { SelectionBar } from "../components/SelectionBar";
+import { usePriorities } from "../components/usePriorities";
+import { useIssueActions } from "../components/useIssueActions";
+import { useIssueInteractions } from "../components/useIssueInteractions";
+import { BacklogSkeleton } from "../components/Skeletons";
 
 export function BacklogPage() {
   const { projectId } = useParams();
@@ -130,6 +136,29 @@ export function BacklogPage() {
   );
 
   const backlogIssues = issues.filter((i) => i.sprintId === null);
+
+  // 웨이브 B — 다중 선택·우클릭 메뉴·미리보기·속성 단축키·명령 팔레트 범위(useIssueInteractions).
+  // 순서는 보이는 대로: 진행 중 → 예정 스프린트 패널, 마지막에 백로그
+  const priorities = usePriorities();
+  const orderedIssues = useMemo(
+    () => [
+      ...visibleSprints.flatMap((sprint) => issues.filter((issue) => issue.sprintId === sprint.id)),
+      ...issues.filter((issue) => issue.sprintId === null),
+    ],
+    [issues, visibleSprints],
+  );
+  const labelOptions = useMemo(() => [...new Set(issues.flatMap((issue) => issue.labels))].sort(), [issues]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({ setIssues, reload });
+  const interactions = useIssueInteractions({
+    source: "backlog",
+    projectId,
+    issues: orderedIssues,
+    options: { statuses, users, priorities, labels: labelOptions },
+    actions: issueActions,
+    openIssue,
+    sprints,
+  });
 
   /** 패널 키 → order순 이슈 id 배열 (resolveBacklogMove 입력) */
   const panels = useMemo(() => {
@@ -271,9 +300,7 @@ export function BacklogPage() {
 
   if (loading) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="백로그 불러오는 중" />
-      </div>
+      <BacklogSkeleton label="백로그 불러오는 중" />
     );
   }
 
@@ -346,7 +373,8 @@ export function BacklogPage() {
         onSave={(sprint, draft) => void saveSprintPlan(sprint, draft, sprint.version)}
         onResolveConflict={(sprint, draft, mode) => void resolveSprintConflict(sprint, draft, mode)}
       />
-      <section className="backlog-page">
+      {interactions.withContextMenu(
+      <section className="backlog-page" {...interactions.containerProps}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -369,6 +397,7 @@ export function BacklogPage() {
             onMove={handleMove}
             onDelete={handleDelete}
             onOpen={openIssue}
+            selectedIds={interactions.selected}
           />
         ))}
 
@@ -389,6 +418,7 @@ export function BacklogPage() {
                 onMove={handleMove}
                 onDelete={handleDelete}
                 onOpen={openIssue}
+                selected={interactions.selected.has(issue.id)}
               />
             ))}
             {backlogIssues.length === 0 ? (
@@ -454,7 +484,30 @@ export function BacklogPage() {
           ) : null}
         </DragOverlay>
         </DndContext>
-      </section>
+        <SelectionBar
+          count={interactions.selected.size}
+          onClear={interactions.clearSelection}
+          onBulkEdit={() => setBulkOpen(true)}
+          onDelete={() => issueActions.requestDelete(interactions.targets())}
+        />
+      </section>,
+      )}
+      <BulkEditModal
+        open={bulkOpen}
+        targets={orderedIssues
+          .filter((issue) => interactions.selected.has(issue.id))
+          .map((issue) => ({ id: issue.id, key: issue.key, version: issue.version }))}
+        statuses={statuses}
+        users={users}
+        sprints={sprints}
+        onOpenChange={setBulkOpen}
+        onDone={() => {
+          interactions.clearSelection();
+          void reload();
+        }}
+      />
+      {interactions.peek}
+      {issueActionDialogs}
       {issueModal}
     </>
   );

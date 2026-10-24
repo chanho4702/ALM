@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { EmptyState, Lozenge, Spinner, Tabs } from "@chanho/react";
+import { EmptyState, Lozenge, Tabs } from "@chanho/react";
 import type { Issue, Project, User, WorkflowStatus } from "../store/types";
 import {
   findIssues,
@@ -25,6 +25,7 @@ import {
   statusName,
 } from "../components/labels";
 import { relTime } from "../components/time";
+import { ListSkeleton, PageSkeleton } from "../components/Skeletons";
 
 /** 최근 업데이트·최근 본 탭의 날짜 그룹 (지라: Today / Yesterday / …) */
 function dateBucket(iso: string): string {
@@ -275,9 +276,7 @@ export function HomePage() {
 
   if (home === null || me === null) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="홈 불러오는 중" />
-      </div>
+      <PageSkeleton label="홈 불러오는 중" lines={10} />
     );
   }
 
@@ -485,9 +484,7 @@ export function HomePage() {
                       />
                     </div>
                   ) : viewed.status !== "ready" ? (
-                    <div className="home-tab-loading">
-                      <Spinner size="small" label="최근 본 이슈 불러오는 중" />
-                    </div>
+                    <ListSkeleton label="최근 본 이슈 불러오는 중" rows={5} />
                   ) : viewed.items.length === 0 ? (
                     <EmptyState
                       title="최근 본 이슈가 없습니다"

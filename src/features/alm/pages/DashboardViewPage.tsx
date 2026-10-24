@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Button, EmptyState, PageHeader, Spinner, Switch, TextField, useToast } from "@chanho/react";
+import { Button, EmptyState, PageHeader, Switch, TextField, useToast } from "@chanho/react";
 import type { Dashboard, DashboardGadget, Project, User } from "../store/types";
 import { getCurrentUser, getDashboard, listProjects, updateDashboard } from "../store/jiraStore";
 import { AddGadgetModal } from "../components/AddGadgetModal";
 import { GADGET_LABELS, GadgetEmptyHint, renderGadget } from "../components/DashboardGadgets";
+import { GadgetsSkeleton } from "../components/Skeletons";
 
 /**
  * 대시보드 보기 — 2열 그리드에 가젯을 놓고(소유자) 옮기고 지운다. 저장은 배치 전체를 서버에 보낸다.
@@ -52,9 +53,7 @@ export function DashboardViewPage() {
 
   if (dashboard === undefined) {
     return (
-      <div className="app-loading">
-        <Spinner size="large" label="대시보드 불러오는 중" />
-      </div>
+      <GadgetsSkeleton label="대시보드 불러오는 중" />
     );
   }
   if (dashboard === null) {

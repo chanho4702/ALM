@@ -195,6 +195,7 @@ export function ProjectMembersPanel({ projectId }: { projectId: string }) {
             />
             <Select
               label="추가할 사용자"
+              searchable
               value={candidate}
               options={[
                 { value: UNSELECTED, label: "사용자 선택" },

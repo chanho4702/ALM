@@ -1,9 +1,10 @@
 import { Component, Suspense } from "react";
 import type { ReactNode } from "react";
 import { useLocation } from "react-router";
-import { EmptyState, Modal, Spinner } from "@chanho/react";
+import { EmptyState, Modal } from "@chanho/react";
 import { isStaleChunkError, reloadForNewVersion, reportStaleAsset } from "./newVersion";
 import { useNewVersionState } from "./NewVersionBanner";
+import { FormSkeleton, PageSkeleton } from "./Skeletons";
 
 interface LoadErrorBoundaryProps {
   children: ReactNode;
@@ -67,17 +68,17 @@ function LoadFailure({ stale }: { stale: boolean }) {
   );
 }
 
-/** 요청한 화면만 기다려 전역 내비게이션과 프로젝트 탭을 계속 사용할 수 있다. */
-export function LazyPage({ children, label }: { children: ReactNode; label: string }) {
+/**
+ * 요청한 화면만 기다려 전역 내비게이션과 프로젝트 탭을 계속 사용할 수 있다.
+ * `skeleton`을 주면 그 화면 모양의 자리(보드 컬럼·백로그 패널 등)를 그린다 — 접근 이름은
+ * 호출 측이 `${label} 불러오는 중`으로 맞춘다. 없으면 제목 + 문단 자리.
+ */
+export function LazyPage({ children, label, skeleton }: { children: ReactNode; label: string; skeleton?: ReactNode }) {
   const { pathname } = useLocation();
   return (
     <LoadErrorBoundary resetKey={pathname} fallback={(stale) => <LoadFailure stale={stale} />}>
       <Suspense
-        fallback={
-          <div className="board-loading">
-            <Spinner size="large" label={`${label} 불러오는 중`} />
-          </div>
-        }
+        fallback={skeleton ?? <PageSkeleton label={`${label} 불러오는 중`} />}
       >
         {children}
       </Suspense>
@@ -112,7 +113,7 @@ export function LazyModal({
     <LoadErrorBoundary resetKey={title} fallback={(stale) => modal(<LoadFailure stale={stale} />, "불러오기 실패")}>
       <Suspense
         fallback={modal(
-          <div className="board-loading"><Spinner size="large" label="불러오는 중" /></div>,
+          <FormSkeleton label="불러오는 중" />,
           "불러오는 중",
         )}
       >

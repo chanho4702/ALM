@@ -36,6 +36,8 @@ export interface BoardColumnProps {
   droppableId?: string;
   /** issueId → 부모 에픽 이름 (카드 에픽 태그) */
   epicNames?: Record<string, string>;
+  /** 다중 선택된 이슈 id (⌘/Shift 클릭·x) */
+  selectedIds?: ReadonlySet<string>;
 }
 
 export function BoardColumn({
@@ -50,6 +52,7 @@ export function BoardColumn({
   wipLimit = null,
   droppableId,
   epicNames = {},
+  selectedIds,
 }: BoardColumnProps) {
   const label = columnName ?? STATUS_LABELS[status as IssueStatus] ?? status;
   // `workflowStatus`가 진짜 원천이고, 옛 `appearance`만 받은 호출부는 색·이름만이라도 살린다
@@ -110,6 +113,7 @@ export function BoardColumn({
               assignee={issue.assigneeId ? usersById[issue.assigneeId] : undefined}
               epicName={epicNames[issue.id]}
               onOpen={onOpenIssue ? () => onOpenIssue(issue.key) : undefined}
+              selected={selectedIds?.has(issue.id) ?? false}
             />
           ))}
         </div>

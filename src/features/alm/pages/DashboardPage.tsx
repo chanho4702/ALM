@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
-import { Card, EmptyState, Lozenge, ProgressBar, Spinner } from "@chanho/react";
+import { Card, EmptyState, Lozenge, ProgressBar } from "@chanho/react";
 import type { Issue, Sprint, StatusKind, User, WorkflowStatus } from "../store/types";
 import { listIssues, listProjectStatuses, listSprints, listUsers } from "../store/jiraStore";
 import {
@@ -26,6 +26,7 @@ import {
   todayKey,
   workProgress,
 } from "./dashboardMetrics";
+import { GadgetsSkeleton } from "../components/Skeletons";
 
 /** 상태 카운트 타일 — 색 액센트는 상태 언어(neutral/info/success)를 따른다 */
 const STAT_TILES: { key: string; label: string; kind: StatusKind | null; tone: string }[] = [
@@ -104,9 +105,7 @@ export function DashboardPage() {
 
   if (issues === null) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="대시보드 불러오는 중" />
-      </div>
+      <GadgetsSkeleton label="대시보드 불러오는 중" />
     );
   }
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { Check, MoreHorizontal, Trash2 } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -36,6 +36,8 @@ export interface BacklogIssueRowProps {
   onMove: (issue: Issue, sprintId: string | null) => void;
   onDelete: (issue: Issue) => void;
   onOpen: (key: string) => void;
+  /** 다중 선택에 들어 있다(⌘/Shift 클릭·x) */
+  selected?: boolean;
 }
 
 /** 백로그/스프린트 패널 공용 이슈 행. 행 클릭 = 상세 모달, 우측 ⋯ = Dropdown 액션 */
@@ -47,22 +49,32 @@ export function BacklogIssueRow({
   onMove,
   onDelete,
   onOpen,
+  selected = false,
 }: BacklogIssueRowProps) {
   const priorities = usePriorities();
   return (
     // 행 안에 Dropdown 버튼이 중첩되므로 <button>이 아니라 role="button"으로 (button-in-button 방지)
+    // Space는 미리보기 토글(리니어 Peek) 몫이라 행을 여는 키는 Enter만이다 — useIssueInteractions
     <div
-      className="backlog-row"
+      className={selected ? "backlog-row is-selected" : "backlog-row"}
       role="button"
       tabIndex={0}
+      data-issue-key={issue.key}
+      aria-keyshortcuts="Enter Space"
       onClick={() => onOpen(issue.key)}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
+        if (e.key === "Enter") {
           e.preventDefault();
           onOpen(issue.key);
         }
       }}
     >
+      {selected ? (
+        <span className="issue-selected-mark">
+          <Check size={12} aria-hidden />
+          <span className="visually-hidden">선택됨</span>
+        </span>
+      ) : null}
       <IssueTypeGlyph type={issue.type} />
       <span className="backlog-row-key">{issue.key}</span>
       <span className="backlog-row-title">{issue.title}</span>
@@ -194,6 +206,8 @@ export interface SprintPanelProps {
   onMove: (issue: Issue, sprintId: string | null) => void;
   onDelete: (issue: Issue) => void;
   onOpen: (key: string) => void;
+  /** 다중 선택된 이슈 id */
+  selectedIds?: ReadonlySet<string>;
 }
 
 /** planned/active 스프린트 패널 — planned엔 시작 Button, active엔 완료 Button (스펙 §4) */
@@ -210,6 +224,7 @@ export function SprintPanel({
   onMove,
   onDelete,
   onOpen,
+  selectedIds,
 }: SprintPanelProps) {
   const period = formatPlannedRange(sprint.plannedStart, sprint.plannedEnd);
   return (
@@ -272,6 +287,7 @@ export function SprintPanel({
             onMove={onMove}
             onDelete={onDelete}
             onOpen={onOpen}
+            selected={selectedIds?.has(issue.id) ?? false}
           />
         ))}
         {issues.length === 0 ? <p className="sprint-panel-empty">이슈가 없습니다</p> : null}

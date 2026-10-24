@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router";
-import { Card, PageHeader, Spinner } from "@chanho/react";
+import { Card, PageHeader } from "@chanho/react";
 import { OrgAdminApp } from "@chanho/org-admin";
 import type { Project } from "../store/types";
 import { hasAnyProjectAdmin, USE_REST } from "../store/jiraStore";
 import { orgApiFetch } from "../store/orgApi";
 import { useOrgProfile } from "../components/OrgAccountGate";
 import { ORG_ADMIN_BASE } from "../components/SettingsSideNav";
+import { PageSkeleton } from "../components/Skeletons";
 
 /**
  * 패키지는 리소스 링크를 `<a href>`로 그린다(라우터 밖 전체 이동). ALM은 `/alm` 아래에 살므로
@@ -94,9 +95,7 @@ export function OrgAdminPage({ projects }: { projects: Project[] }) {
     }
     if (canInvite === null) {
       return (
-        <div className="board-loading">
-          <Spinner size="large" label="권한 확인 중" />
-        </div>
+        <PageSkeleton label="권한 확인 중" />
       );
     }
     if (!canInvite) {

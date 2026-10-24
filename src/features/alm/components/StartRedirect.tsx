@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router";
-import { Spinner } from "@chanho/react";
 import { getMyPreferences } from "../store/jiraStore";
 import { listRecentProjectIds } from "../store/uiStore";
+import { PageSkeleton } from "./Skeletons";
 
 /**
  * 루트(`/`) 진입 — 개인 설정의 시작 화면으로 보낸다. 마지막 프로젝트가 없으면 홈.
@@ -35,9 +35,7 @@ export function StartRedirect() {
 
   if (!target) {
     return (
-      <div className="app-loading">
-        <Spinner size="large" label="시작 화면 여는 중" />
-      </div>
+      <PageSkeleton label="시작 화면 여는 중" />
     );
   }
   return <Navigate to={target} replace />;

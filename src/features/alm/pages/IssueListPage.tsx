@@ -7,6 +7,7 @@ import {
   Spinner,
   Button,
   Modal,
+  Skeleton,
   Table,
   TextField,
   useToast,
@@ -47,6 +48,8 @@ import { useTablePrefs } from "../components/useTablePrefs";
 import { ColumnPicker } from "../components/ColumnPicker";
 import { useKeyboardShortcuts } from "../components/useKeyboardShortcuts";
 import { UserAvatar } from "../components/UserAvatar";
+import { useIssueActions } from "../components/useIssueActions";
+import { useIssueInteractions } from "../components/useIssueInteractions";
 import "./issue-list.css";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
@@ -281,6 +284,27 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     },
   });
 
+  // 웨이브 B — 우클릭 메뉴·미리보기(Space)·속성 단축키(s/p/a/l/i)·⌘/Shift 클릭 선택·명령 팔레트 범위.
+  // 선택은 체크박스와 같은 상태(selected)를 쓴다 — 대량 변경 바·모달이 그대로 따라온다.
+  const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({
+    setIssues: (update) => setIssues((prev) => (prev ? update(prev) : prev)),
+    reload,
+    onDeleted: (ids) => setSelected((prev) => new Set([...prev].filter((id) => !ids.includes(id)))),
+  });
+  const interactions = useIssueInteractions({
+    source: "list",
+    projectId,
+    issues: sortedIssues,
+    options: { statuses, users, priorities, labels: labelOptions },
+    actions: issueActions,
+    openIssue,
+    sprints,
+    selection: { selected, setSelected },
+    cursorId,
+    setCursorId,
+    disabled: resultsDisabled,
+  });
+
   // 지연: 마감일이 오늘 이전인데 완료가 아니다
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = (issue: Issue) =>
@@ -363,7 +387,9 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
             label="모두 선택"
             labelHidden
             disabled={actionsDisabled}
-            checked={allSelected ? true : selected.size > 0 ? "indeterminate" : false}
+            checked={allSelected}
+            // 일부만 고르면 대시(react 0.14.0 indeterminate — 예전엔 미선택과 같아 보였다)
+            indeterminate={!allSelected && selected.size > 0}
             onCheckedChange={(checked) =>
               setSelected(checked === true ? new Set(sortedIssues.map((i) => i.id)) : new Set())
             }
@@ -523,6 +549,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
           <div className="issue-filter-search visually-hidden-label">
             <TextField
               label="검색"
+              size="compact"
               placeholder="제목·설명·키 검색"
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -657,9 +684,29 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
           </div>
         ) : null}
         {issues === null && loading ? (
-          <div className="board-loading">
-            <Spinner size="large" label="이슈 불러오는 중" />
-          </div>
+          // 첫 조회 — 지라 목록처럼 머리글은 그대로 두고 행 자리만 스켈레톤(레이아웃이 밀리지 않게)
+          <>
+            <div className="issue-toolbar" aria-hidden="true">
+              <Skeleton width={120} height={16} />
+              <span className="issue-toolbar-actions">
+                <Skeleton width={96} height={32} radius="medium" />
+                <Skeleton width={160} height={32} radius="medium" />
+              </span>
+            </div>
+            <div className="issue-table-scroll">
+              {/* 자리 표는 이름을 따로 둔다 — "이슈 목록" 표는 결과가 온 뒤의 표 하나뿐이다 */}
+              <Table
+                aria-label="이슈 목록 (불러오는 중)"
+                columns={visibleColumns}
+                rows={[]}
+                loading
+                loadingRows={10}
+                loadingLabel="이슈 불러오는 중"
+                columnOrder={tablePrefs.order}
+                columnWidths={tablePrefs.widths}
+              />
+            </div>
+          </>
         ) : (
           <>
             <div className="issue-toolbar" role="toolbar" aria-label="이슈 목록 도구">
@@ -721,7 +768,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 />
               </div>
             ) : issues && issues.length > 0 ? (
-              <div className="issue-table-scroll" aria-busy={updating} ref={tableRef}>
+              interactions.withContextMenu(
+              <div className="issue-table-scroll" aria-busy={updating} ref={tableRef} {...interactions.containerProps}>
                 <Table
                   aria-label="이슈 목록"
                   columns={visibleColumns}
@@ -741,7 +789,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                   onColumnOrderChange={tablePrefs.setOrder}
                   onColumnWidthsChange={tablePrefs.setWidths}
                 />
-              </div>
+              </div>,
+              )
             ) : null}
           </>
         )}
@@ -793,6 +842,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
           </div>
         </Modal>
       ) : null}
+      {interactions.peek}
+      {issueActionDialogs}
       {issueModal}
     </>
   );

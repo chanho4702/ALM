@@ -10,7 +10,6 @@ import {
   Lozenge,
   Modal,
   Select,
-  Spinner,
   Switch,
   TextArea,
   TextField,
@@ -78,6 +77,7 @@ import {
   typeAppearance,
   typeName,
 } from "../components/labels";
+import { PageSkeleton } from "../components/Skeletons";
 
 /** AI 팀 구획은 사무실 초상 에셋을 끌고 오므로 따로 쪼갠다 — 그 구획을 여는 사람만 받는다 */
 const AiTeamSettings = lazy(() => import("../office/AiTeamSettings"));
@@ -436,6 +436,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
             />
             <Select
               label="프로젝트 리더"
+              searchable
               value={leadDraft}
               options={[
                 { value: NO_LEAD, label: "없음" },
@@ -769,9 +770,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         {section === "ai-team" ? (
           <Suspense
             fallback={
-              <div className="board-loading">
-                <Spinner size="large" label="AI 팀 불러오는 중" />
-              </div>
+              <PageSkeleton label="AI 팀 불러오는 중" />
             }
           >
             <AiTeamSettings projectId={project.id} users={users} />

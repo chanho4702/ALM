@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EmptyState, Spinner } from "@chanho/react";
+import { EmptyState } from "@chanho/react";
 import { formatDateTime, relTime } from "../components/time";
 import type { AgentTeamPersona } from "../store/types";
 import { OfficePortrait } from "./PixelSprite";
+import { ListSkeleton } from "../components/Skeletons";
 
 /** AI 팀 설정 구획 공용 — 조회 상태·재시도·시각 표기(AiTeamSettings·실행 위치/러너 카드) */
 
@@ -56,7 +57,7 @@ export function LoadState({ load, label, errorTitle, onRetry }: {
   errorTitle: string;
   onRetry: () => void;
 }) {
-  if (load.status === "loading") return <Spinner label={label} />;
+  if (load.status === "loading") return <ListSkeleton label={label} rows={3} media="none" lines={2} />;
   if (load.status === "error") {
     return (
       <EmptyState

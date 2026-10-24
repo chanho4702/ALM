@@ -485,6 +485,7 @@ export function SearchPage() {
             <TextField
               ref={textRef}
               label="검색어"
+              size="compact"
               placeholder="이슈 검색"
               value={textDraft}
               onChange={(e) => {

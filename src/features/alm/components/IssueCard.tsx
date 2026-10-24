@@ -1,5 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Check } from "lucide-react";
 import { Card, Lozenge, Tag } from "@chanho/react";
 import type { Issue, User } from "../store/types";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
@@ -50,13 +51,16 @@ export function IssueCard({ issue, assignee, epicName, onOpen }: IssueCardProps)
  * useSortable 래퍼. DragOverlay에는 래핑 없는 IssueCard를 써야 한다
  * (같은 id로 useSortable을 두 번 등록하면 안 되기 때문).
  */
-export function SortableIssueCard(props: IssueCardProps) {
+export function SortableIssueCard({ selected = false, ...props }: IssueCardProps & { selected?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.issue.id,
   });
   return (
     <div
       ref={setNodeRef}
+      // data-issue-key: 다중 선택(⌘/Shift 클릭)·우클릭 메뉴·미리보기가 이 카드를 찾는 표식(useIssueInteractions)
+      data-issue-key={props.issue.key}
+      className={selected ? "issue-selectable is-selected" : "issue-selectable"}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -66,6 +70,12 @@ export function SortableIssueCard(props: IssueCardProps) {
       {...listeners}
     >
       <IssueCard {...props} />
+      {selected ? (
+        <span className="issue-selected-mark">
+          <Check size={12} aria-hidden />
+          <span className="visually-hidden">선택됨</span>
+        </span>
+      ) : null}
     </div>
   );
 }

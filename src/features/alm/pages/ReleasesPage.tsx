@@ -8,12 +8,12 @@ import {
   EmptyState,
   Lozenge,
   ProgressBar,
-  Spinner,
   TextField,
   useToast,
 } from "@chanho/react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import type { Issue, ProjectVersion, VersionStatus, WorkflowStatus } from "../store/types";
+import { PageSkeleton } from "../components/Skeletons";
 
 interface VersionProgress {
   total: number;
@@ -209,9 +209,7 @@ export function ReleasesPage() {
 
   if (versions === null) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="릴리스 불러오는 중" />
-      </div>
+      <PageSkeleton label="릴리스 불러오는 중" lines={8} />
     );
   }
 

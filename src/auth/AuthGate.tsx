@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Spinner } from "@chanho/react";
+import { ShellSkeleton } from "../features/alm/components/Skeletons";
 import type { AppUser, AuthClient } from "./types";
 import { rememberReturnTo } from "./returnTo";
 import { sharedAuthClient } from "../features/alm/store/apiClient";
@@ -72,11 +72,7 @@ export function AuthGate({
   const value = useMemo<AuthContextValue>(() => ({ user, logout }), [user, logout]);
 
   if (status === "checking") {
-    return (
-      <div className="app-loading">
-        <Spinner size="large" label="로그인 확인 중" />
-      </div>
-    );
+    return <ShellSkeleton label="로그인 확인 중" />;
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

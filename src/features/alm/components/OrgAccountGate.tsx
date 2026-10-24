@@ -8,12 +8,13 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Button, Spinner } from "@chanho/react";
+import { Button } from "@chanho/react";
 import { Ban } from "lucide-react";
 import type { ReactNode } from "react";
 import type { OrgProfile } from "../store/types";
 import { getMyOrgProfile } from "../store/jiraStore";
 import { useAuth } from "../../../auth/AuthGate";
+import { ShellSkeleton } from "./Skeletons";
 
 interface OrgProfileValue {
   /** `/api/org/me` 응답. 게이트 밖(기존 테스트가 페이지를 직접 렌더)에서는 null이다 */
@@ -126,9 +127,7 @@ export function OrgAccountGate({ children }: { children: ReactNode }) {
 
   if (profile === null) {
     return (
-      <div className="app-loading">
-        <Spinner size="large" label="계정 상태 확인 중" />
-      </div>
+      <ShellSkeleton label="계정 상태 확인 중" />
     );
   }
 
@@ -136,9 +135,7 @@ export function OrgAccountGate({ children }: { children: ReactNode }) {
     return (
       <Suspense
         fallback={
-          <div className="app-loading">
-            <Spinner size="large" label="계정 상태 확인 중" />
-          </div>
+          <ShellSkeleton label="계정 상태 확인 중" />
         }
       >
         <PendingApprovalGate api={cachedMeApi} actions={<LogoutAction />}>

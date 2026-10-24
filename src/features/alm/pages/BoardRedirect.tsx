@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation, useParams } from "react-router";
-import { Spinner } from "@chanho/react";
 import { listBoards } from "../store/jiraStore";
+import { BoardSkeleton } from "../components/Skeletons";
 
 /** 기존 `/projects/:id/board` URL 호환 — 프로젝트의 기본 보드로 보낸다 */
 export function BoardRedirect() {
@@ -22,9 +22,7 @@ export function BoardRedirect() {
 
   if (defaultBoardId === undefined) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="보드 불러오는 중" />
-      </div>
+      <BoardSkeleton label="보드 불러오는 중" />
     );
   }
   // normalize가 프로젝트마다 기본 보드를 보장하므로 null은 사실상 없다 — 방어적으로 디렉터리로

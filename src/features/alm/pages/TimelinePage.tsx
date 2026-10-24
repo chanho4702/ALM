@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { useParams } from "react-router";
-import { Button, EmptyState, Spinner } from "@chanho/react";
+import { Button, EmptyState } from "@chanho/react";
 import { Gantt, Willow } from "@svar-ui/react-gantt";
 import type { ITask } from "@svar-ui/react-gantt";
 import "@svar-ui/react-gantt/all.css";
@@ -11,6 +11,7 @@ import { useIssueModal } from "../components/useIssueModal";
 import { useIssueTypes } from "../components/useIssueTypes";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { statusKind, statusName, typeLevel } from "../components/labels";
+import { BlockSkeleton } from "../components/Skeletons";
 
 type ViewMode = "Day" | "Week" | "Month";
 const VIEW_MODES: { value: ViewMode; label: string }[] = [
@@ -357,9 +358,7 @@ export function TimelinePage() {
 
   if (issues === null) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="타임라인 불러오는 중" />
-      </div>
+      <BlockSkeleton label="타임라인 불러오는 중" height={520} actions={2} />
     );
   }
 

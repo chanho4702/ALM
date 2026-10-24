@@ -1037,12 +1037,6 @@
   color: var(--chanho-color-text-subtle);
 }
 
-.office-panel-loading {
-  display: flex;
-  justify-content: center;
-  padding: var(--chanho-space-300) 0;
-}
-
 .office-panel-error {
   display: flex;
   flex-direction: column;
@@ -1454,11 +1448,6 @@
   padding-left: calc(var(--chanho-space-100) + 16px);
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
-}
-
-.office-goal-loading {
-  display: flex;
-  padding: var(--chanho-space-100) 0;
 }
 
 /* 도트 진행바 — 칸 8px·간격 2px·테두리 2px·안쪽 여백 2px = 106px, 2px 계단 노치(§3.3 예외 상수) */

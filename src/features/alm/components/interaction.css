@@ -1,0 +1,169 @@
+/* 웨이브 B 조작감 — 미리보기 패널·다중 선택 표시. 색·간격·그림자는 전부 --chanho-* 토큰 */
+
+/* ── 미리보기(Peek): 상단바(48px) 아래 오른쪽 패널, 모달이 아니라 페이지 위에 뜬다 ── */
+.issue-peek {
+  position: fixed;
+  top: 56px;
+  right: var(--chanho-space-100);
+  bottom: var(--chanho-space-100);
+  z-index: var(--chanho-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  width: min(400px, calc(100vw - var(--chanho-space-200)));
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-large);
+  background: var(--chanho-color-background-surface-overlay);
+  box-shadow: var(--chanho-shadow-overlay);
+  color: var(--chanho-color-text-default);
+  animation: issue-peek-in 160ms ease-out;
+}
+
+@keyframes issue-peek-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--chanho-space-200));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .issue-peek {
+    animation: none;
+  }
+}
+
+.issue-peek-header {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-100) var(--chanho-space-150) var(--chanho-space-100) var(--chanho-space-200);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.issue-peek-key {
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-peek-spacer {
+  flex: 1;
+}
+
+.issue-peek-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--chanho-space-200);
+}
+
+.issue-peek-title {
+  margin: 0 0 var(--chanho-space-200);
+  font-size: var(--chanho-font-size-300);
+  font-weight: var(--chanho-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.issue-peek-fields {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: var(--chanho-space-100) var(--chanho-space-150);
+  margin: 0 0 var(--chanho-space-300);
+  font-size: var(--chanho-font-size-100);
+}
+
+.issue-peek-fields dt {
+  color: var(--chanho-color-text-subtle);
+  font-weight: var(--chanho-font-weight-medium);
+  line-height: 24px;
+}
+
+.issue-peek-fields dd {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.issue-peek-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-50);
+}
+
+.issue-peek-description h3 {
+  margin: 0 0 var(--chanho-space-100);
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.issue-peek-description p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--chanho-font-size-100);
+  line-height: 1.5;
+}
+
+.issue-peek-empty {
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-peek-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-200);
+  padding: var(--chanho-space-100) var(--chanho-space-200);
+  border-top: 1px solid var(--chanho-color-border-default);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-peek-footer kbd + kbd {
+  margin-left: var(--chanho-space-25);
+}
+
+/* ── 다중 선택 표시(보드 카드·백로그 행) — 색 하나에 기대지 않게 테두리 + 체크 표식 ── */
+.issue-selectable {
+  position: relative;
+}
+
+.issue-selectable.is-selected > .issue-card,
+.backlog-row.is-selected {
+  background: var(--chanho-color-background-selected);
+  box-shadow: inset 0 0 0 2px var(--chanho-color-border-selected);
+}
+
+.issue-selected-mark {
+  position: absolute;
+  top: var(--chanho-space-50);
+  right: var(--chanho-space-50);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--chanho-radius-full);
+  background: var(--chanho-color-background-brand);
+  color: var(--chanho-color-text-inverse);
+  pointer-events: none;
+}
+
+.backlog-row.is-selected .issue-selected-mark {
+  position: static;
+  flex: none;
+}
+
+/* 보드·백로그 선택 바 — 목록의 .bulk-bar와 같은 모양, 화면 아래에 붙는다 */
+.selection-bar.bulk-bar {
+  position: sticky;
+  bottom: var(--chanho-space-100);
+  z-index: var(--chanho-z-navigation);
+  margin-top: var(--chanho-space-150);
+  box-shadow: var(--chanho-shadow-overlay);
+}
+
+.selection-bar-hint {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}

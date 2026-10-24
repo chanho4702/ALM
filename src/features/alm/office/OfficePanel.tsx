@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate } from "react-router";
-import { Badge, Banner, Button, Lozenge, Spinner, Tabs } from "@chanho/react";
+import { Badge, Banner, Button, Lozenge, Tabs } from "@chanho/react";
 import { ExternalLink, FileText, History, Keyboard, Laptop, Mail, MessageCircle, Users, UsersRound, Wrench, X } from "lucide-react";
 import type {
   AgentActiveMeeting,
@@ -47,6 +47,7 @@ import {
   runnerWaitText,
   type EpicGoal,
 } from "./officeModel";
+import { ListSkeleton } from "../components/Skeletons";
 
 export interface OfficeLinks {
   gates: string;
@@ -342,9 +343,7 @@ function DialogHistory({
         <p className="office-panel-empty">이 서버는 대화 기록을 저장하지 않아요 — 화면을 떠나면 사라져요</p>
       ) : null}
       {log.status === "loading" || log.status === "idle" ? (
-        <div className="office-panel-loading">
-          <Spinner size="small" label="대화 기록을 불러오는 중" />
-        </div>
+        <ListSkeleton label="대화 기록을 불러오는 중" rows={4} media="avatar" lines={2} />
       ) : log.status === "error" ? (
         <div className="office-panel-error">
           <p role="alert">대화 기록을 불러오지 못했습니다</p>
@@ -475,9 +474,7 @@ function PersonaActivity({
       </Section>
 
       {activityStatus === "loading" || activityStatus === "idle" ? (
-        <div className="office-panel-loading">
-          <Spinner size="medium" label="불러오는 중" />
-        </div>
+        <ListSkeleton label="불러오는 중" rows={4} media="icon" lines={2} />
       ) : activityStatus === "error" && !activity ? (
         <div className="office-panel-error">
           <p role="alert">개인 오피스를 불러오지 못했습니다</p>
@@ -742,9 +739,7 @@ function GoalsSection({ goals, links }: { goals: GoalsView; links: OfficeLinks }
     );
   } else if (goals.status !== "ready" && goals.goals.length === 0) {
     body = (
-      <div className="office-goal-loading">
-        <Spinner size="small" label="목표를 불러오는 중" />
-      </div>
+      <ListSkeleton label="목표를 불러오는 중" rows={3} media="none" lines={2} />
     );
   } else if (goals.goals.length === 0) {
     body = <p className="office-panel-empty">아직 목표(에픽)가 없습니다</p>;

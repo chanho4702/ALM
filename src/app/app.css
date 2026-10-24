@@ -1,4 +1,4 @@
-/* 모든 박스를 border-box로 — @chanho/react Card가 width:100%+padding이라 그리드 셀을 넘친다 */
+/* 모든 박스를 border-box로 — 앱 마크업 기본값(DS Card·Modal은 react 0.13.0부터 스스로 border-box) */
 *,
 *::before,
 *::after {
@@ -487,16 +487,6 @@ body {
   }
 }
 
-.app-loading,
-.app-centered {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--chanho-space-200);
-  min-height: 100vh;
-}
-
 .project-create-form {
   display: flex;
   flex-direction: column;
@@ -933,7 +923,6 @@ body {
 .create-issue-assignee button[role="combobox"],
 .create-issue-link-row button[role="combobox"] {
   width: 100%;
-  min-width: 0;
 }
 
 .search-modal.search-modal {
@@ -1817,12 +1806,6 @@ body {
 .board-avatar-toggle.is-active {
   border-color: var(--chanho-color-border-brand);
   background: var(--chanho-color-background-selected);
-}
-
-.board-loading {
-  display: flex;
-  justify-content: center;
-  padding: var(--chanho-space-600);
 }
 
 /* 컬럼 수는 워크플로 상태 수를 따른다 — 최소 폭 보장, 모자라면 가로 스크롤 */
@@ -3075,12 +3058,6 @@ body {
 }
 
 /* 탭 안에서 늦게 불러오는 목록(최근 본)의 로딩 자리 */
-.home-tab-loading {
-  display: flex;
-  justify-content: center;
-  padding: var(--chanho-space-300) 0;
-}
-
 /* ── 대시보드 ───────────────────────────────────────────── */
 
 .dashboard {

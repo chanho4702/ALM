@@ -11,7 +11,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Button, Dropdown, EmptyState, Lozenge, Select, Spinner, useToast } from "@chanho/react";
+import { Button, Dropdown, EmptyState, Lozenge, Select, useToast } from "@chanho/react";
 import type { Board, BoardSwimlane, Issue, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   completeSprint,
@@ -39,6 +39,12 @@ import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
 import { UserAvatar } from "../components/UserAvatar";
 import { resolveMove } from "./boardDnd";
+import { BulkEditModal } from "../components/BulkEditModal";
+import { SelectionBar } from "../components/SelectionBar";
+import { usePriorities } from "../components/usePriorities";
+import { useIssueActions } from "../components/useIssueActions";
+import { useIssueInteractions } from "../components/useIssueInteractions";
+import { BoardSkeleton } from "../components/Skeletons";
 
 const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
 
@@ -163,6 +169,25 @@ export function BoardPage() {
     return null;
   }, [groupBy, users, visibleIssues, epicsById]);
 
+  // 웨이브 B — 다중 선택(⌘/Shift 클릭·x)·우클릭 메뉴·미리보기(Space)·속성 단축키·명령 팔레트 범위.
+  // 순서는 보이는 대로(컬럼 왼쪽부터, 컬럼 안은 위부터) — Shift 범위와 미리보기 이웃 이동의 기준
+  const priorities = usePriorities();
+  const orderedIssues = useMemo(
+    () => statuses.flatMap((ws) => visibleIssues.filter((issue) => issue.status === ws.id)),
+    [statuses, visibleIssues],
+  );
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({ setIssues, reload });
+  const interactions = useIssueInteractions({
+    source: "board",
+    projectId,
+    issues: orderedIssues,
+    options: { statuses, users, priorities, labels: labelOptions },
+    actions: issueActions,
+    openIssue,
+    sprints,
+  });
+
   /** 상태 id → order순 이슈 id 배열 (resolveMove 입력) — 프로젝트 상태 전부가 키 */
   const columnIds = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -235,9 +260,7 @@ export function BoardPage() {
 
   if (board === undefined) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="보드 불러오는 중" />
-      </div>
+      <BoardSkeleton label="보드 불러오는 중" />
     );
   }
   if (board === null) {
@@ -259,8 +282,8 @@ export function BoardPage() {
       />
     );
   } else {
-    content = (
-      <section>
+    content = interactions.withContextMenu(
+      <section {...interactions.containerProps}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -303,6 +326,7 @@ export function BoardPage() {
                         workflowStatus={ws}
                         // 밴드별 개수는 전체 WIP 기준과 달라 오해 소지 — 스윔레인에선 표시 생략
                         wipLimit={null}
+                        selectedIds={interactions.selected}
                       />
                     );
                   })}
@@ -326,6 +350,7 @@ export function BoardPage() {
                     appearance={ws.color ?? "neutral"}
                     workflowStatus={ws}
                     wipLimit={column?.wipLimit ?? null}
+                    selectedIds={interactions.selected}
                   />
                 );
               })}
@@ -342,7 +367,13 @@ export function BoardPage() {
             ) : null}
           </DragOverlay>
         </DndContext>
-      </section>
+        <SelectionBar
+          count={interactions.selected.size}
+          onClear={interactions.clearSelection}
+          onBulkEdit={() => setBulkOpen(true)}
+          onDelete={() => issueActions.requestDelete(interactions.targets())}
+        />
+      </section>,
     );
   }
 
@@ -367,6 +398,7 @@ export function BoardPage() {
           <span className="board-toolbar-spacer" />
           <Select
             label="그룹"
+            size="compact"
             className="visually-hidden-label board-group-select"
             value={groupBy}
             options={[
@@ -437,6 +469,22 @@ export function BoardPage() {
           void handleCompleteSprint(target, moveUnfinishedTo);
         }}
       />
+      <BulkEditModal
+        open={bulkOpen}
+        targets={orderedIssues
+          .filter((issue) => interactions.selected.has(issue.id))
+          .map((issue) => ({ id: issue.id, key: issue.key, version: issue.version }))}
+        statuses={statuses}
+        users={users}
+        sprints={sprints}
+        onOpenChange={setBulkOpen}
+        onDone={() => {
+          interactions.clearSelection();
+          void reload();
+        }}
+      />
+      {interactions.peek}
+      {issueActionDialogs}
       {/* 활성 스프린트가 없어도 백로그 이슈 키 공유 URL은 열려야 하므로 content 밖에서 렌더 */}
       {issueModal}
     </>

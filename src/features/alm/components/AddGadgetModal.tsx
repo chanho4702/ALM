@@ -62,6 +62,7 @@ export function AddGadgetModal({ open, projects, onClose, onAdd }: AddGadgetModa
         <p className="settings-help">{GADGET_DESCRIPTIONS[type]}</p>
         <Select
           label="프로젝트"
+          searchable
           value={projectId}
           options={[
             ...(needsProject ? [] : [{ value: ALL_PROJECTS, label: "전체 프로젝트" }]),

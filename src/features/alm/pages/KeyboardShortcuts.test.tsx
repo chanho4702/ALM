@@ -213,8 +213,8 @@ describe("이슈 상세 단축키", () => {
     await user.keyboard("e");
     const titleInput = await within(dialog).findByRole("textbox", { name: "제목" });
     expect(titleInput).toBeInTheDocument();
-    // 편집을 취소하고 나온다(Escape는 모달까지 닫으므로 취소 버튼)
-    await user.click(within(dialog).getByRole("button", { name: "취소" }));
+    // 편집을 취소하고 나온다. DS 0.13.0부터 InlineEdit의 저장·취소는 포털 팝오버라 모달 밖(document.body)에 있다
+    await user.click(screen.getByRole("button", { name: "취소" }));
     await within(dialog).findByRole("button", { name: "제목 편집" });
     (document.activeElement as HTMLElement | null)?.blur();
 

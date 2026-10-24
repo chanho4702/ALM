@@ -67,6 +67,7 @@ import {
   type FaceExpression,
 } from "./pixel";
 import { PixelSprite } from "./PixelSprite";
+import { FormSkeleton } from "../components/Skeletons";
 
 const NAME_MAX = 80;
 const EMOJI_MAX = 16;
@@ -252,7 +253,7 @@ export function PersonaEditorDialog({ persona, justCreated = false, onClose, onS
   const lookIsDefault = sameLook(look, defaultLook(persona.slug));
 
   const tabBody = (content: () => ReactNode): ReactNode => {
-    if (load.status === "loading") return <Spinner label="직원 정보 불러오는 중" />;
+    if (load.status === "loading") return <FormSkeleton label="직원 정보 불러오는 중" />;
     if (load.status === "forbidden") return <EmptyState title="이 직원을 편집할 권한이 없습니다" />;
     if (load.status === "error") {
       return (

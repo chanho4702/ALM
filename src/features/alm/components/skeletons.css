@@ -1,0 +1,215 @@
+/* 로딩 스켈레톤 자리(Skeletons.tsx) — 색·쉬머는 DS Skeleton이, 여기서는 실제 화면과 같은 칸만 잡는다 */
+
+.skeleton-region {
+  min-width: 0;
+}
+
+.skeleton-page,
+.skeleton-board,
+.skeleton-backlog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.skeleton-backlog {
+  gap: var(--chanho-space-300);
+}
+
+.skeleton-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-200);
+  min-height: var(--chanho-space-400);
+}
+
+.skeleton-heading-actions {
+  display: flex;
+  gap: var(--chanho-space-100);
+}
+
+/* ── 셸: 상단바 48px + 사이드바 240px(항목 32px) ── */
+.skeleton-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--chanho-color-background-default);
+}
+
+.skeleton-shell-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-200);
+  height: 48px;
+  padding: 0 var(--chanho-space-200);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-surface);
+}
+
+.skeleton-shell-search {
+  flex: 0 1 400px;
+  margin-inline: auto;
+}
+
+.skeleton-shell-account {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.skeleton-shell-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.skeleton-shell-nav {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+  width: 240px;
+  padding: var(--chanho-space-200) var(--chanho-space-150);
+  border-right: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-subtle);
+}
+
+.skeleton-shell-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  height: 32px;
+  padding: 0 var(--chanho-space-100);
+}
+
+.skeleton-shell-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  padding: var(--chanho-space-300) var(--chanho-space-400);
+}
+
+@media (max-width: 720px) {
+  .skeleton-shell-nav {
+    display: none;
+  }
+
+  .skeleton-shell-search {
+    flex-basis: 0;
+  }
+}
+
+/* ── 보드: 실제 .board-columns/.board-column 안에 카드 자리 ── */
+.skeleton-board-column-head {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  min-height: var(--chanho-space-300);
+  padding: 0 var(--chanho-space-50);
+}
+
+.skeleton-board-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  min-height: 76px;
+  padding: var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+}
+
+.skeleton-board-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  margin-top: auto;
+}
+
+.skeleton-board-card-meta > :last-child {
+  margin-left: auto;
+}
+
+/* ── 백로그: .sprint-panel 상자 안 36px 행 ── */
+.skeleton-backlog-head {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  min-height: var(--chanho-space-300);
+}
+
+.skeleton-backlog-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-backlog-row {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  min-height: 36px;
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  border-top: 1px solid var(--chanho-color-border-default);
+}
+
+.skeleton-backlog-row:first-child {
+  border-top: 0;
+}
+
+.skeleton-grow {
+  flex: 1 1 auto;
+}
+
+/* ── 목록·가젯·폼 ── */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-gadget {
+  min-height: 220px;
+}
+
+.skeleton-gadget-head {
+  display: flex;
+  align-items: center;
+  min-height: 41px;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+
+.skeleton-gadget-body {
+  display: block;
+  padding: var(--chanho-space-150);
+}
+
+.skeleton-gadget-inline {
+  padding: var(--chanho-space-50) 0;
+}
+
+.skeleton-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+
+.skeleton-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+}
+
+/* AI 사무실 평면도 자리 — 방 크기(.ai-office-room.is-placeholder)를 그대로 채운다 */
+.ai-office-room-skeleton {
+  display: flex;
+  align-self: stretch;
+  justify-self: stretch;
+}
+
+.ai-office-room-skeleton > * {
+  flex: 1;
+}

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useOutletContext } from "react-router";
-import { Banner, Button, ConfirmDialog, EmptyState, Spinner, useToast } from "@chanho/react";
+import { Banner, Button, ConfirmDialog, EmptyState, useToast } from "@chanho/react";
 import { ArrowLeft, Clock, RefreshCw } from "lucide-react";
 import type { AgentPersona } from "../store/types";
 import { fetchAgentPersonas } from "../store/jiraStore";
@@ -8,6 +8,7 @@ import { useAiTeamStatus } from "../components/useAiTeamActive";
 import type { JiraOutletContext } from "../components/ProjectLayout";
 import { relTimeFine } from "../components/time";
 import type { PolledLoad } from "./usePolledLoad";
+import { PageSkeleton } from "../components/Skeletons";
 
 /**
  * run 목록·상세·게이트 인박스 공용 뼈대(P3a AGP-12/13). 사무실 밖 화면이라 DS 컴포넌트·토큰만 쓴다
@@ -19,9 +20,7 @@ export function AiTeamGate({ loadingLabel, children }: { loadingLabel: string; c
   const status = useAiTeamStatus();
   if (status === "unknown") {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label={loadingLabel} />
-      </div>
+      <PageSkeleton label={loadingLabel} />
     );
   }
   if (status === "inactive") {
@@ -131,9 +130,7 @@ export function SupervisionBody({
 }) {
   if (load.status === "loading") {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label={loadingLabel} />
-      </div>
+      <PageSkeleton label={loadingLabel} />
     );
   }
   if (load.status === "error") {

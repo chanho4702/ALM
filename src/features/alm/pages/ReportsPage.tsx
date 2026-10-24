@@ -8,7 +8,6 @@ import {
   Radio,
   RadioGroup,
   Select,
-  Spinner,
 } from "@chanho/react";
 import {
   CartesianGrid,
@@ -48,6 +47,7 @@ import {
   CumulativeFlowCard,
   VelocityCard,
 } from "../components/ReportCharts";
+import { BlockSkeleton } from "../components/Skeletons";
 
 /** 리포트 종류 — 스프린트 기준(번다운·번업)과 프로젝트 기준(벨로시티·누적 흐름·컨트롤) */
 type ReportKind = "burndown" | "burnup" | "velocity" | "cfd" | "control" | "worklog";
@@ -242,9 +242,7 @@ export function ReportsPage() {
 
   if (issues === null) {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="리포트 불러오는 중" />
-      </div>
+      <BlockSkeleton label="리포트 불러오는 중" height={360} actions={2} />
     );
   }
 
@@ -328,6 +326,7 @@ export function ReportsPage() {
           {kindSelect}
           <Select
             label="스프린트"
+            searchable
             className="visually-hidden-label reports-select"
             value={sprint.id}
             options={sprints.map((item) => ({

@@ -1,5 +1,5 @@
 import { lazy, useEffect, useRef, useState } from "react";
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, Command, Menu, Search } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Modal, TopBar } from "@chanho/react";
 import type { Issue, Notification, Project, User } from "../store/types";
@@ -22,6 +22,8 @@ import { UserAvatar } from "./UserAvatar";
 import { SettingsMenu } from "./SettingsMenu";
 import { ShortcutHelpModal } from "./ShortcutHelpModal";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+import { CommandPaletteHost } from "./CommandPaletteHost";
+import { openCommandPalette } from "./commandScope";
 import { useAuth } from "../../../auth/AuthGate";
 import "./AppShell.css";
 
@@ -146,15 +148,29 @@ export function AppShell({ projects }: AppShellProps) {
   const createAction = projects.length > 0 ? (
     <Button onClick={() => setCreateOpen(true)}>만들기</Button>
   ) : null;
+  const openNotifications = () => {
+    reloadNotifications();
+    setNotificationsOpen(true);
+  };
+  // 명령 팔레트 — 마우스로도 열 수 있게 상단바에 둔다(키는 ⌘K / Ctrl+K)
+  const paletteAction = (
+    <Button
+      variant="ghost"
+      className="topbar-icon"
+      aria-label="명령 팔레트"
+      aria-keyshortcuts="Control+K Meta+K"
+      title="명령 팔레트 (Ctrl+K)"
+      onClick={() => openCommandPalette()}
+    >
+      <Command size={18} />
+    </Button>
+  );
   const notificationAction = (
     <Button
       variant="ghost"
       className="notification-bell topbar-icon"
       aria-label={unreadCount > 0 ? `알림 ${unreadCount}개 미읽음` : "알림"}
-      onClick={() => {
-        reloadNotifications();
-        setNotificationsOpen(true);
-      }}
+      onClick={openNotifications}
     >
       <Bell size={18} />
       {unreadCount > 0 ? <Badge appearance="danger">{unreadCount}</Badge> : null}
@@ -208,6 +224,7 @@ export function AppShell({ projects }: AppShellProps) {
               onClick={openSearch}
             />
             {createAction}
+            {paletteAction}
             {notificationAction}
           </div>
         </header>
@@ -224,6 +241,7 @@ export function AppShell({ projects }: AppShellProps) {
         actions={
           <>
             {createAction}
+            {paletteAction}
             {notificationAction}
             {accountActions}
           </>
@@ -269,6 +287,13 @@ export function AppShell({ projects }: AppShellProps) {
         </LazyModal>
       ) : null}
       <ShortcutHelpModal open={shortcutHelpOpen} onOpenChange={setShortcutHelpOpen} />
+      <CommandPaletteHost
+        projects={projects}
+        currentProject={currentProject}
+        onCreateIssue={() => setCreateOpen(true)}
+        onShowShortcuts={() => setShortcutHelpOpen(true)}
+        onOpenNotifications={openNotifications}
+      />
       <NotificationsModal
         notifications={notifications}
         open={notificationsOpen}

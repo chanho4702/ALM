@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { keyboardShortcutsEnabled } from "../store/uiStore";
-import { createSequenceMatcher, openDialogs, shouldIgnoreKey } from "./keyboardShortcuts";
+import { createSequenceMatcher, openDialogs, shortcutKeyName, shouldIgnoreKey } from "./keyboardShortcuts";
 
 export type ShortcutBindings = Record<string, () => void>;
 
@@ -15,7 +15,8 @@ export interface UseKeyboardShortcutsOptions {
 /**
  * 창 전체 keydown에 단축키를 건다. 바인딩 키 문법·무시 조건은 `keyboardShortcuts.ts`.
  * 개인 설정 "키보드 단축키 사용"을 끄면 전부 멈춘다(키를 누를 때마다 읽는다 — 다른 탭에서 바꿔도 따라간다).
- * Esc는 여기서 다루지 않는다 — 모달·메뉴가 스스로 닫는다(DS/Radix).
+ * 모달·메뉴의 Esc는 DS/Radix가 스스로 닫는다. 화면 단축키는 모달이 열려 있으면 멈추므로, 화면이 `"Escape"`를
+ * 바인딩해도(미리보기 닫기·선택 해제) 모달을 닫는 Esc와 겹치지 않는다.
  */
 export function useKeyboardShortcuts(bindings: ShortcutBindings, options: UseKeyboardShortcutsOptions = {}) {
   // 바인딩은 렌더마다 새 함수다 — 리스너는 한 번만 걸고 최신 값은 ref로 읽는다
@@ -42,7 +43,7 @@ export function useKeyboardShortcuts(bindings: ShortcutBindings, options: UseKey
         matcher.reset();
         return;
       }
-      const result = matcher.feed(event.key, Date.now());
+      const result = matcher.feed(shortcutKeyName(event), Date.now());
       if (result.kind === "pending") {
         event.preventDefault();
       } else if (result.kind === "match") {

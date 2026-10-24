@@ -115,7 +115,7 @@ export function AdminAuditPanel() {
       {error ? (
         <p className="reports-warning">{`감사 로그를 읽을 수 없습니다 — ${error}`}</p>
       ) : entries === null ? (
-        <p className="dash-empty">불러오는 중</p>
+        <p className="dash-empty" role="status">불러오는 중</p>
       ) : entries.length === 0 ? (
         <p className="dash-empty">조건에 맞는 기록이 없습니다.</p>
       ) : (
@@ -184,7 +184,7 @@ export function SystemPanel() {
             </div>
           </dl>
         ) : (
-          <p className="dash-empty">불러오는 중</p>
+          <p className="dash-empty" role="status">불러오는 중</p>
         )}
       </Card>
       <Card padding="lg" title="백업·복구">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { Button, EmptyState, Lozenge, Spinner } from "@chanho/react";
+import { Button, EmptyState, Lozenge } from "@chanho/react";
 import type { DashboardGadget, GadgetType, Issue, ProjectWorklogRow, Sprint, User, WorkflowStatus } from "../store/types";
 import {
   aggregateIssues,
@@ -27,6 +27,7 @@ import { todayKey } from "../pages/dashboardMetrics";
 import { historySince } from "../pages/reportMetrics";
 import { recentRange, worklogSummary, type WorklogSummary } from "../pages/worklogMetrics";
 import { BurnupCard } from "./ReportCharts";
+import { GadgetBodySkeleton } from "./Skeletons";
 
 export const GADGET_LABELS: Record<GadgetType, string> = {
   "status-distribution": "상태 분포",
@@ -85,7 +86,7 @@ function useAsync<T>(load: () => Promise<T>, deps: unknown[]): { data: T | null;
 
 function GadgetBody({ error, loading, children }: { error: string | null; loading: boolean; children: React.ReactNode }) {
   if (error) return <p className="gadget-error">{error}</p>;
-  if (loading) return <Spinner size="small" label="가젯 불러오는 중" />;
+  if (loading) return <GadgetBodySkeleton label="가젯 불러오는 중" />;
   return <>{children}</>;
 }
 

@@ -333,6 +333,7 @@ export function CreateIssueModal({
             <FieldLabel field="project" required>프로젝트</FieldLabel>
             <Select
               label="프로젝트 *"
+              searchable
               className="visually-hidden-label"
               value={projectId}
               options={projects.map((p) => ({ value: p.id, label: `${p.name} (${p.key})` }))}
@@ -387,6 +388,7 @@ export function CreateIssueModal({
             <FieldLabel field="assignee" required={required("assignee")}>담당자</FieldLabel>
             <Select
               label={fieldLabel("assignee", "담당자")}
+              searchable
               className="visually-hidden-label"
               value={assigneeId}
               options={[
@@ -475,6 +477,7 @@ export function CreateIssueModal({
           </FieldLabel>
           <Select
             label={parentRequired ? "상위 항목 *" : fieldLabel("parent", "상위 항목")}
+            searchable
             className="visually-hidden-label"
             value={parentId}
             options={[{ value: NO_PARENT, label: "없음" }, ...projectIssues.map(issueOption)]}
@@ -488,6 +491,7 @@ export function CreateIssueModal({
             <FieldLabel field="sprint" required={required("sprint")}>스프린트</FieldLabel>
             <Select
               label={fieldLabel("sprint", "스프린트")}
+              searchable
               className="visually-hidden-label"
               value={sprintId}
               options={[
@@ -516,6 +520,7 @@ export function CreateIssueModal({
             <FieldLabel field="fixVersion" required={required("fixVersion")}>수정 버전</FieldLabel>
             <Select
               label={fieldLabel("fixVersion", "수정 버전")}
+              searchable
               className="visually-hidden-label"
               value={fixVersionId}
               options={[

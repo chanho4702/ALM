@@ -163,6 +163,7 @@ export function BulkEditModal({
             <FieldLabel field="assignee">담당자</FieldLabel>
             <Select
               label="담당자"
+              searchable
               className="visually-hidden-label"
               value={assignee}
               onValueChange={setAssignee}
@@ -179,6 +180,7 @@ export function BulkEditModal({
             <FieldLabel field="sprint">스프린트</FieldLabel>
             <Select
               label="스프린트"
+              searchable
               className="visually-hidden-label"
               value={sprint}
               onValueChange={setSprint}

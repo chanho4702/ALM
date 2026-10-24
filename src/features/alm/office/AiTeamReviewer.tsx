@@ -151,6 +151,7 @@ export function ReviewerSection({ projectId, canManage, loaded, team, version, o
           <>
             <Select
               label="리뷰어"
+              searchable
               value={pick}
               disabled={busy || candidates.length === 0}
               options={[

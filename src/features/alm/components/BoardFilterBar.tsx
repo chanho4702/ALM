@@ -72,6 +72,7 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
       {/* 라벨은 접근성을 위해 DOM에 남기고 시각적으로만 숨긴다 (지라 보드 툴바 = 한 줄) */}
       <TextField
         label="보드 검색"
+        size="compact"
         className="visually-hidden-label board-filter-search"
         placeholder="보드 검색"
         value={quick.text}
@@ -115,6 +116,7 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
       </div>
       <Select
         label="타입"
+        size="compact"
         className="visually-hidden-label board-filter-select"
         value={quick.type ?? ALL}
         options={[
@@ -130,6 +132,7 @@ export function BoardFilterBar({ users, labelOptions, quick, onChange }: BoardFi
       />
       <Select
         label="라벨"
+        size="compact"
         className="visually-hidden-label board-filter-select"
         value={quick.label ?? ALL}
         options={[

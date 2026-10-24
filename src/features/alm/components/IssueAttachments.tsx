@@ -174,7 +174,7 @@ export function IssueAttachments({
       </div>
 
       {items === null ? (
-        <p className="dash-empty">첨부 불러오는 중</p>
+        <p className="dash-empty" role="status">첨부 불러오는 중</p>
       ) : items.length === 0 ? (
         <p className="dash-empty">첨부된 파일이 없습니다</p>
       ) : (

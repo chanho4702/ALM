@@ -70,6 +70,7 @@ import { ExecutionSection } from "./AiTeamExecution";
 import { ReviewerSection } from "./AiTeamReviewer";
 // 초상 팔레트(`--office-*`)만 쓴다 — 이 화면은 설정 청크에서도 지연 로드라 사무실을 안 여는 사람은 받지 않는다
 import "./ai-office.css";
+import { PageSkeleton } from "../components/Skeletons";
 
 /** 외부 MCP 클라이언트 연결 가이드(위키 개발 문서) */
 export const AI_TEAM_MCP_GUIDE_HREF = "/wiki/spaces/5/pages/47";
@@ -138,9 +139,7 @@ export default function AiTeamSettings({ projectId, users }: AiTeamSettingsProps
   const status = useAiTeamStatus();
   if (status === "unknown") {
     return (
-      <div className="board-loading">
-        <Spinner size="large" label="AI 팀 불러오는 중" />
-      </div>
+      <PageSkeleton label="AI 팀 불러오는 중" />
     );
   }
   if (status === "inactive") {
@@ -686,6 +685,7 @@ function TokenSection({
         <form className="ai-team-token-form" onSubmit={issue}>
           <Select
             label="직원"
+            searchable
             value={personaSlug}
             options={[
               { value: NO_PERSONA, label: "직원 선택" },
