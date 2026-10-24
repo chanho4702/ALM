@@ -83,3 +83,18 @@
 가젯이 스토어에서 읽는다(`DashboardGadgets.tsx`의 `renderGadget`). 가젯 추가는 `AddGadgetModal`(종류별로 프로젝트·기간·쿼리만 묻는다).
 워크로그는 `listProjectWorklogs(projectId, {since, until})` + `worklogMetrics.worklogSummary`로 사람별·날짜별 합산 — 가젯 "기록 시간"과
 리포트 종류 "워크로그"가 같은 표(`WorklogTable`)를 쓴다.
+
+## 키보드 단축키 · 이슈 목록 열 표시 (2026-10-24, F-13·F-14)
+
+**단축키**(지라 클라우드 기준, 우리 화면이 있는 것만): 전역 `?` 도움말(`ShortcutHelpModal`) · `/` 상단바 검색란 포커스(좁은 화면은 검색 모달) ·
+`c` 이슈 만들기 · `g`+`d` 대시보드 목록 · `g`+`p` 프로젝트 목록 · `g`+`b` 현재 프로젝트 보드 · `g`+`i` 현재 프로젝트 이슈 목록(프로젝트 밖은 `/search`).
+이슈 목록 `j`/`k` 행 커서(키 셀 `aria-current`) · `o` 열기. 이슈 상세 `e` 제목 편집 · `a` 담당자 선택지 펼침 · `i` 나에게 할당 · `l` 라벨 입력 · `m` 코멘트 탭+에디터.
+- 규칙은 `components/keyboardShortcuts.ts`(순수 — 무시 조건·시퀀스 매처), 등록은 `useKeyboardShortcuts`(window keydown 하나씩).
+  input/textarea/select/contenteditable·열린 listbox/menu·Select 트리거(combobox)에 포커스면 무시, `isComposing`/229 무시, Ctrl/Meta/Alt 무시, 시퀀스 1초.
+- 화면 단축키는 **모달이 하나라도 열려 있으면 무시**한다. 이슈 상세 단축키는 `dialogRef`로 "자기 모달이 유일하게 열린 모달"일 때만 — 삭제 확인 등 중첩 모달이 뜨면 멈춘다. Esc는 DS 모달이 스스로 처리한다.
+- 끄기: 개인 설정 > 일반 설정 "키보드 단축키 사용"(uiStore `keyboardShortcuts`, localStorage — 서버 개인 설정 계약은 건드리지 않았다. 바로 반영, "저장" 버튼과 무관).
+- 도움말 목록(`SHORTCUT_GROUPS`)과 실제 바인딩(AppShell·IssueListPage·IssueDetailModal)은 손으로 맞춘다 — 하나를 바꾸면 둘 다.
+
+**열 표시·숨김**: 이슈 목록 툴바 "열" 팝오버(`ColumnPicker`, FilterDropdown과 같은 패널) — 체크박스로 끄고 켜며, 키·제목(·선택)은 잠김. "기본값으로"는 표시·순서·너비를 모두 지운다.
+저장은 열 순서·너비와 같은 `uiStore` `tablePrefs.issues.hidden`. 숨긴 열이 있을 때 표가 알려 주는 순서는 보이는 열뿐이라
+`useTablePrefs(tableId, allKeys)`가 `mergeColumnOrder`로 숨긴 열의 자리를 지킨다(다시 켜도 원래 자리로).

@@ -1,4 +1,4 @@
-import { lazy, useEffect, useState } from "react";
+import { lazy, useEffect, useRef, useState } from "react";
 import { Bell, Menu, Search } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Modal, TopBar } from "@chanho/react";
@@ -20,6 +20,8 @@ import { ThemeToggle } from "./ThemeToggle";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { UserAvatar } from "./UserAvatar";
 import { SettingsMenu } from "./SettingsMenu";
+import { ShortcutHelpModal } from "./ShortcutHelpModal";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useAuth } from "../../../auth/AuthGate";
 import "./AppShell.css";
 
@@ -67,6 +69,8 @@ export function AppShell({ projects }: AppShellProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const mobile = useMobileShell();
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setNavigationOpen(false);
@@ -101,6 +105,33 @@ export function AppShell({ projects }: AppShellProps) {
   useEffect(() => {
     if (currentProject) void recordProjectVisit(currentProject.id);
   }, [currentProject?.id]);
+
+  const openSearch = () => {
+    setSearchQuery("");
+    setSearchOpen(true);
+  };
+
+  /** `/` — 지라처럼 상단바 검색란에 포커스(첫 글자에 검색 모달이 열린다). 좁은 화면은 검색란이 없어 모달을 연다 */
+  const focusSearch = () => {
+    const input = shellRef.current?.querySelector<HTMLInputElement>(":scope > header input[type='search']");
+    if (input) input.focus();
+    else openSearch();
+  };
+
+  // 지라 클라우드 전역 단축키 — 모달이 열려 있거나 입력 중이면 동작하지 않는다(useKeyboardShortcuts)
+  useKeyboardShortcuts({
+    "?": () => setShortcutHelpOpen(true),
+    "/": focusSearch,
+    c: () => {
+      if (projects.length > 0) setCreateOpen(true);
+    },
+    "g d": () => navigate("/dashboards"),
+    "g p": () => navigate("/projects"),
+    "g b": () => {
+      if (currentProject) navigate(`/projects/${currentProject.id}/board`);
+    },
+    "g i": () => navigate(currentProject ? `/projects/${currentProject.id}/issues` : "/search"),
+  });
 
   const openIssue = (issue: Issue) => {
     setSearchOpen(false);
@@ -150,7 +181,7 @@ export function AppShell({ projects }: AppShellProps) {
   );
 
   return (
-    <div className={mobile ? "app-shell app-shell-mobile" : "app-shell"}>
+    <div ref={shellRef} className={mobile ? "app-shell app-shell-mobile" : "app-shell"}>
       {mobile ? (
         <header className="app-mobile-topbar">
           <Modal
@@ -177,10 +208,7 @@ export function AppShell({ projects }: AppShellProps) {
               variant="ghost"
               iconBefore={<Search size={18} />}
               aria-label="이슈 검색 열기"
-              onClick={() => {
-                setSearchQuery("");
-                setSearchOpen(true);
-              }}
+              onClick={openSearch}
             />
             {createAction}
             {notificationAction}
@@ -243,6 +271,7 @@ export function AppShell({ projects }: AppShellProps) {
           />
         </LazyModal>
       ) : null}
+      <ShortcutHelpModal open={shortcutHelpOpen} onOpenChange={setShortcutHelpOpen} />
       <NotificationsModal
         notifications={notifications}
         open={notificationsOpen}

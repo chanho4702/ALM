@@ -10,6 +10,7 @@ import {
   saveMyPreferences,
   uploadMyAvatar, formatAvatarLimit } from "../store/jiraStore";
 import { UserAvatar } from "./UserAvatar";
+import { keyboardShortcutsEnabled, setKeyboardShortcutsEnabled } from "../store/uiStore";
 
 const START_PAGE_OPTIONS: { value: StartPage; label: string }[] = [
   { value: "home", label: "홈(For you)" },
@@ -37,6 +38,8 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarInput = useRef<HTMLInputElement | null>(null);
+  /** 단축키 사용 — 이 브라우저의 화면 설정(uiStore)이라 "저장" 없이 바로 반영한다 */
+  const [shortcuts, setShortcuts] = useState(() => keyboardShortcutsEnabled());
 
   useEffect(() => {
     let cancelled = false;
@@ -240,6 +243,22 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
             label="내가 수정한 이슈"
             checked={prefs.autoWatch.edited}
             onCheckedChange={(v) => setAutoWatch("edited", v)}
+          />
+        </div>
+      </Card>
+      <Card padding="lg" title="키보드 단축키">
+        <p className="settings-help">
+          c(만들기)·/(검색)·?(도움말)·g 다음 d(대시보드) 같은 지라 단축키입니다. 입력란에 글을 쓰는 중에는
+          동작하지 않습니다. 바로 적용되며 이 브라우저에 저장됩니다.
+        </p>
+        <div className="settings-toggle-list">
+          <Switch
+            label="키보드 단축키 사용"
+            checked={shortcuts}
+            onCheckedChange={(v) => {
+              setShortcuts(v);
+              void setKeyboardShortcutsEnabled(v);
+            }}
           />
         </div>
       </Card>

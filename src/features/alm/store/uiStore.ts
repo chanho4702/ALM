@@ -60,10 +60,12 @@ const ownerOnly = () => Object.assign(new Error(SHARED_FILTER_OWNER_ONLY), { sta
 const FILTER_NAME_MAX = 60;
 const FILTER_QUERY_MAX = 4000;
 
-/** 테이블별 열 순서·너비 — DS Table의 columnOrder/columnWidths와 같은 모양 */
+/** 테이블별 열 순서·너비·숨김 — order/widths는 DS Table의 columnOrder/columnWidths와 같은 모양 */
 export interface TablePrefs {
   order?: string[];
   widths?: Record<string, number>;
+  /** 숨긴 열 key(지라 목록 보기의 "열" 선택) — 없거나 빈 배열이면 전부 보인다 */
+  hidden?: string[];
 }
 
 interface UiState {
@@ -73,6 +75,8 @@ interface UiState {
   sideNavCollapsed: boolean;
   sideNavWidth: number;
   savedFilters: SavedFilter[];
+  /** 키보드 단축키(c·/·?·g 시퀀스 등) 사용 — 기본 켬, 개인 설정에서 끈다 */
+  keyboardShortcuts: boolean;
 }
 
 const DEFAULT_STATE: UiState = {
@@ -82,6 +86,7 @@ const DEFAULT_STATE: UiState = {
   sideNavCollapsed: false,
   sideNavWidth: SIDENAV_DEFAULT_WIDTH,
   savedFilters: [],
+  keyboardShortcuts: true,
 };
 
 function load(): UiState {
@@ -96,6 +101,7 @@ function load(): UiState {
       sideNavCollapsed: parsed.sideNavCollapsed ?? false,
       sideNavWidth: parsed.sideNavWidth ?? SIDENAV_DEFAULT_WIDTH,
       savedFilters: parsed.savedFilters ?? [],
+      keyboardShortcuts: parsed.keyboardShortcuts ?? true,
     };
   } catch {
     return { ...DEFAULT_STATE };
@@ -116,6 +122,15 @@ export async function setTablePrefs(tableId: string, patch: TablePrefs): Promise
   const state = load();
   state.tablePrefs = { ...state.tablePrefs, [tableId]: { ...(state.tablePrefs[tableId] ?? {}), ...patch } };
   persist(state);
+}
+
+/** 키보드 단축키 사용 여부 — 동기 판정이 필요한 keydown 처리기도 쓸 수 있게 동기로 둔다 */
+export function keyboardShortcutsEnabled(): boolean {
+  return load().keyboardShortcuts;
+}
+
+export async function setKeyboardShortcutsEnabled(enabled: boolean): Promise<void> {
+  persist({ ...load(), keyboardShortcuts: enabled });
 }
 
 export async function listRecentProjectIds(): Promise<string[]> {

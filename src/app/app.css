@@ -5803,3 +5803,45 @@ th:last-child > [role="separator"] {
   max-width: 720px;
   margin: 0 auto;
 }
+
+/* 키보드 단축키 도움말(`?`) — 지라 Keyboard shortcuts 창처럼 묶음별 표 */
+.keyboard-shortcut-modal {
+  max-width: 560px;
+}
+.keyboard-shortcut-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.keyboard-shortcut-title {
+  margin: 0 0 var(--chanho-space-75);
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-default);
+}
+.keyboard-shortcut-keys,
+.keyboard-shortcut-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}
+.keyboard-shortcut-keys {
+  gap: var(--chanho-space-75);
+}
+.keyboard-shortcut-then {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+.keyboard-shortcut-kbd {
+  min-width: 1.5em;
+  padding: 0 var(--chanho-space-75);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  color: var(--chanho-color-text-default);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  text-align: center;
+}

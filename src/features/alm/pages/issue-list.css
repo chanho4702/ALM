@@ -54,3 +54,22 @@
   color: var(--chanho-color-text-subtle);
   overflow-wrap: anywhere;
 }
+
+/* "열" 선택 — 툴바 오른쪽에 있어 패널을 오른쪽 끝에 맞춘다 */
+.column-picker .column-picker-panel {
+  left: auto;
+  right: 0;
+}
+
+.column-picker .filter-dropdown-trigger {
+  padding: var(--chanho-space-50) var(--chanho-space-100);
+  font-size: var(--chanho-font-size-75);
+}
+
+.column-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--chanho-space-50);
+  padding-top: var(--chanho-space-75);
+  border-top: thin solid var(--chanho-color-border-default);
+}

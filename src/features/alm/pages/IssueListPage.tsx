@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import {
   Checkbox,
@@ -44,6 +44,8 @@ import {
 import { resolveFields } from "../components/fieldConfig";
 import { usePriorities } from "../components/usePriorities";
 import { useTablePrefs } from "../components/useTablePrefs";
+import { ColumnPicker } from "../components/ColumnPicker";
+import { useKeyboardShortcuts } from "../components/useKeyboardShortcuts";
 import { UserAvatar } from "../components/UserAvatar";
 import "./issue-list.css";
 
@@ -80,6 +82,13 @@ const SORT_FIELDS: Record<string, IssueSortField> = {
   updatedAt: "updated",
 };
 
+/** 표의 전체 열(기본 순서) — 열 숨김이 있어도 순서 저장이 숨긴 열의 자리를 지키게 hook에 준다 */
+const ISSUE_COLUMN_KEYS = [
+  "select", "type", "key", "title", "labels", "status", "priority", "assignee", "dueDate", "createdAt", "updatedAt",
+];
+/** 숨길 수 없는 열 — 선택 체크박스, 키, 제목(지라 목록 보기의 Key·Summary와 같다) */
+const LOCKED_COLUMNS = new Set(["select", "key", "title"]);
+
 export function IssueListPage() {
   const { projectId } = useParams();
   // 프로젝트가 바뀌면 이전 프로젝트의 필터·선택·응답을 함께 버린다.
@@ -88,7 +97,7 @@ export function IssueListPage() {
 
 function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
   const issueTypes = useIssueTypes();
-  const tablePrefs = useTablePrefs("issues");
+  const tablePrefs = useTablePrefs("issues", ISSUE_COLUMN_KEYS);
   const priorities = usePriorities();
   const PRIORITIES = priorities.map((d) => d.id);
   const [issues, setIssues] = useState<Issue[] | null>(null); // null = 로딩 중
@@ -251,6 +260,27 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     [issueKey, issues],
   );
 
+  // 단축키 j/k로 고른 행(지라 목록의 선택 커서) — o로 연다. 상세가 열려 있으면 그 이슈가 우선 강조된다
+  const [cursorId, setCursorId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement | null>(null);
+  const moveCursor = (delta: number) => {
+    if (resultsDisabled || sortedIssues.length === 0) return;
+    const index = sortedIssues.findIndex((i) => i.id === cursorId);
+    const next = index === -1 ? 0 : Math.min(sortedIssues.length - 1, Math.max(0, index + delta));
+    const target = sortedIssues[next];
+    setCursorId(target.id);
+    // 커서 행이 화면 밖이면 따라 스크롤한다(jsdom에는 scrollIntoView가 없다)
+    setTimeout(() => tableRef.current?.querySelector(`[data-issue-key="${target.key}"]`)?.scrollIntoView?.({ block: "nearest" }), 0);
+  };
+  useKeyboardShortcuts({
+    j: () => moveCursor(1),
+    k: () => moveCursor(-1),
+    o: () => {
+      const target = sortedIssues.find((i) => i.id === cursorId);
+      if (target && !resultsDisabled) openIssue(target.key);
+    },
+  });
+
   // 지연: 마감일이 오늘 이전인데 완료가 아니다
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = (issue: Issue) =>
@@ -370,7 +400,16 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
       header: "키",
       sortable: true,
       width: "80px",
-      render: (issue) => <span className="issue-key-cell">{issue.key}</span>,
+      render: (issue) => (
+        <span
+          className="issue-key-cell"
+          data-issue-key={issue.key}
+          // 단축키 커서 표시 — 보조기기에도 "지금 고른 행"으로 알린다
+          aria-current={issue.id === cursorId ? "true" : undefined}
+        >
+          {issue.key}
+        </span>
+      ),
     },
     { key: "title", header: "제목", sortable: true },
     {
@@ -460,6 +499,15 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
       render: (issue) => formatDate(issue.updatedAt),
     },
   ];
+
+  const visibleColumns = columns.filter((c) => LOCKED_COLUMNS.has(c.key) || !tablePrefs.hidden.includes(c.key));
+  const pickerColumns = columns
+    .filter((c) => c.key !== "select")
+    .map((c) => ({
+      key: c.key,
+      label: typeof c.header === "string" ? c.header : (c.ariaLabel ?? c.key),
+      locked: LOCKED_COLUMNS.has(c.key),
+    }));
 
   return (
     <>
@@ -628,6 +676,12 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 ) : null}
               </div>
               <div className="issue-toolbar-actions">
+                <ColumnPicker
+                  columns={pickerColumns}
+                  hidden={tablePrefs.hidden}
+                  onHiddenChange={tablePrefs.setHidden}
+                  onReset={tablePrefs.reset}
+                />
                 <Button size="small" variant="secondary" disabled={actionsDisabled || !issues?.length} onClick={exportCsv}>
                   {`CSV 내보내기 (${exportScope})`}
                 </Button>
@@ -663,16 +717,19 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 />
               </div>
             ) : issues && issues.length > 0 ? (
-              <div className="issue-table-scroll" aria-busy={updating}>
+              <div className="issue-table-scroll" aria-busy={updating} ref={tableRef}>
                 <Table
                   aria-label="이슈 목록"
-                  columns={columns}
+                  columns={visibleColumns}
                   rows={sortedIssues}
                   sortKey={sortKey}
                   sortDirection={sortDirection}
                   onSort={handleSort}
-                  onRowClick={resultsDisabled ? undefined : (issue) => openIssue(issue.key)}
-                  selectedId={selectedId}
+                  onRowClick={resultsDisabled ? undefined : (issue) => {
+                    setCursorId(issue.id);
+                    openIssue(issue.key);
+                  }}
+                  selectedId={selectedId ?? cursorId ?? undefined}
                   resizable
                   reorderable
                   columnOrder={tablePrefs.order}

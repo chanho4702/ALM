@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { Banner, Button, Checkbox, Comment as CommentBlock, InlineEdit, Lozenge, Modal, ProgressBar, Select, Tabs, Tag, TextField, useToast } from "@chanho/react";
 import type {
   Activity,
@@ -149,6 +150,9 @@ export interface IssueDetailModalProps {
   onIssueChanged: () => void | Promise<void>;
 }
 
+/** 담당자 Select 트리거 id — 단축키 `a`가 찾는다 */
+const ASSIGNEE_TRIGGER_ID = "issue-detail-assignee";
+
 export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDetailModalProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [me, setMe] = useState<User | null>(null);
@@ -164,6 +168,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [commentDraft, setCommentDraft] = useState("");
   const [labelDraft, setLabelDraft] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** 하단 기록 탭 — 단축키 `m`이 코멘트 탭으로 옮긴다 */
+  const [historyTab, setHistoryTab] = useState("comments");
+  /** 단축키가 "이 모달이 맨 위인가"를 판정할 모달 안 기준 요소 */
+  const shortcutAnchor = useRef<HTMLDivElement | null>(null);
   /** 상위 항목 경로(루트 먼저) — 부모를 한 단계씩 읽는다(프로젝트 전체를 읽지 않는다) */
   const [ancestors, setAncestors] = useState<Issue[]>([]);
   /** 하위의 하위 — 하위 이슈마다 그 자식만 읽는다 */
@@ -686,6 +694,33 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
     }
   };
 
+  // 지라 이슈 보기 단축키 — 이 모달이 유일하게 열린 모달이고 입력 중이 아닐 때만(useKeyboardShortcuts)
+  const inDialog = (selector: string) =>
+    shortcutAnchor.current?.closest("[role='dialog']")?.querySelector<HTMLElement>(selector) ?? null;
+  useKeyboardShortcuts(
+    {
+      e: () => inDialog("button[aria-label='제목 편집']")?.click(),
+      a: () => {
+        const trigger = inDialog(`#${ASSIGNEE_TRIGGER_ID}`);
+        if (!trigger) return;
+        trigger.focus();
+        // 지라처럼 담당자 선택지를 바로 펼친다 — Radix Select 트리거는 ArrowDown으로 열린다
+        trigger.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      },
+      i: () => {
+        if (!issue || !me || !fields.assignee.visible || issue.assigneeId === me.id) return;
+        void applyPatch({ assigneeId: me.id }, "나에게 할당했습니다");
+      },
+      l: () => inDialog(".issue-labels-field input")?.focus(),
+      m: () => {
+        setHistoryTab("comments");
+        // 탭이 바뀐 다음 그려진 에디터에 포커스한다
+        setTimeout(() => inDialog(".issue-comment-form [contenteditable='true']")?.focus(), 0);
+      },
+    },
+    { dialogRef: shortcutAnchor },
+  );
+
   if (!issue) return null;
 
   /** 미완료 차단자가 있고 이 이슈도 미완료면 "차단됨" */
@@ -759,7 +794,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       className="issue-detail-modal"
     >
       {/* 모달 헤더 줄 — 왼쪽 상위 경로·키, 오른쪽 관심 등록(닫기 버튼 옆) */}
-      <div className="issue-detail-header">
+      <div className="issue-detail-header" ref={shortcutAnchor}>
         <nav className="issue-ancestors" aria-label="상위 항목 경로">
           {(fields.parent.visible ? ancestors : []).map((a) => (
             <span key={a.id} className="issue-ancestor">
@@ -1162,6 +1197,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               </span>
             )}
             <Select
+              id={ASSIGNEE_TRIGGER_ID}
               label="담당자"
               className="visually-hidden-label"
               value={issue.assigneeId ?? UNASSIGNED}
@@ -1411,6 +1447,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       <Tabs
         label="이슈 기록"
         className="issue-tabs"
+        value={historyTab}
+        onValueChange={setHistoryTab}
         items={[
           {
             value: "comments",
