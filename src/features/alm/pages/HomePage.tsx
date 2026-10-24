@@ -14,6 +14,7 @@ import {
   listRecentProjectIds,
   listStarredProjectIds,
   listViewedIssues,
+  VIEWED_ISSUES_CHANGED_EVENT,
 } from "../store/uiStore";
 import { settleWithConcurrency } from "../store/concurrency";
 import { ProjectAvatar } from "../components/ProjectAvatar";
@@ -156,6 +157,17 @@ export function HomePage() {
       cancelled = true;
     };
   }, [retry]);
+
+  // 최근 본 캐시 무효화 — 탭을 떠나면 다음 진입 때 다시 읽고, 이슈를 열어 기록이 바뀌면(홈에 머문 채 다른 탭에서
+  // 연 경우 포함) 다음 표시 때 새 기록을 읽는다. 지금 "최근 본"을 보고 있으면 바로 다시 읽는다.
+  useEffect(() => {
+    if (tab !== "viewed") viewedLoadedFor.current = null;
+  }, [tab]);
+  useEffect(() => {
+    const onViewedChanged = () => setViewedReload((value) => value + 1);
+    window.addEventListener(VIEWED_ISSUES_CHANGED_EVENT, onViewedChanged);
+    return () => window.removeEventListener(VIEWED_ISSUES_CHANGED_EVENT, onViewedChanged);
+  }, []);
 
   /**
    * 최근 본 — 탭을 처음 열 때 기록을 읽어 이슈로 되살린다(최대 20건, 동시 5건).

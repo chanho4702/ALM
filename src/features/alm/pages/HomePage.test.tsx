@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
@@ -143,6 +143,35 @@ describe("HomePage (For you)", () => {
     expect(await screen.findByRole("dialog", { name: "ALM-3" })).toBeInTheDocument();
     await waitFor(async () => {
       expect((await listViewedIssues("u1")).map((v) => v.key)).toEqual(["ALM-3"]);
+    });
+
+  });
+
+  it("최근 본 탭: 한 번 읽은 뒤 홈에 머문 채 이슈를 열면, 다시 들어올 때 새 기록을 보여 준다", async () => {
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await user.click(screen.getByRole("tab", { name: "최근 본" }));
+    expect(await screen.findByText("최근 본 이슈가 없습니다")).toBeInTheDocument();
+
+    // 다른 탭에 있는 동안 이슈 상세가 기록을 남긴다(상세 모달이 하는 일)
+    await user.click(screen.getByRole("tab", { name: /나에게 배정됨/ }));
+    await act(async () => {
+      await recordIssueView("u1", "ALM-3");
+    });
+    await user.click(screen.getByRole("tab", { name: "최근 본" }));
+    const viewed = await screen.findByTestId("viewed-issues");
+    expect(within(viewed).getByText(/ALM-3 ·/)).toBeInTheDocument();
+
+    // "최근 본"을 보고 있는 중에 기록이 바뀌어도 바로 다시 읽는다
+    await act(async () => {
+      await recordIssueView("u1", "ALM-5");
+    });
+    await waitFor(() => {
+      const metas = within(screen.getByTestId("viewed-issues"))
+        .getAllByText(/ALM-\d+ ·/)
+        .map((el) => el.textContent?.split(" ·")[0]);
+      expect(metas).toEqual(["ALM-5", "ALM-3"]);
     });
   });
 });

@@ -22,6 +22,8 @@ export const SIDENAV_DEFAULT_WIDTH = 240;
 
 /** uiStore가 바뀔 때마다 window에 발행 — 사이드바 등 구독자가 다시 읽는다 */
 export const UI_CHANGED_EVENT = "alm:ui-changed";
+/** 최근 본 이슈 기록이 바뀜 — 사이드바는 구독하지 않고(UI_CHANGED_EVENT를 내지 않는 이유) 홈 "최근 본" 탭만 듣는다 */
+export const VIEWED_ISSUES_CHANGED_EVENT = "alm:viewed-issues-changed";
 
 /**
  * 저장 필터 — query는 스마트 검색 문자열 또는 AQL 문자열 (URL·사이드바에서 재사용).
@@ -176,6 +178,7 @@ export async function recordIssueView(userId: string, issueKey: string): Promise
     ...current.filter((v) => v.key !== issueKey),
   ].slice(0, VIEWED_LIMIT);
   persist({ ...state, viewedIssuesByUser: { ...state.viewedIssuesByUser, [userId]: next } }, false);
+  window.dispatchEvent(new Event(VIEWED_ISSUES_CHANGED_EVENT));
 }
 
 /** 더는 열 수 없는 이슈(삭제·프로젝트 삭제·키 변경)를 최근 본 목록에서 걷어낸다 */
