@@ -149,3 +149,16 @@
   margin: 0;
   font-size: var(--chanho-font-size-100);
 }
+
+.issue-flag-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  min-width: 240px;
+}
+
+.issue-flag-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-75);
+}

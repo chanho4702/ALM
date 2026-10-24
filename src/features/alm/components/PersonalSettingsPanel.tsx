@@ -248,7 +248,7 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
       </Card>
       <Card padding="lg" title="키보드 단축키">
         <p className="settings-help">
-          c(만들기)·/(검색)·?(도움말)·g 다음 d(대시보드) 같은 지라 단축키입니다. 입력란에 글을 쓰는 중에는
+          c(만들기)·/(검색)·?(도움말)·g 다음 d(대시보드) 같은 키보드 단축키입니다. 입력란에 글을 쓰는 중에는
           동작하지 않습니다. 바로 적용되며 이 브라우저에 저장됩니다.
         </p>
         <div className="settings-toggle-list">

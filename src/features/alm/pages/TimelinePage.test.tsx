@@ -7,7 +7,7 @@ import { App } from "../../../app/App";
 // 이 화면은 App에서 lazy()로 쪼개져 있다. 전체 스위트를 병렬로 돌릴 때 첫 findBy가 청크 로딩까지
 // 기다리다 한도(5s)를 넘기므로, 수집 시점에 미리 올려 lazy 해석이 즉시 끝나게 한다.
 import "./TimelinePage";
-import { __resetForTest } from "../store/jiraStore";
+import { __resetForTest, getIssueByKey, updateIssue } from "../store/jiraStore";
 // 지연 로드(lazy) 청크를 수집 시점에 미리 올린다 — 병렬 실행에서 첫 findBy가 청크 변환을 기다리다 한도를 넘지 않게
 import "../components/IssueDetailModal";
 
@@ -76,5 +76,15 @@ describe("TimelinePage", () => {
     expect(screen.queryByRole("button", { name: "오늘" })).not.toBeInTheDocument();
     // 요약은 남는다 — 몇 건이 어느 기간에 걸쳐 있는지는 표에서도 유효하다
     expect(screen.getByText(/이슈 8개/)).toBeInTheDocument();
+  });
+
+  it("시작일(V30)이 있으면 막대가 생성일이 아니라 시작일부터 그려진다 (D3)", async () => {
+    const alm4 = await getIssueByKey("ALM-4");
+    await updateIssue(alm4!.id, { startDate: "2026-01-05", dueDate: "2026-01-20" }, alm4!.version);
+    renderTimeline();
+    const table = await screen.findByRole("table", { name: "일정 표" });
+    const cells = within(within(table).getByText("ALM-4").closest("tr")!).getAllByRole("cell");
+    expect(cells[1]).toHaveTextContent("2026-01-05");
+    expect(cells[2]).toHaveTextContent("2026-01-20");
   });
 });

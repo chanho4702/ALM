@@ -94,6 +94,9 @@ export function CreateIssueModal({
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [fixVersionId, setFixVersionId] = useState(NO_VERSION);
   const [estimateHours, setEstimateHours] = useState("");
+  /** 계획 필드(V30) — 시작일·스토리 포인트 */
+  const [startDate, setStartDate] = useState("");
+  const [storyPoints, setStoryPoints] = useState("");
   const [linkKind, setLinkKind] = useState<LinkKind>(LINK_KIND_DEFAULT);
   const [linkTargetId, setLinkTargetId] = useState(NO_PARENT);
   const [linkDrafts, setLinkDrafts] = useState<LinkDraft[]>([]);
@@ -145,6 +148,8 @@ export function CreateIssueModal({
     setSprintId(BACKLOG);
     setFixVersionId(NO_VERSION);
     setEstimateHours("");
+    setStartDate("");
+    setStoryPoints("");
     setLinkDrafts([]);
     setLinkTargetId(NO_PARENT);
     return () => {
@@ -208,6 +213,8 @@ export function CreateIssueModal({
     ...(required("fixVersion") && fixVersionId === NO_VERSION ? (["fixVersion"] as const) : []),
     ...(required("dueDate") && !dueDate ? (["dueDate"] as const) : []),
     ...(required("estimate") && !estimateHours.trim() ? (["estimate"] as const) : []),
+    ...(required("startDate") && !startDate ? (["startDate"] as const) : []),
+    ...(required("storyPoints") && !storyPoints.trim() ? (["storyPoints"] as const) : []),
   ];
   const canSubmit =
     !submitting &&
@@ -232,6 +239,8 @@ export function CreateIssueModal({
     setSprintId(BACKLOG);
     setFixVersionId(NO_VERSION);
     setEstimateHours("");
+    setStartDate("");
+    setStoryPoints("");
     setCreateAnother(false);
   };
 
@@ -266,6 +275,9 @@ export function CreateIssueModal({
         fixVersionId: show("fixVersion") && fixVersionId !== NO_VERSION ? fixVersionId : null,
         estimateHours:
           show("estimate") && estimateHours.trim() ? Number(estimateHours) : null,
+        // 계획 필드는 값이 있을 때만 싣는다(REST planning은 보낸 키만 바꾼다)
+        ...(show("startDate") && startDate ? { startDate } : {}),
+        ...(show("storyPoints") && storyPoints.trim() ? { storyPoints: Number(storyPoints) } : {}),
       });
       // 연결 이슈는 생성 뒤에 건다 — 하나가 실패해도 이슈 자체는 남고, 실패만 알린다
       const failed: string[] = [];
@@ -502,6 +514,19 @@ export function CreateIssueModal({
             />
           </div>
           ) : null}
+          {show("startDate") ? (
+          <div className="alm-field">
+            <FieldLabel field="startDate" required={required("startDate")}>시작일</FieldLabel>
+            <TextField
+              label={fieldLabel("startDate", "시작일")}
+              className="visually-hidden-label"
+              type="date"
+              value={startDate}
+              max={dueDate || undefined}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+          ) : null}
           {show("dueDate") ? (
           <div className="alm-field">
             <FieldLabel field="dueDate" required={required("dueDate")}>마감일</FieldLabel>
@@ -543,6 +568,22 @@ export function CreateIssueModal({
               placeholder="미지정"
               value={estimateHours}
               onChange={(e) => setEstimateHours(e.target.value)}
+            />
+          </div>
+        ) : null}
+        {show("storyPoints") ? (
+          <div className="alm-field">
+            <FieldLabel field="storyPoints" required={required("storyPoints")}>스토리 포인트</FieldLabel>
+            <TextField
+              label={fieldLabel("storyPoints", "스토리 포인트")}
+              className="visually-hidden-label"
+              type="number"
+              min={0}
+              max={9999}
+              step={0.5}
+              placeholder="미지정"
+              value={storyPoints}
+              onChange={(e) => setStoryPoints(e.target.value)}
             />
           </div>
         ) : null}

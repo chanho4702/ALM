@@ -59,6 +59,8 @@ import { PriorityGlyph } from "./PriorityGlyph";
 import { ResolutionGlyph } from "./ResolutionGlyph";
 import { StatusGlyph } from "./StatusGlyph";
 import { StatusTransitionButton } from "./transitions/StatusTransitionButton";
+import { IssueFlagControl } from "./IssueFlagControl";
+import { IssueFlagMark } from "./IssueCard";
 import { useIssueTypes } from "./useIssueTypes";
 import { Copy, Lock, Plus, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
@@ -205,6 +207,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [worklogDate, setWorklogDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [worklogComment, setWorklogComment] = useState("");
   const [estimateDraft, setEstimateDraft] = useState("");
+  /** 스토리 포인트 입력 초안(V30) — 흐림(blur)에 저장 */
+  const [pointsDraft, setPointsDraft] = useState("");
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [childType, setChildType] = useState<IssueType>("subtask");
   const [linkKind, setLinkKind] = useState<LinkKind>(LINK_KIND_DEFAULT);
@@ -346,6 +350,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       setIssue(found);
       setDescriptionDraft(found.description);
       setEstimateDraft(found.estimateHours === null ? "" : String(found.estimateHours));
+      setPointsDraft(found.storyPoints === null || found.storyPoints === undefined ? "" : String(found.storyPoints));
       setUsers(userList);
       setSprints(sprintList);
       setComments(commentList);
@@ -389,6 +394,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         | "estimateHours"
       | "resolution"
       | "fixVersionId"
+      | "startDate"
+      | "storyPoints"
       >
     >,
     successTitle: string,
@@ -1127,6 +1134,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           {fields.links.visible ? <IssueWebLinks issueId={issue.id} canEdit={canEdit} /> : null}
         </div>
         <aside className="issue-props">
+          {issue.flagged ? <IssueFlagMark /> : null}
           {isBlocked ? (
             <Lozenge appearance="danger" data-testid="issue-blocked-lozenge">
               차단됨
@@ -1309,6 +1317,21 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             />
           </div>
           ) : null}
+          {fields.startDate.visible ? (
+          <div className="alm-field">
+            <FieldLabel field="startDate">시작일</FieldLabel>
+            <TextField
+              label="시작일"
+              className="visually-hidden-label"
+              type="date"
+              value={issue.startDate ?? ""}
+              max={issue.dueDate ?? undefined}
+              onChange={(e) =>
+                void applyPatch({ startDate: e.target.value || null }, "시작일을 저장했습니다")
+              }
+            />
+          </div>
+          ) : null}
           {fields.dueDate.visible ? (
           <div className="alm-field">
             <FieldLabel field="dueDate">마감일</FieldLabel>
@@ -1383,6 +1406,27 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             />
           </div>
           ) : null}
+          {fields.storyPoints.visible ? (
+          <div className="alm-field">
+            <FieldLabel field="storyPoints">스토리 포인트</FieldLabel>
+            <TextField
+              label="스토리 포인트"
+              className="visually-hidden-label"
+              type="number"
+              min={0}
+              max={9999}
+              step={0.5}
+              placeholder="미지정"
+              value={pointsDraft}
+              onChange={(e) => setPointsDraft(e.target.value)}
+              onBlur={() => {
+                const next = pointsDraft.trim() === "" ? null : Number(pointsDraft);
+                if (next === (issue.storyPoints ?? null)) return;
+                void applyPatch({ storyPoints: next }, "스토리 포인트를 저장했습니다");
+              }}
+            />
+          </div>
+          ) : null}
           {fields.estimate.visible && (loggedHours > 0 || issue.estimateHours !== null) ? (
             <div className="issue-time-tracking" data-testid="issue-time-tracking">
               <span className={overEstimate ? "issue-time-label is-over" : "issue-time-label"}>
@@ -1405,6 +1449,16 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             <dd>{formatDateTime(issue.updatedAt)}</dd>
           </dl>
           <div className="issue-danger-actions">
+            {canEdit ? (
+              <IssueFlagControl
+                issue={issue}
+                onChanged={async (saved) => {
+                  setIssue(saved);
+                  await refreshLogs(saved.id);
+                  await onIssueChanged();
+                }}
+              />
+            ) : null}
             {canEdit ? (
               <Button
                 variant="secondary"

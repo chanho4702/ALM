@@ -335,3 +335,14 @@ describe("전환 규칙 저장 검증 — 서버와 같은 문구", () => {
     expect((await resolveSettings("p1")).body.transitions).toEqual([rule]);
   });
 });
+
+describe("같은 합성 전환 id는 한 줄로 (서버 Codex 지적 반영)", () => {
+  it("id 없는 전환 둘이 같은 대상이면 implicit:<대상> 한 줄 — 할 수 있는 쪽이 남는다", async () => {
+    await useWorkflow([
+      { id: "", name: "끝", from: ["todo"], to: "done", conditions: [{ type: "assignee" }] },
+      { id: "", name: "끝", from: [], to: "done" },
+    ]);
+    const { transitions } = await listIssueTransitions((await issue("ALM-5")).id);
+    expect(transitions.filter((t) => t.id === "implicit:done")).toEqual([expect.objectContaining({ available: true })]);
+  });
+});

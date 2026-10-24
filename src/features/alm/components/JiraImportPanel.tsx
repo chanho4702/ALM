@@ -112,7 +112,7 @@ export function JiraImportPanel({ projectId, ctx, onImported }: JiraImportPanelP
 
   return (
     <div className="project-settings">
-      <Card padding="lg" title="지라에서 가져오기">
+      <Card padding="lg" title="Jira에서 가져오기(CSV)">
         <p className="admin-scheme-note">
           지라의 <strong>이슈 → 내보내기 → CSV(모든 필드)</strong> 파일을 그대로 읽습니다. Issue key는 보존되고,
           우리가 모르는 상태·타입·담당자는 아래에서 짝지은 뒤 가져옵니다. 첨부·코멘트는 아직 이관하지
@@ -122,7 +122,7 @@ export function JiraImportPanel({ projectId, ctx, onImported }: JiraImportPanelP
           <input
             type="file"
             accept=".csv,text/csv"
-            aria-label="지라 CSV 파일"
+            aria-label="Jira CSV 파일"
             onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           />
           <span className="issue-attachments-upload-text">CSV 파일 고르기</span>

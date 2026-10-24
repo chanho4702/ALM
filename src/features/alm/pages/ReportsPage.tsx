@@ -8,6 +8,7 @@ import {
   Radio,
   RadioGroup,
   Select,
+  SkeletonText,
 } from "@chanho/react";
 import {
   CartesianGrid,
@@ -19,7 +20,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Issue, IssueChange, ProjectWorklogRow, Sprint, WorkflowStatus } from "../store/types";
+import type { Issue, IssueChange, ProjectWorklogRow, Sprint, VelocityReport, VelocityUnit, WorkflowStatus } from "../store/types";
+import { getVelocity } from "../store/jiraStore";
 import { WorklogTable } from "../components/DashboardGadgets";
 import { recentRange, worklogSummary } from "./worklogMetrics";
 import {
@@ -40,7 +42,7 @@ import { ResolutionGlyph } from "../components/ResolutionGlyph";
 import { ValueWithIcon } from "../components/ValueWithIcon";
 import { todayKey } from "./dashboardMetrics";
 import { burndownSeries, historySince, sprintReport, type BurndownUnit } from "./reportMetrics";
-import { burnupSeries, controlChart, cumulativeFlow, velocitySeries } from "./reportMetricsExt";
+import { burnupSeries, controlChart, cumulativeFlow } from "./reportMetricsExt";
 import {
   BurnupCard,
   ControlChartCard,
@@ -63,6 +65,8 @@ const SPRINT_SCOPED = new Set<ReportKind>(["burndown", "burnup"]);
 const RANGE_DAYS = 30;
 
 const UNIT_LABELS: Record<BurndownUnit, string> = { hours: "예상 시간", count: "이슈 수" };
+/** 속도 리포트 단위(V30) — 서버 `reports/velocity?unit=` 어휘 */
+const VELOCITY_UNIT_LABELS: Record<VelocityUnit, string> = { points: "스토리 포인트", hours: "예상 시간", count: "이슈 수" };
 
 /** 오늘 포함 최근 `days`일의 첫날(YYYY-MM-DD, 로컬) — 누적 흐름·컨트롤 차트의 기간 시작 */
 function rangeStartDay(days: number): string {
@@ -196,12 +200,29 @@ export function ReportsPage() {
     () => (kind === "worklog" ? worklogSummary(worklogRows, users) : null),
     [kind, worklogRows, users],
   );
+  /**
+   * 속도(벨로시티) — 서버 집계(`GET /projects/{id}/reports/velocity`)를 쓴다. 약속 = 완료 시점 범위(완료 + 이월),
+   * 단위는 스토리 포인트(기본)·예상 시간·이슈 수. 최신이 앞에 오므로 차트는 시간 순으로 뒤집는다.
+   */
+  const [velocityUnit, setVelocityUnit] = useState<VelocityUnit>("points");
+  const [velocityReport, setVelocityReport] = useState<VelocityReport | null>(null);
+  const [velocityError, setVelocityError] = useState<string | null>(null);
+  const loadVelocity = useCallback(async () => {
+    if (!projectId) return;
+    setVelocityError(null);
+    setVelocityReport(null);
+    try {
+      setVelocityReport(await getVelocity(projectId, velocityUnit, 7));
+    } catch (error) {
+      setVelocityError(error instanceof Error ? error.message : String(error));
+    }
+  }, [projectId, velocityUnit]);
+  useEffect(() => {
+    if (kind === "velocity") void loadVelocity();
+  }, [kind, loadVelocity]);
   const velocity = useMemo(
-    () =>
-      issues && kind === "velocity"
-        ? velocitySeries({ sprints, issues, changes, statuses, unit: effectiveUnit })
-        : null,
-    [sprints, issues, changes, statuses, effectiveUnit, kind],
+    () => (velocityReport ? [...velocityReport.sprints].reverse() : null),
+    [velocityReport],
   );
   const rangeFrom = useMemo(() => rangeStartDay(RANGE_DAYS), []);
   const flow = useMemo(
@@ -270,18 +291,45 @@ export function ReportsPage() {
         <div className="dashboard">
           <div className="reports-toolbar">
             {kindSelect}
-            <RadioGroup
-              value={effectiveUnit}
-              onValueChange={(next) => setUnit(next as BurndownUnit)}
-              aria-label="집계 단위"
-              className="reports-units"
-            >
-              <Radio value="hours" label={UNIT_LABELS.hours} />
-              <Radio value="count" label={UNIT_LABELS.count} />
-            </RadioGroup>
+            {kind === "velocity" ? (
+              <RadioGroup
+                value={velocityUnit}
+                onValueChange={(next) => setVelocityUnit(next as VelocityUnit)}
+                aria-label="집계 단위"
+                className="reports-units"
+              >
+                <Radio value="points" label={VELOCITY_UNIT_LABELS.points} />
+                <Radio value="hours" label={VELOCITY_UNIT_LABELS.hours} />
+                <Radio value="count" label={VELOCITY_UNIT_LABELS.count} />
+              </RadioGroup>
+            ) : (
+              <RadioGroup
+                value={effectiveUnit}
+                onValueChange={(next) => setUnit(next as BurndownUnit)}
+                aria-label="집계 단위"
+                className="reports-units"
+              >
+                <Radio value="hours" label={UNIT_LABELS.hours} />
+                <Radio value="count" label={UNIT_LABELS.count} />
+              </RadioGroup>
+            )}
           </div>
           {truncatedBanner}
-          {velocity ? <VelocityCard rows={velocity} unit={effectiveUnit} /> : null}
+          {kind === "velocity" && velocityError ? (
+            <div role="alert">
+              <EmptyState
+                title="속도 리포트를 불러오지 못했습니다"
+                description={velocityError}
+                primaryAction={{ label: "다시 시도", onClick: () => void loadVelocity() }}
+              />
+            </div>
+          ) : null}
+          {kind === "velocity" && !velocityError && !velocity ? (
+            <Card padding="md" title="벨로시티" role="status" aria-label="벨로시티 불러오는 중">
+              <SkeletonText lines={4} />
+            </Card>
+          ) : null}
+          {velocity ? <VelocityCard rows={velocity} unit={velocityUnit} average={velocityReport?.average ?? 0} /> : null}
           {worklog ? (
             <Card padding="lg" title={`워크로그 (최근 ${RANGE_DAYS}일)`} data-testid="worklog-report">
               <WorklogTable summary={worklog} rows={worklogRows} />

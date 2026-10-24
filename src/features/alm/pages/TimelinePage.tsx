@@ -77,7 +77,8 @@ interface TimelineRow {
 function buildRows(issues: Issue[], types: IssueTypeDef[]): TimelineRow[] {
   const sorted = [...issues].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const toRow = (issue: Issue, parentId: string | null): TimelineRow => {
-    const start = dayOf(issue.createdAt);
+    // 막대 시작 = 시작일(V30, 계획) → 없으면 생성일. 시작일이 있으면 계획 기간이 그대로 그려진다(D3)
+    const start = issue.startDate ?? dayOf(issue.createdAt);
     // 마감일이 없거나 시작보다 이르면 하루짜리로 눕힌다
     const end = issue.dueDate && issue.dueDate >= start ? issue.dueDate : start;
     return { issue, isChild: parentId !== null, parentId, start, end };
@@ -366,7 +367,7 @@ export function TimelinePage() {
     return (
       <EmptyState
         title="타임라인에 표시할 이슈가 없습니다"
-        description="이슈를 만들면 생성일부터 마감일까지 막대로 표시됩니다."
+        description="이슈를 만들면 시작일(없으면 생성일)부터 마감일까지 막대로 표시됩니다."
       />
     );
   }

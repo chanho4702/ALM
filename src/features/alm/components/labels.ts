@@ -290,21 +290,33 @@ export function formatPlannedRange(start?: string, end?: string): string {
 }
 
 /**
- * 패널 계획 합계 — 예상 시간(h) 합과 미입력 건수. 추정 단위는 ALM 확정 결정(예상+기록 2값)에
- * 따라 시간이며, 스토리 포인트는 도입하지 않았다(roadmap 2026-08-28 §10-1).
+ * 패널 계획 합계 — 예상 시간(h) 합과 미입력 건수, 스토리 포인트(V30) 합과 미추정 건수.
+ * 추정 단위는 둘 다다 — 예상+기록 시간(ALM 특색)과 스토리 포인트(2026-10-24 도입)를 함께 센다.
+ * 서버 `GET /projects/{id}/estimation/summary`와 같은 규칙(미추정은 0으로 센다)이고, 화면이 이미 가진 목록으로 센다.
  */
-export function estimateSummary(issues: { estimateHours: number | null }[]): {
+export function estimateSummary(issues: { estimateHours: number | null; storyPoints?: number | null }[]): {
   totalHours: number;
   missing: number;
+  totalPoints: number;
+  unpointed: number;
 } {
   let totalHours = 0;
   let missing = 0;
+  let totalPoints = 0;
+  let unpointed = 0;
   for (const issue of issues) {
     if (issue.estimateHours == null) missing += 1;
     else totalHours += issue.estimateHours;
+    if (issue.storyPoints == null) unpointed += 1;
+    else totalPoints += issue.storyPoints;
   }
-  // 0.1h 단위까지만 — 부동소수 누적 오차가 "8.000000000000002h"로 새지 않게 한다
-  return { totalHours: Math.round(totalHours * 10) / 10, missing };
+  // 0.1 단위까지만 — 부동소수 누적 오차가 "8.000000000000002h"로 새지 않게 한다
+  return {
+    totalHours: Math.round(totalHours * 10) / 10,
+    missing,
+    totalPoints: Math.round(totalPoints * 10) / 10,
+    unpointed,
+  };
 }
 
 // ── 해결(Resolution) ─────────────────────────────────────

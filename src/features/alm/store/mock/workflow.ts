@@ -80,7 +80,15 @@ export function transitionName(t: WorkflowTransition, flow: ResolvedWorkflow): s
   return t.name?.trim() ? t.name.trim() : statusName(flow, t.to);
 }
 
-function editDenied(data: JiraData, projectId: string): string | null {
+/** 트리아지 대기 이슈는 일반 전환·보드 이동·상태 수정을 받지 않는다 — 트리아지에서 먼저 처리(서버와 같은 문구) */
+export const TRIAGE_FIRST_MESSAGE = "트리아지 대기열에 있는 이슈는 트리아지에서 먼저 처리해야 합니다";
+
+export function assertNotInTriage(issue: Issue): void {
+  if (issue.triageState) throw new Error(TRIAGE_FIRST_MESSAGE);
+}
+
+function editDenied(data: JiraData, projectId: string, issue?: Issue): string | null {
+  if (issue?.triageState) return TRIAGE_FIRST_MESSAGE;
   try {
     assertCanEdit(data, projectId);
     return null;
@@ -152,13 +160,20 @@ function implicit(target: WorkflowStatus, denied: string | null): EvaluatedTrans
 
 /** 현재 상태에서 갈 수 있는 전환 전부 — 못 하는 것도 이유와 함께. 자기 루프는 뺀다 */
 export function evaluateTransitions(data: JiraData, issue: Issue, flow: ResolvedWorkflow): EvaluatedTransition[] {
-  const denied = editDenied(data, issue.projectId);
+  const denied = editDenied(data, issue.projectId, issue);
   if (flow.transitions.length === 0) {
     return flow.statuses.filter((s) => s.id !== issue.status).map((s) => implicit(s, denied));
   }
-  return flow.transitions
+  const evaluated = flow.transitions
     .filter((t) => (t.from.length === 0 || t.from.includes(issue.status)) && t.to !== issue.status)
     .map((t) => evaluateOne(data, t, flow, issue, denied));
+  // 같은 id(id 없는 전환의 합성 id `implicit:<대상>` 포함)는 한 줄로 — 할 수 있는 쪽을 남긴다(서버와 같다)
+  const byId = new Map<string, EvaluatedTransition>();
+  for (const item of evaluated) {
+    const seen = byId.get(item.id);
+    if (!seen || (!seen.available && item.available)) byId.set(item.id, item);
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -350,6 +365,7 @@ export async function transitionIssue(issueId: string, request: TransitionReques
   const stored = data.issues.find((i) => i.id === issueId);
   if (!stored) throw new ApiError(404, "이슈를 찾을 수 없습니다");
   assertCanEdit(data, stored.projectId);
+  assertNotInTriage(stored);
   if (request.expectedVersion !== undefined && stored.version !== request.expectedVersion) {
     throw new ApiError(409, `다른 사용자가 먼저 이슈를 수정했습니다. 현재 ${stored.version}, 요청 ${request.expectedVersion}`);
   }

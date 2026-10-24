@@ -32,7 +32,8 @@ const TOOLTIP_STYLE = {
   color: "var(--chanho-color-text-default)",
 };
 const LEGEND_STYLE = { fontSize: 12, color: "var(--chanho-color-text-subtle)" };
-const unitSuffix = (unit: BurndownUnit) => (unit === "hours" ? "h" : "건");
+/** 단위 꼬리 — 스토리 포인트(V30)는 "점" */
+const unitSuffix = (unit: BurndownUnit | "points") => (unit === "hours" ? "h" : unit === "points" ? "점" : "건");
 const shortDate = (value: string) => value.slice(5);
 
 /** SVG 속성은 var()를 못 읽는다 — 토큰을 실제 색으로 풀어 Recharts에 넘긴다 */
@@ -108,11 +109,21 @@ export function BurnupCard({ series, sprintName }: { series: BurnupSeries; sprin
   );
 }
 
-export function VelocityCard({ rows, unit }: { rows: VelocityRow[]; unit: BurndownUnit }) {
+export function VelocityCard({
+  rows,
+  unit,
+  average: givenAverage,
+}: {
+  rows: Pick<VelocityRow, "sprintId" | "name" | "committed" | "completed">[];
+  unit: BurndownUnit | "points";
+  /** 서버가 낸 평균(속도 리포트 API) — 없으면 화면이 rows로 낸다 */
+  average?: number | null;
+}) {
   const colors = useChartColors();
   const suffix = unitSuffix(unit);
   const average =
-    rows.length === 0 ? 0 : Math.round((rows.reduce((sum, r) => sum + r.completed, 0) / rows.length) * 10) / 10;
+    givenAverage ??
+    (rows.length === 0 ? 0 : Math.round((rows.reduce((sum, r) => sum + r.completed, 0) / rows.length) * 10) / 10);
   return (
     <Card padding="md" title="벨로시티" role="region" aria-label="벨로시티">
       {rows.length === 0 ? (

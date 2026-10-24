@@ -9,7 +9,7 @@ import { load, clone, assertRequiredFields, nextId, persist, defaultSettingsBody
 import { type IssuePage, findIssues } from "./search";
 import { resolvedBody, typeLevelOf, typeDefOf, typeNameOf, assertVersionAssignable, resolvePriority, assertParentAllowed, applyResolutionRule, addWatcher, logChange, recordChanges } from "./rules";
 import { assertCanEdit, myProjectRole } from "./members";
-import { applyPostFunctions, assertStatusInWorkflow, assertValidators, chooseTransition, defaultResolution, defaultStatusFor, mappedStatus, workflowFor, type EvaluatedTransition } from "./workflow";
+import { assertNotInTriage, applyPostFunctions, assertStatusInWorkflow, assertValidators, chooseTransition, defaultResolution, defaultStatusFor, mappedStatus, workflowFor, type EvaluatedTransition } from "./workflow";
 import { emitIssueEvent, snapshotForAutomation } from "./automation";
 import { assertPlanning, enterTriage } from "./planning";
 import { validateComponentIds, resolveDefaultAssigneeFor } from "./components";
@@ -278,6 +278,7 @@ export async function updateIssue(
     // 타입을 바꿨더니 새 타입 워크플로(C5)에 지금 상태가 없다 — 설정 변경 이관과 같은 규칙(전환 규칙 없음)
     nextStatus = mappedStatus(data, issue.projectId, issue.status, flow.statuses);
   } else if (patch.status !== undefined) {
+    if (patch.status !== issue.status) assertNotInTriage(issue);
     assertStatusInWorkflow(data, issue.projectId, nextType, patch.status);
     // 전환 규칙(조건 포함)은 지금 상태가 그 워크플로 안에 있을 때만 — 밖이면 타입 변경에 따른 이관이다
     if (patch.status !== issue.status && inFlow) used = chooseTransition(data, issue, flow, patch.status);
@@ -373,6 +374,7 @@ export async function moveIssue(
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   assertCanEdit(data, issue.projectId);
+  if (to.status !== issue.status) assertNotInTriage(issue);
   assertStatusInWorkflow(data, issue.projectId, issue.type, to.status);
   const flow = workflowFor(data, issue.projectId, issue.type);
   // 같은 열 안 순서 변경은 전환이 아니다. 지금 상태가 워크플로 밖(옛 데이터)이면 규칙 없이 옮긴다(이관)

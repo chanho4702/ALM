@@ -75,7 +75,7 @@ export function CsvImportModal({ open, projectId, ctx, onOpenChange, onDone }: C
     <Modal
       trigger={<span hidden />}
       title="CSV 가져오기"
-      description="우리 내보내기 형식이나 지라 CSV 내보내기(Summary, Issue Type, Status …)를 읽습니다. 키 열이 있으면 키를 보존합니다."
+      description="우리 내보내기 형식이나 Jira에서 내보낸 CSV(Summary, Issue Type, Status …)를 읽습니다. 키 열이 있으면 키를 보존합니다."
       open={open}
       onOpenChange={(next) => {
         if (!next) reset();

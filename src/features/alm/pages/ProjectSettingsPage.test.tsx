@@ -235,7 +235,7 @@ describe("프로젝트 설정 — 가져오기", () => {
       "ALM-41,완료된 것,Bug,Done,Low,",
     ].join("\n");
     await user.upload(
-      await screen.findByLabelText("지라 CSV 파일"),
+      await screen.findByLabelText("Jira CSV 파일"),
       new File([csv], "jira-export.csv", { type: "text/csv" }),
     );
     expect(await screen.findByText(/읽을 수 있는 행 1개, 건너뛸 행 1개/)).toBeInTheDocument();

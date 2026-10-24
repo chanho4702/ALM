@@ -240,3 +240,20 @@ describe("트리아지 (V35)", () => {
     expect(await getTriageSettings("p1")).toMatchObject({ pending: 0, snoozed: 1 });
   });
 });
+
+describe("트리아지 대기 이슈의 상태 변경 (서버 Codex 지적 반영)", () => {
+  it("일반 전환·보드 이동·수정은 거부하고, 전환 목록은 그 이유로 전부 비활성", async () => {
+    const { listIssueTransitions, moveIssue, transitionIssue } = await import("./jiraStore");
+    await saveTriageSettings("p1", true);
+    const created = await createIssue({ projectId: "p1", title: "접수", triage: true });
+    const message = "트리아지 대기열에 있는 이슈는 트리아지에서 먼저 처리해야 합니다";
+    const { transitions } = await listIssueTransitions(created.id);
+    expect(transitions.length).toBeGreaterThan(0);
+    expect(transitions.every((t) => !t.available && t.unavailableReason === message)).toBe(true);
+    await expect(moveIssue(created.id, { status: "inprogress" })).rejects.toThrow(message);
+    await expect(updateIssue(created.id, { status: "done" }, created.version)).rejects.toThrow(message);
+    await expect(transitionIssue(created.id, { transitionId: "implicit:done" })).rejects.toThrow(message);
+    // 제목 같은 다른 수정은 된다
+    await expect(updateIssue(created.id, { title: "접수(수정)" }, created.version)).resolves.toMatchObject({ title: "접수(수정)" });
+  });
+});

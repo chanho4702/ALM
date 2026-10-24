@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { Button, Popover, Spinner, Tooltip, useToast } from "@chanho/react";
+import { Button, Popover, SkeletonListItem, Tooltip, useToast } from "@chanho/react";
 import { ArrowRight, ChevronDown, Lock } from "lucide-react";
 import type { Issue, IssueTransitionOption, WorkflowStatus } from "../../store/types";
 import { listIssueTransitions } from "../../store/jiraStore";
@@ -127,8 +127,9 @@ export function StatusTransitionButton({ issue, statuses, onTransitioned, openSi
             </Button>
           </div>
         ) : options === null ? (
-          <div className="transition-popover-state">
-            <Spinner size="small" label="전환 불러오는 중" />
+          <div className="transition-popover-state" role="status" aria-label="전환 불러오는 중">
+            <SkeletonListItem media="icon" width="70%" />
+            <SkeletonListItem media="icon" width="50%" />
           </div>
         ) : options.length === 0 ? (
           <p className="transition-popover-state">지금 상태에서 갈 수 있는 전환이 없습니다.</p>

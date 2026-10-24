@@ -19,6 +19,7 @@ import {
 } from "./labels";
 import { usePriorities } from "./usePriorities";
 import { UserAvatar } from "./UserAvatar";
+import { IssueFlagMark } from "./IssueCard";
 
 /** 이슈를 옮길 수 있는 대상. sprintId null = 백로그 */
 export interface MoveTarget {
@@ -78,6 +79,12 @@ export function BacklogIssueRow({
       <IssueTypeGlyph type={issue.type} />
       <span className="backlog-row-key">{issue.key}</span>
       <span className="backlog-row-title">{issue.title}</span>
+      {issue.flagged ? <IssueFlagMark /> : null}
+      {issue.storyPoints !== null && issue.storyPoints !== undefined ? (
+        <span className="issue-points" aria-label={`스토리 포인트 ${issue.storyPoints}`} title={`스토리 포인트 ${issue.storyPoints}`}>
+          {issue.storyPoints}
+        </span>
+      ) : null}
       <span className="status-cell">
         <StatusGlyph status={issue.status} statuses={statuses} variant="icon" />
         <Lozenge appearance={statusAppearance(statuses, issue.status)}>
@@ -179,9 +186,16 @@ export function BacklogDropZone({
  * 미입력이 없으면 그 칩은 렌더하지 않는다(잡음 제거).
  */
 export function PanelEstimateSummary({ issues }: { issues: Issue[] }) {
-  const { totalHours, missing } = estimateSummary(issues);
+  const { totalHours, missing, totalPoints, unpointed } = estimateSummary(issues);
   return (
     <>
+      {/* 스토리 포인트(V30)는 하나라도 추정된 이슈가 있을 때만 — 시간 추정만 쓰는 팀의 머리글을 어지럽히지 않는다 */}
+      {unpointed < issues.length ? (
+        <span className="sprint-panel-estimate" aria-label={`스토리 포인트 합계 ${totalPoints}`}>
+          {`포인트 ${totalPoints}`}
+          {unpointed > 0 ? ` · 미추정 ${unpointed}건` : ""}
+        </span>
+      ) : null}
       <span className="sprint-panel-estimate">예상 {totalHours}h</span>
       {missing > 0 ? <span className="sprint-panel-estimate">미입력 {missing}건</span> : null}
     </>
