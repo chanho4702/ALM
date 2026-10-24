@@ -190,7 +190,7 @@ export function BoardPage() {
     [columns, visibleIssues],
   );
   const [bulkOpen, setBulkOpen] = useState(false);
-  const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({ setIssues, reload });
+  const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({ setIssues, reload, statuses });
   const interactions = useIssueInteractions({
     source: "board",
     projectId,

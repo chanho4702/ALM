@@ -11,7 +11,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../store/jiraStore";
-import { recordProjectVisit } from "../store/uiStore";
+import { recordProjectVisit, setUiUser } from "../store/uiStore";
 import { LazyModal } from "./LazyContent";
 import { GlobalSideNav } from "./GlobalSideNav";
 import { SettingsSideNav, isSettingsPath } from "./SettingsSideNav";
@@ -82,7 +82,12 @@ export function AppShell({ projects }: AppShellProps) {
 
   useEffect(() => {
     // 개인 설정에서 프로필 사진을 바꾸면 상단바 아바타도 바로 따라간다(새로고침 없이)
-    const loadMe = () => void getCurrentUser().then(setMe);
+    const loadMe = () =>
+      void getCurrentUser().then((user) => {
+        // 즐겨찾기·만들기 초안은 사용자별 — 현재 사용자를 알자마자 uiStore 자리를 맞춘다
+        setUiUser(user.id);
+        setMe(user);
+      });
     loadMe();
     reloadNotifications();
     window.addEventListener(AVATAR_CHANGED_EVENT, loadMe);

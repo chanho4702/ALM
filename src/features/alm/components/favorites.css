@@ -1,0 +1,18 @@
+/* 사이드바 즐겨찾기 — 끌어 놓기 표시(토큰만) */
+.favorite-row {
+  border-radius: var(--chanho-radius-small);
+  transition: background-color var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard);
+}
+
+.favorite-row.is-dragging {
+  opacity: 0.5;
+}
+
+.favorite-row.is-drop-target {
+  box-shadow: inset 0 2px 0 var(--chanho-color-border-brand);
+}
+
+/* 별표 토글(상세·보기 막대) — 켜지면 강조색 */
+.favorite-toggle.is-pinned {
+  color: var(--chanho-color-text-warning);
+}

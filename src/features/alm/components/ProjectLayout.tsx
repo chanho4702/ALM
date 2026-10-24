@@ -5,7 +5,7 @@ import { Check, ChevronDown, ExternalLink, MoreHorizontal, Star } from "lucide-r
 import type { Project, ProjectShortcut } from "../store/types";
 import { listProjectShortcuts } from "../store/jiraStore";
 import { SHORTCUTS_CHANGED_EVENT } from "./ProjectShortcutsPanel";
-import { UI_CHANGED_EVENT, listStarredProjectIds, toggleProjectStar } from "../store/uiStore";
+import { UI_CHANGED_EVENT, UI_USER_CHANGED_EVENT, listStarredProjectIds, toggleProjectStar } from "../store/uiStore";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useAiTeamActive } from "./useAiTeamActive";
 import { projectViewTabs, type ProjectViewTab } from "./projectViews";
@@ -42,7 +42,11 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
   useEffect(() => {
     refreshStarred();
     window.addEventListener(UI_CHANGED_EVENT, refreshStarred);
-    return () => window.removeEventListener(UI_CHANGED_EVENT, refreshStarred);
+    window.addEventListener(UI_USER_CHANGED_EVENT, refreshStarred);
+    return () => {
+      window.removeEventListener(UI_CHANGED_EVENT, refreshStarred);
+      window.removeEventListener(UI_USER_CHANGED_EVENT, refreshStarred);
+    };
   }, [refreshStarred]);
 
   const current = projects.find((p) => p.id === projectId);
@@ -86,7 +90,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
           className={starred ? "project-star is-starred" : "project-star"}
           aria-label={`${current.name} 별표`}
           aria-pressed={starred}
-          onClick={() => void toggleProjectStar(current.id)}
+          onClick={() => void toggleProjectStar(current.id, current.name)}
         >
           <Star size={16} fill={starred ? "currentColor" : "none"} aria-hidden />
         </Button>

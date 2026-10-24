@@ -149,7 +149,7 @@ export function BacklogPage() {
   );
   const labelOptions = useMemo(() => [...new Set(issues.flatMap((issue) => issue.labels))].sort(), [issues]);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({ setIssues, reload });
+  const { actions: issueActions, dialogs: issueActionDialogs } = useIssueActions({ setIssues, reload, statuses });
   const interactions = useIssueInteractions({
     source: "backlog",
     projectId,

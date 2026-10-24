@@ -297,6 +297,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     setIssues: (update) => setIssues((prev) => (prev ? update(prev) : prev)),
     reload,
     onDeleted: (ids) => setSelected((prev) => new Set([...prev].filter((id) => !ids.includes(id)))),
+    statuses,
   });
   const interactions = useIssueInteractions({
     source: "list",

@@ -9,6 +9,9 @@ import type { SavedFilter } from "../store/jiraStore";
 import type { SavedView } from "../store/types";
 import { VIEWS_CHANGED_EVENT } from "./views/useIssueViews";
 import { BoardCreateModal } from "./BoardCreateModal";
+import { FavoritesNavSection } from "./FavoritesNavSection";
+import { useFavorites } from "./useFavorites";
+import type { Favorite } from "../store/uiStore";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { projectViewTabs } from "./projectViews";
 import { useAiTeamActive } from "./useAiTeamActive";
@@ -21,7 +24,6 @@ import {
   getSideNavWidth,
   isSideNavCollapsed,
   listRecentProjectIds,
-  listStarredProjectIds,
   setSideNavCollapsed,
   setSideNavWidth,
 } from "../store/uiStore";
@@ -45,7 +47,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
   const toast = useToast();
   const { pathname, search } = useLocation();
   const [recentIds, setRecentIds] = useState<string[]>([]);
-  const [starredIds, setStarredIds] = useState<string[]>([]);
+  const { favorites } = useFavorites();
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   /** 남이 공유한 필터(F-12) — 실행만 한다. 못 읽어도 내 필터 섹션은 그대로 둔다 */
   const [sharedFilters, setSharedFilters] = useState<SavedFilter[]>([]);
@@ -97,7 +99,6 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
 
   const refresh = useCallback(() => {
     void listRecentProjectIds().then(setRecentIds);
-    void listStarredProjectIds().then(setStarredIds);
     void refreshFilters();
     void isSideNavCollapsed().then(setCollapsed);
     void getSideNavWidth().then((w) => {
@@ -212,7 +213,24 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
 
   const byId = (id: string) => projects.find((p) => p.id === id);
   const recentProjects = recentIds.map(byId).filter((p): p is Project => Boolean(p));
-  const starredProjects = starredIds.map(byId).filter((p): p is Project => Boolean(p));
+
+  /** 즐겨찾기 열기 — 프로젝트는 보드, 보기는 이슈 목록의 그 보기, 이슈는 상세 */
+  const openFavorite = (favorite: Favorite) => {
+    if (favorite.kind === "project") navigate(`/projects/${favorite.id}/board`);
+    else if (favorite.kind === "view")
+      navigate(
+        favorite.projectId
+          ? `/projects/${favorite.projectId}/issues?view=${encodeURIComponent(favorite.id)}`
+          : `/search?view=${encodeURIComponent(favorite.id)}`,
+      );
+    else if (favorite.projectId) navigate(`/projects/${favorite.projectId}/issues?issue=${encodeURIComponent(favorite.id)}`);
+    else navigate(`/search?q=${encodeURIComponent(favorite.id)}`);
+  };
+  const favoriteActive = (favorite: Favorite) => {
+    if (favorite.kind === "view") return currentViewId === favorite.id;
+    if (favorite.kind === "issue") return new URLSearchParams(search).get("issue") === favorite.id;
+    return false;
+  };
 
   /**
    * 프로젝트 행 — 아바타 + 이름, 호버하면 ⋯ 메뉴가 드러난다.
@@ -423,7 +441,9 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
       ) : null}
 
       {projectSection("최근", recentProjects, "nav-recent")}
-      {projectSection("별표", starredProjects, "nav-starred")}
+      {collapsed ? null : (
+        <FavoritesNavSection favorites={favorites} projects={projects} onOpen={openFavorite} isActive={favoriteActive} />
+      )}
 
       {projects.length > 0 ? (
         <>

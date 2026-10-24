@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Bookmark, MoreHorizontal } from "lucide-react";
+import { Bookmark, MoreHorizontal, Star } from "lucide-react";
 import { Badge, Button, ConfirmDialog, Dropdown, Modal, Popover, Radio, RadioGroup, TextField } from "@chanho/react";
 import type { DropdownItem } from "@chanho/react";
 import type { ViewScope } from "../../store/types";
 import type { IssueViewsController } from "./useIssueViews";
 import "./views.css";
+import "../favorites.css";
+import { favoriteOfView, useFavorites } from "../useFavorites";
 
 /**
  * 저장된 보기 고르기 + 보기 작업(저장·업데이트·삭제·닫기). 상태와 서버 호출은 `useIssueViews`가 맡는다.
@@ -15,6 +17,8 @@ export function SavedViewsBar({ controller }: { controller: IssueViewsController
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { isPinned, toggle: toggleFavorite } = useFavorites();
+  const pinned = active ? isPinned("view", active.id) : false;
 
   const items: DropdownItem[] = [
     { label: "보기로 저장", onSelect: () => setSaveOpen(true), disabled: saving },
@@ -73,6 +77,19 @@ export function SavedViewsBar({ controller }: { controller: IssueViewsController
           </ul>
         )}
       </Popover>
+      {active ? (
+        <Button
+          variant="ghost"
+          iconOnly
+          className={pinned ? "favorite-toggle is-pinned" : "favorite-toggle"}
+          aria-label={`보기 ${active.name} 즐겨찾기`}
+          aria-pressed={pinned}
+          title={pinned ? "즐겨찾기에서 빼기" : "사이드바 즐겨찾기에 추가"}
+          onClick={() => void toggleFavorite(favoriteOfView(active))}
+        >
+          <Star size={16} fill={pinned ? "currentColor" : "none"} aria-hidden />
+        </Button>
+      ) : null}
       {dirty ? <Badge>변경됨</Badge> : null}
       <Dropdown
         align="end"

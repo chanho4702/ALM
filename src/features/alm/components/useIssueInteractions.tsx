@@ -9,6 +9,8 @@ import { issueContextMenuItems } from "./issueCommands";
 import { IssuePeek } from "./IssuePeek";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import type { ShortcutBindings } from "./useKeyboardShortcuts";
+import { useStatusAvailability } from "./statusAvailability";
+import { favoriteOfIssue, useFavorites } from "./useFavorites";
 
 /**
  * 목록·보드·백로그 공통 조작감(웨이브 B) — 다중 선택, 미리보기(Space), 우클릭 메뉴, 속성 단축키(s/p/a/l/i),
@@ -82,6 +84,10 @@ export function useIssueInteractions({
   /** 마우스·포커스가 마지막으로 가리킨 이슈 */
   const pointedKey = useRef<string | null>(null);
   const [menuTargets, setMenuTargets] = useState<Issue[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // 상태 하위 메뉴는 가용 전환만 — 메뉴가 열린 동안만 읽는다
+  const statusAvailability = useStatusAvailability(menuTargets, menuOpen && menuTargets.length > 0);
+  const { isPinned, toggle: toggleFavorite } = useFavorites();
 
   const byId = useMemo(() => new Map(issues.map((issue) => [issue.id, issue])), [issues]);
   const byKey = useMemo(() => new Map(issues.map((issue) => [issue.key, issue])), [issues]);
@@ -262,9 +268,15 @@ export function useIssueInteractions({
   /** 우클릭 메뉴로 감싼다 — 대상은 우클릭한 이슈(선택에 들어 있으면 선택 전체) */
   const withContextMenu = (child: ReactElement<{ onContextMenuCapture?: (event: ReactMouseEvent) => void }>): ReactNode => (
     <ContextMenu
+      onOpenChange={setMenuOpen}
       items={issueContextMenuItems(menuTargets, options, actions, {
         onOpen: (issue) => openIssue(issue.key),
         onPeek: (issue) => setPeekId(issue.id),
+        statusAvailability,
+        favorite: {
+          pinned: menuTargets.length === 1 && isPinned("issue", menuTargets[0].key),
+          toggle: (issue) => void toggleFavorite(favoriteOfIssue(issue)),
+        },
       })}
     >
       {cloneElement(child, {

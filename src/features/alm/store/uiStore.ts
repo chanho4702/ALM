@@ -24,6 +24,8 @@ export const SIDENAV_DEFAULT_WIDTH = 240;
 export const UI_CHANGED_EVENT = "alm:ui-changed";
 /** 최근 본 이슈 기록이 바뀜 — 사이드바는 구독하지 않고(UI_CHANGED_EVENT를 내지 않는 이유) 홈 "최근 본" 탭만 듣는다 */
 export const VIEWED_ISSUES_CHANGED_EVENT = "alm:viewed-issues-changed";
+/** 사용자별 UI 자리(즐겨찾기·초안)의 주인이 바뀜 — `setUiUser` */
+export const UI_USER_CHANGED_EVENT = "alm:ui-user-changed";
 
 /**
  * 저장 필터 — query는 스마트 검색 문자열 또는 AQL 문자열 (URL·사이드바에서 재사용).
@@ -78,6 +80,35 @@ export interface TablePrefs {
   hidden?: string[];
 }
 
+/**
+ * 즐겨찾기(Linear Favorites) — 사이드바 "즐겨찾기" 섹션의 항목. 저장된 보기·프로젝트·이슈를 고정한다.
+ * id: 프로젝트·보기는 그 id, 이슈는 **키**(키는 불변이라 링크·브랜치처럼 박아도 된다).
+ * label은 고정할 때의 이름(표시 폴백) — 프로젝트는 사이드바가 현재 이름으로 다시 그린다.
+ */
+export type FavoriteKind = "project" | "issue" | "view";
+
+export interface Favorite {
+  kind: FavoriteKind;
+  id: string;
+  label: string;
+  /** 이슈·보기가 속한 프로젝트 — 열 때 경로를 만든다 */
+  projectId?: string;
+}
+
+/** 이슈 만들기 모달 초안(Linear 초안 보존) — 닫아도 프로젝트별로 남는다 */
+export interface CreateIssueDraft {
+  type?: string;
+  title?: string;
+  description?: string;
+  priority?: string;
+  assigneeId?: string | null;
+  labels?: string;
+  dueDate?: string;
+  estimateHours?: string;
+  storyPoints?: string;
+  savedAt?: string;
+}
+
 interface UiState {
   tablePrefs: Record<string, TablePrefs>;
   recentProjectIds: string[];
@@ -89,6 +120,10 @@ interface UiState {
   savedFilters: SavedFilter[];
   /** 키보드 단축키(c·/·?·g 시퀀스 등) 사용 — 기본 켬, 개인 설정에서 끈다 */
   keyboardShortcuts: boolean;
+  /** 사용자 id → 즐겨찾기(사이드바 순서) */
+  favoritesByUser: Record<string, Favorite[]>;
+  /** 사용자 id → 프로젝트 id → 이슈 만들기 초안 */
+  createDraftsByUser: Record<string, Record<string, CreateIssueDraft>>;
 }
 
 const DEFAULT_STATE: UiState = {
@@ -100,6 +135,8 @@ const DEFAULT_STATE: UiState = {
   sideNavWidth: SIDENAV_DEFAULT_WIDTH,
   savedFilters: [],
   keyboardShortcuts: true,
+  favoritesByUser: {},
+  createDraftsByUser: {},
 };
 
 function load(): UiState {
@@ -116,6 +153,8 @@ function load(): UiState {
       sideNavWidth: parsed.sideNavWidth ?? SIDENAV_DEFAULT_WIDTH,
       savedFilters: parsed.savedFilters ?? [],
       keyboardShortcuts: parsed.keyboardShortcuts ?? true,
+      favoritesByUser: parsed.favoritesByUser ?? {},
+      createDraftsByUser: parsed.createDraftsByUser ?? {},
     };
   } catch {
     return { ...DEFAULT_STATE };
@@ -191,19 +230,141 @@ export async function forgetViewedIssues(userId: string, issueKeys: readonly str
   persist({ ...state, viewedIssuesByUser: { ...state.viewedIssuesByUser, [userId]: next } }, false);
 }
 
+// ── 즐겨찾기 · 이슈 만들기 초안 — 사용자별 ─────────────────────────────
+
+/** 로그인 사용자를 알기 전의 자리 — 사용자가 정해지면 그 사용자 자리로 옮긴다 */
+const ANONYMOUS_UI_USER = "__local__";
+let uiUserId = ANONYMOUS_UI_USER;
+
+/**
+ * 사용자별 UI 상태(즐겨찾기·초안)의 주인을 정한다 — 셸이 현재 사용자를 읽으면 부른다.
+ * 그 사용자 자리가 비어 있으면 익명 자리(로그인 전에 고정한 것)를 물려받는다.
+ */
+export function setUiUser(userId: string): void {
+  if (!userId || userId === uiUserId) return;
+  uiUserId = userId;
+  const state = load();
+  let changed = false;
+  if (!state.favoritesByUser[userId] && state.favoritesByUser[ANONYMOUS_UI_USER]) {
+    state.favoritesByUser[userId] = state.favoritesByUser[ANONYMOUS_UI_USER];
+    delete state.favoritesByUser[ANONYMOUS_UI_USER];
+    changed = true;
+  }
+  if (!state.createDraftsByUser[userId] && state.createDraftsByUser[ANONYMOUS_UI_USER]) {
+    state.createDraftsByUser[userId] = state.createDraftsByUser[ANONYMOUS_UI_USER];
+    delete state.createDraftsByUser[ANONYMOUS_UI_USER];
+    changed = true;
+  }
+  if (changed) persist(state, false);
+  // 사용자별 값(즐겨찾기)만 다시 읽게 — 사이드바 전체 갱신(UI_CHANGED_EVENT)은 내지 않는다(저장 필터를 다시 부르지 않게)
+  window.dispatchEvent(new Event(UI_USER_CHANGED_EVENT));
+}
+
+/** 테스트 격리용 — 사용자 자리를 익명으로 되돌린다 */
+export function __resetUiUserForTest(): void {
+  uiUserId = ANONYMOUS_UI_USER;
+}
+
+function favoritesOf(state: UiState): Favorite[] {
+  const own = state.favoritesByUser[uiUserId];
+  if (own) return own;
+  // 옛 전역 별표(starredProjectIds) — 그 사용자의 첫 즐겨찾기 쓰기 때 프로젝트 항목으로 옮겨 적는다
+  return state.starredProjectIds.map((id) => ({ kind: "project" as const, id, label: "" }));
+}
+
+function writeFavorites(state: UiState, favorites: Favorite[]): void {
+  persist({
+    ...state,
+    favoritesByUser: { ...state.favoritesByUser, [uiUserId]: favorites },
+    // 옛 키는 비운다 — 즐겨찾기가 정본이다
+    starredProjectIds: [],
+  });
+}
+
+const sameFavorite = (kind: FavoriteKind, id: string) => (f: Favorite) => f.kind === kind && f.id === id;
+
+/** 즐겨찾기(사이드바 순서) */
+export async function listFavorites(): Promise<Favorite[]> {
+  return favoritesOf(load()).map((f) => ({ ...f }));
+}
+
+/** 동기 판정 — 메뉴·팔레트 항목 이름("즐겨찾기에 추가/빼기")을 그릴 때 */
+export function isFavoriteSync(kind: FavoriteKind, id: string): boolean {
+  return favoritesOf(load()).some(sameFavorite(kind, id));
+}
+
+/** 고정/해제 토글 — 토글 뒤 고정 상태를 돌려준다. 새 항목은 맨 끝에 붙는다 */
+export async function toggleFavorite(favorite: Favorite): Promise<boolean> {
+  const state = load();
+  const current = favoritesOf(state);
+  const pinned = current.some(sameFavorite(favorite.kind, favorite.id));
+  writeFavorites(
+    state,
+    pinned ? current.filter((f) => !sameFavorite(favorite.kind, favorite.id)(f)) : [...current, { ...favorite }],
+  );
+  return !pinned;
+}
+
+export async function removeFavorite(kind: FavoriteKind, id: string): Promise<void> {
+  const state = load();
+  const current = favoritesOf(state);
+  if (!current.some(sameFavorite(kind, id))) return;
+  writeFavorites(state, current.filter((f) => !sameFavorite(kind, id)(f)));
+}
+
+/** 순서 바꾸기 — `toIndex`(0부터, 범위 밖이면 양끝)로 옮긴다 */
+export async function moveFavorite(kind: FavoriteKind, id: string, toIndex: number): Promise<void> {
+  const state = load();
+  const current = [...favoritesOf(state)];
+  const from = current.findIndex(sameFavorite(kind, id));
+  if (from === -1) return;
+  const [item] = current.splice(from, 1);
+  current.splice(Math.max(0, Math.min(current.length, toIndex)), 0, item);
+  writeFavorites(state, current);
+}
+
+/** 프로젝트 별표 = 프로젝트 즐겨찾기(디렉터리·프로젝트 헤더의 별 버튼) */
 export async function listStarredProjectIds(): Promise<string[]> {
-  return load().starredProjectIds;
+  return favoritesOf(load())
+    .filter((f) => f.kind === "project")
+    .map((f) => f.id);
 }
 
 /** 별표 토글 — 토글 후 별표 상태를 반환한다 */
-export async function toggleProjectStar(projectId: string): Promise<boolean> {
+export async function toggleProjectStar(projectId: string, label = ""): Promise<boolean> {
+  return toggleFavorite({ kind: "project", id: projectId, label });
+}
+
+/** 이슈 만들기 초안 — 없으면 null */
+export async function getCreateIssueDraft(projectId: string): Promise<CreateIssueDraft | null> {
+  const draft = load().createDraftsByUser[uiUserId]?.[projectId];
+  return draft ? { ...draft } : null;
+}
+
+/** 초안 저장 — 쓴 내용(제목·설명·라벨·날짜·추정)이 하나도 없으면 지운다. 사이드바가 볼 값이 아니라 이벤트는 내지 않는다 */
+export async function saveCreateIssueDraft(projectId: string, draft: CreateIssueDraft): Promise<void> {
   const state = load();
-  const starred = state.starredProjectIds.includes(projectId);
-  const next = starred
-    ? state.starredProjectIds.filter((id) => id !== projectId)
-    : [...state.starredProjectIds, projectId];
-  persist({ ...state, starredProjectIds: next });
-  return !starred;
+  const mine = { ...(state.createDraftsByUser[uiUserId] ?? {}) };
+  const meaningful = Boolean(
+    draft.title?.trim() ||
+      draft.description?.trim() ||
+      draft.labels?.trim() ||
+      draft.dueDate ||
+      draft.estimateHours ||
+      draft.storyPoints,
+  );
+  if (meaningful) mine[projectId] = { ...draft, savedAt: new Date().toISOString() };
+  else delete mine[projectId];
+  persist({ ...state, createDraftsByUser: { ...state.createDraftsByUser, [uiUserId]: mine } }, false);
+}
+
+export async function clearCreateIssueDraft(projectId: string): Promise<void> {
+  const state = load();
+  const mine = state.createDraftsByUser[uiUserId];
+  if (!mine?.[projectId]) return;
+  const next = { ...mine };
+  delete next[projectId];
+  persist({ ...state, createDraftsByUser: { ...state.createDraftsByUser, [uiUserId]: next } }, false);
 }
 
 export async function isSideNavCollapsed(): Promise<boolean> {
@@ -328,9 +489,16 @@ export function clearLocalSavedFilters(): void {
 /** 삭제된 프로젝트를 최근/별표에서 걷어낸다 (프로젝트 삭제 후 호출) */
 export async function pruneProject(projectId: string): Promise<void> {
   const state = load();
+  const favoritesByUser = Object.fromEntries(
+    Object.entries(state.favoritesByUser).map(([user, list]) => [
+      user,
+      list.filter((f) => !(f.kind === "project" ? f.id === projectId : f.projectId === projectId)),
+    ]),
+  );
   persist({
     ...state,
     recentProjectIds: state.recentProjectIds.filter((id) => id !== projectId),
     starredProjectIds: state.starredProjectIds.filter((id) => id !== projectId),
+    favoritesByUser,
   });
 }

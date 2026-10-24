@@ -39,7 +39,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
   }, []);
 
   const handleStarToggle = async (project: Project) => {
-    await toggleProjectStar(project.id); // uiStore 이벤트로 사이드바 별표 섹션도 갱신된다
+    await toggleProjectStar(project.id, project.name); // uiStore 이벤트로 사이드바 별표 섹션도 갱신된다
     setStarredIds(await listStarredProjectIds());
   };
 

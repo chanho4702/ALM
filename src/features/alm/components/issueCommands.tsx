@@ -1,15 +1,20 @@
 import type { ReactNode } from "react";
 import type { CommandItem, ContextMenuItem } from "@chanho/react";
-import { CircleDot, Copy, CopyPlus, ExternalLink, Eye, Link2, Signal, Tag as TagIcon, Trash2, UserRound, UserRoundCheck } from "lucide-react";
+import { CircleDot, Copy, CopyPlus, ExternalLink, Eye, GitBranch, Link2, Signal, Star, Tag as TagIcon, Trash2, UserRound, UserRoundCheck } from "lucide-react";
 import type { Issue } from "../store/types";
 import type { BulkIssuePatch } from "../store/jiraStore";
 import type { IssueFieldOptions, PaletteField } from "./commandScope";
+import { openCommandPalette } from "./commandScope";
 import type { IssueActionRunner } from "./useIssueActions";
 import { describeTargets } from "./useIssueActions";
 import { BUILTIN_PRIORITY_IDS, priorityName, statusName } from "./labels";
 import { PriorityGlyph } from "./PriorityGlyph";
 import { StatusGlyph } from "./StatusGlyph";
 import { UserAvatar } from "./UserAvatar";
+import type { StatusAvailability } from "./statusAvailability";
+
+/** 브랜치 이름 복사 단축키 힌트 — 실제 바인딩은 CommandPaletteHost(⌘/Ctrl+Shift+.) */
+export const COPY_BRANCH_SHORTCUT = "Ctrl+Shift+.";
 
 /**
  * 이슈 명령 모델 — 우클릭 메뉴(ContextMenu)와 명령 팔레트(CommandPalette)가 같은 선택지·같은 단축키 힌트를
@@ -46,14 +51,33 @@ export interface FieldChoice {
   checked: boolean;
   patch: BulkIssuePatch;
   successTitle: string;
+  /** 고를 수 없는 항목(조건에 막힌 전환·불러오는 중) */
+  disabled?: boolean;
+  /** 못 고르는 이유 등 보조 설명 */
+  description?: string;
+  /** 있으면 일괄 편집 패치가 아니라 워크플로 전환으로 간다(상태 변경) */
+  transitionTo?: { id: string; name: string };
+}
+
+/** 선택지 적용 — 상태는 전환 실행, 나머지는 일괄 편집 */
+export function applyChoice(choice: FieldChoice, targets: Issue[], actions: IssueActionRunner): void {
+  if (choice.disabled) return;
+  if (choice.transitionTo) void actions.transition(targets, choice.transitionTo.id, choice.transitionTo.name);
+  else void actions.update(targets, choice.patch, choice.successTitle);
 }
 
 const UNASSIGNED = "__unassigned__";
 
-export function fieldChoices(field: PaletteField, targets: Issue[], options: IssueFieldOptions): FieldChoice[] {
+export function fieldChoices(
+  field: PaletteField,
+  targets: Issue[],
+  options: IssueFieldOptions,
+  availability?: StatusAvailability,
+): FieldChoice[] {
   const all = (test: (issue: Issue) => boolean) => targets.length > 0 && targets.every(test);
   switch (field) {
     case "status":
+      if (availability) return statusTransitionChoices(targets, options, availability);
       return options.statuses.map((status) => ({
         id: `status:${status.id}`,
         label: status.name,
@@ -108,6 +132,49 @@ export function fieldChoices(field: PaletteField, targets: Issue[], options: Iss
   }
 }
 
+const placeholderChoice = (id: string, label: string, description?: string): FieldChoice => ({
+  id,
+  label,
+  description,
+  checked: false,
+  disabled: true,
+  patch: {},
+  successTitle: "",
+});
+
+/** 상태 하위 메뉴 — 가용 전환만(statusAvailability). 상태 순서는 워크플로 order */
+function statusTransitionChoices(targets: Issue[], options: IssueFieldOptions, availability: StatusAvailability): FieldChoice[] {
+  if (availability.state === "loading") return [placeholderChoice("status:loading", "전환 불러오는 중…")];
+  if (availability.state === "error") {
+    return [placeholderChoice("status:error", "전환 목록을 불러오지 못했습니다", availability.error)];
+  }
+  const known = new Set(options.statuses.map((s) => s.id));
+  const ids = [
+    ...options.statuses.map((s) => s.id).filter((id) => availability.byStatus.has(id)),
+    // 워크플로 밖(타입별 워크플로의 상태 등) 전환 대상도 버리지 않는다
+    ...[...availability.byStatus.keys()].filter((id) => !known.has(id)),
+  ];
+  const choices = ids.map((id): FieldChoice => {
+    const state = availability.byStatus.get(id)!;
+    const name = statusName(options.statuses, id);
+    return {
+      id: `status:${id}`,
+      label: name,
+      icon: <StatusGlyph status={id} statuses={options.statuses} variant="icon" />,
+      checked: false,
+      disabled: !state.available,
+      description: state.reason ?? undefined,
+      patch: {},
+      successTitle: `상태를 ${name}(으)로 바꿨습니다`,
+      transitionTo: { id, name },
+    };
+  });
+  if (choices.length === 0) {
+    return [placeholderChoice("status:none", targets.length === 1 ? "지금 상태에서 갈 수 있는 전환이 없습니다" : "함께 갈 수 있는 상태가 없습니다")];
+  }
+  return choices;
+}
+
 /** 새 라벨 만들어 붙이기 — 팔레트 라벨 페이지에서 검색어가 기존 라벨과 다를 때 */
 export function newLabelChoice(query: string, options: IssueFieldOptions): FieldChoice | null {
   const label = query.trim();
@@ -143,6 +210,10 @@ export interface IssueMenuExtras {
   onPeek?: (issue: Issue) => void;
   /** 상세 열기 */
   onOpen?: (issue: Issue) => void;
+  /** 상태 하위 메뉴의 가용 전환(없으면 상태 목록 전부 — 옛 동작) */
+  statusAvailability?: StatusAvailability;
+  /** 즐겨찾기(단건) — 지금 고정됐나와 토글 */
+  favorite?: { pinned: boolean; toggle: (issue: Issue) => void };
 }
 
 const FIELDS: PaletteField[] = ["status", "assignee", "priority", "labels"];
@@ -157,7 +228,7 @@ export function issueContextMenuItems(
   if (targets.length === 0) return [];
   const single = targets.length === 1 ? targets[0] : null;
   const fieldItem = (field: PaletteField): ContextMenuItem => {
-    const choices = fieldChoices(field, targets, options);
+    const choices = fieldChoices(field, targets, options, field === "status" ? extras.statusAvailability : undefined);
     return {
       label: FIELD_TITLES[field],
       icon: FIELD_ICONS[field](14),
@@ -166,8 +237,11 @@ export function issueContextMenuItems(
       items: choices.map((choice) => ({
         label: choice.label,
         icon: choice.icon,
-        checked: choice.checked,
-        onSelect: () => void actions.update(targets, choice.patch, choice.successTitle),
+        description: choice.description,
+        disabled: choice.disabled,
+        // 상태 전환 항목은 체크 항목이 아니다(현재 상태는 전환 목록에 없다)
+        checked: choice.transitionTo || choice.disabled ? undefined : choice.checked,
+        onSelect: () => applyChoice(choice, targets, actions),
       })),
     };
   };
@@ -185,6 +259,21 @@ export function issueContextMenuItems(
     { separator: true },
     { label: single ? "키 복사" : "키 복사(전부)", icon: <Copy size={14} />, onSelect: () => void actions.copyKeys(targets) },
     { label: single ? "링크 복사" : "링크 복사(전부)", icon: <Link2 size={14} />, onSelect: () => void actions.copyLinks(targets) },
+    {
+      label: single ? "브랜치 이름 복사" : "브랜치 이름 복사(전부)",
+      icon: <GitBranch size={14} />,
+      shortcut: COPY_BRANCH_SHORTCUT,
+      onSelect: () => void actions.copyBranchName(targets),
+    },
+    ...(single && extras.favorite
+      ? [
+          {
+            label: extras.favorite.pinned ? "즐겨찾기에서 빼기" : "즐겨찾기에 추가",
+            icon: <Star size={14} />,
+            onSelect: () => extras.favorite!.toggle(single),
+          },
+        ]
+      : []),
     {
       label: "복제",
       icon: <CopyPlus size={14} />,
@@ -213,7 +302,9 @@ export function issuePaletteCommands(
   const group = targets.length === 1 ? `현재 이슈 · ${targets[0].key}` : `선택한 ${targets.length}개 이슈`;
   const single = targets.length === 1 ? targets[0] : null;
   return [
-    ...FIELDS.map((field) => fieldPaletteItem(field, targets, options, actions, group)),
+    ...FIELDS.map((field) =>
+      fieldPaletteItem(field, targets, options, actions, group, field === "status" ? extras.statusAvailability : undefined),
+    ),
     {
       id: "issue:assign-me",
       group,
@@ -228,6 +319,27 @@ export function issuePaletteCommands(
       : []),
     { id: "issue:copy-key", group, label: "키 복사", icon: <Copy size={16} />, keywords: ["copy", "key"], onSelect: () => void actions.copyKeys(targets) },
     { id: "issue:copy-link", group, label: "링크 복사", icon: <Link2 size={16} />, keywords: ["copy", "link", "url"], onSelect: () => void actions.copyLinks(targets) },
+    {
+      id: "issue:copy-branch",
+      group,
+      label: "브랜치 이름 복사",
+      icon: <GitBranch size={16} />,
+      shortcut: ["Ctrl", "Shift", "."],
+      keywords: ["git", "branch", "브랜치", "copy"],
+      onSelect: () => void actions.copyBranchName(targets),
+    },
+    ...(single && extras.favorite
+      ? [
+          {
+            id: "issue:favorite",
+            group,
+            label: extras.favorite.pinned ? "즐겨찾기에서 빼기" : "즐겨찾기에 추가",
+            icon: <Star size={16} />,
+            keywords: ["favorite", "pin", "star", "즐겨찾기", "별표"],
+            onSelect: () => extras.favorite!.toggle(single),
+          },
+        ]
+      : []),
     ...(single
       ? [{ id: "issue:duplicate", group, label: "복제", icon: <CopyPlus size={16} />, keywords: ["clone", "duplicate"], onSelect: () => void actions.duplicate(single) }]
       : []),
@@ -242,6 +354,7 @@ export function fieldPaletteItem(
   options: IssueFieldOptions,
   actions: IssueActionRunner,
   group?: string,
+  availability?: StatusAvailability,
 ): CommandItem {
   return {
     id: `field:${field}`,
@@ -252,7 +365,10 @@ export function fieldPaletteItem(
     shortcut: FIELD_SHORTCUTS[field],
     keywords: [field],
     placeholder: `${FIELD_TITLES[field]} — ${describeTargets(targets)}`,
-    items: fieldPageItems(field, targets, options, actions),
+    // 하위 페이지 항목은 들어갈 때 스냅숏이다 — 전환 목록을 아직 읽는 중이면 그 필드 페이지로 다시 연다(살아 있는 목록)
+    ...(field === "status" && availability?.state === "loading"
+      ? { onSelect: () => setTimeout(() => openCommandPalette("status"), 0) }
+      : { items: fieldPageItems(field, targets, options, actions, "", availability) }),
   };
 }
 
@@ -262,15 +378,17 @@ export function fieldPageItems(
   options: IssueFieldOptions,
   actions: IssueActionRunner,
   query = "",
+  availability?: StatusAvailability,
 ): CommandItem[] {
-  const choices = fieldChoices(field, targets, options);
+  const choices = fieldChoices(field, targets, options, field === "status" ? availability : undefined);
   const extra = field === "labels" ? newLabelChoice(query, options) : null;
   return [...choices, ...(extra ? [extra] : [])].map((choice) => ({
     id: choice.id,
     label: choice.label,
     icon: choice.icon,
-    description: choice.checked ? (field === "labels" ? "붙어 있음 · 고르면 뺌" : "현재 값") : undefined,
+    description: choice.description ?? (choice.checked ? (field === "labels" ? "붙어 있음 · 고르면 뺌" : "현재 값") : undefined),
+    disabled: choice.disabled,
     keywords: choice.id.startsWith("label-new:") ? [query] : undefined,
-    onSelect: () => void actions.update(targets, choice.patch, choice.successTitle),
+    onSelect: () => applyChoice(choice, targets, actions),
   }));
 }

@@ -16,11 +16,15 @@ import {
   Search,
   Settings,
   SquareKanban,
+  Star,
   UserCog,
 } from "lucide-react";
 import type { Issue, Project } from "../store/types";
 import { getCurrentUser, getIssueByKey, searchIssues } from "../store/jiraStore";
-import { listViewedIssues } from "../store/uiStore";
+import { isFavoriteSync, listViewedIssues, toggleFavorite } from "../store/uiStore";
+import { favoriteOfIssue, favoriteOfProject } from "./useFavorites";
+import { isCopyBranchKey } from "./branchName";
+import { useStatusAvailability } from "./statusAvailability";
 import { settleWithConcurrency } from "../store/concurrency";
 import type { IssueCommandScope, IssueFieldOptions, PaletteField } from "./commandScope";
 import { activeIssueScope, closeCommandPalette, usePaletteRequest } from "./commandScope";
@@ -108,6 +112,20 @@ export function CommandPaletteHost({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // ⌘/Ctrl+Shift+. — 현재 이슈(선택·커서·상세)의 git 브랜치 이름 복사(Linear와 같은 키). 수식 키 조합이라 단축키 끄기와 무관
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229 || !isCopyBranchKey(event)) return;
+      const scope = activeIssueScope();
+      const targets = scope?.getTargets() ?? [];
+      if (!scope || targets.length === 0) return;
+      event.preventDefault();
+      void scope.actions.copyBranchName(targets);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   // 속성 단축키·화면 버튼이 보낸 열기 요청
   useEffect(() => {
     if (request) show(request.field);
@@ -174,15 +192,24 @@ export function CommandPaletteHost({
   });
 
   const { scope, targets, options, field } = snapshot;
+  // 상태 하위 페이지는 가용 전환만 — 열린 동안 대상의 전환 목록을 읽는다(FE2 이월)
+  const statusAvailability = useStatusAvailability(targets, open && targets.length > 0);
+  /** 즐겨찾기 토글 뒤 항목 이름("추가/빼기")을 다시 그리게 */
+  const [favoriteTick, setFavoriteTick] = useState(0);
 
   const items = useMemo<CommandItem[]>(() => {
-    if (field && scope && options) return fieldPageItems(field, targets, options, scope.actions, query);
+    if (field && scope && options) return fieldPageItems(field, targets, options, scope.actions, query, statusAvailability);
 
     const list: CommandItem[] = [];
     if (scope && options && targets.length > 0) {
       list.push(
         ...issuePaletteCommands(targets, options, scope.actions, {
           onOpen: scope.source === "detail" ? undefined : (issue) => (scope.openIssue ? scope.openIssue(issue.key) : goIssue(issue)),
+          statusAvailability,
+          favorite: {
+            pinned: targets.length === 1 && isFavoriteSync("issue", targets[0].key),
+            toggle: (issue) => void toggleFavorite(favoriteOfIssue(issue)).then(() => setFavoriteTick((n) => n + 1)),
+          },
         }),
       );
     }
@@ -230,6 +257,15 @@ export function CommandPaletteHost({
         keywords: ["settings", currentProject.key],
         onSelect: () => navigate(`/projects/${currentProject.id}/settings`),
       });
+      const projectPinned = isFavoriteSync("project", currentProject.id);
+      list.push({
+        id: "favorite:project",
+        group: `이동 · ${currentProject.name}`,
+        label: projectPinned ? "프로젝트 즐겨찾기에서 빼기" : "프로젝트를 즐겨찾기에 추가",
+        icon: <Star size={16} />,
+        keywords: ["favorite", "star", "pin", "즐겨찾기", "별표", currentProject.key],
+        onSelect: () => void toggleFavorite(favoriteOfProject(currentProject)).then(() => setFavoriteTick((n) => n + 1)),
+      });
     }
 
     list.push(
@@ -244,7 +280,7 @@ export function CommandPaletteHost({
         keywords: ["search", "aql", "검색", query],
         onSelect: () => navigate(query.trim() ? `/search?q=${encodeURIComponent(query.trim())}` : "/search"),
       },
-      { id: "go:notifications", group: "이동", label: "알림", icon: <Bell size={16} />, keywords: ["notifications"], onSelect: onOpenNotifications },
+      { id: "go:notifications", group: "이동", label: "인박스", icon: <Bell size={16} />, shortcut: ["G", "N"], keywords: ["notifications", "inbox", "알림"], onSelect: onOpenNotifications },
       ...projects
         .filter((project) => project.id !== currentProject?.id)
         .map((project) => ({
@@ -263,7 +299,7 @@ export function CommandPaletteHost({
     return list;
     // goIssue·issueItem은 navigate만 닫아 쓴다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [field, scope, options, targets, query, results, recent, projects, currentProject, onCreateIssue, onShowShortcuts, onOpenNotifications, navigate]);
+  }, [field, scope, options, targets, query, results, recent, projects, currentProject, onCreateIssue, onShowShortcuts, onOpenNotifications, navigate, statusAvailability, favoriteTick]);
 
   return (
     <CommandPalette

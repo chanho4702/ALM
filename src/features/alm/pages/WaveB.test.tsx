@@ -274,10 +274,48 @@ describe("우클릭 메뉴", () => {
     vi.spyOn(store, "bulkUpdateIssues").mockRejectedValue(new Error("서버가 응답하지 않습니다"));
     const table = await openIssueList();
     fireEvent.contextMenu(within(rowOf(table, "ALM-5")).getByText("이슈 목록 필터 구현"));
-    await user.click(await screen.findByRole("menuitem", { name: "상태 변경" }));
-    fireEvent.click(await screen.findByRole("menuitemcheckbox", { name: "완료" }));
+    await user.click(await screen.findByRole("menuitem", { name: "우선순위 변경" }));
+    fireEvent.click(await screen.findByRole("menuitemcheckbox", { name: "최상" }));
     expect(await screen.findByText("서버가 응답하지 않습니다")).toBeInTheDocument();
+    // 낙관적으로 "최상"을 보였다가 되돌린다 — 원래 값(낮음)이 남는다
+    await waitFor(() => expect(within(rowOf(table, "ALM-5")).getByText("낮음")).toBeInTheDocument());
+    expect(within(rowOf(table, "ALM-5")).queryByText("최상")).not.toBeInTheDocument();
+  });
+
+  it("상태 하위 메뉴는 가용 전환만 — 고르면 워크플로 전환으로 가고, 거부되면 이유를 알린다(FE2 이월)", async () => {
+    const user = userEvent.setup();
+    const transitions = vi.spyOn(store, "listIssueTransitions");
+    vi.spyOn(store, "transitionIssue").mockRejectedValue(new Error("하위 작업이 남았습니다"));
+    const bulk = vi.spyOn(store, "bulkUpdateIssues");
+    const table = await openIssueList();
+    fireEvent.contextMenu(within(rowOf(table, "ALM-5")).getByText("이슈 목록 필터 구현"));
+    await user.click(await screen.findByRole("menuitem", { name: "상태 변경" }));
+    // 현재 상태(할 일)는 전환 목록에 없다 — 체크 항목이 아니라 일반 항목이다
+    fireEvent.click(await screen.findByRole("menuitem", { name: "완료" }));
+    expect(transitions).toHaveBeenCalled();
+    expect(await screen.findByText("하위 작업이 남았습니다", { exact: false })).toBeInTheDocument();
+    expect(bulk).not.toHaveBeenCalled();
     expect(within(rowOf(table, "ALM-5")).getByText("할 일")).toBeInTheDocument();
+  });
+
+  it("조건에 막힌 전환은 흐리게 이유와 함께 보인다", async () => {
+    const user = userEvent.setup();
+    const real = store.listIssueTransitions;
+    vi.spyOn(store, "listIssueTransitions").mockImplementation(async (id) => {
+      const result = await real(id);
+      return {
+        ...result,
+        transitions: result.transitions.map((t) =>
+          t.toName === "완료" ? { ...t, available: false, unavailableReason: "담당자만 완료할 수 있습니다" } : t,
+        ),
+      };
+    });
+    const table = await openIssueList();
+    fireEvent.contextMenu(within(rowOf(table, "ALM-5")).getByText("이슈 목록 필터 구현"));
+    await user.click(await screen.findByRole("menuitem", { name: "상태 변경" }));
+    const done = await screen.findByRole("menuitem", { name: /완료/ });
+    expect(done).toHaveAttribute("aria-disabled", "true");
+    expect(done).toHaveTextContent("담당자만 완료할 수 있습니다");
   });
 });
 

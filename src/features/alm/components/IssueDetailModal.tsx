@@ -62,7 +62,7 @@ import { StatusTransitionButton } from "./transitions/StatusTransitionButton";
 import { IssueFlagControl } from "./IssueFlagControl";
 import { IssueFlagMark } from "./IssueCard";
 import { useIssueTypes } from "./useIssueTypes";
-import { Copy, Lock, Plus, UserRound } from "lucide-react";
+import { Copy, GitBranch, Lock, Plus, Star, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
@@ -88,6 +88,9 @@ import { FieldLabel } from "./FieldLabel";
 import { formatDateTime } from "./time";
 import { useIssueActions } from "./useIssueActions";
 import { useIssueCommandScope } from "./commandScope";
+import { branchName } from "./branchName";
+import { favoriteOfIssue, useFavorites } from "./useFavorites";
+import "./favorites.css";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const NO_VERSION = "__no_version__";
@@ -754,7 +757,9 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
       await onIssueChanged();
     },
     onDeleted: () => onClose(),
+    statuses,
   });
+  const { isPinned: isFavorite, toggle: toggleFavorite } = useFavorites();
   useIssueCommandScope(
     issue
       ? {
@@ -856,6 +861,30 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           <span className="issue-ancestor-current">{issue.key}</span>
         </nav>
         <div className="issue-detail-toolbar">
+          <Button
+            variant="ghost"
+            size="small"
+            iconOnly
+            className="issue-branch-copy"
+            aria-label="브랜치 이름 복사"
+            aria-keyshortcuts="Control+Shift+Period Meta+Shift+Period"
+            title={`브랜치 이름 복사 (Ctrl+Shift+.) — ${branchName(issue)}`}
+            onClick={() => void commandActions.copyBranchName([issue])}
+          >
+            <GitBranch size={16} aria-hidden />
+          </Button>
+          <Button
+            variant="ghost"
+            size="small"
+            iconOnly
+            className={isFavorite("issue", issue.key) ? "favorite-toggle is-pinned" : "favorite-toggle"}
+            aria-label="즐겨찾기"
+            aria-pressed={isFavorite("issue", issue.key)}
+            title={isFavorite("issue", issue.key) ? "즐겨찾기에서 빼기" : "즐겨찾기에 추가(사이드바)"}
+            onClick={() => void toggleFavorite(favoriteOfIssue(issue))}
+          >
+            <Star size={16} fill={isFavorite("issue", issue.key) ? "currentColor" : "none"} aria-hidden />
+          </Button>
           <WatchButton issueId={issue.id} users={users} />
         </div>
       </div>

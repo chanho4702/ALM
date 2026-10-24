@@ -1,9 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ConfirmDialog, useToast } from "@chanho/react";
-import type { Issue, User } from "../store/types";
-import { bulkDeleteIssues, bulkUpdateIssues, cloneIssue, getCurrentUser } from "../store/jiraStore";
+import type { Issue, IssueTransitionOption, User, WorkflowStatus } from "../store/types";
+import { bulkDeleteIssues, bulkUpdateIssues, cloneIssue, getCurrentUser, listIssueTransitions } from "../store/jiraStore";
 import type { BulkIssuePatch } from "../store/jiraStore";
+import { branchName } from "./branchName";
+import { useTransitionRunner } from "./transitions/useTransitionRunner";
 
 /**
  * 이슈 조작 실행기 — 우클릭 메뉴·명령 팔레트·속성 단축키가 같은 경로로 바꾼다.
@@ -18,6 +20,13 @@ export interface IssueActionRunner {
   assignToMe: (targets: Issue[]) => Promise<void>;
   copyKeys: (targets: Issue[]) => Promise<void>;
   copyLinks: (targets: Issue[]) => Promise<void>;
+  /** git 브랜치 이름 복사(Linear ⌘⇧.) — 여러 건이면 줄마다 하나 */
+  copyBranchName: (targets: Issue[]) => Promise<void>;
+  /**
+   * 상태 전환(FE2 이월) — 대상마다 **워크플로 엔진의 가용 전환**으로 간다(`listIssueTransitions` → 도착 상태가 같은
+   * 첫 가능 전환). 전환 화면이 있으면 창을 띄운다. 갈 수 없는 이슈는 이유와 함께 실패로 모아 알린다.
+   */
+  transition: (targets: Issue[], toStatus: string, toName: string) => Promise<void>;
   duplicate: (target: Issue) => Promise<void>;
   /** 삭제 확인 창을 연다(바로 지우지 않는다) */
   requestDelete: (targets: Issue[]) => void;
@@ -30,6 +39,8 @@ export interface UseIssueActionsOptions {
   reload: () => void | Promise<void>;
   /** 삭제가 끝나면(선택 해제·미리보기 닫기 등) */
   onDeleted?: (ids: string[]) => void;
+  /** 전환 화면 창이 쓰는 워크플로 상태(글리프·이름) — 없으면 상태 id로 그린다 */
+  statuses?: WorkflowStatus[];
 }
 
 /** 일괄 변경 패치를 화면의 이슈 하나에 적용한 모습 — 서버 응답 전 미리 보여 줄 값 */
@@ -70,7 +81,9 @@ function currentUser(): Promise<User> {
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-export function useIssueActions({ setIssues, reload, onDeleted }: UseIssueActionsOptions): {
+const NO_STATUSES: WorkflowStatus[] = [];
+
+export function useIssueActions({ setIssues, reload, onDeleted, statuses = NO_STATUSES }: UseIssueActionsOptions): {
   actions: IssueActionRunner;
   dialogs: ReactNode;
 } {
@@ -162,6 +175,56 @@ export function useIssueActions({ setIssues, reload, onDeleted }: UseIssueAction
     [copy],
   );
 
+  const copyBranchName = useCallback(
+    (targets: Issue[]) =>
+      copy(
+        targets.map((issue) => branchName(issue)).join("\n"),
+        targets.length === 1 ? `브랜치 이름 ${branchName(targets[0])}을(를) 복사했습니다` : `브랜치 이름 ${targets.length}개를 복사했습니다`,
+      ),
+    [copy],
+  );
+
+  const runner = useTransitionRunner(statuses);
+  const runTransition = runner.run;
+  const transition = useCallback(
+    async (targets: Issue[], toStatus: string, toName: string) => {
+      const pending = targets.filter((issue) => issue.status !== toStatus);
+      if (pending.length === 0) return;
+      const failed: string[] = [];
+      let done = 0;
+      // 한 건씩 — 전환 화면이 있으면 창을 하나씩 띄운다(겹쳐 뜨지 않게)
+      for (const issue of pending) {
+        let option: IssueTransitionOption | undefined;
+        try {
+          const options = (await listIssueTransitions(issue.id)).transitions;
+          const toTarget = options.filter((o) => o.to === toStatus);
+          option = toTarget.find((o) => o.available);
+          if (!option) {
+            failed.push(`${issue.key}: ${toTarget[0]?.unavailableReason ?? `지금 상태에서 ${toName}(으)로 가는 전환이 없습니다`}`);
+            continue;
+          }
+        } catch (error) {
+          failed.push(`${issue.key}: ${message(error)}`);
+          continue;
+        }
+        const outcome = await runTransition(issue, option);
+        if (outcome.kind === "done") done += 1;
+        else if (outcome.kind === "failed") failed.push(`${issue.key}: ${message(outcome.error)}`);
+      }
+      if (failed.length > 0) {
+        toast({
+          title: done > 0 ? `${done}개는 바꿨고 ${failed.length}개는 바꾸지 못했습니다` : "상태를 바꾸지 못했습니다",
+          description: failed.join(" · "),
+          appearance: "danger",
+        });
+      } else if (done > 0) {
+        toast({ title: `상태를 ${toName}(으)로 바꿨습니다`, appearance: "success" });
+      }
+      await latest.current.reload();
+    },
+    [toast, runTransition],
+  );
+
   const duplicate = useCallback(
     async (target: Issue) => {
       try {
@@ -207,6 +270,8 @@ export function useIssueActions({ setIssues, reload, onDeleted }: UseIssueAction
   };
 
   const dialogs = (
+    <>
+    {runner.element}
     <ConfirmDialog
       open={deleting !== null}
       onOpenChange={(open) => {
@@ -219,16 +284,19 @@ export function useIssueActions({ setIssues, reload, onDeleted }: UseIssueAction
       loading={busy}
       onConfirm={() => void confirmDelete()}
     />
+    </>
   );
 
   // 실행기 객체는 매 렌더 새로 만들지 않는다 — 범위(commandScope)·메뉴가 같은 참조를 오래 들고 있어도 된다
   const actionsRef = useRef<IssueActionRunner | null>(null);
-  actionsRef.current = { update, assignToMe, copyKeys, copyLinks, duplicate, requestDelete };
+  actionsRef.current = { update, assignToMe, copyKeys, copyLinks, copyBranchName, transition, duplicate, requestDelete };
   const [actions] = useState<IssueActionRunner>(() => ({
     update: (...args) => actionsRef.current!.update(...args),
     assignToMe: (...args) => actionsRef.current!.assignToMe(...args),
     copyKeys: (...args) => actionsRef.current!.copyKeys(...args),
     copyLinks: (...args) => actionsRef.current!.copyLinks(...args),
+    copyBranchName: (...args) => actionsRef.current!.copyBranchName(...args),
+    transition: (...args) => actionsRef.current!.transition(...args),
     duplicate: (...args) => actionsRef.current!.duplicate(...args),
     requestDelete: (...args) => actionsRef.current!.requestDelete(...args),
   }));

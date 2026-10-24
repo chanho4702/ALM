@@ -65,6 +65,7 @@ export const SHORTCUT_GROUPS: { title: string; rows: ShortcutRow[] }[] = [
       { id: "prop-assignee", keys: "a", label: "담당자 바꾸기" },
       { id: "prop-labels", keys: "l", label: "라벨(상세는 라벨 입력)" },
       { id: "prop-assign-me", keys: "i", label: "나에게 할당" },
+      { id: "copy-branch", keys: "Ctrl+Shift+.", label: "git 브랜치 이름 복사(맥은 ⌘⇧.) — alm-12-login-bug 형식" },
     ],
   },
   {
