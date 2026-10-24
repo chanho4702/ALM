@@ -642,12 +642,15 @@ export function SearchPage() {
               </div>
             ) : null}
           </div>
-          <Table
-            aria-label="검색 결과"
-            columns={columns}
-            rows={issues}
-            onRowClick={(issue) => openIssue(issue.key)}
-          />
+          {/* 좁은 폭에서 제목 열이 한 글자 폭으로 줄어 세로로 쌓이지 않게 — 표가 최소 폭을 갖고 가로로 스크롤한다 */}
+          <div className="search-table-scroll">
+            <Table
+              aria-label="검색 결과"
+              columns={columns}
+              rows={issues}
+              onRowClick={(issue) => openIssue(issue.key)}
+            />
+          </div>
         </>
       )}
 

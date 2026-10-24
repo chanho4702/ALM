@@ -95,7 +95,7 @@ export function BacklogIssueRow({
       <span onClick={(e) => e.stopPropagation()}>
         <Dropdown
           trigger={
-            <Button variant="subtle" size="small" aria-label={`${issue.key} 액션`}>
+            <Button variant="subtle" size="small" iconOnly aria-label={`${issue.key} 액션`}>
               <MoreHorizontal size={16} />
             </Button>
           }

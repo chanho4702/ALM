@@ -117,12 +117,15 @@ body {
   align-items: center;
   gap: var(--chanho-space-100);
   width: 100%;
-  padding: var(--chanho-space-100);
+  /* 지라 사이드바 실측: 항목 32px·반경 6px */
+  min-height: var(--chanho-space-400);
+  padding: var(--chanho-space-75) var(--chanho-space-100);
   border: 0;
   border-radius: var(--chanho-radius-medium);
   background: none;
   font: inherit;
   font-size: var(--chanho-font-size-100);
+  line-height: var(--chanho-space-250);
   color: var(--chanho-color-text-default);
   text-align: left;
   cursor: pointer;
@@ -132,10 +135,18 @@ body {
   background: var(--chanho-color-background-neutral-hovered);
 }
 
+/* 선택 — 지라: 옅은 파랑 배경 + 브랜드 글자, 굵기는 그대로(400) */
 .global-nav-item.is-active {
   background: var(--chanho-color-background-selected);
   color: var(--chanho-color-text-selected);
-  font-weight: var(--chanho-font-weight-medium);
+}
+
+.global-nav-item.is-active:hover {
+  background: var(--chanho-color-background-selected-hovered);
+}
+
+.global-nav-add {
+  min-height: var(--chanho-space-400);
 }
 
 .global-nav-avatar {
@@ -241,9 +252,9 @@ body {
   border-left: 1px solid var(--chanho-color-border-default);
 }
 
+/* "+ 새 보드" — 다른 하위 항목과 같은 글자 크기(예전 12px은 같은 목록에서 혼자 작았다) */
 .global-nav-add {
   color: var(--chanho-color-text-subtle);
-  font-size: var(--chanho-font-size-75);
 }
 
 /* ── 프로젝트 콘텐츠 영역 ────────────────────────────────── */
@@ -278,59 +289,123 @@ body {
   font-size: var(--chanho-font-size-300);
 }
 
-/* 프로젝트 헤더 — 아바타 + 이름(h1) + 별표 (지라 프로젝트 화면 상단) */
+/* 프로젝트 헤더 — 아바타 + 이름(h1) + 별표 + ⋯ (지라 프로젝트 화면 상단).
+   이름이 길면 이름만 말줄임되고 별표·⋯는 제자리에 남는다(min-width:0) */
 .project-header {
   display: flex;
   align-items: center;
   gap: var(--chanho-space-100);
+  min-width: 0;
   padding: var(--chanho-space-100) var(--chanho-space-400) 0;
 }
 
-.project-header-name {
+.project-header > * {
+  flex-shrink: 0;
+}
+
+.project-header .project-header-name {
+  flex-shrink: 1;
+  min-width: 0;
   margin: 0;
   font-size: var(--chanho-font-size-300);
   font-weight: var(--chanho-font-weight-bold);
+  line-height: var(--chanho-space-400);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 헤더 별표 — 꺼졌을 때는 보조 톤, 켜지면 아래 .project-star.is-starred가 노란 별로 */
-.project-header .project-star {
+/* 헤더 별표·⋯ — 꺼졌을 때는 보조 톤, 켜지면 아래 .project-star.is-starred가 노란 별로 */
+.project-header .project-star,
+.project-header .project-header-more {
   color: var(--chanho-color-text-subtle);
 }
 
-/* 가로 뷰 탭 — 밑줄 액티브 (지라의 요약/보드/타임라인 탭) */
+/* 가로 뷰 탭 — 지라 실측: 탭 32px(패딩 6px 8px)·반경 6px·선택 밑줄 2px.
+   넘치는 탭은 "더 보기" 메뉴로 접히므로(ProjectTabs) 가로 스크롤을 두지 않는다 */
 .project-tabs {
+  position: relative;
   display: flex;
-  gap: var(--chanho-space-100);
-  padding: var(--chanho-space-50) var(--chanho-space-400) 0;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  min-width: 0;
+  padding: var(--chanho-space-100) var(--chanho-space-400) 0;
   border-bottom: 1px solid var(--chanho-color-border-default);
-  overflow-x: auto;
-  overflow-y: hidden; /* auto면 -1px 마진 트릭 때문에 세로 스크롤바가 생긴다 */
+  overflow: hidden;
 }
 
 .project-tab {
-  padding: var(--chanho-space-100) var(--chanho-space-150);
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  height: var(--chanho-space-400);
+  margin-bottom: var(--chanho-space-75);
+  padding: var(--chanho-space-75) var(--chanho-space-100);
   border: 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px; /* 보더 라인과 겹치게 */
+  border-radius: var(--chanho-radius-medium);
   background: none;
   font: inherit;
   font-size: var(--chanho-font-size-100);
   font-weight: var(--chanho-font-weight-medium);
+  line-height: var(--chanho-space-250);
   color: var(--chanho-color-text-subtle);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .project-tab:hover {
+  background: var(--chanho-color-background-neutral-hovered);
   color: var(--chanho-color-text-default);
 }
 
+.project-tab:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: -2px;
+}
+
 .project-tab.is-active {
-  color: var(--chanho-color-text-brand);
-  border-bottom-color: var(--chanho-color-border-brand);
+  color: var(--chanho-color-text-selected);
+}
+
+/* 선택 밑줄 — 탭 아래 여백(6px)을 건너 나비 경계선 위에 2px로 앉는다 */
+.project-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: var(--chanho-space-100);
+  right: var(--chanho-space-100);
+  bottom: calc(-1 * var(--chanho-space-75) - 1px);
+  height: 2px;
+  border-radius: var(--chanho-radius-xsmall);
+  background: var(--chanho-color-border-selected);
+}
+
+.project-tab-more svg {
+  flex-shrink: 0;
+}
+
+/* 탭 폭 측정 줄 — 보이지 않고 자리를 차지하지 않는다. 글자는 attr()로만 그려 텍스트 노드가 없다 */
+.project-tabs-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+}
+
+.project-tabs-measure .project-tab::before {
+  content: attr(data-label);
+}
+
+/* DS Dropdown 항목 아이콘 자리 맞춤(선택 체크가 없는 항목) */
+.dropdown-icon-spacer {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
 }
 
 /* 탭 아래 얇은 뷰 액션 행 (스프린트 뱃지·버튼 등) */
@@ -749,10 +824,23 @@ body {
 }
 
 .create-issue-link-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: var(--chanho-space-100);
+}
+
+.create-issue-link-row > div {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.create-issue-link-row > div:nth-child(2) {
+  flex-grow: 1.6;
+}
+
+.create-issue-link-row > button {
+  flex: 0 0 auto;
 }
 
 .create-issue-link-list {
@@ -833,10 +921,19 @@ body {
   gap: var(--chanho-space-200);
 }
 
+/* 두 칸 줄 — 칸 최소 폭은 DS Select 최소 폭(180px). 폰 폭 모달에서는 한 칸으로 접힌다
+   (예전 고정 2열은 390px에서 Select가 옆 칸·모달 가장자리를 넘었다) */
 .create-issue-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--chanho-space-150);
+}
+
+.create-issue-grid button[role="combobox"],
+.create-issue-assignee button[role="combobox"],
+.create-issue-link-row button[role="combobox"] {
+  width: 100%;
+  min-width: 0;
 }
 
 .search-modal.search-modal {
@@ -1067,21 +1164,28 @@ body {
   color: var(--chanho-color-text-subtle);
 }
 
-/* 필터 드롭다운 (지라 Basic 필터 버튼) */
+/* 필터 드롭다운 (지라 Basic 필터 버튼) — 트리거는 DS 버튼과 같은 32px, 패널은 usePopoverPanel이
+   트리거 폭을 최소 폭으로 주고 화면 가장자리에서 뒤집는다(.is-align-end / .is-above) */
 .filter-dropdown {
   position: relative;
+  min-width: 0;
 }
 
 .filter-dropdown-trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--chanho-space-50);
-  padding: var(--chanho-space-75) var(--chanho-space-150);
+  max-width: 100%;
+  height: var(--chanho-space-400);
+  padding: 0 var(--chanho-space-100) 0 var(--chanho-space-150);
   border: 1px solid var(--chanho-color-border-default);
   border-radius: var(--chanho-radius-medium);
   background: var(--chanho-color-background-surface);
   font: inherit;
-  color: inherit;
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-medium);
+  line-height: var(--chanho-space-250);
+  color: var(--chanho-color-text-subtle);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1090,57 +1194,135 @@ body {
   background: var(--chanho-color-background-neutral-hovered);
 }
 
+.filter-dropdown-trigger:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: 2px;
+}
+
+.filter-dropdown-trigger[aria-expanded="true"] {
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-selected);
+}
+
 .filter-dropdown-trigger.is-active {
-  border-color: var(--chanho-color-border-brand);
-  background: var(--chanho-color-background-brand-subtle);
-  color: var(--chanho-color-text-brand);
+  border-color: var(--chanho-color-border-selected);
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-selected);
+}
+
+/* 긴 선택 요약("담당자: 아주 긴 이름 외 2")은 말줄임 — 트리거가 툴바를 밀어내지 않게 */
+.filter-dropdown-summary {
+  min-width: 0;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .filter-dropdown-caret {
-  font-size: 10px;
-  color: var(--chanho-color-text-subtle);
+  flex-shrink: 0;
+  color: currentColor;
 }
 
 .filter-dropdown-panel {
   position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
+  z-index: var(--chanho-z-dropdown);
+  top: calc(100% + var(--chanho-space-50));
   left: 0;
+  /* 내용 폭으로 — 오른쪽 정렬(right:0)일 때 좁은 트리거 폭에 갇혀 글자가 세로로 쌓이지 않게 */
+  width: max-content;
   min-width: 200px;
-  max-height: 280px;
+  max-width: min(360px, calc(100vw - var(--chanho-space-200)));
+  max-height: 320px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--chanho-space-50);
-  padding: var(--chanho-space-100);
-  border: 1px solid var(--chanho-color-border-default);
+  gap: var(--chanho-space-25);
+  padding: var(--chanho-space-75) 0;
   border-radius: var(--chanho-radius-medium);
-  background: var(--chanho-color-background-surface-raised);
+  background: var(--chanho-color-background-surface-overlay);
   box-shadow: var(--chanho-shadow-overlay);
+}
+
+.filter-dropdown-panel.is-align-end {
+  left: auto;
+  right: 0;
+}
+
+.filter-dropdown-panel.is-above {
+  top: auto;
+  bottom: calc(100% + var(--chanho-space-50));
+}
+
+/* 멀티선택 체크박스 행 — 지라 메뉴 항목처럼 패널 가로 전체가 눌리는 32px 행 */
+.filter-dropdown-panel .filter-dropdown-check {
+  min-height: var(--chanho-space-400);
+  padding: var(--chanho-space-50) var(--chanho-space-150);
+}
+
+.filter-dropdown-panel .filter-dropdown-check:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.filter-dropdown-search {
+  margin: 0 var(--chanho-space-100) var(--chanho-space-50);
+  height: var(--chanho-space-400);
+  padding: 0 var(--chanho-space-100);
+  border: 1px solid var(--chanho-color-border-input);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-input);
+  font: inherit;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-default);
+}
+
+.filter-dropdown-search:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: -1px;
+}
+
+.filter-dropdown-empty {
+  margin: 0;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-subtle);
 }
 
 /* 단일 선택 모드(multiple=false)의 라디오 항목 — 스토어 필터 계약이 단일 값인 화면용 */
 .filter-dropdown-option {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
   width: 100%;
-  padding: var(--chanho-space-50) var(--chanho-space-100);
+  min-height: var(--chanho-space-400);
+  padding: var(--chanho-space-50) var(--chanho-space-150);
   border: 0;
-  border-radius: var(--chanho-radius-small);
+  border-radius: 0;
   background: none;
   font: inherit;
-  color: inherit;
+  font-size: var(--chanho-font-size-100);
+  color: var(--chanho-color-text-default);
   text-align: left;
   cursor: pointer;
 }
 
-.filter-dropdown-option:hover {
+.filter-dropdown-option:hover,
+.filter-dropdown-option:focus-visible {
   background: var(--chanho-color-background-neutral-hovered);
+  outline: none;
+}
+
+.filter-dropdown-option:focus-visible {
+  box-shadow: inset 2px 0 0 var(--chanho-color-border-focused);
 }
 
 .filter-dropdown-option.is-selected {
-  background: var(--chanho-color-background-brand-subtle);
-  color: var(--chanho-color-text-brand);
-  font-weight: var(--chanho-font-weight-medium);
+  background: var(--chanho-color-background-selected);
+  color: var(--chanho-color-text-selected);
+}
+
+.filter-dropdown-check-mark {
+  flex-shrink: 0;
 }
 
 /* 결과 머리글 한 줄 — 범위 표시 + 페이지 이동(AQL은 서버가 자른 한 페이지만 그린다) */
@@ -1346,12 +1528,71 @@ body {
   gap: var(--chanho-space-100);
 }
 
-.status-editor-row {
-  display: grid;
-  /* 첫 칸은 상태 글리프 + 카테고리 Lozenge 한 쌍 */
-  grid-template-columns: 108px 1fr auto;
+/*
+ * 레지스트리 편집 행·추가 폼(상태·카테고리·이슈 타입·우선순위·링크 타입·컴포넌트·워크플로 상태) —
+ * flex 줄바꿈 레이아웃. 예전 grid는 패널마다 자식 수가 다른데 같은 열 정의를 나눠 썼고, 고정 열(150~170px)이
+ * DS Select의 최소 폭(180px)보다 좁아 칸끼리 겹치거나, 남는 1fr 열(이름)이 0으로 줄어 글자가 세로로 쌓였다.
+ * 이제 입력·선택 칸은 최소 180px에서 늘고, 자리가 모자라면 다음 줄로 내려간다. 같은 패널의 행은 자식 구성이
+ * 같아 줄마다 같은 폭으로 정렬된다(사용 수 칸은 고정 폭).
+ */
+.status-editor-row,
+.status-editor-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: var(--chanho-space-100);
+  min-width: 0;
+}
+
+.status-editor-add {
+  padding-top: var(--chanho-space-150);
+  border-top: 1px solid var(--chanho-color-border-default);
+}
+
+/* 입력·선택 칸(DS TextField/Select 루트는 div) */
+.status-editor-row > div:not(.status-editor-row-actions),
+.status-editor-add > div {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+/* DS Select 루트는 inline-flex라 칸 폭을 채우지 않는다 — 트리거가 칸 폭을 따르게 */
+.status-editor-row > div:not(.status-editor-row-actions) button[role="combobox"],
+.status-editor-add > div button[role="combobox"] {
+  width: 100%;
+}
+
+/* 첫 칸(이름)은 조금 더 넓게 */
+.status-editor-add > div:first-child {
+  flex-grow: 2;
+}
+
+/* 글리프·로젠지·사용 수·액션은 내용 폭 그대로, 입력과 같은 높이(36px) 가운데에 */
+.status-editor-row > span,
+.status-editor-row > .status-editor-row-actions,
+.status-editor-add > button {
+  flex: 0 0 auto;
+  display: inline-flex;
   align-items: center;
+  min-height: 36px;
+}
+
+.status-editor-row > span:first-child {
+  gap: var(--chanho-space-50);
+}
+
+.status-editor-row--category > span:first-child {
+  min-width: 72px;
+}
+
+.status-editor-row--registry > span:first-child,
+.status-editor-row:not([class*="--"]) > span:first-child {
+  min-width: 108px;
+}
+
+.status-editor-row--type > span:first-child {
+  justify-content: center;
+  min-width: 32px;
 }
 
 .status-editor-name {
@@ -1359,49 +1600,10 @@ body {
 }
 
 .status-editor-usage {
+  min-width: 80px;
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
   white-space: nowrap;
-}
-
-/* 전역 관리의 레지스트리 편집 행 — 로젠지 · 이름 · 카테고리/의미/색 · 사용 수 · 액션 */
-.status-editor-row--category {
-  grid-template-columns: 72px minmax(0, 1fr) 180px 180px auto auto;
-  align-items: end;
-}
-
-/* 상태 레지스트리 행 — 글리프+카테고리 · 이름 · 카테고리 · 아이콘 · 사용 수 · 액션 */
-.status-editor-row--registry {
-  grid-template-columns: 108px minmax(0, 1fr) 200px 170px auto auto;
-  align-items: end;
-}
-
-.status-editor-row--category .status-editor-usage,
-.status-editor-row--registry .status-editor-usage,
-.status-editor-row--category .status-editor-row-actions,
-.status-editor-row--registry .status-editor-row-actions {
-  margin-bottom: var(--chanho-space-100);
-}
-
-/* 기본 .status-editor-add(3열)보다 뒤에 오지 않으므로 특이도로 이긴다 */
-.status-editor-add.status-editor-add--3 {
-  grid-template-columns: minmax(0, 1fr) 180px 180px auto;
-}
-
-.status-editor-add.status-editor-add--4 {
-  grid-template-columns: minmax(0, 1fr) 150px 150px 150px auto;
-}
-
-/* 이슈 타입 행 — 글리프 · 이름 · 계층/아이콘/색 · 사용 수 · 액션 */
-.status-editor-row--type {
-  grid-template-columns: 32px minmax(120px, 1fr) 170px 170px 180px auto auto;
-  align-items: end;
-}
-
-.status-editor-row--type .status-editor-usage,
-.status-editor-row--type .status-editor-row-actions,
-.status-editor-row--type .status-editor-glyph {
-  margin-bottom: var(--chanho-space-100);
 }
 
 .status-editor-glyph {
@@ -1409,35 +1611,21 @@ body {
   justify-content: center;
 }
 
-.status-editor-row > span:first-child {
-  margin-bottom: var(--chanho-space-100);
-}
-
 .status-editor-row-actions {
   display: flex;
   gap: var(--chanho-space-50);
+  margin-left: auto; /* 줄이 바뀌어도 액션은 오른쪽 끝 — 왼쪽에 홀로 떨어지지 않게 */
 }
 
-.status-editor-add {
-  display: grid;
-  grid-template-columns: 1fr 140px auto;
-  gap: var(--chanho-space-100);
-  align-items: end;
-  padding-top: var(--chanho-space-100);
-  border-top: 1px solid var(--chanho-color-border-default);
+/* 행이 줄바꿈될 수 있으니 행 사이를 실선으로 갈라 한 행의 칸들이 한 덩어리로 읽히게 */
+.status-editor-list > .status-editor-row {
+  padding-bottom: var(--chanho-space-100);
+  border-bottom: 1px solid var(--chanho-color-border-default);
 }
 
-@media (max-width: 720px) {
-  .status-editor-row,
-  .status-editor-row--category,
-  .status-editor-row--registry,
-  .status-editor-row--type,
-  .status-editor-add,
-  .status-editor-add--3,
-  .status-editor-add--4 {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
+.status-editor-list > .status-editor-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 @media (max-width: 720px) {
@@ -1815,6 +2003,44 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--chanho-space-50);
+}
+
+/* 이슈 목록 행의 라벨 — 한 줄 고정(첫 라벨 + "+N") */
+.issue-card-labels.issue-row-labels {
+  position: relative; /* 시각 숨김 텍스트(absolute)가 표 스크롤 상자를 빠져나가 페이지 가로 스크롤을 만들지 않게 */
+  flex-wrap: nowrap;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.issue-row-labels > :first-child {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+
+.issue-label-more {
+  flex-shrink: 0;
+  padding: 0 var(--chanho-space-50);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  font-size: var(--chanho-font-size-75);
+  line-height: var(--chanho-space-250);
+  color: var(--chanho-color-text-subtle);
+}
+
+/* 시각만 숨기고 스크린리더에는 남기는 텍스트 */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* 이슈 타입 글리프 — 지라 타입 아이콘의 색 언어 (작업 파랑/스토리 초록/버그 빨강/에픽 주황) */
@@ -2356,8 +2582,15 @@ body {
 
 .sprint-panel-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--chanho-space-100);
+  gap: var(--chanho-space-50) var(--chanho-space-100);
+  min-width: 0;
+}
+
+.sprint-panel-header > h3,
+.sprint-panel-header > span {
+  white-space: nowrap;
 }
 
 .sprint-panel-header h3 {
@@ -2370,6 +2603,7 @@ body {
 /* 액션 그룹 — 계획 수정·시작/완료를 오른쪽 한 덩어리로 (지라) */
 .sprint-panel-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--chanho-space-100);
   margin-left: auto;
@@ -2552,6 +2786,36 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--chanho-font-size-100);
+}
+
+.backlog-row > .status-cell {
+  flex-shrink: 0;
+  min-width: 96px;
+}
+
+.backlog-row > .status-cell + .status-cell {
+  flex-shrink: 0;
+  min-width: 72px;
+}
+
+/* 좁은 패널 — 키·제목이 첫 줄, 상태·우선순위·담당·⋯가 둘째 줄(제목이 두 글자로 잘리지 않게) */
+.sprint-panel-issues {
+  container-type: inline-size;
+}
+
+@container (max-width: 520px) {
+  .backlog-row {
+    flex-wrap: wrap;
+    row-gap: var(--chanho-space-50);
+  }
+
+  .backlog-row-title {
+    flex-basis: calc(100% - 96px);
+  }
+
+  .backlog-row > .backlog-row-title + .status-cell {
+    margin-left: var(--chanho-space-300);
+  }
 }
 
 .backlog-create-form {
@@ -2832,6 +3096,13 @@ body {
   gap: var(--chanho-space-200);
 }
 
+@media (max-width: 480px) {
+  .dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--chanho-space-100);
+  }
+}
+
 /* 상태 카운트 타일 — 왼쪽 액센트가 상태 색 언어를 잇는다 */
 .stat-tile {
   position: relative;
@@ -2911,6 +3182,15 @@ body {
 }
 
 /* 노드 색은 상태 카테고리 색(레지스트리)을 따른다 — 라이브러리 기본값을 쓰지 않는다 */
+/* 라이브러리 출처 표기 — 기본 회색(#999 on #f8f8f8)이 대비 2.7:1이라 토큰 색으로(다크에서도 따라 바뀜) */
+.workflow-flow .react-flow__attribution {
+  background: var(--chanho-color-background-surface);
+}
+
+.workflow-flow .react-flow__attribution a {
+  color: var(--chanho-color-text-subtle);
+}
+
 .workflow-flow .react-flow__node.workflow-node {
   width: 160px;
   padding: var(--chanho-space-100) var(--chanho-space-150);
@@ -3089,6 +3369,7 @@ body {
 .timeline-chart {
   height: 520px;
   border-top: 1px solid var(--chanho-color-border-default);
+  border-bottom: 1px solid var(--chanho-color-border-default);
   /* 간트 내용이 짧아도 패널 바닥까지 같은 면으로 — 다크에서 경계가 드러난다 */
   background: var(--chanho-color-background-surface);
   overflow: hidden;
@@ -3350,19 +3631,27 @@ body {
   gap: var(--chanho-space-100);
 }
 
+/* 사람 추가·버전 만들기 줄 — 칸은 최소 180px(DS Select 최소 폭)에서 늘고 모자라면 줄바꿈.
+   예전 2열 grid는 사이드바가 있는 768px 폭에서 칸이 180px보다 좁아져 Select끼리 겹쳤다 */
 .member-add {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: var(--chanho-space-150);
 }
 
-/* DS Select 트리거가 180px 최소폭이라 좁은 화면에서는 3열이 카드를 넘친다 */
-@media (max-width: 640px) {
-  .member-add {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: stretch;
-  }
+.member-add > div {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.member-add > div button[role="combobox"],
+.project-details-grid button[role="combobox"] {
+  width: 100%;
+}
+
+.member-add > button {
+  flex: 0 0 auto;
 }
 
 /* ── 리포트(번다운·스프린트 리포트) ─────────────────────── */
@@ -3408,6 +3697,11 @@ body {
 
 .reports-chart {
   width: 100%;
+}
+
+.timeline-chart + .reports-table,
+.timeline-chart ~ .reports-table {
+  margin-top: var(--chanho-space-150);
 }
 
 .reports-table summary {
@@ -3557,6 +3851,30 @@ body {
 .dash-issue-meta {
   font-size: var(--chanho-font-size-75);
   color: var(--chanho-color-text-subtle);
+}
+
+@media (max-width: 600px) {
+  .dash-issue-row {
+    grid-template-columns: 56px auto minmax(0, 1fr);
+    row-gap: var(--chanho-space-50);
+  }
+
+  .dash-issue-row > .dash-issue-title {
+    grid-column: 2 / -1;
+  }
+
+  .dash-issue-row > :nth-child(n + 3) {
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .dash-issue-row > :nth-child(3) {
+    grid-column: 2;
+  }
+
+  .dash-issue-row > :nth-child(4) {
+    grid-column: 3;
+  }
 }
 
 /* 활성 스프린트·완료 진행 */
@@ -3716,11 +4034,25 @@ body {
 }
 
 .issue-table-scroll table {
-  /* 제목을 뺀 고정 열 합(908px)보다 넉넉히 커야 제목이 남는 폭을 먹는다 (2026-09-04 손질 §4) */
+  /* 제목을 뺀 고정 열 합(920px)보다 넉넉히 커야 제목이 남는 폭을 먹는다 (2026-09-04 손질 §4) */
   min-width: 1120px;
 }
 
 .issue-table-scroll td {
+  white-space: nowrap;
+}
+
+/* 검색 결과 표 — 고정 열 합(728px) + 제목 최소 폭 */
+.search-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.search-table-scroll table {
+  min-width: 960px;
+}
+
+.search-table-scroll td {
   white-space: nowrap;
 }
 
@@ -3789,16 +4121,7 @@ th:last-child > [role="separator"] {
   opacity: 0.7;
 }
 
-/* 인라인 만들기 폼 — 만들기 옆에 취소가 붙어 한 줄로 (member-add 3열 + 취소) */
-.release-create-form.release-create-form {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
-}
-
-@media (max-width: 640px) {
-  .release-create-form.release-create-form {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+/* 인라인 만들기 폼은 .member-add(flex 줄바꿈)를 그대로 쓴다 — 만들기 옆에 취소가 붙는다 */
 
 .release-row-head {
   display: flex;
@@ -3807,8 +4130,11 @@ th:last-child > [role="separator"] {
   flex-wrap: wrap;
 }
 
-.release-row-spacer {
-  flex: 1;
+.release-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  margin-left: auto;
 }
 
 .release-name {
@@ -4011,9 +4337,13 @@ th:last-child > [role="separator"] {
   color: var(--chanho-color-text-subtle);
 }
 
+/* 선택 열 — 머리글(DS Checkbox)과 행(날 input)이 같은 세로·가로 중심에 서게 블록 flex로.
+   inline-flex면 글자 기준선에 붙어 행마다 1~2px 위로 떠 보였다 */
 .issue-select {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  min-height: var(--chanho-space-300);
 }
 
 /* 행의 날 체크박스 — 머리글은 DS Checkbox라 자식 선택자로 행만 겨냥한다 */
@@ -4221,9 +4551,10 @@ th:last-child > [role="separator"] {
   gap: var(--chanho-space-100);
   margin-bottom: var(--chanho-space-150);
 }
+/* 칸 최소 폭 = DS Select 최소 폭(180px) — 좁으면 한 열로 접힌다(390px에서 2열 Select가 겹쳤다) */
 .project-details-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--chanho-space-150);
 }
 .shortcut-list {
@@ -4321,11 +4652,21 @@ th:last-child > [role="separator"] {
   display: flex;
   gap: var(--chanho-space-50);
 }
-.project-shortcuts {
+.project-header .project-shortcuts {
   display: flex;
-  flex-wrap: wrap;
+  flex-shrink: 1;
+  flex-wrap: nowrap;
   gap: var(--chanho-space-100);
+  min-width: 0;
   margin-left: auto;
+  overflow: hidden;
+}
+
+.project-shortcut-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .project-shortcuts a {
   display: inline-flex;

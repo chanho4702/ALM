@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import { Checkbox } from "@chanho/react";
+import { usePopoverPanel } from "./usePopoverPanel";
 import { ValueWithIcon } from "./ValueWithIcon";
 
 export interface FilterOption {
@@ -34,9 +36,13 @@ export interface FilterDropdownProps {
   clearValue?: string;
 }
 
+/** 옵션이 이보다 많으면 패널 맨 위에 검색 입력을 둔다(지라 필터: 담당자·라벨처럼 긴 목록) */
+const SEARCH_THRESHOLD = 8;
+
 /**
  * 지라 이슈 검색의 필터 드롭다운 모방 — 체크박스 멀티 선택, 열린 채로 여러 개 토글.
  * 트리거는 선택 요약("상태: 진행 중 외 1")을 보여준다.
+ * 열기·닫기·포커스·뒤집기·키보드는 `usePopoverPanel`이 맡는다.
  */
 export function FilterDropdown({
   label,
@@ -46,25 +52,9 @@ export function FilterDropdown({
   multiple = true,
   clearValue,
 }: FilterDropdownProps) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  // 바깥 클릭·Escape로 닫기 (Radix 메뉴는 항목 선택마다 닫혀 멀티 선택에 못 쓴다)
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  const { open, setOpen, close, rootRef, triggerRef, panelRef, panelClassName, panelStyle, onPanelKeyDown } =
+    usePopoverPanel();
+  const [query, setQuery] = useState("");
 
   // "전체"는 선택으로 세지 않는다 — 트리거가 필터 이름만 보이도록
   const active = clearValue === undefined ? selected : selected.filter((v) => v !== clearValue);
@@ -76,19 +66,29 @@ export function FilterDropdown({
         ? first.label
         : `${first.label} 외 ${active.length - 1}`;
 
+  const searchable = options.length > SEARCH_THRESHOLD;
+  const needle = query.trim().toLowerCase();
+  const visibleOptions = needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
+
   const choose = (value: string) => {
     onToggle(value);
-    if (!multiple) setOpen(false);
+    if (!multiple) close(true);
+  };
+
+  const toggleOpen = () => {
+    if (!open) setQuery("");
+    setOpen((o) => !o);
   };
 
   return (
     <div className="filter-dropdown" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={active.length > 0 ? "filter-dropdown-trigger is-active" : "filter-dropdown-trigger"}
         aria-expanded={open}
         aria-haspopup="true"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
       >
         {summary ? (
           <>
@@ -98,25 +98,40 @@ export function FilterDropdown({
             {`${label}: `}
             {/* 고른 값이 하나일 때만 글리프를 세운다 — "외 N"에는 대표 아이콘이 없다 */}
             {active.length === 1 ? first?.icon : null}
-            {summary}
+            <span className="filter-dropdown-summary">{summary}</span>
           </>
         ) : (
           label
         )}
-        <span className="filter-dropdown-caret" aria-hidden>
-          ▾
-        </span>
+        <ChevronDown className="filter-dropdown-caret" size={16} aria-hidden />
       </button>
       {open ? (
         <div
-          className="filter-dropdown-panel"
+          ref={panelRef}
+          className={panelClassName}
+          style={panelStyle}
           role={multiple ? "group" : "radiogroup"}
           aria-label={`${label} 필터`}
+          onKeyDown={onPanelKeyDown}
         >
-          {options.map((option) =>
+          {searchable ? (
+            <input
+              type="search"
+              className="filter-dropdown-search"
+              placeholder={`${label} 찾기`}
+              aria-label={`${label} 찾기`}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          ) : null}
+          {visibleOptions.length === 0 ? (
+            <p className="filter-dropdown-empty">일치하는 항목이 없습니다</p>
+          ) : null}
+          {visibleOptions.map((option) =>
             multiple ? (
               <Checkbox
                 key={option.value}
+                className="filter-dropdown-check"
                 // 노드 라벨(react 0.11.0) — 아이콘은 장식, 접근 이름은 라벨 텍스트가 갖는다
                 label={
                   option.icon ? (
@@ -144,8 +159,12 @@ export function FilterDropdown({
                 {option.icon ? (
                   <ValueWithIcon icon={option.icon}>{option.label}</ValueWithIcon>
                 ) : (
-                  option.label
+                  <span>{option.label}</span>
                 )}
+                {/* 선택 표시는 색만이 아니라 체크 모양으로도(지라 드롭다운) */}
+                {selected.includes(option.value) ? (
+                  <Check className="filter-dropdown-check-mark" size={16} aria-hidden />
+                ) : null}
               </button>
             ),
           )}

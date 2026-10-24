@@ -283,45 +283,47 @@ export function ReleasesPage() {
                     <span className="dash-sprint-meta">
                       {formatPlannedRange(version.startDate, version.releaseDate) || "날짜 미정"}
                     </span>
-                    <span className="release-row-spacer" />
-                    {version.status === "unreleased" ? (
-                      <Button
-                        size="small"
-                        aria-label={`${version.name} 릴리스`}
-                        onClick={() => void openRelease(version)}
-                      >
-                        릴리스
-                      </Button>
-                    ) : null}
-                    <Dropdown
-                      trigger={
-                        <Button variant="subtle" size="small" iconOnly aria-label={`${version.name} 메뉴`}>
-                          <MoreHorizontal size={16} />
+                    {/* 릴리스·⋯는 한 묶음 — 좁은 폭에서 ⋯만 다음 줄로 떨어지지 않게 */}
+                    <span className="release-row-actions">
+                      {version.status === "unreleased" ? (
+                        <Button
+                          size="small"
+                          aria-label={`${version.name} 릴리스`}
+                          onClick={() => void openRelease(version)}
+                        >
+                          릴리스
                         </Button>
-                      }
-                      items={[
-                        { label: "편집", onSelect: () => setEditing(version) },
-                        ...(version.status !== "archived"
-                          ? [
-                              {
-                                label: "보관",
-                                onSelect: () =>
-                                  void run("보관 실패", "버전을 보관했습니다", () =>
-                                    archiveVersion(version.id),
-                                  ),
-                              },
-                            ]
-                          : []),
-                        {
-                          label: "삭제",
-                          danger: true,
-                          onSelect: () =>
-                            void run("삭제 실패", "버전을 삭제했습니다", () =>
-                              deleteVersion(version.id),
-                            ),
-                        },
-                      ]}
-                    />
+                      ) : null}
+                      <Dropdown
+                        trigger={
+                          <Button variant="subtle" size="small" iconOnly aria-label={`${version.name} 메뉴`}>
+                            <MoreHorizontal size={16} />
+                          </Button>
+                        }
+                        items={[
+                          { label: "편집", onSelect: () => setEditing(version) },
+                          ...(version.status !== "archived"
+                            ? [
+                                {
+                                  label: "보관",
+                                  onSelect: () =>
+                                    void run("보관 실패", "버전을 보관했습니다", () =>
+                                      archiveVersion(version.id),
+                                    ),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: "삭제",
+                            danger: true,
+                            onSelect: () =>
+                              void run("삭제 실패", "버전을 삭제했습니다", () =>
+                                deleteVersion(version.id),
+                              ),
+                          },
+                        ]}
+                      />
+                    </span>
                   </div>
                   {version.description ? (
                     <p className="dash-sprint-goal">{version.description}</p>

@@ -55,21 +55,30 @@
   overflow-wrap: anywhere;
 }
 
-/* "열" 선택 — 툴바 오른쪽에 있어 패널을 오른쪽 끝에 맞춘다 */
-.column-picker .column-picker-panel {
-  left: auto;
-  right: 0;
-}
-
+/* "열" 선택 — 패널 정렬은 usePopoverPanel이 화면 가장자리를 보고 정한다(오른쪽 끝이면 뒤집힘).
+   트리거는 옆의 DS 작은 버튼(CSV 내보내기 등)과 같은 높이·글자 크기 */
 .column-picker .filter-dropdown-trigger {
-  padding: var(--chanho-space-50) var(--chanho-space-100);
-  font-size: var(--chanho-font-size-75);
+  padding: 0 var(--chanho-space-75) 0 var(--chanho-space-100);
 }
 
 .column-picker-footer {
   display: flex;
   justify-content: flex-end;
   margin-top: var(--chanho-space-50);
-  padding-top: var(--chanho-space-75);
+  padding: var(--chanho-space-75) var(--chanho-space-100) 0;
   border-top: thin solid var(--chanho-color-border-default);
+}
+
+/* 페이지 이동(이전·다음)은 한 묶음 — 줄이 바뀌어도 둘이 갈라지지 않고 오른쪽 끝에 붙는다 */
+.issue-list-page .issue-pager {
+  display: flex;
+  gap: var(--chanho-space-50);
+  margin-left: auto;
+}
+
+/* 줄바꿈되는 폭에서는 구분선이 줄 맨 앞에 홀로 남으므로 숨긴다 */
+@media (max-width: 1100px) {
+  .issue-list-page .bulk-bar-divider {
+    display: none;
+  }
 }

@@ -157,7 +157,7 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
     <span onClick={(e) => e.stopPropagation()}>
       <Dropdown
         trigger={
-          <Button variant="ghost" size="small" aria-label={`${project.name} 관리`}>
+          <Button variant="ghost" size="small" iconOnly aria-label={`${project.name} 관리`}>
             <MoreHorizontal size={16} />
           </Button>
         }
@@ -273,8 +273,8 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
                   variant={view === "table" ? "secondary" : "ghost"}
                   aria-pressed={view === "table"}
                   onClick={() => setView("table")}
+                  iconBefore={<List size={16} aria-hidden="true" />}
                 >
-                  <List size={16} aria-hidden="true" />
                   테이블
                 </Button>
                 <Button
@@ -282,8 +282,8 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
                   variant={view === "cards" ? "secondary" : "ghost"}
                   aria-pressed={view === "cards"}
                   onClick={() => setView("cards")}
+                  iconBefore={<LayoutGrid size={16} aria-hidden="true" />}
                 >
-                  <LayoutGrid size={16} aria-hidden="true" />
                   카드
                 </Button>
               </div>

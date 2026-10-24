@@ -392,7 +392,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     {
       key: "type",
       header: "타입",
-      width: "44px",
+      // 머리글 "타입" 두 글자 + 셀 패딩이 들어가는 폭(44px에선 머리글이 잘렸다)
+      width: "56px",
       render: (issue) => <IssueTypeGlyph type={issue.type} />,
     },
     {
@@ -416,12 +417,17 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
       key: "labels",
       header: "라벨",
       width: "120px",
+      // 한 줄 고정 — 라벨이 여럿이면 첫 라벨 + "+N"(지라 목록 보기처럼). 예전엔 칩이 두 줄로 쌓여 행 높이가 들쭉날쭉했다
       render: (issue) =>
         issue.labels.length > 0 ? (
-          <span className="issue-card-labels">
-            {issue.labels.map((l) => (
-              <Tag key={l} label={l} />
-            ))}
+          <span className="issue-card-labels issue-row-labels" title={issue.labels.join(", ")}>
+            <Tag label={issue.labels[0]} />
+            {issue.labels.length > 1 ? (
+              <span className="issue-label-more">
+                <span aria-hidden>{`+${issue.labels.length - 1}`}</span>
+                <span className="visually-hidden">{`외 라벨 ${issue.labels.slice(1).join(", ")}`}</span>
+              </span>
+            ) : null}
           </span>
         ) : null,
     },
@@ -682,16 +688,15 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                   onHiddenChange={tablePrefs.setHidden}
                   onReset={tablePrefs.reset}
                 />
-                <Button size="small" variant="secondary" disabled={actionsDisabled || !issues?.length} onClick={exportCsv}>
+                <Button variant="secondary" disabled={actionsDisabled || !issues?.length} onClick={exportCsv}>
                   {`CSV 내보내기 (${exportScope})`}
                 </Button>
-                <Button size="small" variant="secondary" disabled={!metadataLoaded || metadataLoading || metadataError !== null} onClick={() => setImportOpen(true)}>
+                <Button variant="secondary" disabled={!metadataLoaded || metadataLoading || metadataError !== null} onClick={() => setImportOpen(true)}>
                   CSV 가져오기
                 </Button>
                 <span className="bulk-bar-divider" aria-hidden />
                 <div className="issue-pager" role="navigation" aria-label="페이지">
                   <Button
-                    size="small"
                     variant="ghost"
                     disabled={resultsDisabled || page === 0}
                     onClick={() => setQuery((prev) => ({ ...prev, page: prev.page - 1 }))}
@@ -699,7 +704,6 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                     이전
                   </Button>
                   <Button
-                    size="small"
                     variant="ghost"
                     disabled={resultsDisabled || (page + 1) * PAGE_SIZE >= total}
                     onClick={() => setQuery((prev) => ({ ...prev, page: prev.page + 1 }))}

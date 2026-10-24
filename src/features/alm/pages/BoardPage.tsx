@@ -392,7 +392,7 @@ export function BoardPage() {
           ) : null}
           <Dropdown
             trigger={
-              <Button variant="ghost" size="small" aria-label="보드 메뉴">
+              <Button variant="ghost" size="small" iconOnly aria-label="보드 메뉴">
                 <MoreHorizontal size={16} />
               </Button>
             }

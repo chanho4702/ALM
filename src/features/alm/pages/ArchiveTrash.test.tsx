@@ -37,7 +37,9 @@ describe("이슈 보관함 (지라 보관된 업무 항목)", () => {
     // 배경을 접근성 트리에서 가린다(뷰 탭을 못 찾는다) — 닫힘을 먼저 확인하고 넘어간다(측정: 0.8~3.7초)
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "ALM-2" })).not.toBeInTheDocument(), { timeout: 15_000 });
 
-    await user.click(await screen.findByRole("button", { name: "보관함" }));
+    // 사이드바 하위 목록에도 같은 이름이 있다(뷰 목록 공유) — 가로 뷰 탭에서 고른다
+    const viewTabs = await screen.findByRole("navigation", { name: "프로젝트 뷰" });
+    await user.click(within(viewTabs).getByRole("button", { name: "보관함" }));
     const list = await screen.findByRole("list", { name: "보관된 이슈 목록" });
     // 목록 컨테이너는 로드 전에도 그려진다(비동기) — 항목은 기다려서 찾는다
     expect(await within(list).findByText("ALM-2")).toBeInTheDocument();

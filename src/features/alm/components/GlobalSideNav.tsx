@@ -8,6 +8,8 @@ import { deleteSavedFilter, listBoards, listSavedFilters, listSharedFilters, upd
 import type { SavedFilter } from "../store/jiraStore";
 import { BoardCreateModal } from "./BoardCreateModal";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { projectViewTabs } from "./projectViews";
+import { useAiTeamActive } from "./useAiTeamActive";
 import {
   SIDENAV_DEFAULT_WIDTH,
   SIDENAV_MAX_WIDTH,
@@ -24,16 +26,6 @@ import {
 const clampWidth = (width: number) =>
   Math.min(SIDENAV_MAX_WIDTH, Math.max(SIDENAV_MIN_WIDTH, width));
 
-/** 프로젝트 하위 페이지 — 현재 프로젝트 항목 아래에 중첩 표시된다 */
-const PROJECT_PAGES = [
-  { id: "dashboard", label: "요약" },
-  { id: "releases", label: "릴리스" },
-  { id: "timeline", label: "타임라인" },
-  { id: "board", label: "보드" },
-  { id: "backlog", label: "백로그" },
-  { id: "issues", label: "이슈" },
-];
-
 export interface GlobalSideNavProps {
   projects: Project[];
   /** 모바일 내비게이션에서는 데스크톱 접힘 설정과 무관하게 모든 메뉴를 보여준다. */
@@ -46,6 +38,7 @@ export interface GlobalSideNavProps {
  */
 export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNavProps) {
   const navigate = useNavigate();
+  const aiTeamActive = useAiTeamActive();
   const toast = useToast();
   const { pathname } = useLocation();
   const [recentIds, setRecentIds] = useState<string[]>([]);
@@ -412,7 +405,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
                   {projectRow(project, isCurrent && !currentPage)}
                   {isCurrent && !collapsed ? (
                     <ul className="global-nav-sub">
-                      {PROJECT_PAGES.map((page) => (
+                      {projectViewTabs(aiTeamActive).map((page) => (
                         <li key={page.id}>
                           <button
                             type="button"

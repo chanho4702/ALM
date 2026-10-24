@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Columns3 } from "lucide-react";
+import { ChevronDown, Columns3 } from "lucide-react";
+import { usePopoverPanel } from "./usePopoverPanel";
 import { Button, Checkbox } from "@chanho/react";
 
 export interface ColumnPickerOption {
@@ -19,27 +19,10 @@ export interface ColumnPickerProps {
 
 /**
  * 지라 목록 보기의 "열" 선택 — 체크박스로 열을 켜고 끈다. 순서·너비는 표 머리글(드래그·Alt+화살표)이 맡는다.
- * 패널은 FilterDropdown과 같은 팝오버다(DS에 팝오버가 없고, Radix 메뉴는 토글마다 닫혀 여러 개를 못 고른다).
+ * 패널은 FilterDropdown과 같은 팝오버(usePopoverPanel)다(DS에 팝오버가 없고, Radix 메뉴는 토글마다 닫혀 여러 개를 못 고른다).
  */
 export function ColumnPicker({ columns, hidden, onHiddenChange, onReset }: ColumnPickerProps) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  const { open, setOpen, rootRef, triggerRef, panelRef, panelClassName, panelStyle, onPanelKeyDown } = usePopoverPanel();
 
   const hiddenCount = columns.filter((c) => !c.locked && hidden.includes(c.key)).length;
 
@@ -49,6 +32,7 @@ export function ColumnPicker({ columns, hidden, onHiddenChange, onReset }: Colum
   return (
     <div className="filter-dropdown column-picker" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={hiddenCount > 0 ? "filter-dropdown-trigger is-active" : "filter-dropdown-trigger"}
         aria-expanded={open}
@@ -57,15 +41,21 @@ export function ColumnPicker({ columns, hidden, onHiddenChange, onReset }: Colum
       >
         <Columns3 size={14} aria-hidden />
         {hiddenCount > 0 ? `열 (${hiddenCount}개 숨김)` : "열"}
-        <span className="filter-dropdown-caret" aria-hidden>
-          ▾
-        </span>
+        <ChevronDown className="filter-dropdown-caret" size={16} aria-hidden />
       </button>
       {open ? (
-        <div className="filter-dropdown-panel column-picker-panel" role="group" aria-label="표시할 열">
+        <div
+          ref={panelRef}
+          className={`${panelClassName} column-picker-panel`}
+          style={panelStyle}
+          role="group"
+          aria-label="표시할 열"
+          onKeyDown={onPanelKeyDown}
+        >
           {columns.map((column) => (
             <Checkbox
               key={column.key}
+              className="filter-dropdown-check"
               label={column.locked ? `${column.label} (항상 표시)` : column.label}
               checked={column.locked ? true : !hidden.includes(column.key)}
               disabled={column.locked}
