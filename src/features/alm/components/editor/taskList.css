@@ -1,0 +1,30 @@
+/* 체크 목록(`[] `) — 글머리 대신 체크 상자, 토큰만 */
+.rich-text-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: var(--chanho-space-50);
+}
+
+.rich-text-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--chanho-space-100);
+}
+
+.rich-text-content ul[data-type="taskList"] li > label {
+  flex: none;
+  margin-top: var(--chanho-space-25);
+}
+
+.rich-text-content ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.rich-text-content ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: var(--chanho-color-background-brand);
+}
+
+.rich-text-content ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--chanho-color-text-subtle);
+  text-decoration: line-through;
+}

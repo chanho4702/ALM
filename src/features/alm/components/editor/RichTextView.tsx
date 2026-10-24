@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
+import { richTextSchemaExtensions } from "./extensions";
 import Link from "@tiptap/extension-link";
 import Mention from "@tiptap/extension-mention";
 import { toEditorHtml } from "../../store/richText";
@@ -21,7 +21,7 @@ export function RichTextView({ html, className, emptyText }: RichTextViewProps) 
   const editor = useEditor({
     editable: false,
     extensions: [
-      StarterKit.configure({ heading: { levels: [2, 3] } }),
+      ...richTextSchemaExtensions(),
       Link.configure({ openOnClick: true, autolink: false }),
       Mention.configure({
         HTMLAttributes: { class: "user-mention" },

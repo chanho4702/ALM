@@ -35,3 +35,29 @@ export function insertMention(label: string, user: { id: string; name: string })
       .run();
   });
 }
+
+/**
+ * 실제 타이핑처럼 한 글자씩 — 에디터 플러그인의 `handleTextInput`(TipTap 입력 규칙: `## `, `- `, `**굵게**` …)을
+ * 거친다. 아무 플러그인도 받지 않으면 글자를 그대로 넣는다(브라우저 기본 입력과 같다).
+ */
+export function typeMarkdown(label: string, text: string): void {
+  act(() => {
+    const view = editorOf(label).view;
+    for (const ch of text) {
+      const { from, to } = view.state.selection;
+      const handled = view.someProp("handleTextInput", (handler) => handler(view, from, to, ch, () => view.state.tr.insertText(ch, from, to)));
+      if (!handled) view.dispatch(view.state.tr.insertText(ch, from, to));
+    }
+  });
+}
+
+/** 문단 나누기(Enter) — 목록 항목·코드 블록 안에서 다음 줄로 */
+export function pressEnter(label: string): void {
+  act(() => {
+    editorOf(label).commands.enter();
+  });
+}
+
+export function editorHtml(label: string): string {
+  return editorOf(label).getHTML();
+}
