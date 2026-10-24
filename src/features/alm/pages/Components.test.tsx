@@ -57,7 +57,9 @@ describe("컴포넌트 (지라 Components)", () => {
     await screen.findByRole("table");
     const filterBar = within(screen.getByTestId("issue-filter-bar"));
     await user.click(await filterBar.findByRole("button", { name: "컴포넌트" }));
-    await user.click(await filterBar.findByRole("radio", { name: "API" }));
+    // 패널은 DS Popover(포털) — 필터 줄 밖에 그려진다
+    const panel = await screen.findByRole("radiogroup", { name: "컴포넌트 필터" });
+    await user.click(within(panel).getByRole("radio", { name: "API" }));
     const table = await screen.findByRole("table");
     expect(await within(table).findByText("API 이슈")).toBeInTheDocument();
     expect(within(table).queryByText("칸반 보드 UI 구현")).not.toBeInTheDocument();

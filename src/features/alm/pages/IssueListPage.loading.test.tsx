@@ -29,7 +29,9 @@ function renderIssues() {
 async function pickFilter(user: ReturnType<typeof userEvent.setup>, name: string, value: string) {
   const filters = within(screen.getByTestId("issue-filter-bar"));
   await user.click(filters.getByRole("button", { name }));
-  await user.click(await filters.findByRole("radio", { name: value }));
+  // 패널은 DS Popover(포털) — 필터 줄 밖에 그려진다
+  const panel = await screen.findByRole("radiogroup", { name: `${name} 필터` });
+  await user.click(within(panel).getByRole("radio", { name: value }));
 }
 
 beforeEach(() => {

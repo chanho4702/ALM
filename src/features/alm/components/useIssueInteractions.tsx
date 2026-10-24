@@ -88,15 +88,16 @@ export function useIssueInteractions({
   const order = useMemo(() => issues.map((issue) => issue.id), [issues]);
 
   // 화면에서 사라진 이슈(삭제·필터·다른 스프린트로 이동)는 선택·미리보기에서도 뺀다
+  const externalSelection = selection !== undefined;
   useEffect(() => {
-    if (!selection) {
+    if (!externalSelection) {
       setOwnSelected((prev) => {
         const next = new Set([...prev].filter((id) => byId.has(id)));
         return next.size === prev.size ? prev : next;
       });
     }
     setPeekId((prev) => (prev !== null && !byId.has(prev) ? null : prev));
-  }, [byId, selection]);
+  }, [byId, externalSelection]);
 
   const peekIssue = peekId ? (byId.get(peekId) ?? null) : null;
 

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
-import { Checkbox } from "@chanho/react";
-import { usePopoverPanel } from "./usePopoverPanel";
+import { Checkbox, Popover } from "@chanho/react";
+import { onPopoverListKeyDown } from "./popoverListKeys";
 import { ValueWithIcon } from "./ValueWithIcon";
 
 export interface FilterOption {
@@ -42,7 +42,9 @@ const SEARCH_THRESHOLD = 8;
 /**
  * 지라 이슈 검색의 필터 드롭다운 모방 — 체크박스 멀티 선택, 열린 채로 여러 개 토글.
  * 트리거는 선택 요약("상태: 진행 중 외 1")을 보여준다.
- * 열기·닫기·포커스·뒤집기·키보드는 `usePopoverPanel`이 맡는다.
+ * 패널은 DS `Popover`(react 0.14.0) — 바깥 클릭·Esc·포커스 이동/복귀·가장자리 뒤집기를 맡는다. 포털이라 패널은
+ * 필터 줄 밖(document.body)에 그려진다. 목록 안 ↑↓는 `onPopoverListKeyDown`.
+ * 단일 선택(라디오)이 있어 DS `MultiSelect`(체크 목록 전용)로는 바꾸지 않았다.
  */
 export function FilterDropdown({
   label,
@@ -52,8 +54,7 @@ export function FilterDropdown({
   multiple = true,
   clearValue,
 }: FilterDropdownProps) {
-  const { open, setOpen, close, rootRef, triggerRef, panelRef, panelClassName, panelStyle, onPanelKeyDown } =
-    usePopoverPanel();
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   // "전체"는 선택으로 세지 않는다 — 트리거가 필터 이름만 보이도록
@@ -72,23 +73,13 @@ export function FilterDropdown({
 
   const choose = (value: string) => {
     onToggle(value);
-    if (!multiple) close(true);
+    if (!multiple) setOpen(false); // 포커스는 Popover가 트리거로 돌려준다
   };
 
-  const toggleOpen = () => {
-    if (!open) setQuery("");
-    setOpen((o) => !o);
-  };
-
-  return (
-    <div className="filter-dropdown" ref={rootRef}>
+  const trigger = (
       <button
-        ref={triggerRef}
         type="button"
         className={active.length > 0 ? "filter-dropdown-trigger is-active" : "filter-dropdown-trigger"}
-        aria-expanded={open}
-        aria-haspopup="true"
-        onClick={toggleOpen}
       >
         {summary ? (
           <>
@@ -105,14 +96,27 @@ export function FilterDropdown({
         )}
         <ChevronDown className="filter-dropdown-caret" size={16} aria-hidden />
       </button>
-      {open ? (
+  );
+
+  return (
+    <div className="filter-dropdown">
+      <Popover
+        trigger={trigger}
+        open={open}
+        onOpenChange={(next) => {
+          if (next) setQuery("");
+          setOpen(next);
+        }}
+        label={label}
+        className="filter-dropdown-panel"
+        matchTriggerWidth
+        padding="none"
+      >
         <div
-          ref={panelRef}
-          className={panelClassName}
-          style={panelStyle}
+          className="filter-dropdown-list"
           role={multiple ? "group" : "radiogroup"}
           aria-label={`${label} 필터`}
-          onKeyDown={onPanelKeyDown}
+          onKeyDown={onPopoverListKeyDown}
         >
           {searchable ? (
             <input
@@ -169,7 +173,7 @@ export function FilterDropdown({
             ),
           )}
         </div>
-      ) : null}
+      </Popover>
     </div>
   );
 }

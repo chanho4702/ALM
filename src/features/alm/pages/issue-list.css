@@ -55,7 +55,7 @@
   overflow-wrap: anywhere;
 }
 
-/* "열" 선택 — 패널 정렬은 usePopoverPanel이 화면 가장자리를 보고 정한다(오른쪽 끝이면 뒤집힘).
+/* "열" 선택 — 패널은 DS Popover(오른쪽 끝 정렬, 화면 가장자리면 Popover가 뒤집는다).
    트리거는 옆의 DS 작은 버튼(CSV 내보내기 등)과 같은 높이·글자 크기 */
 .column-picker .filter-dropdown-trigger {
   padding: 0 var(--chanho-space-75) 0 var(--chanho-space-100);

@@ -38,7 +38,9 @@ async function pickFilter(
   option: string,
 ) {
   await user.click(filterBar().getByRole("button", { name: filter }));
-  await user.click(await filterBar().findByRole("radio", { name: option }));
+  // 패널은 DS Popover(포털)라 필터 줄 밖에 그려진다 — 그 필터의 라디오 묶음으로 좁힌다
+  const panel = await screen.findByRole("radiogroup", { name: `${filter} 필터` });
+  await user.click(within(panel).getByRole("radio", { name: option }));
 }
 
 beforeEach(() => {
@@ -189,12 +191,12 @@ describe("IssueListPage 타입", () => {
     await screen.findByText("ALM-1");
 
     await user.click(filterBar().getByRole("button", { name: "상태" }));
-    const todo = await filterBar().findByRole("radio", { name: "할 일" });
+    const todo = within(await screen.findByRole("radiogroup", { name: "상태 필터" })).getByRole("radio", { name: "할 일" });
     expect(within(todo).getByTestId("status-glyph-todo")).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.click(filterBar().getByRole("button", { name: "우선순위" }));
-    const high = await filterBar().findByRole("radio", { name: "높음" });
+    const high = within(await screen.findByRole("radiogroup", { name: "우선순위 필터" })).getByRole("radio", { name: "높음" });
     expect(within(high).getByTestId("priority-glyph-high")).toBeInTheDocument();
   });
 });

@@ -81,8 +81,11 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
 - **Select `searchable`**은 옵션이 8개를 넘을 수 있는 자리(사람·프로젝트·스프린트·버전·이슈 후보)에 켠다.
   필터 줄의 `Select`·`TextField`는 `size="compact"`(32px)로 버튼·필터 트리거와 높이를 맞춘다. 기본 입력은 40px다.
 - **Checkbox `indeterminate`**(0.14.0) — 목록 머리글 "모두 선택"의 일부 선택이 대시로 보인다(위 0.9.0 절의 "중간 상태 그림 없음" 갭 해소).
-- **Popover·MultiSelect**(0.14.0) — 앱 팝오버(`usePopoverPanel` + FilterDropdown/ColumnPicker)를 대신할 DS 부품. 교체는
-  아래 "남은 일"을 본다.
+- **Popover**(0.14.0) — FilterDropdown·ColumnPicker의 패널은 DS `Popover`다(앱 훅 `usePopoverPanel`은 지웠다). 바깥 클릭·Esc·
+  포커스 이동/복귀·가장자리 뒤집기는 Popover가, 목록 안 ↑↓·Home·End만 `components/popoverListKeys.ts`가 맡는다. 패널은
+  **포털**이라 필터 줄 밖에 그려진다 — 테스트는 `within(filterBar)`가 아니라 `screen.findByRole("radiogroup", { name: "상태 필터" })`
+  처럼 패널 묶음 이름으로 좁힌다. Popover 콘텐츠는 `role="dialog"`라 열려 있는 동안 화면 단축키가 멈춘다.
+  FilterDropdown은 단일 선택(라디오) 모드가 있어 `MultiSelect`(체크 목록 전용)로 바꾸지 않았다.
 
 ## 2026-10-24 UI/UX 정비에서 정한 것
 
@@ -97,10 +100,8 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
 - **반응형은 화면 폭이 아니라 컨테이너 폭으로.** 768px 화면도 사이드바(240px)를 빼면 본문은 약 500px다.
   `@media`로 나눈 곳이 그 폭에서 겹쳤다. AI 사무실 탭 줄·백로그 행은 `container-type: inline-size` +
   `@container`를 쓴다.
-- **앱 팝오버는 `components/usePopoverPanel.ts` 하나로.** FilterDropdown·ColumnPicker가 공유한다.
-  바깥 클릭·Esc(트리거로 포커스 복귀), 열면 첫 항목(검색 입력)에 포커스, ↑↓·Home·End, 트리거 폭(최소 200px)을
-  최소 폭으로, 화면 오른쪽·아래 가장자리에서 뒤집기(`.is-align-end`/`.is-above`)를 맡는다. 옵션이 8개를
-  넘으면 FilterDropdown이 검색 입력을 띄운다. 새 멀티선택 팝오버도 이 훅을 쓴다.
+- ~~앱 팝오버는 `components/usePopoverPanel.ts` 하나로~~ — 같은 날 DS 0.14.0 `Popover`로 옮겼다(위 0.13.0·0.14.0 절).
+  옵션이 8개를 넘으면 FilterDropdown이 검색 입력을 띄우는 규칙은 그대로다. 새 멀티선택은 DS `MultiSelect`를 먼저 본다.
 - **프로젝트 뷰 목록은 `components/projectViews.ts` 하나.** 가로 탭과 사이드바 하위 목록이 같은 목록을
   그린다(예전엔 사이드바에 리포트·보관함이 없었다). 그래서 탭 이름 버튼이 두 개 있을 수 있다 —
   테스트는 `within(getByRole("navigation", { name: "프로젝트 뷰" }))`로 좁힌다.

@@ -1153,8 +1153,8 @@ body {
   color: var(--chanho-color-text-subtle);
 }
 
-/* 필터 드롭다운 (지라 Basic 필터 버튼) — 트리거는 DS 버튼과 같은 32px, 패널은 usePopoverPanel이
-   트리거 폭을 최소 폭으로 주고 화면 가장자리에서 뒤집는다(.is-align-end / .is-above) */
+/* 필터 드롭다운 (지라 Basic 필터 버튼) — 트리거는 DS 버튼과 같은 32px, 패널은 DS Popover(포털)가
+   트리거 폭을 최소 폭으로 주고 화면 가장자리에서 뒤집는다 */
 .filter-dropdown {
   position: relative;
   min-width: 0;
@@ -1212,43 +1212,31 @@ body {
   color: currentColor;
 }
 
+/* 패널은 DS Popover(react 0.14.0)의 콘텐츠 — 자리·뒤집기·z는 Popover가, 여기서는 목록 모양만 */
 .filter-dropdown-panel {
-  position: absolute;
-  z-index: var(--chanho-z-dropdown);
-  top: calc(100% + var(--chanho-space-50));
-  left: 0;
-  /* 내용 폭으로 — 오른쪽 정렬(right:0)일 때 좁은 트리거 폭에 갇혀 글자가 세로로 쌓이지 않게 */
+  /* 내용 폭으로 — 트리거가 좁아도("타입") 항목이 한 줄에 들어가게 최소 200px */
   width: max-content;
-  min-width: 200px;
+  min-width: max(200px, var(--radix-popover-trigger-width, 200px));
   max-width: min(360px, calc(100vw - var(--chanho-space-200)));
-  max-height: 320px;
+  max-height: min(320px, var(--radix-popover-content-available-height, 320px));
   overflow-y: auto;
+  padding: var(--chanho-space-75) 0;
+  border-radius: var(--chanho-radius-medium);
+}
+
+.filter-dropdown-list {
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-25);
-  padding: var(--chanho-space-75) 0;
-  border-radius: var(--chanho-radius-medium);
-  background: var(--chanho-color-background-surface-overlay);
-  box-shadow: var(--chanho-shadow-overlay);
-}
-
-.filter-dropdown-panel.is-align-end {
-  left: auto;
-  right: 0;
-}
-
-.filter-dropdown-panel.is-above {
-  top: auto;
-  bottom: calc(100% + var(--chanho-space-50));
 }
 
 /* 멀티선택 체크박스 행 — 지라 메뉴 항목처럼 패널 가로 전체가 눌리는 32px 행 */
-.filter-dropdown-panel .filter-dropdown-check {
+.filter-dropdown-list .filter-dropdown-check {
   min-height: var(--chanho-space-400);
   padding: var(--chanho-space-50) var(--chanho-space-150);
 }
 
-.filter-dropdown-panel .filter-dropdown-check:hover {
+.filter-dropdown-list .filter-dropdown-check:hover {
   background: var(--chanho-color-background-neutral-hovered);
 }
 
