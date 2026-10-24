@@ -368,3 +368,23 @@ project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 �
   RATE_LIMITED 자동 비활성·연속 5회 실패 자동 비활성·액션 묶음 원자성 = 캐시 스냅숏 되돌리기)는 서버와 같다. 예약
   트리거는 목업에 스케줄러가 없어 돌지 않는다. 되돌리기가 캐시를 바꿔 끼우므로 **emit 뒤에는 `load()`로 다시 읽는다**.
 - 필드 구성은 15종(`startDate`·`storyPoints` 추가). AQL 새 필드 `startDate`·`storyPoints`·`flagged`·`triage`(목업 평가기 포함).
+
+
+## Linear 강점 반영 계약 (2026-10-24, alm-backend README "실시간 동기화·사이클·추정 척도·알림 인박스")
+
+- **실시간 스트림** `streamProject(projectId, {signal, lastEventId, onOpen, onActivity, onEvent})` — REST는 `GET /projects/{id}/stream`을
+  fetch 스트리밍(`Accept: text/event-stream`, `Last-Event-ID`), 프레임 → `ProjectStreamEvent`(`realtimeMapping.ts`, id는 문자열, 낯선 issue/sprint
+  프레임은 reset으로 접는다). 오류 종류는 `eventStream.ts`의 `StreamError`(401·403 unauthorized / 404·405 unsupported / 429 rate-limited / 그 밖 network).
+  목업은 같은 계약의 대역이고 신호는 테스트·개발 훅(`__emitProjectStreamEvent`·`__simulateRemoteIssueChange`)으로만 흐른다(MockOnly — REST 빌드에서 undefined).
+  재연결·판정은 화면 쪽(`components/useReconnectingStream.ts`, `components/realtime/ProjectRealtime.tsx`).
+- **알림 인박스** `listNotificationInbox({filter, cursor, limit})` → `{items, nextCursor, unreadCount}`, `snoozeNotification`/`unsnoozeNotification`,
+  `archiveNotification`/`unarchiveNotification`, `bulkNotifications(ids, read|unread|archive|unarchive)`. 알림에 `snoozedUntil`·`archivedAt`(옛 서버는 null).
+  목업은 서버 규칙을 흉내 낸다 — 미뤄 둔 동안 배지·전체에서 빠지고, 해제 시각이 지나면 그 시각 자리(맨 위)에 읽지 않음으로 돌아온다(`sortAt`).
+  목업 알림 생성(`pushNotification`)도 이제 `type`을 싣는다(멘션·할당 필터).
+- **계획 설정** `getPlanningSettings`/`updatePlanningSettings(projectId, patch, expectedVersion)` — 보낸 항목만, 409. 목업 저장은 `data.planningSettings`
+  (normalize `??= {}`). 척도 검사(`assertPointsInScale`)는 포인트가 **바뀔 때만**(서버와 같은 문구). 타입·순수 함수는 `model/cycles.ts`(`allowedPointsOf`·`formatPoints`).
+- **스프린트 완료** `completeSprint(id, {moveUnfinishedTo?, carryOver?: "next"|"backlog"})` → `SprintCompletion`(= Sprint + `carryOver | null`).
+  우선순위: 스프린트 id > carryOver > 설정 기본값(REST는 아무것도 안 보내면 서버가 설정을 쓴다). 목업은 서버처럼 다음 스프린트 자동 생성(끝 숫자 +1, 서울 날짜 + 쿨다운·길이).
+- **검색 `triage`** — `IssueSearchCriteria.triage`(true 대기열만 / false 제외 / 생략 둘 다). REST `listIssues`(보드·백로그)는 `triage=false`로 묻고 total로 끝까지 읽는다.
+- **uiStore 사용자별 자리** — 즐겨찾기(`favoritesByUser`)·이슈 만들기 초안(`createDraftsByUser`)은 `setUiUser(id)`(AppShell이 현재 사용자를 읽으면)로 주인을
+  정한다. 그 전 값은 익명 자리에 있다가 물려받는다. 옛 `starredProjectIds`는 프로젝트 즐겨찾기로 읽히고 첫 쓰기 때 옮겨 적힌다. 테스트는 `vitest.setup.ts`가 매번 익명으로 되돌린다.

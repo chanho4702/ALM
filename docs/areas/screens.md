@@ -9,6 +9,7 @@
 | 라우트 | 파일 | 요지 (지라 대응) |
 |---|---|---|
 | `/home` | HomePage | For you 홈: 인사말 → 이어서 하기 카드 → 추천 작업/나에게 배정됨/최근 업데이트/별표 탭 |
+| `/notifications` | InboxPage | 알림 인박스(Linear Inbox) — 필터 탭·j/k·U·H·E·x, 상단 벨·`g n`이 연다 |
 | `/search` | SearchPage | 이슈 검색: 기본(필터 드롭다운)/스마트 2모드 → search.md |
 | `/settings/org/*` | OrgAdminPage(lazy) | **조직 관리** — 공용 패키지 `@chanho/org-admin`을 통째로 마운트한다(사용자·초대·팀·전역 역할·승인 대기). 위키(`/admin/org/*`)와 **같은 화면**이라 이 리포에 복제하지 않는다. `basePath="/settings/org"`, 인증 fetch는 `store/orgApi.ts`, 프로젝트 이름은 `resolveResource`로 호스트가 준다. **초대 화면만은 프로젝트 관리자도 진입**(설계 §3.2 — 리소스 ADMIN도 초대 가능, `hasAnyProjectAdmin()`으로 판정)하고 나머지 네 화면은 전역 관리자 전용이다. 목업 모드에서는 권한 통과 뒤 "REST 모드에서만" 안내. 프로젝트 권한 화면의 "초대하기"는 `?scope=PROJECT&resourceId=&role=EDITOR` 프리셋을 달아 보낸다(패키지가 읽고 쿼리를 즉시 지운다) |
 | `/settings/:section` | GlobalSettingsPage | 전역 관리(⚙): `categories`(상태 카테고리)·`statuses`(상태 레지스트리)·`issue-types`(이슈 타입 레지스트리)·`fields`(필드 구성 — 스킴별 표시/필수)·`types`(이슈 타입 스킴)·`workflows`(워크플로 스킴). `/settings`는 `types`로 redirect. 구획 메뉴는 **설정 사이드바**(SettingsSideNav) |
@@ -99,3 +100,11 @@
 **열 표시·숨김**: 이슈 목록 툴바 "열" 팝오버(`ColumnPicker`, FilterDropdown과 같은 패널) — 체크박스로 끄고 켜며, 키·제목(·선택)은 잠김. "기본값으로"는 표시·순서·너비를 모두 지운다.
 저장은 열 순서·너비와 같은 `uiStore` `tablePrefs.issues.hidden`. 숨긴 열이 있을 때 표가 알려 주는 순서는 보이는 열뿐이라
 `useTablePrefs(tableId, allKeys)`가 `mergeColumnOrder`로 숨긴 열의 자리를 지킨다(다시 켜도 원래 자리로).
+
+
+## Linear 강점 반영 (2026-10-24)
+
+- 프로젝트 설정에 **계획(사이클·추정)** 구획(`/projects/:id/settings/planning`, `PlanningSettingsPanel`).
+- 사이드바 **즐겨찾기** 섹션이 옛 "별표" 섹션을 대신한다(`FavoritesNavSection`, testid `nav-favorites`).
+- 단축키 추가: `g n` 인박스, ⌘/Ctrl+Shift+. 브랜치 이름 복사, 목록 Shift+↑↓·⌘/Ctrl+A, 인박스 키 묶음(도움말 "인박스").
+- 인라인 만들기 공용 컴포넌트 `InlineIssueCreate`(목록 끝·스프린트 패널·그룹 머리글) — 접근 이름 "{어디}에 이슈 만들기"/"{어디} 새 이슈 제목".

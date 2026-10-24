@@ -4,7 +4,7 @@
 각 패키지의 저작권 고지와 라이선스 전문은 해당 패키지 배포본(`node_modules/<패키지>/LICENSE`)과 아래 홈페이지에 있다.
 
 - 생성: `infra-settings/scripts/notices/New-FrontendNotices.ps1` (기준 `pnpm-lock.yaml` sha256 `d739bdc94a1d`)
-- 패키지 수: 244
+- 패키지 수: 246 (2026-10-24 `@tiptap/extension-task-list`·`@tiptap/extension-task-item` 2.27.2 수동 추가 — 다음 생성 때 lock 해시와 함께 갱신)
 - 상표: Jira, Confluence, Atlassian은 Atlassian Pty Ltd의 상표이며 본 제품은 Atlassian과 무관합니다.
 
 ## 검토 필요 (카피레프트·소스공개·비자유·미확인 라이선스)
@@ -19,7 +19,7 @@
 | BSD-2-Clause | 1 |
 | BSD-3-Clause | 1 |
 | ISC | 17 |
-| MIT | 222 |
+| MIT | 224 |
 | MIT AND ISC | 1 |
 | Python-2.0 | 1 |
 
@@ -199,6 +199,8 @@
 | @tiptap/extension-paragraph | 2.27.2 |  | https://tiptap.dev |
 | @tiptap/extension-placeholder | 2.27.2 |  | https://tiptap.dev |
 | @tiptap/extension-strike | 2.27.2 |  | https://tiptap.dev |
+| @tiptap/extension-task-item | 2.27.2 |  | https://tiptap.dev |
+| @tiptap/extension-task-list | 2.27.2 |  | https://tiptap.dev |
 | @tiptap/extension-text | 2.27.2 |  | https://tiptap.dev |
 | @tiptap/extension-text-style | 2.27.2 |  | https://tiptap.dev |
 | @tiptap/pm | 2.27.2 |  | https://tiptap.dev |

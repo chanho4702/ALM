@@ -175,3 +175,13 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
 
 `--chanho-motion-duration-{instant,fast,base,moderate,slow}`·`--chanho-motion-easing-{standard,enter,exit}` — 동작 줄이기에서 1ms로 줄어든다.
 새 화면의 전환 효과는 `--chanho-transition-*`나 하드코딩 ms 대신 이 토큰을 쓴다(상태 전환 메뉴·보드 흐린 열·트리아지 목록).
+
+
+## Linear 강점 반영에서 정한 것 (2026-10-24)
+
+- **DS 갭 — Toast에 동작 버튼이 없다**(`ToastOptions` = title·description·appearance). 스프린트 완료의 "새 스프린트 보기"는 화면 위 `Banner`의 `action`으로 대신했다.
+  DS에 Toast action이 생기면 옮긴다.
+- **토글 칩은 DS `Button`**(variant primary/secondary + `aria-pressed`) — DS에 ToggleGroup이 없다. 스토리 포인트 척도 칩(`StoryPointsInput`)이 이 패턴이다.
+- **남의 변경 하이라이트는 `data-remote-flash` 속성**(React가 관리하지 않아 다시 그려도 지워지지 않는다) + `@keyframes`에 모션 토큰. 표 행은 `tr`을 칠한다.
+- 인박스 행 체크 상자는 날 `<input type="checkbox">`(이슈 목록 행과 같은 이유 — DS Checkbox는 라벨 글자를 DOM에 남겨 행 질의가 두 개를 문다).
+- 체크 목록(`[] `) 렌더 스타일은 `editor/taskList.css`, 스키마 확장은 편집기·렌더 공용 `editor/extensions.ts` 하나.
