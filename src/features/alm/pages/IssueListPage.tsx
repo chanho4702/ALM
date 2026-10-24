@@ -50,6 +50,11 @@ import { useKeyboardShortcuts } from "../components/useKeyboardShortcuts";
 import { UserAvatar } from "../components/UserAvatar";
 import { useIssueActions } from "../components/useIssueActions";
 import { useIssueInteractions } from "../components/useIssueInteractions";
+import { IssueFlagMark } from "../components/IssueCard";
+import { IssueGroupedView } from "../components/views/IssueGroupedView";
+import { SavedViewsBar } from "../components/views/SavedViewsBar";
+import { ViewOptionsPanel } from "../components/views/ViewOptionsPanel";
+import { useIssueViews } from "../components/views/useIssueViews";
 import "./issue-list.css";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → "전체"는 센티널
@@ -239,6 +244,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     + (text.trim() ? 1 : 0);
 
   const { openIssue, issueKey, issueModal } = useIssueModal(reload);
+  // 저장된 보기·표시 옵션(D1) — 기본 상태면 아래 표가 그대로, 아니면 그룹 보기가 표를 대신한다
+  const views = useIssueViews(projectId);
 
   const userNames = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u.name])), [users]);
   /** 담당자 셀의 프로필 사진 조회용 — 이름만 필요한 자리는 userNames를 계속 쓴다 */
@@ -438,7 +445,21 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
         </span>
       ),
     },
-    { key: "title", header: "제목", sortable: true },
+    {
+      key: "title",
+      header: "제목",
+      sortable: true,
+      // 제목 텍스트 노드는 그대로 두고 플래그(막힘)만 옆에 붙인다
+      render: (issue) =>
+        issue.flagged ? (
+          <span className="issue-title-cell">
+            {issue.title}
+            <IssueFlagMark />
+          </span>
+        ) : (
+          issue.title
+        ),
+    },
     {
       key: "labels",
       header: "라벨",
@@ -729,6 +750,8 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 ) : null}
               </div>
               <div className="issue-toolbar-actions">
+                <SavedViewsBar controller={views} />
+                <ViewOptionsPanel state={views.state} onChange={views.setState} />
                 <ColumnPicker
                   columns={pickerColumns}
                   hidden={tablePrefs.hidden}
@@ -760,7 +783,16 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 </div>
               </div>
             </div>
-            {issues?.length === 0 && !updating && loadError === null ? (
+            {views.engaged && projectId ? (
+              <IssueGroupedView
+                projectId={projectId}
+                state={views.state}
+                chips={query}
+                refreshKey={refreshVersion}
+                selectedKey={issueKey}
+                onOpenIssue={openIssue}
+              />
+            ) : issues?.length === 0 && !updating && loadError === null ? (
               <div className="issue-empty">
                 <EmptyState
                   title={activeFilters > 0 ? "조건에 맞는 이슈가 없습니다" : "아직 이슈가 없습니다"}

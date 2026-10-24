@@ -72,3 +72,13 @@
 - [ ] S-03 잔여 — alm-front가 design-system을 아직 tgz로 소비(GitHub Packages 전환 미완),
       board-service 이미지 푸시는 리포 시크릿 `GH_PACKAGES_TOKEN` 대기
 - [ ] Keycloak ADMIN 롤 부여 — 사용자 직접 작업 (관리자 설정 화면 접근에 필요)
+
+## 8. 웨이브 A·C·D·트리아지·자동화 후속 (2026-10-24)
+
+- **검색 API 트리아지 조건** — `/api/alm/issues/search`에 트리아지 조건이 없어 REST `listIssues`(보드·백로그용)가 대기 이슈를
+  어댑터에서 거른다(페이지 total이 대기 이슈를 포함한다). 서버에 `triage=false|true` 파라미터가 생기면 어댑터 필터를 걷는다.
+- **보드 드래그 키보드 경로** — dnd-kit KeyboardSensor는 Space를 잡아 미리보기(Space, 웨이브 B)와 부딪친다. 지금 키보드 경로는
+  상세 상태 버튼(`s`)·우클릭 메뉴. 보드 카드 포커스에서 "열 이동" 단축키를 따로 둘지 결정 필요.
+- **예약(SCHEDULED) 자동화의 목업 실행** — 목업은 스케줄러가 없어 저장·표시만 한다(서버는 서울 시각 cron으로 돈다).
+- **추정 합계 API** — 화면은 이미 받은 이슈로 포인트·시간 합을 센다(`estimateSummary`, 서버와 같은 규칙). `getEstimationSummary`는
+  파사드에 있으나 아직 쓰는 화면이 없다(스프린트 계획 화면이 생기면 쓴다).

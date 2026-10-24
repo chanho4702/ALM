@@ -114,10 +114,11 @@
 
 - **비어 있거나 없으면 모든 이동을 허용**한다. 기존 프로젝트가 갑자기 막히지 않게 하는 기본값이다.
 - `from: []`은 지라의 "All statuses" 전이 — 모든 상태에서 그 상태로 갈 수 있다.
-- 강제 지점은 `assertTransitionAllowed`이며 `updateIssue`·`moveIssue`(보드 드래그) 두 경로가 부른다.
+- 강제 지점은 **워크플로 엔진**(`store/mock/workflow.ts`, 서버 `WorkflowEngine`)이다 — 아래 "워크플로 엔진" 절.
   같은 상태로의 저장은 전이가 아니다. 거부 문구는 상태 **이름**으로 만든다.
-- 상태를 지우면 그 상태를 쓰던 전이도 저장 시 정리된다(`pruneTransitions`) — 전역 전이(`from: []`)는
-  남고, `from`을 전부 잃은 전이만 버린다.
+- **깨진 참조는 저장 때 400**(2026-10-24 서버 저장 검증 `전환의 대상 상태가 워크플로에 없습니다` 등) — 상태를 지운
+  편집기는 `components/workflowRules.ts`의 `pruneWorkflowRefs`로 전이·타입 워크플로·배치를 덜어 보낸다
+  (프로젝트 설정 워크플로 구획·전역 스킴 모달 둘 다). 조건·검증·화면·후처리는 보존한다.
 - 편집 UI는 `WorkflowCanvas`(프로젝트 설정 → 워크플로 구획, 전역 관리 → 워크플로 스킴 편집 모달).
   캔버스는 `@xyflow/react`(MIT)가 그리고 배치는 `@dagrejs/dagre`(MIT)가 왼쪽→오른쪽 랭크로 잡는다
   (`workflowLayout.ts` `computeAutoLayout`; 전이가 없으면 의미 순서 열, 전역 전이는 가상
@@ -128,6 +129,39 @@
 - **두 층 모두에서 편집한다**: 전역 관리(⚙)의 "워크플로 편집" 모달이 스킴 전이를, 프로젝트 설정의
   워크플로 탭이 커스텀 전이를 다룬다. 스킴 층이 없으면 전이를 바꾸려고 프로젝트마다 커스텀으로
   돌려야 한다.
+
+## 워크플로 엔진 — 조건·검증·전환 화면·후처리 (2026-10-24, 웨이브 A·C)
+
+서버 README "워크플로 엔진" 절이 정본이고 목업 `store/mock/workflow.ts`가 같은 규칙·같은 문구다.
+
+- 전이(`WorkflowTransition`)에 선택 칸 넷: `conditions`(`assignee`·`role` ADMIN|EDIT·`subtasksDone`),
+  `validators`(필드 id), `screenFields`(`resolution`·`comment`·`assignee`·`fixVersion`·`dueDate`),
+  `postFunctions`(`assignToActor`·`clearAssignee`·`setResolution` + 서버 어휘 값 `DONE`…).
+  **설정 본문은 REST가 가공 없이 왕복**하므로 이 값들도 서버 표기다. 다른 구획 저장은 `...body` 스프레드로 보존한다.
+- 가용 전환 `listIssueTransitions(issueId)` — 못 하는 전환도 `available:false` + `unavailableReason`.
+  전이 목록이 빈 워크플로는 `implicit:<상태>` 암묵 전환. 같은 id(합성 id 포함)는 한 줄.
+  트리아지 대기 이슈는 전부 비활성(`트리아지 대기열에 있는 이슈는 트리아지에서 먼저 처리해야 합니다`).
+- 전환 실행 `transitionIssue(issueId, {transitionId, expectedVersion?, fields, comment})` — 화면에 없는 칸 400,
+  순서는 조건 → 화면 값 → 상태 + 해결 → 검증 → 후처리 → 코멘트. 상태·해결만 바뀌면 버전을 올리지 않는다.
+- 상태만 오는 경로(PUT·move·bulk)는 같은 대상의 전환 중 **조건을 충족하는 첫 번째**, 모두 막히면 첫 후보의 이유.
+- 저장 검증 문구(400)는 서버와 같다: `해결 칸은 완료 상태로 가는 전환에만 넣을 수 있습니다`,
+  `해결 설정 후처리는 완료 상태로 가는 전환에만 쓸 수 있습니다`, `담당자를 나로 지정하면서 비울 수는 없습니다`,
+  `역할 조건은 ADMIN 또는 EDIT여야 합니다`, `전환의 출발 상태가 워크플로에 없습니다: x` …
+- 화면: 이슈 상세 상태 버튼 = `components/transitions/StatusTransitionButton`(팝오버 메뉴, 흐린 항목은
+  `aria-disabled` + 툴팁·`aria-describedby` 이유, `s` 단축키). 전환 화면 = `TransitionScreenModal`,
+  흐름은 `useTransitionRunner`(상세·보드 공용 — 화면 없는 전환은 `expectedVersion` 없이, 화면 있는 전환은 본 버전으로).
+  편집 = `WorkflowCanvas` 목록의 "규칙" 버튼(또는 선 더블클릭) → `TransitionRulesModal`, 목록 행에 요약 배지.
+- **포털 모달 안 폼 제출은 `stopPropagation`** — React 이벤트가 트리로 거품이 올라 바깥 편집 폼(워크플로 저장)이
+  옛 초안으로 저장해 버린 적이 있다.
+
+## 이슈 타입별 워크플로 (2026-10-24, C5)
+
+`SettingsBody.workflowsByType?: Record<타입 id, {statuses, transitions}>` — 프로젝트 상태 목록의 **부분집합**과
+그 위의 전환(`null` = 프로젝트 전환 중 이 상태들 사이의 것, `[]` = 모두 허용, 목록 = 그것). 키가 없는 타입은
+프로젝트 기본 워크플로(폴백). 부분집합도 의미마다 상태가 하나 이상(`버그 워크플로에도 카테고리… 필요합니다`).
+보드 열·완료 판정·리포트는 프로젝트 목록 하나를 그대로 본다. 새 이슈의 기본 상태 = 그 타입 워크플로의 첫 '할 일',
+타입을 바꿔 지금 상태가 없으면 이관 규칙(같은 카테고리 → 같은 의미 → 첫 상태). 편집 UI는 `TypeWorkflowEditor`
+(타입 Select → "기본 워크플로 따름" 스위치 → 상태 체크·전이 방식), 프로젝트 설정·전역 스킴 모달 둘 다.
 
 ## 이관 규칙
 
@@ -141,8 +175,13 @@
 - `StatusEditor`는 초안만 다루는 controlled 컴포넌트 — 저장은 부모가
   `updateScheme` 또는 `updateProjectCustomSettings`로 한다. order는 커밋 때 1부터 재부여.
 - 마지막 남은 **의미**의 상태는 빼기 버튼 disabled (검증기와 같은 가드).
-- 보드는 `listProjectStatuses`를 컬럼 원천으로 쓰므로 상태를 추가하면 컬럼이 자동으로 늘어난다.
-  `BoardSettingsModal`의 컬럼 초안도 상태 목록에서 파생된다.
+- 보드 열은 `Board.resolvedColumns`(서버·목업이 같은 규칙으로 계산, `pages/boardColumns.ts`의 `boardColumnsOf`가
+  구 서버 폴백)다. **상태 형식**(열 = 상태 1:1, 상태를 추가하면 열이 자동으로 는다)과 **매핑 형식**(C4 — 열 하나에 여러
+  상태, `unmappedStatuses`의 이슈는 보드에 안 나온다)이 있고, `BoardSettingsModal` › `BoardColumnMappingEditor`가 오간다.
+  매핑 열에 놓으면 열에 넣은 순서대로 **가용 전환이 있는 첫 상태**로 간다(`columnAvailability`).
+- 보드 드래그(A3): 들어 올릴 때 가용 전환을 묻고 갈 수 없는 열은 흐림 + 드롭 비활성(`BoardColumn blockedReason`),
+  놓으면 **낙관적**으로 먼저 옮기고 거부·409면 되돌린다(`applyOptimisticMove`). 전환 화면이 있으면 창, 취소하면 제자리.
+  드래그 키보드 경로는 없다 — 상세 상태 버튼(`s`)·우클릭 메뉴가 키보드 경로다.
 
 ## 우선순위 레지스트리 (2026-08-30)
 

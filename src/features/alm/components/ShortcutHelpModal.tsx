@@ -40,6 +40,7 @@ export const SHORTCUT_GROUPS: { title: string; rows: ShortcutRow[] }[] = [
       { id: "next", keys: "j", label: "다음 이슈 선택" },
       { id: "prev", keys: "k", label: "이전 이슈 선택" },
       { id: "open", keys: "o", label: "선택한 이슈 열기" },
+      { id: "display", keys: "Shift+V", label: "표시 옵션(그룹·정렬·속성) 열기" },
     ],
   },
   {

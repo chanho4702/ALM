@@ -133,11 +133,13 @@ reset 함수로 `__resetForTest`가 초기화한다. 새 함수는 해당 도메
 - 완료 카테고리로 **들어가면** `"done"`이 기본값, 완료에서 **벗어나면** `null`(다시 열기).
 - 명시한 값은 기본값보다 우선하되, 완료가 아닌 이슈에 설정하면 거부한다
   ("완료된 이슈에만 해결을 설정할 수 있습니다").
-- 적용 지점: `createIssue`·`updateIssue`·`moveIssue`(보드 드래그). 새 상태 쓰기 경로를 만들면 여기도 태운다.
+- **서버가 정본**(2026-10-24 A1, `ResolutionRule`) — 목업 `applyResolutionRule`은 같은 규칙의 대역이다. 수정(PUT)은
+  **현재 값과 다를 때만** 지정으로 본다(화면이 들고 있던 값을 다시 보내므로). 완료 안에서 null 지정은 기본값, 기본값은
+  전환 후처리 `setResolution`이 있으면 그 값.
+- 적용 지점: `createIssue`·`updateIssue`·`moveIssue`·`transitionIssue`·트리아지 처리. 새 상태 쓰기 경로를 만들면 여기도 태운다.
 - `normalize`가 도입 전 데이터의 완료 이슈를 `"done"`으로 백필한다(설정 정규화 뒤에 판정).
 - 활동로그 `type: "resolution"`으로 이전값 → 새값을 남긴다.
-- REST 어댑터는 값만 옮긴다(`details.resolution`, 서버 V6). 카테고리 판정이 프론트 소유라 기본값·해제
-  규칙도 프론트가 적용해 보낸다 — 스킴이 서버로 가면 규칙도 함께 옮긴다.
+- REST 어댑터는 값만 옮긴다(`details.resolution`) — 기본값·해제 규칙은 서버가 적용한다.
 
 ## 워처 · 알림 (2026-08-30)
 
@@ -343,3 +345,26 @@ project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 �
 - `store/orgApi.ts`의 `orgApiFetch`가 `@chanho/org-admin`에 넘기는 인증 fetch다. REST 모드는
   `sharedApiFetch` 그대로, 목업 모드는 `/api/org/me`만 목업 프로필로 답하고 나머지는 501
   `{"error"}`로 거절한다(개발 서버가 index.html을 200으로 돌려주는 최악의 실패를 막는다).
+
+## 웨이브 A·C·D·트리아지·자동화 (2026-10-24)
+
+파사드에 더한 함수(목업·REST 둘 다, REST 계약은 alm-backend README가 정본):
+
+| 영역 | 함수 | REST |
+|---|---|---|
+| 워크플로 엔진 | `listIssueTransitions`, `transitionIssue` | `GET/POST /issues/{id}/transitions` |
+| 플래그 | `setIssueFlag(issueId, flagged, comment?)` — 버전 안 올림 | `PUT /issues/{id}/flag` |
+| 계획 필드 | `createIssue`/`updateIssue`의 `startDate`·`storyPoints`(+ 생성 `triage`) | 요청 `planning`(보낸 키만) |
+| 추정·속도 | `getEstimationSummary`, `getVelocity(projectId, unit, limit)` | `/estimation/summary`, `/reports/velocity` |
+| 저장된 보기 | `listMyViews`, `listProjectViews`, `getView`, `createView`, `updateView(id, patch, expectedVersion)`, `deleteView` | `/me/views`, `/projects/{id}/views`, `/views/{id}` (filter null → `clearFilter`) |
+| 트리아지 | `getTriageSettings`, `saveTriageSettings`, `listTriage`, `sendToTriage`, `acceptTriage`, `declineTriage`, `duplicateTriage`, `snoozeTriage` | `/projects/{id}/triage*`, `/issues/{id}/triage*` |
+| 자동화 | `listAutomationRules`, `getAutomationRule`, `create/update/deleteAutomationRule`, `listAutomationRuleRuns`, `listProjectAutomationRuns` | `/projects/{id}/automation/*`, `/automation/rules/{id}*` |
+
+- 이슈 응답 `startDate`·`storyPoints`(BigDecimal은 수로)·`flagged`·`triageState`(소문자) — 구 응답은 null/false.
+- **트리아지 대기 이슈는 `listIssues`(보드·백로그용)에서 빠진다.** REST는 검색 API에 트리아지 조건이 없어 어댑터가
+  거른다(백엔드에 `triage` 파라미터 요청). 검색·AQL(`triage = true`)에는 나온다.
+- 목업 자동화 엔진(`mock/automation.ts`)은 같은 호출 안에서 동기로 돈다 — 사람 경로가 **저장 뒤** `emitIssueEvent`를
+  부르고, 액션은 같은 스토어 함수를 탄다. 안전장치(규칙 변경은 allowRuleTrigger만 깨움·깊이 3·핑퐁 LOOP_BLOCKED·분당 30회
+  RATE_LIMITED 자동 비활성·연속 5회 실패 자동 비활성·액션 묶음 원자성 = 캐시 스냅숏 되돌리기)는 서버와 같다. 예약
+  트리거는 목업에 스케줄러가 없어 돌지 않는다. 되돌리기가 캐시를 바꿔 끼우므로 **emit 뒤에는 `load()`로 다시 읽는다**.
+- 필드 구성은 15종(`startDate`·`storyPoints` 추가). AQL 새 필드 `startDate`·`storyPoints`·`flagged`·`triage`(목업 평가기 포함).

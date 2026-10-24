@@ -4,8 +4,10 @@ import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Button, Dropdown, useToast } from "@chanho/react";
 import type { Board, Project } from "../store/types";
-import { deleteSavedFilter, listBoards, listSavedFilters, listSharedFilters, updateSavedFilter } from "../store/jiraStore";
+import { deleteSavedFilter, listBoards, listProjectViews, listSavedFilters, listSharedFilters, updateSavedFilter } from "../store/jiraStore";
 import type { SavedFilter } from "../store/jiraStore";
+import type { SavedView } from "../store/types";
+import { VIEWS_CHANGED_EVENT } from "./views/useIssueViews";
 import { BoardCreateModal } from "./BoardCreateModal";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { projectViewTabs } from "./projectViews";
@@ -41,7 +43,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
   const navigate = useNavigate();
   const aiTeamActive = useAiTeamActive();
   const toast = useToast();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
@@ -174,6 +176,33 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
       window.removeEventListener(UI_CHANGED_EVENT, loadBoards);
     };
   }, [currentProjectId]);
+
+  // 현재 프로젝트의 저장된 보기(D1) — 못 읽으면 조용히 뺀다(사이드바를 깨지 않는다)
+  const [projectViews, setProjectViews] = useState<SavedView[]>([]);
+  useEffect(() => {
+    if (!currentProjectId) {
+      setProjectViews([]);
+      return;
+    }
+    let cancelled = false;
+    const loadViews = () => {
+      void listProjectViews(currentProjectId).then(
+        (list) => {
+          if (!cancelled) setProjectViews(list);
+        },
+        () => {
+          if (!cancelled) setProjectViews([]);
+        },
+      );
+    };
+    loadViews();
+    window.addEventListener(VIEWS_CHANGED_EVENT, loadViews);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(VIEWS_CHANGED_EVENT, loadViews);
+    };
+  }, [currentProjectId]);
+  const currentViewId = currentPage === "issues" ? new URLSearchParams(search).get("view") : null;
 
   const isHome = pathname === "/home" || pathname === "/";
   const isDirectory = pathname === "/projects" || pathname === "/projects/new";
@@ -411,7 +440,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
                         <li key={page.id}>
                           <button
                             type="button"
-                            className={itemClass(currentPage === page.id && page.id !== "board")}
+                            className={itemClass(currentPage === page.id && page.id !== "board" && !(page.id === "issues" && currentViewId))}
                             onClick={() => navigate(`/projects/${project.id}/${page.id}`)}
                           >
                             {page.label}
@@ -441,6 +470,24 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
                                   + 새 보드
                                 </button>
                               </li>
+                            </ul>
+                          ) : null}
+                          {/* "이슈" 아래 — 이 프로젝트의 저장된 보기 */}
+                          {page.id === "issues" && projectViews.length > 0 ? (
+                            <ul className="global-nav-sub" data-testid="nav-views" aria-label="저장된 보기">
+                              {projectViews.map((view) => (
+                                <li key={view.id}>
+                                  <button
+                                    type="button"
+                                    className={itemClass(currentViewId === view.id)}
+                                    onClick={() =>
+                                      navigate(`/projects/${project.id}/issues?view=${encodeURIComponent(view.id)}`)
+                                    }
+                                  >
+                                    {view.name}
+                                  </button>
+                                </li>
+                              ))}
                             </ul>
                           ) : null}
                         </li>
