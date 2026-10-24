@@ -1,6 +1,14 @@
 /* 상태 전환(A2·A4) — 상태 버튼 목록·전환 화면. 색·간격은 토큰만 */
+
+/* 속성 패널의 다른 칸(Select 36px, 왼쪽 정렬)과 같은 모양 — 지라 상태 버튼처럼 값이 왼쪽에 선다 */
+.transition-trigger.transition-trigger {
+  width: 100%;
+  min-height: 36px;
+  justify-content: flex-start;
+  font-weight: var(--chanho-font-weight-semibold);
+}
 .transition-trigger-chevron {
-  margin-left: var(--chanho-space-50);
+  margin-left: auto;
   color: var(--chanho-color-text-subtle);
 }
 
