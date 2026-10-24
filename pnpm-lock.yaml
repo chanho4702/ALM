@@ -5,8 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@chanho/tokens': npm:@chanho4702/tokens@0.4.0
-  '@chanho/react': npm:@chanho4702/react@0.11.0
+  '@chanho/tokens': npm:@chanho4702/tokens@0.5.0
+  '@chanho/react': npm:@chanho4702/react@0.12.0
 
 importers:
 
@@ -14,13 +14,13 @@ importers:
     dependencies:
       '@chanho/org-admin':
         specifier: npm:@chanho4702/org-admin@0.3.0
-        version: '@chanho4702/org-admin@0.3.0(@chanho4702/react@0.11.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@chanho4702/tokens@0.4.0)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)'
+        version: '@chanho4702/org-admin@0.3.0(@chanho4702/react@0.12.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@chanho4702/tokens@0.5.0)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)'
       '@chanho/react':
-        specifier: npm:@chanho4702/react@0.11.0
-        version: '@chanho4702/react@0.11.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)'
+        specifier: npm:@chanho4702/react@0.12.0
+        version: '@chanho4702/react@0.12.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)'
       '@chanho/tokens':
-        specifier: npm:@chanho4702/tokens@0.4.0
-        version: '@chanho4702/tokens@0.4.0'
+        specifier: npm:@chanho4702/tokens@0.5.0
+        version: '@chanho4702/tokens@0.5.0'
       '@dagrejs/dagre':
         specifier: ^3.1.1
         version: 3.1.1
@@ -214,14 +214,14 @@ packages:
       react-dom: ^19.0.0
       react-router: ^7.0.0
 
-  '@chanho4702/react@0.11.0':
-    resolution: {integrity: sha512-a72+6N3MahVGsgIos/aZ7Xt4e9aJ3dxbaYOMjXCtjBEsr73/2topOE2rU1NjIgIHQPRYKwoNh/9D9s2KYnK0DQ==, tarball: https://npm.pkg.github.com/download/@chanho4702/react/0.11.0/4975228f7508b29bacf1a1e6910f2a99b0efaf9c}
+  '@chanho4702/react@0.12.0':
+    resolution: {integrity: sha512-tifO1Gb+tZGqaGH1SKL2YNnIxBf6ptk5um8ZXbcHmNTAGqw3v+99BGqJzSx7yb/tpaPlHodjZ29hrIMBDKvJYw==, tarball: https://npm.pkg.github.com/download/@chanho4702/react/0.12.0/d9c3b303b945784d439296ad43f79875d4a5248a}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@chanho4702/tokens@0.4.0':
-    resolution: {integrity: sha512-DRPbxCRgQC+Yji00ijan/Qy9D2qurTOG+Amz4MsqiyfiIFNiEJhdHLidk7zWBWMi8vHhq1TS8V1Y7WIdkHiDTQ==, tarball: https://npm.pkg.github.com/download/@chanho4702/tokens/0.4.0/379dd69e1bfc05f46a82386826b55be96088529d}
+  '@chanho4702/tokens@0.5.0':
+    resolution: {integrity: sha512-oJMVG6K5Gv9xMuQEozdVQthdpqDA5blT7/awrZlxRw7Z5SEy31dyKhwJ1MEhxAhNCdMsucd7eBFGZLzIJzAZ8A==, tarball: https://npm.pkg.github.com/download/@chanho4702/tokens/0.5.0/8de0a9ef2f25ebb4d80ac7960e015b0d17eae526}
 
   '@csstools/color-helpers@5.1.0':
     resolution: {integrity: sha512-S11EXWJyy0Mz5SYvRmY8nJYTFFd1LCNV+7cXyAgQtOOuzb4EsgfqDufL+9esx72/eLhsRdGZwaldu/h+E4t4BA==}
@@ -2721,18 +2721,18 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@chanho4702/org-admin@0.3.0(@chanho4702/react@0.11.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@chanho4702/tokens@0.4.0)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
+  '@chanho4702/org-admin@0.3.0(@chanho4702/react@0.12.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@chanho4702/tokens@0.5.0)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@chanho/react': '@chanho4702/react@0.11.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)'
-      '@chanho/tokens': '@chanho4702/tokens@0.4.0'
+      '@chanho/react': '@chanho4702/react@0.12.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)'
+      '@chanho/tokens': '@chanho4702/tokens@0.5.0'
       lucide-react: 1.35.0(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       react-router: 7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
 
-  '@chanho4702/react@0.11.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@chanho4702/react@0.12.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@chanho/tokens': '@chanho4702/tokens@0.4.0'
+      '@chanho/tokens': '@chanho4702/tokens@0.5.0'
       radix-ui: 1.6.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
@@ -2740,7 +2740,7 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@chanho4702/tokens@0.4.0': {}
+  '@chanho4702/tokens@0.5.0': {}
 
   '@csstools/color-helpers@5.1.0': {}
 

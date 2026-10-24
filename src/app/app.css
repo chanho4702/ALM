@@ -1846,6 +1846,8 @@ body {
 
 .issue-type-glyph.is-warning {
   background: var(--chanho-color-background-warning);
+  /* 노란 warning 위 흰 글자는 1.57:1 — 전용 반전 글자색(tokens 0.5.0) */
+  color: var(--chanho-color-text-warning-inverse);
 }
 
 .issue-type-glyph.is-neutral {
@@ -2806,6 +2808,13 @@ body {
 
 .home-date-group:first-child .home-date-group-title {
   margin-top: var(--chanho-space-50);
+}
+
+/* 탭 안에서 늦게 불러오는 목록(최근 본)의 로딩 자리 */
+.home-tab-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--chanho-space-300) 0;
 }
 
 /* ── 대시보드 ───────────────────────────────────────────── */
@@ -4178,11 +4187,14 @@ th:last-child > [role="separator"] {
   padding: var(--chanho-space-100) var(--chanho-space-200);
   font-size: var(--chanho-font-size-75);
   border-bottom: 1px solid var(--chanho-color-border-default);
-  background: var(--chanho-color-background-info);
+  /* info는 tokens 0.5.0에서 진한 블루 — 본문 글자는 옅은 틴트 위에 둔다 */
+  background: var(--chanho-color-background-info-subtle);
   color: var(--chanho-color-text-default);
 }
 .announcement-banner-warning {
   background: var(--chanho-color-background-warning);
+  /* 다크 테마의 밝은 본문 글자는 노란 배경에서 대비가 무너진다 */
+  color: var(--chanho-color-text-warning-inverse);
 }
 .announcement-banner-text {
   flex: 1;
@@ -4608,7 +4620,7 @@ th:last-child > [role="separator"] {
 .pcreate-steps .is-done .pcreate-step-index {
   background: var(--chanho-color-background-brand);
   border-color: var(--chanho-color-background-brand);
-  color: var(--chanho-color-text-inverse, #fff);
+  color: var(--chanho-color-text-inverse);
 }
 
 .pcreate-details {
