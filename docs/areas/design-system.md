@@ -61,6 +61,32 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
 - 필수 `*`는 **텍스트 노드 안에** 넣는다(`withRequiredMark`). 아이콘과 글자를 갈라 놓으면
   `getByText("연결 이슈 *")`가 무너진다.
 
+## 2026-10-24 UI/UX 정비에서 정한 것
+
+- **Select 최소 폭 180px.** DS `Select` 트리거는 `min-width:180px`·높이 36px이고 루트가 `inline-flex`라
+  셀 폭을 채우지 않는다. 180px보다 좁은 grid 열에 두면 옆 칸 위로 겹친다(레지스트리 설정 화면들이 이걸로
+  깨져 있었다). 칸은 **최소 180px**로 잡고(`flex: 1 1 180px` 또는 `repeat(auto-fill, minmax(180px, 1fr))`),
+  칸을 채우려면 `button[role="combobox"]{width:100%}`를 준다(Radix 트리거는 `aria-haspopup`이 아니라
+  `role="combobox"`). 줄일 수 없는 최소 폭 자체는 DS 결함으로 보고했다.
+- **레지스트리 편집 행·추가 폼(`.status-editor-row`/`.status-editor-add`)은 flex 줄바꿈.** 패널마다 자식 수가
+  달라 grid 열 정의를 나눠 쓰면 어긋난다. 입력·선택 칸은 `> div`, 글리프·사용 수는 `> span`, 액션은
+  `.status-editor-row-actions`(줄이 바뀌면 오른쪽 끝).
+- **반응형은 화면 폭이 아니라 컨테이너 폭으로.** 768px 화면도 사이드바(240px)를 빼면 본문은 약 500px다.
+  `@media`로 나눈 곳이 그 폭에서 겹쳤다. AI 사무실 탭 줄·백로그 행은 `container-type: inline-size` +
+  `@container`를 쓴다.
+- **앱 팝오버는 `components/usePopoverPanel.ts` 하나로.** FilterDropdown·ColumnPicker가 공유한다.
+  바깥 클릭·Esc(트리거로 포커스 복귀), 열면 첫 항목(검색 입력)에 포커스, ↑↓·Home·End, 트리거 폭(최소 200px)을
+  최소 폭으로, 화면 오른쪽·아래 가장자리에서 뒤집기(`.is-align-end`/`.is-above`)를 맡는다. 옵션이 8개를
+  넘으면 FilterDropdown이 검색 입력을 띄운다. 새 멀티선택 팝오버도 이 훅을 쓴다.
+- **프로젝트 뷰 목록은 `components/projectViews.ts` 하나.** 가로 탭과 사이드바 하위 목록이 같은 목록을
+  그린다(예전엔 사이드바에 리포트·보관함이 없었다). 그래서 탭 이름 버튼이 두 개 있을 수 있다 —
+  테스트는 `within(getByRole("navigation", { name: "프로젝트 뷰" }))`로 좁힌다.
+- **뷰 탭 넘침은 "더 보기" 메뉴로.** `ProjectTabs`가 ResizeObserver로 재고, 측정 줄은 `content: attr(data-label)`
+  로만 글자를 그려 텍스트 노드를 남기지 않는다(jsdom에선 전부 보임).
+- **시각 숨김 텍스트(`.visually-hidden`, absolute)를 스크롤 상자 안에 둘 때는 가까운 조상에
+  `position:relative`.** 안 그러면 표 스크롤 상자를 빠져나가 페이지 가로 스크롤을 만든다(이슈 목록 라벨 "+N").
+- 툴바 컨트롤 높이는 32px로 맞춘다(DS 버튼 medium·필터 트리거). `size="small"`은 24px다.
+
 ## 2026-09-04 추가 함정
 
 - **모달 안 Select/Dropdown은 DS 0.8.0 이상에서만 마우스로 고를 수 있다.** 0.7.0까지는 팝업 z(400)가 모달 블랭킷(500)보다
