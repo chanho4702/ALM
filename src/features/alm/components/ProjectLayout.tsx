@@ -9,6 +9,7 @@ import { UI_CHANGED_EVENT, listStarredProjectIds, toggleProjectStar } from "../s
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useAiTeamActive } from "./useAiTeamActive";
 import { projectViewTabs, type ProjectViewTab } from "./projectViews";
+import { useTriageEnabled } from "./useTriageEnabled";
 
 export interface ProjectLayoutProps {
   projects: Project[];
@@ -32,6 +33,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
   const location = useLocation();
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const aiTeamActive = useAiTeamActive();
+  const triageEnabled = useTriageEnabled(projectId);
 
   const refreshStarred = useCallback(() => {
     void listStarredProjectIds().then(setStarredIds);
@@ -113,7 +115,7 @@ export function ProjectLayout({ projects, onProjectsChanged }: ProjectLayoutProp
       </header>
 
       <ProjectTabs
-        tabs={projectViewTabs(aiTeamActive)}
+        tabs={projectViewTabs(aiTeamActive, triageEnabled)}
         active={segment}
         onSelect={(id) => navigate(`/projects/${current.id}/${id}`)}
       />

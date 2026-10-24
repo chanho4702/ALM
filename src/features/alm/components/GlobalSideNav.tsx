@@ -10,6 +10,7 @@ import { BoardCreateModal } from "./BoardCreateModal";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { projectViewTabs } from "./projectViews";
 import { useAiTeamActive } from "./useAiTeamActive";
+import { useTriageEnabled } from "./useTriageEnabled";
 import {
   SIDENAV_DEFAULT_WIDTH,
   SIDENAV_MAX_WIDTH,
@@ -144,6 +145,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)(?:\/([^/?]+))?/);
   const currentProjectId = projectMatch && projectMatch[1] !== "new" ? projectMatch[1] : undefined;
+  const triageEnabled = useTriageEnabled(currentProjectId);
   const rawPage = projectMatch?.[2];
   // /boards/:boardId 는 "보드" 페이지로 취급, 활성 보드 id를 함께 뽑는다
   const currentPage = rawPage === "boards" ? "board" : rawPage;
@@ -405,7 +407,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
                   {projectRow(project, isCurrent && !currentPage)}
                   {isCurrent && !collapsed ? (
                     <ul className="global-nav-sub">
-                      {projectViewTabs(aiTeamActive).map((page) => (
+                      {projectViewTabs(aiTeamActive, triageEnabled).map((page) => (
                         <li key={page.id}>
                           <button
                             type="button"

@@ -65,6 +65,8 @@ import { ComponentsPanel } from "../components/ComponentsPanel";
 import { PROJECT_COLOR_OPTIONS } from "../components/ProjectAvatar";
 import { TYPE_ICON_OPTIONS } from "../components/typeIcons";
 import { JiraImportPanel } from "../components/JiraImportPanel";
+import { TriageSettingsPanel } from "../components/TriageSettingsPanel";
+import { AutomationRulesPanel } from "../components/AutomationRulesPanel";
 import { useIssueTypes } from "../components/useIssueTypes";
 import { usePriorities } from "../components/usePriorities";
 import {
@@ -767,6 +769,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         {section === "workflow" ? workflow : null}
         {section === "types" ? types : null}
         {section === "fields" ? fields : null}
+        {section === "triage" ? <TriageSettingsPanel projectId={project.id} canManage={myRole === "admin"} /> : null}
+        {section === "automation" ? <AutomationRulesPanel projectId={project.id} canManage={myRole === "admin"} /> : null}
         {section === "ai-team" ? (
           <Suspense
             fallback={

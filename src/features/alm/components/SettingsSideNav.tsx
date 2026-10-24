@@ -20,6 +20,8 @@ export const PROJECT_SETTINGS_SECTIONS = [
   { id: "workflow", label: "워크플로" },
   { id: "types", label: "이슈 타입" },
   { id: "fields", label: "필드" },
+  { id: "triage", label: "트리아지" },
+  { id: "automation", label: "자동화" },
   { id: "import", label: "가져오기" },
   // agent-service가 있는 플랫폼에서만 메뉴에 보인다(useAiTeamActive) — URL로 들어와도 화면이 빈 상태를 그린다
   { id: "ai-team", label: "AI 팀" },

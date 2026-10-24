@@ -14,11 +14,19 @@ export const PROJECT_VIEW_TABS = [
   { id: "archive", label: "보관함" },
 ] as const;
 
+/** 트리아지 인박스(V35) — 프로젝트 설정에서 켠 경우만(useTriageEnabled) "이슈" 다음에 붙는다 */
+export const TRIAGE_TAB = { id: "triage", label: "트리아지" } as const;
+
 /** AI 사무실 — agent-service가 붙은 플랫폼(useAiTeamActive)에서만 뷰 목록 맨 끝에 붙는다 */
 export const AI_OFFICE_TAB = { id: "ai-office", label: "AI 사무실" } as const;
 
 export type ProjectViewTab = { id: string; label: string };
 
-export function projectViewTabs(aiTeamActive: boolean): ProjectViewTab[] {
-  return aiTeamActive ? [...PROJECT_VIEW_TABS, AI_OFFICE_TAB] : [...PROJECT_VIEW_TABS];
+export function projectViewTabs(aiTeamActive: boolean, triageEnabled = false): ProjectViewTab[] {
+  const tabs: ProjectViewTab[] = [];
+  for (const tab of PROJECT_VIEW_TABS) {
+    tabs.push(tab);
+    if (tab.id === "issues" && triageEnabled) tabs.push(TRIAGE_TAB);
+  }
+  return aiTeamActive ? [...tabs, AI_OFFICE_TAB] : tabs;
 }

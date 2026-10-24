@@ -30,6 +30,9 @@ const BacklogPage = lazy(() =>
 const IssueListPage = lazy(() =>
   import("../features/alm/pages/IssueListPage").then((module) => ({ default: module.IssueListPage })),
 );
+const TriageInboxPage = lazy(() =>
+  import("../features/alm/pages/TriageInboxPage").then((module) => ({ default: module.TriageInboxPage })),
+);
 const TrashPage = lazy(() =>
   import("../features/alm/pages/TrashPage").then((module) => ({ default: module.TrashPage })),
 );
@@ -250,6 +253,14 @@ function AppRoutes() {
             element={
               <LazyPage label="이슈 목록" skeleton={<ListSkeleton label="이슈 목록 불러오는 중" rows={10} />}>
                 <IssueListPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="triage"
+            element={
+              <LazyPage label="트리아지">
+                <TriageInboxPage />
               </LazyPage>
             }
           />
