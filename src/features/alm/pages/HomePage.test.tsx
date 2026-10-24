@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import { __resetForTest } from "../store/jiraStore";
+import { listViewedIssues, recordIssueView } from "../store/uiStore";
 // 지연 로드(lazy) 청크를 수집 시점에 미리 올린다 — 병렬 실행에서 첫 findBy가 청크 변환을 기다리다 한도를 넘지 않게
 import "../components/IssueDetailModal";
 
@@ -109,5 +110,39 @@ describe("HomePage (For you)", () => {
       expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/issues?issue=ALM-3");
     });
     expect(await screen.findByRole("dialog", { name: "ALM-3" })).toBeInTheDocument();
+  });
+  it("최근 본 탭: 상세를 연 이슈를 최근 본 순서대로, 없어진 이슈는 조용히 빼고 기록에서도 지운다", async () => {
+    const user = userEvent.setup();
+    // 시드 현재 사용자 = 김찬호(u1). ALM-999는 없는 이슈(삭제된 것과 같다)
+    await recordIssueView("u1", "ALM-999");
+    await recordIssueView("u1", "ALM-5");
+    await recordIssueView("u1", "ALM-2");
+    renderHome();
+    await screen.findByRole("heading", { name: /안녕하세요/ });
+
+    await user.click(screen.getByRole("tab", { name: "최근 본" }));
+    const viewed = await screen.findByTestId("viewed-issues");
+    const metas = within(viewed).getAllByText(/ALM-\d+ ·/).map((el) => el.textContent?.split(" ·")[0]);
+    expect(metas).toEqual(["ALM-2", "ALM-5"]);
+    expect(within(viewed).getByText("오늘")).toBeInTheDocument();
+    await waitFor(async () => {
+      expect((await listViewedIssues("u1")).map((v) => v.key)).toEqual(["ALM-2", "ALM-5"]);
+    });
+  });
+
+  it("최근 본 탭: 기록이 없으면 안내를 보여 주고, 이슈 상세를 열면 기록된다", async () => {
+    const user = userEvent.setup();
+    renderHome();
+    await screen.findByRole("heading", { name: /안녕하세요/ });
+
+    await user.click(screen.getByRole("tab", { name: "최근 본" }));
+    expect(await screen.findByText("최근 본 이슈가 없습니다")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /나에게 배정됨/ }));
+    await user.click(within(await screen.findByTestId("my-issues")).getByText("이슈 상세 모달 구현")); // ALM-3
+    expect(await screen.findByRole("dialog", { name: "ALM-3" })).toBeInTheDocument();
+    await waitFor(async () => {
+      expect((await listViewedIssues("u1")).map((v) => v.key)).toEqual(["ALM-3"]);
+    });
   });
 });

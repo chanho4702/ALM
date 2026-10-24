@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  forgetViewedIssues,
   getSideNavWidth,
   isSideNavCollapsed,
   listRecentProjectIds,
   listStarredProjectIds,
+  listViewedIssues,
   pruneProject,
+  recordIssueView,
   recordProjectVisit,
   setSideNavCollapsed,
   setSideNavWidth,
@@ -29,6 +32,43 @@ describe("uiStore 최근 방문", () => {
     expect(recents).toHaveLength(5);
     expect(recents[0]).toBe("6");
     expect(recents).not.toContain("1");
+  });
+});
+
+describe("uiStore 최근 본 이슈", () => {
+  it("연 순서를 최신순으로, 다시 열면 맨 앞으로 올린다", async () => {
+    await recordIssueView("u1", "ALM-1");
+    await recordIssueView("u1", "ALM-2");
+    await recordIssueView("u1", "ALM-1");
+    expect((await listViewedIssues("u1")).map((v) => v.key)).toEqual(["ALM-1", "ALM-2"]);
+  });
+
+  it("최대 20건까지만 보관한다", async () => {
+    for (let n = 1; n <= 21; n += 1) await recordIssueView("u1", `ALM-${n}`);
+    const viewed = await listViewedIssues("u1");
+    expect(viewed).toHaveLength(20);
+    expect(viewed[0].key).toBe("ALM-21");
+    expect(viewed.map((v) => v.key)).not.toContain("ALM-1");
+  });
+
+  it("사용자별로 따로 보관하고, 걷어낸 키는 그 사용자 목록에서만 빠진다", async () => {
+    await recordIssueView("u1", "ALM-1");
+    await recordIssueView("u2", "ALM-1");
+    await recordIssueView("u2", "ALM-2");
+    await forgetViewedIssues("u2", ["ALM-1"]);
+    expect((await listViewedIssues("u1")).map((v) => v.key)).toEqual(["ALM-1"]);
+    expect((await listViewedIssues("u2")).map((v) => v.key)).toEqual(["ALM-2"]);
+  });
+
+  it("기록은 사이드바 구독 이벤트를 내지 않는다(이슈를 열 때마다 사이드바가 다시 읽지 않게)", async () => {
+    let fired = 0;
+    const onChange = () => {
+      fired += 1;
+    };
+    window.addEventListener("alm:ui-changed", onChange);
+    await recordIssueView("u1", "ALM-1");
+    window.removeEventListener("alm:ui-changed", onChange);
+    expect(fired).toBe(0);
   });
 });
 

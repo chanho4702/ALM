@@ -53,6 +53,7 @@ import {
 import type { IssueLinkView } from "../store/jiraStore";
 import { errorStatus } from "../store/mapping";
 import { settleWithConcurrency } from "../store/concurrency";
+import { recordIssueView } from "../store/uiStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PriorityGlyph } from "./PriorityGlyph";
 import { ResolutionGlyph } from "./ResolutionGlyph";
@@ -333,6 +334,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
         getCurrentUser(),
       ]);
       if (cancelled) return;
+      // 홈 For you "최근 본" 탭의 기록 — 상세를 실제로 연 이슈만(찾지 못한 키는 위에서 빠진다)
+      void recordIssueView(currentUser.id, found.key);
       setIssue(found);
       setDescriptionDraft(found.description);
       setEstimateDraft(found.estimateHours === null ? "" : String(found.estimateHours));

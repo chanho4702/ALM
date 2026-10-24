@@ -1,5 +1,5 @@
 /**
- * 내비게이션 UI 상태 저장소 — 최근 방문 프로젝트, 별표(즐겨찾기), 사이드바 접힘.
+ * 내비게이션 UI 상태 저장소 — 최근 방문 프로젝트, 최근 본 이슈, 별표(즐겨찾기), 사이드바 접힘.
  * 도메인 데이터(alm.jira.v1)와 분리된 키를 쓴다. 실제 백엔드에서는 사용자 설정 API가 된다.
  */
 
@@ -7,6 +7,14 @@ import { parseAndCheck } from "./aql/validate";
 
 const STORAGE_KEY = "alm.jira.ui.v1";
 const RECENT_LIMIT = 5;
+/** 최근 본 이슈 보관 건수 — 지라 For you "Viewed" 탭 */
+const VIEWED_LIMIT = 20;
+
+/** 최근 본 이슈 한 건 — 키와 마지막으로 연 시각(ISO) */
+export interface ViewedIssue {
+  key: string;
+  viewedAt: string;
+}
 
 export const SIDENAV_MIN_WIDTH = 180;
 export const SIDENAV_MAX_WIDTH = 400;
@@ -71,6 +79,8 @@ export interface TablePrefs {
 interface UiState {
   tablePrefs: Record<string, TablePrefs>;
   recentProjectIds: string[];
+  /** 사용자 id → 최근 본 이슈(최신순). 한 브라우저를 여러 계정이 쓰면 서로 섞이지 않게 사용자별로 둔다 */
+  viewedIssuesByUser: Record<string, ViewedIssue[]>;
   starredProjectIds: string[];
   sideNavCollapsed: boolean;
   sideNavWidth: number;
@@ -82,6 +92,7 @@ interface UiState {
 const DEFAULT_STATE: UiState = {
   tablePrefs: {},
   recentProjectIds: [],
+  viewedIssuesByUser: {},
   starredProjectIds: [],
   sideNavCollapsed: false,
   sideNavWidth: SIDENAV_DEFAULT_WIDTH,
@@ -97,6 +108,7 @@ function load(): UiState {
     return {
       tablePrefs: parsed.tablePrefs ?? {},
       recentProjectIds: parsed.recentProjectIds ?? [],
+      viewedIssuesByUser: parsed.viewedIssuesByUser ?? {},
       starredProjectIds: parsed.starredProjectIds ?? [],
       sideNavCollapsed: parsed.sideNavCollapsed ?? false,
       sideNavWidth: parsed.sideNavWidth ?? SIDENAV_DEFAULT_WIDTH,
@@ -108,9 +120,10 @@ function load(): UiState {
   }
 }
 
-function persist(state: UiState): void {
+/** notify=false는 구독자(사이드바 등)가 보지 않는 값만 바꿀 때 — 이슈를 열 때마다 사이드바가 다시 읽지 않게 */
+function persist(state: UiState, notify = true): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  window.dispatchEvent(new Event(UI_CHANGED_EVENT));
+  if (notify) window.dispatchEvent(new Event(UI_CHANGED_EVENT));
 }
 
 export async function getTablePrefs(tableId: string): Promise<TablePrefs> {
@@ -147,6 +160,32 @@ export async function recordProjectVisit(projectId: string): Promise<void> {
   // 이미 맨 앞이면 저장/이벤트 발행을 생략한다 (내비게이션마다 불필요한 재렌더 방지)
   if (next.join() === state.recentProjectIds.join()) return;
   persist({ ...state, recentProjectIds: next });
+}
+
+/** 최근 본 이슈(최신순, 최대 VIEWED_LIMIT건) */
+export async function listViewedIssues(userId: string): Promise<ViewedIssue[]> {
+  return (load().viewedIssuesByUser[userId] ?? []).map((v) => ({ ...v }));
+}
+
+/** 이슈 상세를 열 때 — 맨 앞으로 올리고 시각을 갱신한다(중복 제거, 최대 VIEWED_LIMIT건) */
+export async function recordIssueView(userId: string, issueKey: string): Promise<void> {
+  const state = load();
+  const current = state.viewedIssuesByUser[userId] ?? [];
+  const next = [
+    { key: issueKey, viewedAt: new Date().toISOString() },
+    ...current.filter((v) => v.key !== issueKey),
+  ].slice(0, VIEWED_LIMIT);
+  persist({ ...state, viewedIssuesByUser: { ...state.viewedIssuesByUser, [userId]: next } }, false);
+}
+
+/** 더는 열 수 없는 이슈(삭제·프로젝트 삭제·키 변경)를 최근 본 목록에서 걷어낸다 */
+export async function forgetViewedIssues(userId: string, issueKeys: readonly string[]): Promise<void> {
+  if (issueKeys.length === 0) return;
+  const state = load();
+  const current = state.viewedIssuesByUser[userId] ?? [];
+  const next = current.filter((v) => !issueKeys.includes(v.key));
+  if (next.length === current.length) return;
+  persist({ ...state, viewedIssuesByUser: { ...state.viewedIssuesByUser, [userId]: next } }, false);
 }
 
 export async function listStarredProjectIds(): Promise<string[]> {

@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { EmptyState, Lozenge, Spinner, Tabs } from "@chanho/react";
 import type { Issue, Project, User, WorkflowStatus } from "../store/types";
 import {
   findIssues,
   getCurrentUser,
+  getIssueByKey,
   listProjects,
   statusMetaByProject,
 } from "../store/jiraStore";
-import { listRecentProjectIds, listStarredProjectIds } from "../store/uiStore";
+import {
+  forgetViewedIssues,
+  listRecentProjectIds,
+  listStarredProjectIds,
+  listViewedIssues,
+} from "../store/uiStore";
+import { settleWithConcurrency } from "../store/concurrency";
 import { ProjectAvatar } from "../components/ProjectAvatar";
 import { IssueTypeGlyph } from "../components/IssueTypeGlyph";
 import { StatusGlyph } from "../components/StatusGlyph";
@@ -18,7 +25,7 @@ import {
 } from "../components/labels";
 import { relTime } from "../components/time";
 
-/** 최근 업데이트 탭의 날짜 그룹 (지라: Today / Yesterday / …) */
+/** 최근 업데이트·최근 본 탭의 날짜 그룹 (지라: Today / Yesterday / …) */
 function dateBucket(iso: string): string {
   const date = new Date(iso);
   const today = new Date();
@@ -45,6 +52,24 @@ const RECOMMEND_LIMIT = 8;
 const ASSIGNED_LIMIT = 50;
 /** 담당자 필요 후보를 고를 때 읽는 최대 건수(마감 임박분은 앞 사유로 빠지므로 여유 있게) */
 const UNASSIGNED_SCAN = 50;
+
+/** 최근 본 탭 — 기록(키·연 시각)을 이슈로 되살린 결과. 기록 순서(최신순)를 그대로 둔다 */
+type ViewedState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; items: { issue: Issue; viewedAt: string }[] };
+
+/** 날짜 그룹으로 묶는다 — 입력 순서(최신순)대로 그룹이 등장한다 */
+function groupByDate<T>(items: readonly T[], at: (item: T) => string): { label: string; items: T[] }[] {
+  const groups: { label: string; items: T[] }[] = [];
+  for (const item of items) {
+    const label = dateBucket(at(item));
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(item);
+    else groups.push({ label, items: [item] });
+  }
+  return groups;
+}
 
 /** 홈이 서버에서 받는 조각들 — 이슈 전량이 아니라 목적별 상위 N건과 건수(total)다 */
 interface HomeData {
@@ -73,6 +98,11 @@ export function HomePage() {
   const [tab, setTab] = useState("recommended"); // 오늘 요약 줄에서 탭을 바꿀 수 있게 제어 모드
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [viewed, setViewed] = useState<ViewedState>({ status: "loading" });
+  /** 최근 본을 다시 읽을 때 올린다(오류 후 다시 시도) */
+  const [viewedReload, setViewedReload] = useState(0);
+  /** 이미 읽은 viewedReload 값 — 탭을 오가도 다시 읽지 않는다 */
+  const viewedLoadedFor = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,6 +157,44 @@ export function HomePage() {
     };
   }, [retry]);
 
+  /**
+   * 최근 본 — 탭을 처음 열 때 기록을 읽어 이슈로 되살린다(최대 20건, 동시 5건).
+   * 없어진 이슈(삭제·프로젝트 삭제·이동으로 키 변경 = 조회 결과 없음)는 조용히 빼고 기록에서도 지운다.
+   * 권한·일시 오류로 일부만 실패하면 이번 표시에서만 빼고, 전부 실패하면 빈 목록이 아니라 오류로 보여 준다.
+   */
+  useEffect(() => {
+    if (tab !== "viewed" || me === null || viewedLoadedFor.current === viewedReload) return;
+    viewedLoadedFor.current = viewedReload;
+    let cancelled = false;
+    let done = false;
+    setViewed({ status: "loading" });
+    void (async () => {
+      const entries = await listViewedIssues(me.id);
+      const results = await settleWithConcurrency(entries, (entry) => getIssueByKey(entry.key));
+      if (cancelled) return;
+      const items: { issue: Issue; viewedAt: string }[] = [];
+      const gone: string[] = [];
+      results.forEach((result, index) => {
+        if (result.status === "rejected") return;
+        if (result.value) items.push({ issue: result.value, viewedAt: entries[index].viewedAt });
+        else gone.push(entries[index].key);
+      });
+      const allFailed = entries.length > 0 && results.every((result) => result.status === "rejected");
+      done = true;
+      setViewed(allFailed ? { status: "error" } : { status: "ready", items });
+      void forgetViewedIssues(me.id, gone);
+    })().catch(() => {
+      if (cancelled) return;
+      done = true;
+      setViewed({ status: "error" });
+    });
+    return () => {
+      cancelled = true;
+      // 읽는 도중 탭을 떠나면 다음에 탭을 열 때 다시 읽는다(로딩에 멈춰 있지 않게)
+      if (!done) viewedLoadedFor.current = null;
+    };
+  }, [tab, me, viewedReload]);
+
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "알 수 없음";
   const openIssue = (issue: Issue) =>
     navigate(`/projects/${issue.projectId}/issues?issue=${issue.key}`);
@@ -166,16 +234,13 @@ export function HomePage() {
   const myIssueTotal = home?.assigned.total ?? 0;
 
   /** 최근 업데이트를 날짜 그룹으로 — 그룹 등장 순서 유지 */
-  const recentGroups = useMemo(() => {
-    const groups: { label: string; items: Issue[] }[] = [];
-    for (const issue of recentIssues) {
-      const label = dateBucket(issue.updatedAt);
-      const last = groups[groups.length - 1];
-      if (last && last.label === label) last.items.push(issue);
-      else groups.push({ label, items: [issue] });
-    }
-    return groups;
-  }, [recentIssues]);
+  const recentGroups = useMemo(() => groupByDate(recentIssues, (issue) => issue.updatedAt), [recentIssues]);
+
+  /** 최근 본을 연 날짜로 묶는다(수정 시각이 아니라 내가 본 시각) */
+  const viewedGroups = useMemo(
+    () => (viewed.status === "ready" ? groupByDate(viewed.items, (item) => item.viewedAt) : []),
+    [viewed],
+  );
 
   const starredProjects = useMemo(
     () => projects.filter((p) => starredIds.includes(p.id)),
@@ -393,6 +458,40 @@ export function HomePage() {
                     <ul className="home-issue-list" data-testid="starred-projects">
                       {starredProjects.map(projectRow)}
                     </ul>
+                  ),
+              },
+              {
+                value: "viewed",
+                label: "최근 본",
+                content:
+                  viewed.status === "error" ? (
+                    <div role="alert">
+                      <EmptyState
+                        title="최근 본 이슈를 불러오지 못했습니다"
+                        description="잠시 후 다시 시도해 주세요."
+                        primaryAction={{ label: "다시 시도", onClick: () => setViewedReload((value) => value + 1) }}
+                      />
+                    </div>
+                  ) : viewed.status !== "ready" ? (
+                    <div className="home-tab-loading">
+                      <Spinner size="small" label="최근 본 이슈 불러오는 중" />
+                    </div>
+                  ) : viewed.items.length === 0 ? (
+                    <EmptyState
+                      title="최근 본 이슈가 없습니다"
+                      description="이슈 상세를 열면 여기에 최근 본 순서대로 모입니다."
+                    />
+                  ) : (
+                    <div data-testid="viewed-issues">
+                      {viewedGroups.map((group) => (
+                        <section key={group.label} className="home-date-group">
+                          <h3 className="home-date-group-title">{group.label}</h3>
+                          <ul className="home-issue-list">
+                            {group.items.map((item) => issueRow(item.issue))}
+                          </ul>
+                        </section>
+                      ))}
+                    </div>
                   ),
               },
             ]}
