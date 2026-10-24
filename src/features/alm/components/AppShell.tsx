@@ -144,11 +144,10 @@ export function AppShell({ projects }: AppShellProps) {
     </button>
   );
   const createAction = projects.length > 0 ? (
-    <Button size="small" onClick={() => setCreateOpen(true)}>만들기</Button>
+    <Button onClick={() => setCreateOpen(true)}>만들기</Button>
   ) : null;
   const notificationAction = (
     <Button
-      size="small"
       variant="ghost"
       className="notification-bell topbar-icon"
       aria-label={unreadCount > 0 ? `알림 ${unreadCount}개 미읽음` : "알림"}
@@ -168,7 +167,7 @@ export function AppShell({ projects }: AppShellProps) {
       {authUser ? (
         <>
           <span className="jira-auth-user">{authUser.name ?? authUser.email}</span>
-          <Button size="small" variant="ghost" onClick={() => void logout()}>로그아웃</Button>
+          <Button variant="ghost" onClick={() => void logout()}>로그아웃</Button>
         </>
       ) : null}
       {me ? <UserAvatar user={me} size="small" /> : null}
@@ -187,7 +186,6 @@ export function AppShell({ projects }: AppShellProps) {
           <Modal
             trigger={
               <Button
-                size="small"
                 variant="ghost"
                 iconBefore={<Menu size={20} />}
                 aria-label="내비게이션 열기"
@@ -204,7 +202,6 @@ export function AppShell({ projects }: AppShellProps) {
           {brand}
           <div className="app-mobile-actions">
             <Button
-              size="small"
               variant="ghost"
               iconBefore={<Search size={18} />}
               aria-label="이슈 검색 열기"

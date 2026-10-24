@@ -31,7 +31,6 @@ export function ThemeToggle() {
   return (
     <Button iconOnly className="topbar-icon"
       variant="ghost"
-      size="small"
       onClick={toggle}
       aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
     >

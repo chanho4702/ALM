@@ -77,7 +77,6 @@ export function SettingsMenu() {
       className="settings-menu"
       trigger={
         <Button
-          size="small"
           variant="ghost"
           iconOnly
           className="topbar-icon"
