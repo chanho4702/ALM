@@ -155,6 +155,8 @@ export type {
 } from "./model/activity";
 export type {
   JiraData,
+  MockRepository,
+  MockDevCommit,
 } from "./model/mockData";
 export type {
   OrgProfile,
@@ -254,3 +256,20 @@ export type {
   ProjectStreamEvent,
   ProjectStreamHandlers,
 } from "./model/realtime";
+export type {
+  DevRepository,
+  DevRepositoryInput,
+  DevCommitSource,
+  DevIssueRef,
+  DevCommit,
+  DevPullRequest,
+  DevelopmentSummary,
+  IssueDevelopment,
+  ProjectCommitQuery,
+  ProjectCommitPage,
+} from "./model/development";
+export {
+  MAX_PROJECT_REPOSITORIES,
+  PROJECT_COMMITS_DEFAULT_LIMIT,
+  PROJECT_COMMITS_MAX_LIMIT,
+} from "./model/development";

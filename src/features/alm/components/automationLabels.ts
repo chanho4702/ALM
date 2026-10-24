@@ -17,6 +17,7 @@ export const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
   ISSUE_TRANSITIONED: "상태 전환됨",
   FIELD_CHANGED: "필드 값 변경됨",
   SCHEDULED: "예약 실행",
+  COMMIT_LINKED: "커밋이 연결되면",
 };
 
 export const TRIGGER_DESCRIPTIONS: Record<AutomationTriggerType, string> = {
@@ -24,6 +25,7 @@ export const TRIGGER_DESCRIPTIONS: Record<AutomationTriggerType, string> = {
   ISSUE_TRANSITIONED: "이슈의 상태가 바뀌면 실행합니다. 출발·도착 상태를 비우면 아무 상태나 맞습니다.",
   FIELD_CHANGED: "고른 필드 중 하나라도 값이 바뀌면 실행합니다.",
   SCHEDULED: "정해진 시각(서울 기준)에 조건(AQL)에 맞는 이슈를 찾아 실행합니다. 회차당 100건까지입니다.",
+  COMMIT_LINKED: "커밋 메시지의 이슈 키로 이 프로젝트 이슈에 커밋이 새로 이어지면 실행합니다. 같은 커밋을 다시 보내면 실행하지 않습니다.",
 };
 
 export const WATCH_FIELD_LABELS: Record<AutomationWatchField, string> = {

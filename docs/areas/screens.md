@@ -20,6 +20,7 @@
 | `/projects/:id/backlog` | BacklogPage | 스프린트 패널 + 백로그, DnD 랭크/이동 |
 | `/projects/:id/issues` | IssueListPage | 목록: 필터 6종 + 정렬 테이블, ?issue=키로 상세 모달 |
 | `/projects/:id/triage` | TriageInboxPage(lazy) | **트리아지 인박스**(V35, Linear Triage) — 뷰 탭 "트리아지"는 프로젝트 설정 › 트리아지에서 켠 경우만(`useTriageEnabled`). 대기·보류·전체 탭, 왼쪽 목록 + 오른쪽 상세, 수락(상태·담당자·우선순위·코멘트)·중복(원본 검색)·거절(이유)·보류(프리셋), 키 j/k·1·2·3·H. 대기 이슈는 일반 전환이 막혀 있어 상태 버튼을 두지 않는다 |
+| `/projects/:id/commits` | CommitsPage(lazy) | **커밋**(V41, 지라 Code·Development) — 등록 저장소 커밋 ∪ 이 프로젝트 이슈에 이어진 커밋, 날짜별 최근 순·커서 "더 보기"(30건). 연결 이슈 칩 → `?issue=` 상세. 빈 상태는 저장소 설정 바로 가기. 실시간 development 신호에 첫 쪽 재조회. 이슈 상세의 **개발 패널**(`components/development/IssueDevelopmentPanel` — 요약 → 펼침 커밋·PR, 빈 상태 키 안내 + 브랜치 이름 복사)·미리보기 "개발" 줄·프로젝트 설정 "저장소"(`RepositoriesPanel`)가 같은 모듈 |
 | `/projects/:id/timeline` | TimelinePage(lazy) | 간트: **SVAR React Gantt**(`@svar-ui/react-gantt` 2.7, MIT) — 그리드(이슈/시작/종료) + 차트, 상위(에픽)는 요약 막대와 접힘 트리, 차단 링크는 끝→시작 의존선, 오늘 마커, 일/주/월 눈금. 읽기 전용(막대 드래그로 마감일 변경은 후속). 테마 변수(`--wx-*`)를 우리 토큰으로 덮는다. 그래픽을 못 그리는 환경(jsdom)은 이슈 목록 + 일정 표 대체본 |
 | `/projects/:id/releases` | ReleasesPage(lazy) | 릴리스 허브: 버전 만들기·진행률·릴리스(미완료 이관 선택)·보관·삭제 |
 | `/projects/:id/reports` | ReportsPage(lazy) | 번다운(Recharts·MIT) + 스프린트 리포트(완료/미완료/스코프 변경), 집계는 `reportMetrics.ts`. 벨로시티는 서버 속도 리포트(`getVelocity`, 단위 스토리 포인트·예상 시간·이슈 수) |

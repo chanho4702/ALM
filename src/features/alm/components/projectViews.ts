@@ -11,6 +11,8 @@ export const PROJECT_VIEW_TABS = [
   { id: "board", label: "보드" },
   { id: "backlog", label: "백로그" },
   { id: "issues", label: "이슈" },
+  // 개발 기록(V41) — 커밋 메시지 속 이슈 키로 이어진 최근 커밋
+  { id: "commits", label: "커밋" },
   { id: "archive", label: "보관함" },
 ] as const;
 

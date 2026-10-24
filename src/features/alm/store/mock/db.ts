@@ -345,6 +345,8 @@ function normalize(data: JiraData): JiraData {
   data.automationRules ??= [];
   data.automationRuns ??= [];
   data.planningSettings ??= {};
+  data.repositories ??= [];
+  data.devCommits ??= [];
   data.notifications ??= [];
   data.boards ??= [];
   data.links ??= [];

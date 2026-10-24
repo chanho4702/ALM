@@ -20,6 +20,7 @@ import {
   CalendarClock,
   CirclePlus,
   Filter,
+  GitCommitHorizontal,
   Flag,
   MessageSquare,
   PencilLine,
@@ -86,6 +87,7 @@ export const TRIGGER_ICONS: Record<AutomationTriggerType, ReactNode> = {
   ISSUE_TRANSITIONED: <ArrowRightLeft size={14} aria-hidden />,
   FIELD_CHANGED: <PencilLine size={14} aria-hidden />,
   SCHEDULED: <CalendarClock size={14} aria-hidden />,
+  COMMIT_LINKED: <GitCommitHorizontal size={14} aria-hidden />,
 };
 
 export const ACTION_ICONS: Record<AutomationActionType, ReactNode> = {

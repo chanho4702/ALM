@@ -77,6 +77,10 @@ const ReleasesPage = lazy(() =>
   import("../features/alm/pages/ReleasesPage").then((module) => ({ default: module.ReleasesPage })),
 );
 
+const CommitsPage = lazy(() =>
+  import("../features/alm/pages/CommitsPage").then((module) => ({ default: module.CommitsPage })),
+);
+
 const ReportsPage = lazy(() =>
   import("../features/alm/pages/ReportsPage").then((module) => ({ default: module.ReportsPage })),
 );
@@ -272,6 +276,14 @@ function AppRoutes() {
             element={
               <LazyPage label="트리아지">
                 <TriageInboxPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="commits"
+            element={
+              <LazyPage label="커밋" skeleton={<ListSkeleton label="커밋 불러오는 중" rows={6} />}>
+                <CommitsPage />
               </LazyPage>
             }
           />

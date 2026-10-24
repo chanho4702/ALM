@@ -330,6 +330,11 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     views: [],
     triageProjects: [],
     planningSettings: {},
+    // 개발 기록(V41) 데모 — 저장소 하나와 커밋 4건(ALM-2에 2건, ALM-1·ALM-3에 1건씩)
+    repositories: [
+      { id: "repo1", projectId: "p1", name: "chanho4702/alm-front", url: "https://github.com/chanho4702/alm-front", defaultBranch: "main" },
+    ],
+    devCommits: seedCommits(daysAgo),
     triageEntries: [],
     automationRules: [],
     automationRuns: [],
@@ -540,4 +545,29 @@ function applyRichSeed(
   data.links.push({ id: "l2", sourceId: "i11", targetId: "i9", type: "relates" });
   data.issueCounters.p1 = 17;
   data.issueCounters.p2 = 8;
+}
+
+/** 데모 커밋 — sha는 결정적(테스트가 짧은 sha를 볼 수 있게), 시각은 상대값 */
+function seedCommits(daysAgo: (days: number) => string) {
+  const repo = "https://github.com/chanho4702/alm-front";
+  const rows: { sha: string; title: string; author: string; email: string; ago: number; branch: string; issueIds: string[] }[] = [
+    { sha: "3dc8bbc1f0e2a7d4c5b6a7980123456789abcdef", title: "feat(board): 컬럼 드래그 앤 드롭 [ALM-2]", author: "이영희", email: "younghee@example.com", ago: 0.1, branch: "feat/alm-2", issueIds: ["i2"] },
+    { sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", title: "fix(board): 빈 컬럼 높이 보정 (ALM-2)", author: "이영희", email: "younghee@example.com", ago: 1, branch: "feat/alm-2", issueIds: ["i2"] },
+    { sha: "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432", title: "feat(issue): 상세 모달 뼈대 — Refs: ALM-3", author: "김찬호", email: "chanho@example.com", ago: 2, branch: "main", issueIds: ["i3"] },
+    { sha: "0123456789abcdef0123456789abcdef01234567", title: "chore: 프로젝트 스캐폴드 ALM-1", author: "김찬호", email: "chanho@example.com", ago: 6, branch: "main", issueIds: ["i1"] },
+  ];
+  return rows.map((row, index) => ({
+    id: `dc${index + 1}`,
+    repositoryUrl: repo,
+    repositoryName: "chanho4702/alm-front",
+    sha: row.sha,
+    title: row.title,
+    message: null,
+    authorName: row.author,
+    authorEmail: row.email,
+    authoredAt: daysAgo(row.ago),
+    branch: row.branch,
+    url: `${repo}/commit/${row.sha}`,
+    issueIds: row.issueIds,
+  }));
 }

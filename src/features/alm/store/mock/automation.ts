@@ -388,7 +388,9 @@ function changedFields(before: AutomationSnapshot, after: AutomationSnapshot): s
 let chainDepth = 0;
 let chainSeen: Set<string> | null = null;
 
-function triggerMatches(trigger: AutomationTrigger, created: boolean, changed: string[], before: AutomationSnapshot | null, after: AutomationSnapshot): boolean {
+function triggerMatches(trigger: AutomationTrigger, created: boolean, changed: string[], before: AutomationSnapshot | null, after: AutomationSnapshot, kind: IssueEventKind): boolean {
+  // 커밋 연결은 필드 변경이 아니다 — COMMIT_LINKED만 깨운다(서버 AutomationListener와 같다)
+  if (kind === "commit_linked") return trigger.type === "COMMIT_LINKED";
   switch (trigger.type) {
     case "ISSUE_CREATED":
       return created;
@@ -529,16 +531,28 @@ async function runAction(action: AutomationAction, issueId: string, rule: Automa
  * 이슈 변경 알림 — 사람이든 규칙이든 이슈를 바꾼 경로가 **저장 뒤** 부른다. `before`가 null이면 생성.
  * 규칙이 만든 변경(연쇄 깊이 > 0)은 `allowRuleTrigger` 규칙만 깨운다.
  */
-export async function emitIssueEvent(issueId: string, before: AutomationSnapshot | null, _transitionId: string | null = null): Promise<void> {
+type IssueEventKind = "change" | "commit_linked";
+
+/** 커밋이 이슈에 새로 이어졌다(V41) — 자동화 COMMIT_LINKED */
+export async function emitCommitLinked(issueId: string): Promise<void> {
+  await emitIssueEvent(issueId, null, null, "commit_linked");
+}
+
+export async function emitIssueEvent(
+  issueId: string,
+  before: AutomationSnapshot | null,
+  _transitionId: string | null = null,
+  kind: IssueEventKind = "change",
+): Promise<void> {
   const data = load();
   const issue = data.issues.find((i) => i.id === issueId);
   if (!issue) return;
   const rules = data.automationRules.filter((r) => r.projectId === issue.projectId && r.enabled);
   if (rules.length === 0) return;
   const after = snapshotForAutomation(issue);
-  const created = before === null;
+  const created = before === null && kind === "change";
   const changed = before ? changedFields(before, after) : [];
-  if (!created && changed.length === 0) return;
+  if (kind === "change" && !created && changed.length === 0) return;
   const outermost = chainSeen === null;
   if (outermost) chainSeen = new Set();
   try {
@@ -546,7 +560,7 @@ export async function emitIssueEvent(issueId: string, before: AutomationSnapshot
       const rule = liveRule(candidate.id);
       if (!rule?.enabled) continue;
       if (chainDepth > 0 && !rule.allowRuleTrigger) continue;
-      if (!triggerMatches(rule.trigger, created, changed, before, after)) continue;
+      if (!triggerMatches(rule.trigger, created, changed, before, after, kind)) continue;
       const current = load().issues.find((i) => i.id === issueId);
       if (!current || !conditionMatches(load(), rule, current)) continue;
       const startedAt = new Date().toISOString();

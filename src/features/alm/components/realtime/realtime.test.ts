@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { mapProjectStreamFrame } from "../../store/realtimeMapping";
 import type { IssueStreamEvent } from "../../store/types";
 import { StreamError } from "../../store/eventStream";
-import { decideIssueEvent } from "./ProjectRealtime";
+import { decideIssueEvent, isDevelopmentOnlyEvent } from "./ProjectRealtime";
 import { useReconnectingStream } from "../useReconnectingStream";
 import type { StreamConnection } from "../useReconnectingStream";
 
@@ -88,6 +88,15 @@ describe("이슈 신호 판정 — 버전 비교로 중복·역순·자기 변�
     expect(decideIssueEvent(issueEvent({ type: "issue.archived", version: null }), 5, "me")).toBe("remove");
     expect(decideIssueEvent(issueEvent({ type: "issue.ranked" }), 5, "me")).toBe("reload");
     expect(decideIssueEvent(issueEvent({ type: "issue.ranked", actorId: "me" }), 5, "me")).toBe("ignore");
+  });
+});
+
+describe("개발 정보만 바뀐 신호(V41 커밋 연결)", () => {
+  it("issue.updated + changedFields [development]만 — 다른 필드가 섞이거나 종류가 다르면 아니다", () => {
+    expect(isDevelopmentOnlyEvent(issueEvent({ changedFields: ["development"] }))).toBe(true);
+    expect(isDevelopmentOnlyEvent(issueEvent({ changedFields: ["development", "title"] }))).toBe(false);
+    expect(isDevelopmentOnlyEvent(issueEvent({ changedFields: [] }))).toBe(false);
+    expect(isDevelopmentOnlyEvent(issueEvent({ type: "issue.transitioned", changedFields: ["development"] }))).toBe(false);
   });
 });
 

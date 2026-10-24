@@ -6,6 +6,7 @@ import type { Board } from "./board";
 import type { SettingsScheme, ProjectSettingsEntry } from "./settings";
 import type { SavedView, AutomationRule, AutomationRun } from "./planning";
 import type { PlanningSettings } from "./cycles";
+import type { DevRepository } from "./development";
 
 /** 트리아지 대기열 한 줄(목업 전용 저장 — 서버는 issue.triage_* 컬럼) */
 export interface MockTriageEntry {
@@ -74,4 +75,29 @@ export interface JiraData {
   automationRuns: AutomationRun[];
   /** 프로젝트 계획 설정(V39) — 없으면 기본값(자동 생성 끔·이월 백로그·수직선 척도) */
   planningSettings: Record<string, PlanningSettings>;
+  /** 프로젝트 저장소 등록(V41) — 옛 저장분에는 없다(normalize가 채운다) */
+  repositories: MockRepository[];
+  /** 수집한 커밋(V41) — 화면은 수집하지 않는다. 시드와 테스트 훅(`__ingestMockCommits`)만 넣는다 */
+  devCommits: MockDevCommit[];
+}
+
+/** 목업 저장소 한 줄 — 서버 code_repository */
+export interface MockRepository extends DevRepository {
+  projectId: string;
+}
+
+/** 목업 수집 커밋 — 서버 dev_commit + issue_commit(이어진 이슈 id 목록) */
+export interface MockDevCommit {
+  id: string;
+  repositoryUrl: string;
+  repositoryName: string;
+  sha: string;
+  title: string;
+  message: string | null;
+  authorName: string | null;
+  authorEmail: string | null;
+  authoredAt: string;
+  branch: string | null;
+  url: string;
+  issueIds: string[];
 }

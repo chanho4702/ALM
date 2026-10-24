@@ -3970,6 +3970,12 @@ body {
   font-size: var(--chanho-font-size-100);
 }
 
+.issue-activity-icon {
+  margin-right: var(--chanho-space-50);
+  vertical-align: -2px;
+  color: var(--chanho-color-text-subtle);
+}
+
 .issue-activity-time {
   margin-left: var(--chanho-space-100);
   font-size: var(--chanho-font-size-75);

@@ -171,6 +171,7 @@ export async function deleteIssue(id: string): Promise<void> {
   data.watchers = data.watchers.filter((w) => w.issueId !== id);
   data.links = data.links.filter((l) => l.sourceId !== id && l.targetId !== id);
   data.webLinks = data.webLinks.filter((w) => w.issueId !== id);
+  for (const commit of data.devCommits) commit.issueIds = commit.issueIds.filter((i) => i !== id);
   data.worklogs = data.worklogs.filter((w) => w.issueId !== id);
   data.changes = data.changes.filter((c) => c.issueId !== id);
   data.attachments = data.attachments.filter((a) => a.issueId !== id);

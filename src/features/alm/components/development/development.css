@@ -1,0 +1,332 @@
+/* 개발 기록(V41) — 이슈 개발 패널·프로젝트 커밋 탭·저장소 설정. 색·간격은 전부 DS 토큰 */
+
+.issue-dev-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-150);
+  width: 100%;
+  padding: var(--chanho-space-75) var(--chanho-space-100);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+  font: inherit;
+  color: var(--chanho-color-text-default);
+  text-align: left;
+  cursor: pointer;
+}
+
+.issue-dev-summary:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.issue-dev-summary:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: 1px;
+}
+
+.issue-dev-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+
+.issue-dev-stat-muted {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-dev-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  padding-top: var(--chanho-space-50);
+}
+
+.issue-dev-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.issue-dev-group-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-dev-empty-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-100);
+  border: 1px dashed var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+}
+
+.issue-dev-empty,
+.issue-dev-note {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.issue-dev-error {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-danger);
+}
+
+.dev-key {
+  padding: 0 var(--chanho-space-50);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-default);
+}
+
+/* 커밋 한 줄 */
+.dev-commit-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+}
+
+.dev-commit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--chanho-space-100);
+  min-width: 0;
+  padding: var(--chanho-space-75) var(--chanho-space-100);
+}
+
+.dev-commit + .dev-commit {
+  border-top: 1px solid var(--chanho-color-border-default);
+}
+
+.dev-commit-icon {
+  flex: none;
+  margin-top: var(--chanho-space-25);
+  color: var(--chanho-color-text-subtle);
+}
+
+.dev-sha {
+  flex: none;
+  padding: 0 var(--chanho-space-50);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  line-height: 1.6;
+  color: var(--chanho-color-text-default);
+}
+
+.dev-commit-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--chanho-space-25);
+  min-width: 0;
+}
+
+.dev-commit-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--chanho-color-text-default);
+  text-decoration: none;
+}
+
+a.dev-commit-title:hover .dev-commit-title-text {
+  color: var(--chanho-color-text-link);
+  text-decoration: underline;
+}
+
+a.dev-commit-title:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: 1px;
+  border-radius: var(--chanho-radius-small);
+}
+
+.dev-commit-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-commit-title svg {
+  flex: none;
+  color: var(--chanho-color-text-subtle);
+}
+
+.dev-commit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.dev-commit-trailing {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--chanho-space-50);
+  max-width: 40%;
+}
+
+/* 연결 이슈 칩 — 누르면 이슈 상세 */
+.dev-issue-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--chanho-space-75);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-full);
+  background: var(--chanho-color-background-surface);
+  font: inherit;
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  line-height: 1.8;
+  color: var(--chanho-color-text-link);
+  cursor: pointer;
+}
+
+.dev-issue-chip:hover {
+  background: var(--chanho-color-background-neutral-hovered);
+}
+
+.dev-issue-chip:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: 1px;
+}
+
+/* 프로젝트 커밋 탭 — 날짜별 묶음 */
+.commits-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  max-width: 1040px;
+}
+
+.commits-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+}
+
+.commits-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+}
+
+.commits-day-title {
+  margin: 0;
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.commits-more {
+  align-self: center;
+}
+
+/* 프로젝트 설정 › 저장소 */
+.repo-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+
+.repo-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.8fr) auto;
+  align-items: end;
+  gap: var(--chanho-space-100);
+}
+
+.repo-row-remove {
+  padding-bottom: var(--chanho-space-25);
+}
+
+.repo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.repo-actions-spacer {
+  flex: 1;
+}
+
+.repo-count {
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.repo-readonly {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+
+.repo-readonly li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.repo-url {
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+  overflow-wrap: anywhere;
+}
+
+.repo-usage {
+  margin: 0;
+  padding: var(--chanho-space-100) var(--chanho-space-150);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-neutral);
+  font-family: var(--chanho-font-family-mono);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-default);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .repo-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dev-commit {
+    flex-wrap: wrap;
+  }
+
+  .dev-commit-trailing {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+}

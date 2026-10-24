@@ -45,6 +45,7 @@ type MockOnly =
   | "__emitProjectStreamEvent"
   | "__simulateRemoteIssueChange"
   | "__setMockProjectStream"
+  | "__ingestMockCommits"
   | "__versionForTest"
   | "ISSUE_CONFLICT_MESSAGE"
   | "AVATAR_MAX_BYTES"
@@ -182,6 +183,8 @@ export const streamProject = impl.streamProject;
 /** 목업 전용(REST 빌드에서는 undefined) — 테스트·개발 화면에서 "다른 사람의 변경"을 흉내 낸다 */
 export const __emitProjectStreamEvent = (impl as Partial<typeof mock>).__emitProjectStreamEvent;
 export const __simulateRemoteIssueChange = (impl as Partial<typeof mock>).__simulateRemoteIssueChange;
+/** 목업 전용 — 커밋 수집 대역(테스트·화면 데모). REST 빌드에서 undefined */
+export const __ingestMockCommits = (impl as Partial<typeof mock>).__ingestMockCommits;
 export const __setMockProjectStream = (impl as Partial<typeof mock>).__setMockProjectStream;
 export type { AgentMockScenario } from "./jiraMock";
 export const listIssuesPage = impl.listIssuesPage;
@@ -339,3 +342,11 @@ export const updateAutomationRule = impl.updateAutomationRule;
 export const deleteAutomationRule = impl.deleteAutomationRule;
 export const listAutomationRuleRuns = impl.listAutomationRuleRuns;
 export const listProjectAutomationRuns = impl.listProjectAutomationRuns;
+/**
+ * 개발 기록(V41) — 저장소 등록(통째 교체·최대 20, 관리자), 이슈 개발 정보(커밋·PR·요약), 프로젝트 최근 커밋(커서).
+ * 수집은 화면 몫이 아니다(CLI·MCP의 `POST /api/alm/dev/commits`).
+ */
+export const listProjectRepositories = impl.listProjectRepositories;
+export const saveProjectRepositories = impl.saveProjectRepositories;
+export const getIssueDevelopment = impl.getIssueDevelopment;
+export const listProjectCommits = impl.listProjectCommits;

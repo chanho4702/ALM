@@ -62,7 +62,7 @@ import { StatusTransitionButton } from "./transitions/StatusTransitionButton";
 import { IssueFlagControl } from "./IssueFlagControl";
 import { IssueFlagMark } from "./IssueCard";
 import { useIssueTypes } from "./useIssueTypes";
-import { Copy, GitBranch, Lock, Plus, Star, UserRound } from "lucide-react";
+import { Copy, GitBranch, GitCommitHorizontal, Lock, Plus, Star, UserRound } from "lucide-react";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
 import { IssueAttachments } from "./IssueAttachments";
@@ -92,7 +92,8 @@ import { branchName } from "./branchName";
 import { favoriteOfIssue, useFavorites } from "./useFavorites";
 import { StoryPointsInput } from "./StoryPointsInput";
 import { usePlanningSettings } from "./usePlanningSettings";
-import { decideIssueEvent, useProjectRealtime } from "./realtime/ProjectRealtime";
+import { decideIssueEvent, isDevelopmentOnlyEvent, useProjectRealtime } from "./realtime/ProjectRealtime";
+import { IssueDevelopmentPanel } from "./development/IssueDevelopmentPanel";
 import "./favorites.css";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
@@ -765,6 +766,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   // 실시간 동기화 — 열어 둔 이슈를 남이 바꾸면 최신 값으로 갈아 끼우고 "방금 바뀜"을 잠깐 보인다.
   // 쓰던 설명 초안은 건드리지 않는다(초안이 옛 본문과 같을 때만 새 본문으로 따라간다)
   const [remoteNote, setRemoteNote] = useState<string | null>(null);
+  /** 개발 패널 다시 읽기 신호 — 커밋 연결 실시간 신호마다 올린다 */
+  const [devRefresh, setDevRefresh] = useState(0);
   const issueRef = useRef(issue);
   issueRef.current = issue;
   const draftRef = useRef(descriptionDraft);
@@ -772,6 +775,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const { meId: realtimeMe } = useProjectRealtime((event) => {
     const current = issueRef.current;
     if (event.kind !== "issue" || !current || event.issueId !== current.id) return;
+    if (isDevelopmentOnlyEvent(event)) {
+      // 커밋이 새로 이어졌다 — 이슈는 그대로(version 불변), 개발 패널과 활동(commit_linked)만 다시 읽는다
+      setDevRefresh((n) => n + 1);
+      void refreshLogs(current.id);
+      return;
+    }
     const decision = decideIssueEvent(event, current.version, realtimeMe);
     if (decision === "ignore") return;
     if (decision === "remove") {
@@ -1197,6 +1206,12 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           </section>
           ) : null}
           {fields.links.visible ? <IssueWebLinks issueId={issue.id} canEdit={canEdit} /> : null}
+          <IssueDevelopmentPanel
+            issueId={issue.id}
+            issueKey={issue.key}
+            refreshKey={devRefresh}
+            onCopyBranch={() => void commandActions.copyBranchName([issue])}
+          />
         </div>
         <aside className="issue-props">
           {issue.flagged ? <IssueFlagMark /> : null}
@@ -1756,7 +1771,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             content: (
               <ul className="issue-activity" data-testid="issue-activity">
                 {activities.map((activity) => (
-                  <li key={activity.id}>
+                  <li key={activity.id} data-activity-type={activity.type}>
+                    {activity.type === "commit_linked" ? (
+                      <GitCommitHorizontal size={14} aria-label="커밋 연결" className="issue-activity-icon" />
+                    ) : null}
                     <strong>{userName(activity.actorId)}</strong> —{" "}
                     <span className="issue-activity-detail">{activity.detail}</span>
                     <span className="issue-activity-time">{formatDateTime(activity.at)}</span>

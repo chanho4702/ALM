@@ -119,6 +119,14 @@ export function decideIssueEvent(event: IssueStreamEvent, known: number | undefi
   return "refetch";
 }
 
+/**
+ * 개발 정보만 바뀐 신호(커밋 연결, V41) — `issue.updated` + `changedFields: ["development"]`, version 불변.
+ * 이슈 본문은 그대로라 목록·보드는 다시 읽지 않고, 개발 패널만 다시 읽는다.
+ */
+export function isDevelopmentOnlyEvent(event: IssueStreamEvent): boolean {
+  return event.type === "issue.updated" && event.changedFields.length > 0 && event.changedFields.every((f) => f === "development");
+}
+
 // ── 남의 변경 하이라이트 ────────────────────────────────────────────────
 
 const FLASH_MS = 2_400;
@@ -195,6 +203,8 @@ export function useRealtimeIssueSync({
       return;
     }
     if (event.kind !== "issue") return;
+    // 커밋 연결은 이슈 본문을 바꾸지 않는다 — 카드·행을 다시 읽을 것이 없다
+    if (isDevelopmentOnlyEvent(event)) return;
     const local = issuesRef.current?.find((issue) => issue.id === event.issueId);
     const known = Math.max(local?.version ?? -1, seen.current.get(event.issueId) ?? -1);
     const decision = decideIssueEvent(event, known < 0 ? undefined : known, meId);

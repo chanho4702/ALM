@@ -388,3 +388,19 @@ project.deleted_at)으로 낸다. 프로젝트 보관(`archivedAt`)은 읽기 �
 - **검색 `triage`** — `IssueSearchCriteria.triage`(true 대기열만 / false 제외 / 생략 둘 다). REST `listIssues`(보드·백로그)는 `triage=false`로 묻고 total로 끝까지 읽는다.
 - **uiStore 사용자별 자리** — 즐겨찾기(`favoritesByUser`)·이슈 만들기 초안(`createDraftsByUser`)은 `setUiUser(id)`(AppShell이 현재 사용자를 읽으면)로 주인을
   정한다. 그 전 값은 익명 자리에 있다가 물려받는다. 옛 `starredProjectIds`는 프로젝트 즐겨찾기로 읽히고 첫 쓰기 때 옮겨 적힌다. 테스트는 `vitest.setup.ts`가 매번 익명으로 되돌린다.
+
+## 개발 기록 — 커밋 연결 (2026-10-25, alm-backend V41 · README "개발 기록 — 커밋 연결")
+
+| 함수 | REST |
+|---|---|
+| `listProjectRepositories(projectId)` / `saveProjectRepositories(projectId, inputs)` | `GET/PUT /projects/{id}/settings/repositories`(읽기 VIEW·쓰기 ADMIN, 본문 `{repositories}` 통째 교체 ≤20) |
+| `getIssueDevelopment(issueId)` | `GET /issues/{id}/development` → `{issueId, issueKey, summary, commits, truncated, pullRequests}` |
+| `listProjectCommits(projectId, {cursor, limit})` | `GET /projects/{id}/commits` → `{items, nextCursor}`(항목 `issues`는 볼 수 있는 것만) |
+
+- 타입은 `model/development.ts`. 매퍼(`api/development.ts`)가 Long id를 문자열로, 빈 `shortSha`·`title`은 sha·URL로 메운다(옛 웹 링크 커밋은 작성자·시각 null).
+- **수집은 화면 몫이 아니다**(`POST /api/alm/dev/commits`는 CLI·MCP). 목업은 시드(저장소 1·커밋 4 — ALM-2에 2, ALM-1·3에 1)와 테스트 훅
+  `__ingestMockCommits`(MockOnly)만 커밋을 넣는다. 훅은 서버처럼 등록 키만 파싱·멱등·활동 `commit_linked`·실시간 `issue.updated`
+  `changedFields: ["development"]`(version 불변)·자동화 `COMMIT_LINKED`(`emitCommitLinked`)를 낸다.
+- URL 정규화·검증 문구는 서버 `RepositoryUrls`·`CodeRepositoryService`와 글자까지 같다(`normalizeRepositoryUrl`).
+- 실시간: `isDevelopmentOnlyEvent`(ProjectRealtime) — 목록·보드는 무시, 상세는 개발 패널과 활동만 다시 읽는다, 커밋 탭은 첫 쪽을 다시 읽는다.
+- 삭제 연쇄: `deleteIssue`가 커밋의 이슈 연결을, `purgeProject`가 저장소·연결을 지운다(커밋 행은 남는다 — 서버도 커밋은 불변).

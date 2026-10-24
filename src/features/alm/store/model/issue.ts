@@ -182,7 +182,9 @@ export interface Activity {
     | "fixversion"
     | "attachment"
     | "flag"
-    | "triage";
+    | "triage"
+    /** 커밋 연결(V41) — "커밋 N건 연결: abc1234, …" */
+    | "commit_linked";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }

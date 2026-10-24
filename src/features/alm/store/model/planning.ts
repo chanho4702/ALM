@@ -203,12 +203,14 @@ export interface TriageAcceptInput {
 
 // ── 자동화 규칙(V36·V37) ─────────────────────────────────────
 
-export type AutomationTriggerType = "ISSUE_CREATED" | "ISSUE_TRANSITIONED" | "FIELD_CHANGED" | "SCHEDULED";
+export type AutomationTriggerType = "ISSUE_CREATED" | "ISSUE_TRANSITIONED" | "FIELD_CHANGED" | "SCHEDULED" | "COMMIT_LINKED";
 export const AUTOMATION_TRIGGER_TYPES: AutomationTriggerType[] = [
   "ISSUE_CREATED",
   "ISSUE_TRANSITIONED",
   "FIELD_CHANGED",
   "SCHEDULED",
+  // 커밋이 이슈에 새로 이어졌다(V41) — 받을 항목 없음
+  "COMMIT_LINKED",
 ];
 
 /** FIELD_CHANGED가 지켜볼 수 있는 필드 — 서버 `IssueDomainEventPublisher.CHANGED_FIELDS` */

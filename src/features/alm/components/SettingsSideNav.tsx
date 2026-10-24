@@ -23,6 +23,8 @@ export const PROJECT_SETTINGS_SECTIONS = [
   { id: "planning", label: "계획(사이클·추정)" },
   { id: "triage", label: "트리아지" },
   { id: "automation", label: "자동화" },
+  // 개발 기록(V41) — 커밋을 모을 git 저장소
+  { id: "repositories", label: "저장소" },
   { id: "import", label: "가져오기" },
   // agent-service가 있는 플랫폼에서만 메뉴에 보인다(useAiTeamActive) — URL로 들어와도 화면이 빈 상태를 그린다
   { id: "ai-team", label: "AI 팀" },

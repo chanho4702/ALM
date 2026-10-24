@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
-import { ExternalLink, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ExternalLink, GitCommitHorizontal, GitPullRequest, X } from "lucide-react";
 import { Button, Lozenge, Tag } from "@chanho/react";
-import type { Issue, PriorityDef, Sprint, User, WorkflowStatus } from "../store/types";
+import type { DevelopmentSummary, Issue, PriorityDef, Sprint, User, WorkflowStatus } from "../store/types";
+import { getIssueDevelopment } from "../store/jiraStore";
 import { htmlToText } from "../store/richText";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
 import { PriorityGlyph } from "./PriorityGlyph";
@@ -37,6 +38,19 @@ export function IssuePeek({ issue, statuses, users, priorities, sprints = [], on
   useEffect(() => {
     bodyRef.current?.scrollTo?.({ top: 0 });
   }, [issue.id]);
+  // 개발 요약(커밋·PR 수) — 이웃 이슈로 넘길 때마다 그 이슈 것만. 늦게 온 옛 응답은 버린다
+  const [dev, setDev] = useState<{ issueId: string; summary: DevelopmentSummary | null; failed: boolean } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getIssueDevelopment(issue.id).then(
+      (result) => alive && setDev({ issueId: issue.id, summary: result.summary, failed: false }),
+      () => alive && setDev({ issueId: issue.id, summary: null, failed: true }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [issue.id]);
+  const devSummary = dev?.issueId === issue.id ? dev : null;
 
   return (
     <aside className="issue-peek" aria-label={`${issue.key} 미리보기`}>
@@ -109,6 +123,23 @@ export function IssuePeek({ issue, statuses, users, priorities, sprints = [], on
           <dd>{issue.estimateHours === null ? "—" : `${issue.estimateHours}h`}</dd>
           <dt>마감일</dt>
           <dd>{issue.dueDate ? formatDate(issue.dueDate) : "—"}</dd>
+          <dt>개발</dt>
+          <dd data-testid="issue-peek-development">
+            {devSummary === null ? (
+              "…"
+            ) : devSummary.failed || !devSummary.summary ? (
+              "불러오지 못했습니다"
+            ) : devSummary.summary.commits + devSummary.summary.pullRequests === 0 ? (
+              "없음"
+            ) : (
+              <span className="status-cell">
+                <GitCommitHorizontal size={14} aria-hidden />
+                <span>커밋 {devSummary.summary.commits}건</span>
+                <GitPullRequest size={14} aria-hidden />
+                <span>PR {devSummary.summary.pullRequests}건</span>
+              </span>
+            )}
+          </dd>
           <dt>생성일</dt>
           <dd>{formatDate(issue.createdAt)}</dd>
           <dt>수정일</dt>
