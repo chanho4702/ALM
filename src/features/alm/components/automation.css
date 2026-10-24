@@ -1,0 +1,272 @@
+/* 프로젝트 설정 › 자동화(V36·V37) — 규칙 목록·편집기·감사 로그. 토큰만 쓴다. */
+
+.automation-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--chanho-space-150);
+  margin-bottom: var(--chanho-space-150);
+}
+.automation-panel-head .settings-help {
+  flex: 1 1 320px;
+}
+
+.automation-tab {
+  padding-top: var(--chanho-space-150);
+}
+.automation-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+
+/* ── 규칙 목록 ── */
+.automation-rule-list,
+.automation-rule-actions,
+.automation-run-list,
+.automation-action-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.automation-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+.automation-rule {
+  display: flex;
+  gap: var(--chanho-space-150);
+  align-items: flex-start;
+  padding: var(--chanho-space-150) var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+}
+.automation-rule.is-disabled {
+  background: var(--chanho-color-background-subtle);
+}
+.automation-rule-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-50);
+}
+.automation-rule-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+.automation-rule-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--chanho-color-text-link);
+  font: inherit;
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+.automation-rule-name:hover {
+  color: var(--chanho-color-text-link-hovered);
+  text-decoration: underline;
+}
+.automation-rule-name:focus-visible {
+  outline: none;
+  box-shadow: var(--chanho-focus-ring);
+  border-radius: var(--chanho-radius-small);
+}
+.automation-rule-desc,
+.automation-rule-meta {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+.automation-rule-line {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  margin: 0;
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-100);
+}
+.automation-rule-line > svg {
+  flex: none;
+  color: var(--chanho-color-text-subtle);
+}
+.automation-rule-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-25);
+  padding-left: var(--chanho-space-200);
+}
+.automation-rule-reason {
+  margin-top: var(--chanho-space-50);
+}
+.automation-rule-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+/* ── 감사 로그 ── */
+.automation-runs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+  margin-bottom: var(--chanho-space-100);
+}
+.automation-runs-head .settings-help {
+  margin: 0;
+}
+.automation-run {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--chanho-space-150);
+  padding: var(--chanho-space-100) 0;
+  border-bottom: 1px solid var(--chanho-color-border-default);
+}
+.automation-outcome {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  min-width: 96px;
+}
+.automation-run-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-25);
+}
+.automation-run-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+.automation-run-meta,
+.automation-run-time {
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+.automation-run-message {
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-75);
+  overflow-wrap: anywhere;
+}
+.automation-run-time {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ── 편집기 ── */
+.automation-editor-modal.automation-editor-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+.automation-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+}
+.automation-editor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+.automation-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+  padding: var(--chanho-space-200);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-surface);
+}
+.automation-block .settings-help,
+.automation-block .settings-empty {
+  margin: 0;
+}
+.automation-block-title {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  margin: 0;
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-100);
+  font-weight: var(--chanho-font-weight-semibold);
+}
+.automation-block-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--chanho-space-150);
+}
+/* DS Select 트리거는 최소 180px — 칸도 180px 아래로 줄이지 않고, 트리거가 칸을 채운다 */
+.automation-block-row > div {
+  flex: 1 1 180px;
+  min-width: 180px;
+}
+.automation-block-row button[role="combobox"] {
+  width: 100%;
+}
+.automation-block-row > p {
+  flex: 1 1 100%;
+}
+.automation-label-new {
+  align-items: flex-end;
+}
+.automation-label-new > button {
+  flex: none;
+}
+.automation-block-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-150);
+}
+.automation-aql textarea {
+  font-family: var(--chanho-font-family-mono);
+}
+.automation-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+}
+.automation-action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-subtle);
+}
+.automation-action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-100);
+}
+.automation-action-index {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  font-size: var(--chanho-font-size-100);
+}
+.automation-action-tools {
+  display: flex;
+  gap: var(--chanho-space-25);
+}
+.automation-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
