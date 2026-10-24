@@ -484,7 +484,7 @@ export function InboxPage() {
   );
 
   return (
-    <div className="jira-main inbox-page">
+    <main className="project-list-content inbox-page">
       <header className="inbox-header">
         <div className="inbox-header-text">
           <h1 className="inbox-title">
@@ -530,7 +530,7 @@ export function InboxPage() {
           onSave={(at) => snooze(customFor, at)}
         />
       ) : null}
-    </div>
+    </main>
   );
 }
 

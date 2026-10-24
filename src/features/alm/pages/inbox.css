@@ -1,6 +1,9 @@
 /* 알림 인박스(V40, Linear Inbox) — 토큰만 쓴다 */
 
 .inbox-page {
+  /* .project-list-content(960px) 보다 조금 넓게 — 홈과 같은 폭 */
+  width: min(1040px, 100%);
+  max-width: 1040px;
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-200);
