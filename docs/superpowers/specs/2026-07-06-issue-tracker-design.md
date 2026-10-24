@@ -1,4 +1,4 @@
-# ALM Front — 지라 클론 설계 문서
+# ALM Front — 이슈 트래커 설계 문서
 
 - 작성일: 2026-07-06
 - 상태: 승인됨 (구현 계획 수립 전)
@@ -6,7 +6,7 @@
 
 ## 1. 목적과 배경
 
-Chanho Design System(@chanho/react·tokens)의 첫 실전 소비 프로젝트로 **지라 클론**을 만든다. myFront(이력/블로그 관리용으로 유지)와 분리된 **독립 프론트 앱**이며, 향후 MSA의 한 서비스로 게이트웨이 뒤에 배치된다. ALM(Application Lifecycle Management)이라는 이름은 이후 컨플루언스 클론(features/wiki)까지 품는 우산이다.
+Chanho Design System(@chanho/react·tokens)의 첫 실전 소비 프로젝트로 **이슈 트래커(ALM)**를 만든다(화면 구성은 Jira의 공개된 사용 흐름을 참고 — 코드·자산은 쓰지 않는다). myFront(이력/블로그 관리용으로 유지)와 분리된 **독립 프론트 앱**이며, 향후 MSA의 한 서비스로 게이트웨이 뒤에 배치된다. ALM(Application Lifecycle Management)이라는 이름은 이후 위키(features/wiki)까지 품는 우산이다.
 
 ### 범위 (풀코스 MVP)
 
@@ -19,7 +19,7 @@ Chanho Design System(@chanho/react·tokens)의 첫 실전 소비 프로젝트로
 ### 범위 제외 (MVP)
 
 - 실제 백엔드·인증: 데이터는 localStorage 목업, 유저는 목업 4명 고정. 백엔드(jira-service) 연동과 Keycloak OIDC 통합은 후속 단계 — 스토어 계층이 교체 지점
-- 컨플루언스 클론(위키): 지라 완성 후 별도 스펙
+- 위키: 이슈 트래커 완성 후 별도 스펙
 - 백로그 화면의 드래그 정렬 (Dropdown 액션으로 대체), 에픽/라벨/워치어 등 지라 고급 기능
 
 ## 2. 아키텍처
