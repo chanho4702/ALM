@@ -77,7 +77,7 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
-  transition: background var(--chanho-transition-fast);
+  transition: background var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard);
 }
 
 .triage-item:hover {

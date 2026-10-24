@@ -3,7 +3,7 @@
   opacity: 0.45;
   border-style: dashed;
   border-color: var(--chanho-color-border-default);
-  transition: opacity var(--chanho-transition-fast);
+  transition: opacity var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard);
 }
 
 .board-column-blocked {

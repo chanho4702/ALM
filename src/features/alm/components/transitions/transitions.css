@@ -42,7 +42,7 @@
   font-size: var(--chanho-font-size-100);
   text-align: left;
   cursor: pointer;
-  transition: background var(--chanho-transition-fast);
+  transition: background var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard);
 }
 
 .transition-item:hover,

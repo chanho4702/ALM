@@ -1,4 +1,4 @@
-# 디자인 시스템 (@chanho/react 0.14.0 / @chanho/tokens 0.6.1)
+# 디자인 시스템 (@chanho/react 0.15.0 / @chanho/tokens 0.7.0)
 
 GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름을 유지한다(S-03, 2026-09-04 — 전엔 `file:../design-system/artifacts/*.tgz`). 새 버전은 design-system에 `v*` 태그를 밀어 발행한 뒤 `package.json`과 `pnpm-workspace.yaml`의 `overrides` **두 곳**의 버전을 함께 올린다. Radix 기반. **다른 UI 라이브러리 금지**,
 커스텀 마크업은 토큰(`--chanho-*`)만.
@@ -170,3 +170,8 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
   `<>버그 <Badge appearance="brand">덮어씀</Badge></>`로 그리고 **`ariaLabel: "버그 (덮어씀)"`**로
   읽히는 이름을 고정한다 — 노드 라벨은 스크린리더가 안쪽 텍스트를 이어붙여 이름이 흔들린다.
   기존 테스트 셀렉터(`"버그 (덮어씀)"`)가 그대로 사는 이유가 이 `ariaLabel`이다.
+
+## 0.15.0 (2026-10-24) — 모션 토큰
+
+`--chanho-motion-duration-{instant,fast,base,moderate,slow}`·`--chanho-motion-easing-{standard,enter,exit}` — 동작 줄이기에서 1ms로 줄어든다.
+새 화면의 전환 효과는 `--chanho-transition-*`나 하드코딩 ms 대신 이 토큰을 쓴다(상태 전환 메뉴·보드 흐린 열·트리아지 목록).

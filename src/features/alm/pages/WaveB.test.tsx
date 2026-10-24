@@ -159,12 +159,13 @@ describe("속성 단축키 s/p/a/l", () => {
     const user = userEvent.setup();
     renderAt("/projects/p1/issues?issue=ALM-4");
     const dialog = await screen.findByRole("dialog", { name: "ALM-4" });
-    await within(dialog).findByRole("combobox", { name: "상태" });
+    // 상태는 Select가 아니라 가용 전환 메뉴(웨이브 A2) — s가 그 목록을 연다
+    await within(dialog).findByRole("button", { name: "상태: 할 일" });
     blur();
     await user.keyboard("s");
-    expect(await screen.findByRole("option", { name: "진행 중" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "진행 중" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("option", { name: "진행 중" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "진행 중" })).not.toBeInTheDocument());
     blur();
     await user.keyboard("p");
     expect(await screen.findByRole("option", { name: "최상" })).toBeInTheDocument();
