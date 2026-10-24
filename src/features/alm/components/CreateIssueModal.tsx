@@ -1,8 +1,10 @@
 import { StoryPointsInput } from "./StoryPointsInput";
 import { usePlanningSettings } from "./usePlanningSettings";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Button, Checkbox, Modal, Select, TextField, useToast } from "@chanho/react";
+import { Banner, Button, Checkbox, Modal, Select, TextField, useToast } from "@chanho/react";
+import { clearCreateIssueDraft, getCreateIssueDraft, saveCreateIssueDraft } from "../store/uiStore";
+import type { CreateIssueDraft } from "../store/uiStore";
 import { RichTextEditor } from "./editor/RichTextEditor";
 import type {
   Component,
@@ -112,6 +114,78 @@ export function CreateIssueModal({
     void listUsers().then(setUsers);
     void getCurrentUser().then(setMe);
   }, []);
+
+  // ── 초안 보존(Linear) — 닫아도 프로젝트별로 남고, 다시 열면 복원한다 ──
+  /** 불러온 초안의 저장 시각 — 있으면 "초안을 불러왔습니다" 배너 */
+  const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  /** 초안 저장을 잠시 멈춘다(복원·초기화·생성 직후 — 빈 값으로 초안을 덮지 않게) */
+  const pauseDraft = useRef(true);
+  const draftNow = (): CreateIssueDraft => ({
+    type,
+    title,
+    description: isEmptyHtml(description) ? "" : description,
+    priority,
+    assigneeId: assigneeId === UNASSIGNED ? null : assigneeId,
+    labels: labelsText,
+    dueDate,
+    estimateHours,
+    storyPoints,
+  });
+  const draftRef = useRef(draftNow);
+  draftRef.current = draftNow;
+  useEffect(() => {
+    if (!projectId) return;
+    let alive = true;
+    pauseDraft.current = true;
+    void getCreateIssueDraft(projectId).then((draft) => {
+      if (!alive) return;
+      // 이미 쓰기 시작한 폼(다른 프로젝트에서 넘어옴)은 덮지 않는다
+      if (draft && !title.trim() && isEmptyHtml(description)) {
+        if (draft.type) setType(draft.type as IssueType);
+        setTitle(draft.title ?? "");
+        setDescription(draft.description ?? "");
+        if (draft.priority) setPriority(draft.priority as IssuePriority);
+        setAssigneeId(draft.assigneeId ?? UNASSIGNED);
+        setLabelsText(draft.labels ?? "");
+        setDueDate(draft.dueDate ?? "");
+        setEstimateHours(draft.estimateHours ?? "");
+        setStoryPoints(draft.storyPoints ?? "");
+        setRestoredAt(draft.savedAt ?? new Date().toISOString());
+      } else {
+        setRestoredAt(null);
+      }
+      setTimeout(() => {
+        if (alive) pauseDraft.current = false;
+      }, 0);
+    });
+    return () => {
+      alive = false;
+    };
+    // 프로젝트를 고를 때만 — 쓰는 동안 다시 읽지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+  // 입력이 멈추면 저장, 닫을 때(언마운트)는 바로 저장
+  useEffect(() => {
+    if (!projectId || pauseDraft.current) return;
+    const timer = setTimeout(() => void saveCreateIssueDraft(projectId, draftNow()), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, type, title, description, priority, assigneeId, labelsText, dueDate, estimateHours, storyPoints]);
+  useEffect(
+    () => () => {
+      if (projectId && !pauseDraft.current) void saveCreateIssueDraft(projectId, draftRef.current());
+    },
+    [projectId],
+  );
+  const discardDraft = () => {
+    pauseDraft.current = true;
+    if (projectId) void clearCreateIssueDraft(projectId);
+    setRestoredAt(null);
+    reset(false);
+    setTimeout(() => {
+      pauseDraft.current = false;
+    }, 0);
+  };
 
   // 프로젝트가 바뀌면 그 프로젝트의 컴포넌트·이슈(상위 항목/연결 후보)·스프린트를 읽는다
   useEffect(() => {
@@ -301,9 +375,16 @@ export function CreateIssueModal({
         description: failed.length > 0 ? `연결하지 못한 이슈: ${failed.join(", ")}` : undefined,
         appearance: failed.length > 0 ? "info" : "success",
       });
+      // 만들었으면 초안은 끝 — 지우고, 이어 만들기의 빈 폼으로 초안을 덮지 않게 잠깐 멈춘다
+      pauseDraft.current = true;
+      void clearCreateIssueDraft(projectId);
+      setRestoredAt(null);
       if (createAnother) {
         reset(true);
         setProjectIssues((prev) => [...prev, issue]);
+        setTimeout(() => {
+          pauseDraft.current = false;
+        }, 0);
         return;
       }
       reset(false);
@@ -336,12 +417,22 @@ export function CreateIssueModal({
       description="필수 항목은 *로 표시됩니다."
       open={open}
       onOpenChange={(next) => {
-        if (!next) reset(false);
+        if (!next) {
+          // 닫아도 초안은 남는다 — 지금 값을 먼저 저장하고 폼만 비운다
+          if (projectId && !pauseDraft.current) void saveCreateIssueDraft(projectId, draftNow());
+          pauseDraft.current = true;
+          reset(false);
+        }
         onOpenChange(next);
       }}
       className="create-issue-modal"
     >
       <form className="create-issue-form" onSubmit={handleSubmit}>
+        {restoredAt ? (
+          <Banner variant="info" action={{ label: "초안 삭제", onClick: discardDraft }}>
+            저장해 둔 초안을 불러왔습니다. 닫아도 이 프로젝트의 초안으로 남습니다.
+          </Banner>
+        ) : null}
         <div className="create-issue-grid">
           {/* 시각 라벨은 아이콘 + 텍스트(FieldLabel), DS 라벨은 접근 이름으로만 남긴다 */}
           <div className="alm-field">

@@ -19,6 +19,7 @@ import {
   listComponents,
   bulkDeleteIssues,
   listIssuesPage,
+  createIssue,
   listProjectLabels,
   listProjectStatuses,
   listSprints,
@@ -48,6 +49,8 @@ import { useTablePrefs } from "../components/useTablePrefs";
 import { ColumnPicker } from "../components/ColumnPicker";
 import { useKeyboardShortcuts } from "../components/useKeyboardShortcuts";
 import { useRealtimeIssueSync } from "../components/realtime/ProjectRealtime";
+import { useRangeSelection } from "../components/useRangeSelection";
+import { InlineIssueCreate } from "../components/InlineIssueCreate";
 import { UserAvatar } from "../components/UserAvatar";
 import { useIssueActions } from "../components/useIssueActions";
 import { useIssueInteractions } from "../components/useIssueInteractions";
@@ -161,6 +164,18 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
   };
 
   const reload = useCallback(() => setRefreshVersion((version) => version + 1), []);
+  const createInList = async (title: string): Promise<boolean> => {
+    if (!projectId) return false;
+    try {
+      const created = await createIssue({ projectId, title });
+      toast({ title: `${created.key}를 만들었습니다`, appearance: "success" });
+      reload();
+      return true;
+    } catch (error) {
+      toast({ title: "이슈 생성 실패", description: error instanceof Error ? error.message : String(error), appearance: "danger" });
+      return false;
+    }
+  };
   // 실시간 동기화 — 목록은 필터·정렬·페이지를 서버가 다시 정하게 한 페이지를 다시 읽고, 남이 바꾼 행은 하이라이트
   useRealtimeIssueSync({
     issues,
@@ -290,6 +305,18 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
     // 커서 행이 화면 밖이면 따라 스크롤한다(jsdom에는 scrollIntoView가 없다)
     setTimeout(() => tableRef.current?.querySelector(`[data-issue-key="${target.key}"]`)?.scrollIntoView?.({ block: "nearest" }), 0);
   };
+  // Shift+↑/↓ 범위 선택 · ⌘/Ctrl+A 전체(Linear) — 선택은 체크박스와 같은 상태
+  useRangeSelection({
+    order: sortedIssues.map((issue) => issue.id),
+    cursorId,
+    setCursorId,
+    setSelected,
+    disabled: resultsDisabled || views.engaged,
+    onCursorMoved: (id) => {
+      const key = sortedIssues.find((issue) => issue.id === id)?.key;
+      if (key) setTimeout(() => tableRef.current?.querySelector(`[data-issue-key="${key}"]`)?.scrollIntoView?.({ block: "nearest" }), 0);
+    },
+  });
   useKeyboardShortcuts({
     j: () => moveCursor(1),
     k: () => moveCursor(-1),
@@ -800,6 +827,7 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 refreshKey={refreshVersion}
                 selectedKey={issueKey}
                 onOpenIssue={openIssue}
+                onIssueCreated={reload}
               />
             ) : issues?.length === 0 && !updating && loadError === null ? (
               <div className="issue-empty">
@@ -832,6 +860,10 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 />
               </div>,
               )
+            ) : null}
+            {/* 목록 끝 인라인 만들기(Linear) — 제목만 적고 Enter, 백로그에 만든다 */}
+            {!views.engaged && projectId && loadError === null ? (
+              <InlineIssueCreate where="목록" onCreate={createInList} />
             ) : null}
           </>
         )}

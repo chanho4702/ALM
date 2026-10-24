@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { Badge, Button, EmptyState, Lozenge, SkeletonListItem, Tag } from "@chanho/react";
-import type { Component, Issue, Project, ProjectVersion, Sprint, User, ViewProperty, WorkflowStatus } from "../../store/types";
+import { Badge, Button, EmptyState, Lozenge, SkeletonListItem, Tag, useToast } from "@chanho/react";
+import type { Component, Issue, IssuePriority, IssueType, Project, ProjectVersion, Sprint, User, ViewProperty, WorkflowStatus } from "../../store/types";
 import {
+  createIssue,
   listComponents,
   listProjectLabels,
   listProjectStatuses,
@@ -24,7 +25,8 @@ import { formatDate } from "../time";
 import { statusAppearance, statusKind, statusName, typeLevel } from "../labels";
 import { useIssueTypes } from "../useIssueTypes";
 import { usePriorities } from "../usePriorities";
-import { buildViewAql, epicOf, groupIssues } from "./viewGrouping";
+import { buildViewAql, epicOf, groupCreatePatch, groupIssues } from "./viewGrouping";
+import { InlineIssueCreate } from "../InlineIssueCreate";
 import type { GroupingContext, IssueGroup } from "./viewGrouping";
 import type { ViewState } from "./useViewDisplay";
 import "./views.css";
@@ -82,13 +84,16 @@ export interface IssueGroupedViewProps {
   refreshKey?: number;
   selectedKey?: string | null;
   onOpenIssue: (key: string) => void;
+  /** 그룹 머리글 인라인 만들기 뒤(목록 화면의 다른 집계도 다시 읽게) */
+  onIssueCreated?: () => void;
 }
 
 /**
  * 표시 옵션이 적용된 이슈 보기 — 목록(접히는 그룹 + 고른 속성의 행) 또는 보드(그룹 = 열, 카드 = IssueCard).
  * 데이터는 `queryIssuesAql`(project = KEY AND 보기 조건) 한 번, 정렬·그룹은 `viewGrouping`이 한다.
  */
-export function IssueGroupedView({ projectId, state, chips, refreshKey = 0, selectedKey, onOpenIssue }: IssueGroupedViewProps) {
+export function IssueGroupedView({ projectId, state, chips, refreshKey = 0, selectedKey, onOpenIssue, onIssueCreated }: IssueGroupedViewProps) {
+  const toast = useToast();
   const types = useIssueTypes();
   const priorities = usePriorities();
   const [directory, setDirectory] = useState<Directory | null>(null);
@@ -243,7 +248,26 @@ export function IssueGroupedView({ projectId, state, chips, refreshKey = 0, sele
   }
 
   const usersById = new Map(ctx.users.map((u) => [u.id, u]));
-  const rowProps: RowContext = { ctx, usersById, properties: display.properties, selectedKey, onOpenIssue };
+  const onCreateInGroup = async (group: IssueGroup, title: string): Promise<boolean> => {
+    const patch = groupCreatePatch(group.kind, group.value);
+    try {
+      const created = await createIssue({
+        projectId,
+        title,
+        ...patch,
+        type: patch.type as IssueType | undefined,
+        priority: patch.priority as IssuePriority | undefined,
+      });
+      toast({ title: `${created.key}를 ${group.label}에 만들었습니다`, appearance: "success" });
+      setRetry((value) => value + 1);
+      onIssueCreated?.();
+      return true;
+    } catch (failure) {
+      toast({ title: "이슈 생성 실패", description: failure instanceof Error ? failure.message : String(failure), appearance: "danger" });
+      return false;
+    }
+  };
+  const rowProps: RowContext = { ctx, usersById, properties: display.properties, selectedKey, onOpenIssue, onCreateInGroup };
 
   if (layout === "board") {
     return (
@@ -292,6 +316,8 @@ export function IssueGroupedView({ projectId, state, chips, refreshKey = 0, sele
 }
 
 interface RowContext {
+  /** 그룹 머리글 인라인 만들기 — 없으면 버튼을 그리지 않는다 */
+  onCreateInGroup?: (group: IssueGroup, title: string) => Promise<boolean>;
   ctx: GroupingContext;
   usersById: Map<string, User>;
   properties: ViewProperty[];
@@ -319,12 +345,18 @@ function GroupSection({
   const Heading = level === 3 ? "h3" : "h4";
   return (
     <section className={`issue-group is-level-${level}`} aria-label={`${group.label} ${group.count}건`}>
-      <Heading className="issue-group-header">
-        <button type="button" className="issue-group-toggle" aria-expanded={!isCollapsed} onClick={() => onToggle(stateKey)}>
-          {isCollapsed ? <ChevronRight size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
-          <GroupHeading group={group} ctx={rowProps.ctx} usersById={rowProps.usersById} />
-        </button>
-      </Heading>
+      <div className="issue-group-head">
+        <Heading className="issue-group-header">
+          <button type="button" className="issue-group-toggle" aria-expanded={!isCollapsed} onClick={() => onToggle(stateKey)}>
+            {isCollapsed ? <ChevronRight size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+            <GroupHeading group={group} ctx={rowProps.ctx} usersById={rowProps.usersById} />
+          </button>
+        </Heading>
+        {/* 그룹 머리글 인라인 만들기 — 최상위 그룹만(하위 그룹 값까지 합치지 않는다) */}
+        {level === 3 && rowProps.onCreateInGroup ? (
+          <InlineIssueCreate compact where={group.label} onCreate={(title) => rowProps.onCreateInGroup!(group, title)} />
+        ) : null}
+      </div>
       {isCollapsed ? null : group.subGroups && group.subGroups.length > 0 ? (
         group.subGroups.map((sub) => (
           <GroupSection

@@ -372,3 +372,44 @@ export function buildViewAql(projectKey: string, filterAql: string | null): stri
   const where = filterAql ? aqlWhere(filterAql) : "";
   return where ? `${scope} AND (${where})` : scope;
 }
+
+/**
+ * 그룹 머리글 인라인 만들기(Linear) — 그 그룹에 들어갈 값으로 만든다. "값 없음" 그룹은 비운 채로.
+ * 에픽 그룹은 상위 항목, 라벨·컴포넌트는 그 하나를 붙인다. 그룹이 없으면(none) 아무 값도 넣지 않는다.
+ */
+export interface GroupCreatePatch {
+  status?: string;
+  assigneeId?: string | null;
+  priority?: string;
+  sprintId?: string | null;
+  parentId?: string | null;
+  type?: string;
+  labels?: string[];
+  componentIds?: string[];
+  fixVersionId?: string | null;
+}
+
+export function groupCreatePatch(kind: ViewGroupBy, value: string | null): GroupCreatePatch {
+  switch (kind) {
+    case "status":
+      return value ? { status: value } : {};
+    case "assignee":
+      return { assigneeId: value };
+    case "priority":
+      return value ? { priority: value } : {};
+    case "sprint":
+      return { sprintId: value };
+    case "epic":
+      return { parentId: value };
+    case "type":
+      return value ? { type: value } : {};
+    case "label":
+      return value ? { labels: [value] } : {};
+    case "component":
+      return value ? { componentIds: [value] } : {};
+    case "fixVersion":
+      return { fixVersionId: value };
+    default:
+      return {};
+  }
+}

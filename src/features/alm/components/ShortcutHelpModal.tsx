@@ -53,6 +53,8 @@ export const SHORTCUT_GROUPS: { title: string; rows: ShortcutRow[] }[] = [
       { id: "prev", keys: "k", label: "이전 이슈 선택" },
       { id: "open", keys: "o", label: "선택한 이슈 열기" },
       { id: "display", keys: "Shift+V", label: "표시 옵션(그룹·정렬·속성) 열기" },
+      { id: "range", keys: "Shift+↓", label: "커서부터 범위 선택 넓히기(Shift+↑는 위로)" },
+      { id: "select-all", keys: "Ctrl+A", label: "보이는 이슈 모두 선택(맥은 ⌘A, 입력란 밖에서)" },
     ],
   },
   {

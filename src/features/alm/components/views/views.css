@@ -343,3 +343,19 @@
   align-items: center;
   gap: var(--chanho-space-75);
 }
+
+/* 그룹 머리글 + 인라인 만들기(Linear) — 만들기 폼이 열리면 머리글 아래로 내려간다 */
+.issue-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.issue-group-head > .issue-group-header {
+  flex: 1 1 auto;
+}
+
+.issue-group-head > .inline-create-form {
+  flex: 1 1 100%;
+}
