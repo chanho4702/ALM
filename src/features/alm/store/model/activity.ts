@@ -43,4 +43,36 @@ export interface Notification {
   message: string;
   at: string;
   read: boolean;
+  /** 미루기 해제 시각(V40) — 미래면 미뤄 둔 알림, 과거면 "미루기에서 돌아온" 알림. 없으면 null/생략 */
+  snoozedUntil?: string | null;
+  /** 보관 시각(V40) — 있으면 보관함에만 보인다 */
+  archivedAt?: string | null;
+  /** 정렬 키 — 처음엔 생성 시각, 미루기에서 돌아오면 해제 시각(서버 sortAt). 목업만 저장한다 */
+  sortAt?: string;
+}
+
+/** 인박스 필터(Linear Inbox) — 서버 `filter` 값 그대로 */
+export type InboxFilter = "all" | "unread" | "mentions" | "assigned" | "automation" | "snoozed" | "archived";
+
+export interface InboxQuery {
+  filter?: InboxFilter;
+  /** 불투명 커서 — 앞 페이지의 nextCursor */
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface InboxPage {
+  items: Notification[];
+  /** 다음 페이지 커서 — 없으면 null */
+  nextCursor: string | null;
+  /** 배지 숫자 — 미뤄 둔 것·보관한 것은 세지 않는다 */
+  unreadCount: number;
+}
+
+/** 일괄 처리(`POST /notifications/bulk`) */
+export type InboxBulkAction = "read" | "unread" | "archive" | "unarchive";
+
+export interface InboxBulkResult {
+  updated: number;
+  unreadCount: number;
 }

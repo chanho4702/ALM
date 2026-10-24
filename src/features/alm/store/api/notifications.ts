@@ -1,6 +1,6 @@
 // alm-backend REST 어댑터 — notifications (jiraApi.ts에서 분할, 동작 불변)
 import { toBackendId } from "../mapping";
-import type { Notification } from "../types";
+import type { InboxBulkAction, InboxBulkResult, InboxPage, InboxQuery, Notification } from "../types";
 import { json, sharedApiFetch } from "./http";
 
 // ── 워처 · 알림 — 서버 V9. 문장은 서버가 만들지 않으므로 여기서 type + detail로 만든다 ──
@@ -49,6 +49,9 @@ interface NotificationDto {
   detail: string | null;
   read: boolean;
   createdAt: string;
+  /** V40 — 뒤에 붙은 필드(옛 서버는 없다) */
+  snoozedUntil?: string | null;
+  archivedAt?: string | null;
 }
 
 /**
@@ -72,9 +75,8 @@ function notificationMessage(dto: NotificationDto): string {
   }
 }
 
-export async function listNotifications(): Promise<Notification[]> {
-  const rows = (await json(await sharedApiFetch("/api/alm/notifications"))) as NotificationDto[];
-  return rows.map((dto) => ({
+export function mapNotification(dto: NotificationDto): Notification {
+  return {
     id: String(dto.id),
     userId: "me",
     issueId: dto.issueId === null ? "" : String(dto.issueId),
@@ -84,7 +86,78 @@ export async function listNotifications(): Promise<Notification[]> {
     message: notificationMessage(dto),
     at: dto.createdAt,
     read: dto.read,
-  }));
+    snoozedUntil: dto.snoozedUntil ?? null,
+    archivedAt: dto.archivedAt ?? null,
+  };
+}
+
+export async function listNotifications(): Promise<Notification[]> {
+  const rows = (await json(await sharedApiFetch("/api/alm/notifications"))) as NotificationDto[];
+  return rows.map(mapNotification);
+}
+
+// ── 알림 인박스(V40, Linear Inbox) ──
+
+interface InboxPageDto {
+  items: NotificationDto[];
+  nextCursor: string | null;
+  unreadCount: number;
+}
+
+export async function listNotificationInbox(query: InboxQuery = {}): Promise<InboxPage> {
+  const params = new URLSearchParams();
+  params.set("filter", query.filter ?? "all");
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  const body = (await json(await sharedApiFetch(`/api/alm/notifications/inbox?${params}`))) as InboxPageDto;
+  return {
+    items: (body.items ?? []).map(mapNotification),
+    nextCursor: body.nextCursor ?? null,
+    unreadCount: body.unreadCount ?? 0,
+  };
+}
+
+const notificationPath = (id: string, tail: string) => `/api/alm/notifications/${toBackendId(id)}/${tail}`;
+
+export async function snoozeNotification(id: string, until: string): Promise<Notification> {
+  return mapNotification(
+    (await json(
+      await sharedApiFetch(notificationPath(id, "snooze"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ until }),
+      }),
+    )) as NotificationDto,
+  );
+}
+
+export async function unsnoozeNotification(id: string): Promise<Notification> {
+  return mapNotification(
+    (await json(await sharedApiFetch(notificationPath(id, "snooze"), { method: "DELETE" }))) as NotificationDto,
+  );
+}
+
+export async function archiveNotification(id: string): Promise<Notification> {
+  return mapNotification(
+    (await json(await sharedApiFetch(notificationPath(id, "archive"), { method: "POST" }))) as NotificationDto,
+  );
+}
+
+export async function unarchiveNotification(id: string): Promise<Notification> {
+  return mapNotification(
+    (await json(await sharedApiFetch(notificationPath(id, "unarchive"), { method: "POST" }))) as NotificationDto,
+  );
+}
+
+export async function bulkNotifications(ids: string[], action: InboxBulkAction): Promise<InboxBulkResult> {
+  const body = (await json(
+    await sharedApiFetch("/api/alm/notifications/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ids.map(toBackendId), action }),
+    }),
+  )) as InboxBulkResult;
+  return { updated: body.updated ?? 0, unreadCount: body.unreadCount ?? 0 };
 }
 
 export async function markNotificationRead(id: string): Promise<void> {

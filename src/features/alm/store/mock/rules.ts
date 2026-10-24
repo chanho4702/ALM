@@ -330,6 +330,13 @@ export function notificationRecipients(data: JiraData, issue: Issue, actorId: st
 
 type NotificationKind = keyof UserPreferences["notifications"];
 
+const NOTIFICATION_TYPE_OF: Record<NotificationKind, NonNullable<import("../types").Notification["type"]>> = {
+  assigned: "assigned",
+  statusChanged: "status_changed",
+  commented: "commented",
+  mentioned: "mentioned",
+};
+
 export function pushNotification(
   data: JiraData,
   userId: string,
@@ -341,6 +348,8 @@ export function pushNotification(
   if (!preferencesOf(data, userId).notifications[kind]) return;
   data.notifications.push({
     id: nextId(),
+    // 인박스 필터(멘션·할당)가 종류로 거른다 — 서버 type의 소문자
+    type: NOTIFICATION_TYPE_OF[kind],
     userId,
     issueId: issue.id,
     issueKey: issue.key,

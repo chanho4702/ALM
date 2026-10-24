@@ -373,10 +373,13 @@ describe("이슈 타입", () => {
 });
 
 describe("notifications", () => {
-  it("시드 알림 2개가 현재 사용자(u1)에게 최신순으로 조회된다", async () => {
+  it("시드 알림 5개(미읽음 2개)가 현재 사용자(u1)에게 최신순으로 조회된다", async () => {
     const notifications = await listNotifications();
-    expect(notifications).toHaveLength(2);
-    expect(notifications.every((n) => n.userId === "u1" && !n.read)).toBe(true);
+    expect(notifications).toHaveLength(5);
+    expect(notifications.every((n) => n.userId === "u1")).toBe(true);
+    expect(notifications.filter((n) => !n.read)).toHaveLength(2);
+    const times = notifications.map((n) => n.at);
+    expect([...times].sort().reverse()).toEqual(times);
   });
 
   it("담당자 변경/상태 변경/코멘트가 담당자에게 알림을 만든다 (본인 액션 제외)", async () => {

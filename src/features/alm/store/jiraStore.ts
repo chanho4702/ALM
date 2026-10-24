@@ -224,6 +224,12 @@ export const listBoardIssues = impl.listBoardIssues;
 export const listNotifications = impl.listNotifications;
 export const markNotificationRead = impl.markNotificationRead;
 export const markAllNotificationsRead = impl.markAllNotificationsRead;
+export const listNotificationInbox = impl.listNotificationInbox;
+export const snoozeNotification = impl.snoozeNotification;
+export const unsnoozeNotification = impl.unsnoozeNotification;
+export const archiveNotification = impl.archiveNotification;
+export const unarchiveNotification = impl.unarchiveNotification;
+export const bulkNotifications = impl.bulkNotifications;
 export const listProjectChanges = impl.listProjectChanges;
 /** 변경 이력 + 잘림 여부(서버 상한 20000) — 리포트가 since 창으로 부른다 */
 export const listProjectChangeWindow = impl.listProjectChangeWindow;

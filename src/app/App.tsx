@@ -30,6 +30,9 @@ const BacklogPage = lazy(() =>
 const IssueListPage = lazy(() =>
   import("../features/alm/pages/IssueListPage").then((module) => ({ default: module.IssueListPage })),
 );
+const InboxPage = lazy(() =>
+  import("../features/alm/pages/InboxPage").then((module) => ({ default: module.InboxPage })),
+);
 const TriageInboxPage = lazy(() =>
   import("../features/alm/pages/TriageInboxPage").then((module) => ({ default: module.TriageInboxPage })),
 );
@@ -127,6 +130,14 @@ function AppRoutes() {
         {/* For you 홈 — 내 담당·최근 업데이트 */}
         <Route path="/" element={<StartRedirect />} />
         <Route path="/home" element={<HomePage />} />
+        <Route
+          path="/notifications"
+          element={
+            <LazyPage label="인박스" skeleton={<ListSkeleton label="인박스 불러오는 중" rows={6} />}>
+              <InboxPage />
+            </LazyPage>
+          }
+        />
         <Route
           path="/search"
           element={

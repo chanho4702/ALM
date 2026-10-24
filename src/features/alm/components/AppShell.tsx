@@ -2,20 +2,13 @@ import { lazy, useEffect, useRef, useState } from "react";
 import { Bell, Command, Menu, Search } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Modal, TopBar } from "@chanho/react";
-import type { Issue, Notification, Project, User } from "../store/types";
-import {
-  AVATAR_CHANGED_EVENT,
-  getCurrentUser,
-  getIssueByKey,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from "../store/jiraStore";
+import type { Issue, Project, User } from "../store/types";
+import { AVATAR_CHANGED_EVENT, getCurrentUser, listNotificationInbox } from "../store/jiraStore";
+import { INBOX_CHANGED_EVENT } from "./inboxEvents";
 import { recordProjectVisit, setUiUser } from "../store/uiStore";
 import { LazyModal } from "./LazyContent";
 import { GlobalSideNav } from "./GlobalSideNav";
 import { SettingsSideNav, isSettingsPath } from "./SettingsSideNav";
-import { NotificationsModal } from "./NotificationsModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { UserAvatar } from "./UserAvatar";
@@ -67,8 +60,7 @@ export function AppShell({ projects }: AppShellProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const mobile = useMobileShell();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -78,7 +70,12 @@ export function AppShell({ projects }: AppShellProps) {
     setNavigationOpen(false);
   }, [location.key, mobile]);
 
-  const reloadNotifications = () => void listNotifications().then(setNotifications);
+  /** 벨 배지 — 인박스의 읽지 않음 수(미뤄 둔 것·보관한 것 제외). 못 읽으면 배지만 숨긴다(벨은 그대로 인박스를 연다) */
+  const reloadNotifications = () =>
+    void listNotificationInbox({ filter: "unread", limit: 1 }).then(
+      (page) => setUnreadCount(page.unreadCount),
+      () => setUnreadCount(0),
+    );
 
   useEffect(() => {
     // 개인 설정에서 프로필 사진을 바꾸면 상단바 아바타도 바로 따라간다(새로고침 없이)
@@ -91,18 +88,12 @@ export function AppShell({ projects }: AppShellProps) {
     loadMe();
     reloadNotifications();
     window.addEventListener(AVATAR_CHANGED_EVENT, loadMe);
-    return () => window.removeEventListener(AVATAR_CHANGED_EVENT, loadMe);
+    window.addEventListener(INBOX_CHANGED_EVENT, reloadNotifications);
+    return () => {
+      window.removeEventListener(AVATAR_CHANGED_EVENT, loadMe);
+      window.removeEventListener(INBOX_CHANGED_EVENT, reloadNotifications);
+    };
   }, []);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const openNotification = async (notification: Notification) => {
-    await markNotificationRead(notification.id);
-    reloadNotifications();
-    setNotificationsOpen(false);
-    const issue = await getIssueByKey(notification.issueKey);
-    if (issue) navigate(`/projects/${issue.projectId}/issues?issue=${issue.key}`);
-  };
 
   // 현재 URL의 프로젝트 — 전역 만들기 모달의 기본 프로젝트
   const currentProjectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
@@ -138,6 +129,8 @@ export function AppShell({ projects }: AppShellProps) {
       if (currentProject) navigate(`/projects/${currentProject.id}/board`);
     },
     "g i": () => navigate(currentProject ? `/projects/${currentProject.id}/issues` : "/search"),
+    // Linear g i(Inbox) 자리는 지라 이슈 목록이 쓰고 있어 인박스는 g n(notifications)
+    "g n": () => navigate("/notifications"),
   });
 
   const openIssue = (issue: Issue) => {
@@ -153,9 +146,10 @@ export function AppShell({ projects }: AppShellProps) {
   const createAction = projects.length > 0 ? (
     <Button onClick={() => setCreateOpen(true)}>만들기</Button>
   ) : null;
+  /** 벨 = 인박스 열기(Linear Inbox 전체 화면) */
   const openNotifications = () => {
     reloadNotifications();
-    setNotificationsOpen(true);
+    navigate("/notifications");
   };
   // 명령 팔레트 — 마우스로도 열 수 있게 상단바에 둔다(키는 ⌘K / Ctrl+K)
   const paletteAction = (
@@ -175,6 +169,8 @@ export function AppShell({ projects }: AppShellProps) {
       variant="ghost"
       className="notification-bell topbar-icon"
       aria-label={unreadCount > 0 ? `알림 ${unreadCount}개 미읽음` : "알림"}
+      aria-keyshortcuts="G N"
+      title="인박스 열기 (g n)"
       onClick={openNotifications}
     >
       <Bell size={18} />
@@ -298,15 +294,6 @@ export function AppShell({ projects }: AppShellProps) {
         onCreateIssue={() => setCreateOpen(true)}
         onShowShortcuts={() => setShortcutHelpOpen(true)}
         onOpenNotifications={openNotifications}
-      />
-      <NotificationsModal
-        notifications={notifications}
-        open={notificationsOpen}
-        onOpenChange={setNotificationsOpen}
-        onNavigate={(n) => void openNotification(n)}
-        onMarkAllRead={() => {
-          void markAllNotificationsRead().then(reloadNotifications);
-        }}
       />
     </div>
   );

@@ -119,6 +119,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
   const notifications: Notification[] = [
     {
       id: "n1",
+      type: "commented",
       userId: "u1",
       issueId: "i2",
       issueKey: "ALM-2",
@@ -129,6 +130,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     },
     {
       id: "n2",
+      type: "assigned",
       userId: "u1",
       issueId: "i3",
       issueKey: "ALM-3",
@@ -136,6 +138,40 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
       message: "박준영 님이 ALM-3을 나에게 할당했습니다",
       at: now,
       read: false,
+    },
+    // 인박스 데모(이미 읽음) — 멘션·자동화·상태 변경. 배지(미읽음 2개)는 그대로
+    {
+      id: "n3",
+      type: "mentioned",
+      userId: "u1",
+      issueId: "i4",
+      issueKey: "ALM-4",
+      actorId: "u2",
+      message: "이서연 님이 ALM-4 코멘트에서 나를 멘션했습니다",
+      at: new Date(Date.parse(now) - 60 * 60 * 1000).toISOString(),
+      read: true,
+    },
+    {
+      id: "n4",
+      type: "automation",
+      userId: "u1",
+      issueId: "i1",
+      issueKey: "ALM-1",
+      actorId: "u3",
+      message: "ALM-1: 완료되어 플래그를 내렸습니다",
+      at: new Date(Date.parse(now) - 3 * 60 * 60 * 1000).toISOString(),
+      read: true,
+    },
+    {
+      id: "n5",
+      type: "status_changed",
+      userId: "u1",
+      issueId: "i5",
+      issueKey: "ALM-5",
+      actorId: "u4",
+      message: "최다인 님이 ALM-5를 진행 중(으)로 옮겼습니다",
+      at: new Date(Date.parse(now) - 26 * 60 * 60 * 1000).toISOString(),
+      read: true,
     },
   ];
 

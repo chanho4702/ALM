@@ -32,6 +32,18 @@ export const SHORTCUT_GROUPS: { title: string; rows: ShortcutRow[] }[] = [
       { id: "go-board", keys: "g b", label: "보드로(현재 프로젝트)" },
       { id: "go-issues", keys: "g i", label: "이슈 목록으로(프로젝트 밖에서는 이슈 검색)" },
       { id: "go-projects", keys: "g p", label: "프로젝트 목록으로" },
+      { id: "go-inbox", keys: "g n", label: "인박스(알림)로 — 상단 벨과 같다" },
+    ],
+  },
+  {
+    title: "인박스",
+    rows: [
+      { id: "inbox-move", keys: "j", label: "다음 알림(k는 이전, ↑↓도 같다)" },
+      { id: "inbox-open", keys: "Enter", label: "알림의 이슈 열기(읽음으로 바뀐다)" },
+      { id: "inbox-read", keys: "U", label: "읽음·읽지 않음 토글(선택이 있으면 선택 전부)" },
+      { id: "inbox-snooze", keys: "H", label: "미루기 — 1시간·내일 아침 9시·다음 주 월요일·직접" },
+      { id: "inbox-archive", keys: "E", label: "보관(Backspace도 같다, 보관함에서는 해제)" },
+      { id: "inbox-select", keys: "x", label: "선택·해제(Shift+클릭 범위, Esc 해제)" },
     ],
   },
   {

@@ -101,21 +101,20 @@ describe("AppShell 전역 검색", () => {
   });
 });
 
-describe("AppShell 알림 벨", () => {
-  it("미읽음 배지를 보여주고, 알림 클릭 시 해당 이슈 상세로 이동하며 읽음 처리된다", async () => {
+describe("AppShell 알림 벨 = 인박스 열기", () => {
+  it("미읽음 배지를 보여주고, 벨은 인박스(/notifications)를 연다 — 알림을 열면 이슈 상세로 가고 읽음 처리된다", async () => {
     const user = userEvent.setup();
     renderShell("/projects");
     await screen.findByRole("table", { name: "프로젝트 목록" });
 
-    // 시드 미읽음 2개
+    // 시드 미읽음 2개(읽은 알림 3개는 세지 않는다)
     const bell = await screen.findByRole("button", { name: "알림 2개 미읽음" });
+    expect(bell).toHaveAttribute("aria-keyshortcuts", "G N");
     await user.click(bell);
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/notifications"));
 
-    const dialog = await screen.findByRole("dialog", { name: "알림" });
-    const list = within(dialog).getByTestId("notification-list");
-    expect(within(list).getByText(/이서연 님이 ALM-2에 코멘트를 남겼습니다/)).toBeInTheDocument();
-
-    await user.click(within(list).getByText(/ALM-2에 코멘트/));
+    const list = await screen.findByRole("list", { name: "알림 목록" });
+    await user.click(within(list).getByText(/이서연 님이 ALM-2에 코멘트를 남겼습니다/));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/issues?issue=ALM-2");
     });
@@ -123,22 +122,14 @@ describe("AppShell 알림 벨", () => {
 
     // 상세 모달을 닫으면(배경 aria-hidden 해제) 읽음 처리된 배지가 보인다 → 미읽음 1개
     await user.click(within(detail).getByRole("button", { name: "닫기" }));
-    expect(
-      await screen.findByRole("button", { name: "알림 1개 미읽음" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "알림 1개 미읽음" })).toBeInTheDocument();
   });
 
-  it("모두 읽음을 누르면 배지가 사라진다", async () => {
+  it("인박스에서 보이는 알림을 모두 읽으면 배지가 사라진다", async () => {
     const user = userEvent.setup();
-    renderShell("/projects");
-    await screen.findByRole("table", { name: "프로젝트 목록" });
-
-    await user.click(await screen.findByRole("button", { name: "알림 2개 미읽음" }));
-    const dialog = await screen.findByRole("dialog", { name: "알림" });
-    await user.click(within(dialog).getByRole("button", { name: "모두 읽음" }));
-    await user.click(within(dialog).getByRole("button", { name: "닫기" }));
-
-    // 모달을 닫으면 미읽음 없는 벨("알림")이 보인다
+    renderShell("/notifications");
+    await screen.findByRole("list", { name: "알림 목록" });
+    await user.click(screen.getByRole("button", { name: "보이는 알림 모두 읽음" }));
     expect(await screen.findByRole("button", { name: "알림" })).toBeInTheDocument();
   });
 });

@@ -143,6 +143,11 @@ export type {
 } from "./model/planning";
 export type {
   NotificationType,
+  InboxFilter,
+  InboxQuery,
+  InboxPage,
+  InboxBulkAction,
+  InboxBulkResult,
   AuditEntry,
   SystemStats,
   IssueWatcher,
