@@ -4,6 +4,17 @@ import type { Sprint, Issue, Comment, Activity, IssueLink, WebLink, Worklog, Iss
 import type { Notification, IssueWatcher } from "./activity";
 import type { Board } from "./board";
 import type { SettingsScheme, ProjectSettingsEntry } from "./settings";
+import type { SavedView, AutomationRule, AutomationRun } from "./planning";
+
+/** 트리아지 대기열 한 줄(목업 전용 저장 — 서버는 issue.triage_* 컬럼) */
+export interface MockTriageEntry {
+  issueId: string;
+  source: "EXTERNAL" | "MANUAL";
+  /** 들어온 시각 — 대기열 순서 */
+  enteredAt: string;
+  /** 보류 시각(지나면 다시 pending) */
+  snoozedUntil: string | null;
+}
 
 /** localStorage `alm.jira.v1`에 저장되는 루트 구조 */
 export interface JiraData {
@@ -52,4 +63,12 @@ export interface JiraData {
   /** userId → 프로필 사진 dataURL (목업 전용 저장소 — 서버는 오브젝트 스토리지에 둔다) */
   avatars: Record<string, string>;
   banner: AnnouncementBanner;
+  /** 저장된 보기(V31) — 목업은 모두 현재 사용자 소유로 본다 */
+  views: (Omit<SavedView, "mine" | "canEdit">)[];
+  /** 트리아지를 켠 프로젝트 id(V35) */
+  triageProjects: string[];
+  triageEntries: MockTriageEntry[];
+  /** 자동화 규칙·실행 이력(V36·V37) */
+  automationRules: AutomationRule[];
+  automationRuns: AutomationRun[];
 }

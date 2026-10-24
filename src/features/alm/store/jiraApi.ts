@@ -283,3 +283,35 @@ export {
 } from "./shared";
 
 export { CHANGE_HISTORY_MAX_LIMIT } from "./shared";
+export {
+  listIssueTransitions,
+  transitionIssue,
+} from "./api/workflow";
+export {
+  setIssueFlag,
+  getEstimationSummary,
+  getVelocity,
+  listMyViews,
+  listProjectViews,
+  getView,
+  createView,
+  updateView,
+  deleteView,
+  getTriageSettings,
+  saveTriageSettings,
+  listTriage,
+  sendToTriage,
+  acceptTriage,
+  declineTriage,
+  duplicateTriage,
+  snoozeTriage,
+} from "./api/planning";
+export {
+  listAutomationRules,
+  getAutomationRule,
+  createAutomationRule,
+  updateAutomationRule,
+  deleteAutomationRule,
+  listAutomationRuleRuns,
+  listProjectAutomationRuns,
+} from "./api/automation";

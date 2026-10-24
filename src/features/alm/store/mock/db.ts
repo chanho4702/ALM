@@ -1,10 +1,11 @@
 // localStorage 목업 스토어 — db (jiraMock.ts에서 분할, 동작 불변)
-import { type JiraData, type IssueFieldId, type IssueFieldConfig, ISSUE_FIELD_IDS, type SettingsBody, ISSUE_FIELD_NAMES, type StatusCategory, type StatusKind, type WorkflowStatus, type SettingsScheme, type BoardType, type Board, type User } from "../types";
+import { type JiraData, type IssueFieldId, type IssueFieldConfig, ISSUE_FIELD_IDS, type SettingsBody, type WorkflowTransition, type TypeWorkflow, ISSUE_FIELD_NAMES, type StatusCategory, type StatusKind, type WorkflowStatus, type SettingsScheme, type BoardType, type Board, type User } from "../types";
 import { CURRENT_USER_ID } from "../../../../mock/users";
 import { createSeedData } from "../../../../mock/seed";
 import { BUILTIN_LINK_TYPES, BUILTIN_PRIORITIES, priorityDefOf, BUILTIN_ISSUE_TYPES, typeDefOf, statusKindOf } from "./rules";
 import { resetAgentMockState, resetMockOfficeStream } from "./officeRuns";
 import { resetTeamMockState } from "./aiTeam";
+import { resetAutomationMockState } from "./automation";
 
 const STORAGE_KEY = "alm.jira.v1";
 
@@ -19,7 +20,7 @@ export const NEVER_REQUIRED_FIELDS: Partial<Record<IssueFieldId, string>> = {
   parent: "상위 항목은 최상위 이슈가 있어야 하므로 필수로 지정할 수 없습니다",
 };
 
-/** 기본 필드 구성 — 13종 전부 보이고 필수는 없다 */
+/** 기본 필드 구성 — 15종 전부 보이고 필수는 없다 */
 function defaultFieldConfigs(): IssueFieldConfig[] {
   return ISSUE_FIELD_IDS.map((id) => ({ id, visible: true, required: false }));
 }
@@ -65,7 +66,7 @@ function normalizeFieldConfigs(fields?: IssueFieldConfig[] | null): IssueFieldCo
 }
 
 /**
- * 타입별 덮어쓰기 정규화 — 덮어쓰기가 있는 타입만 키로 남기고 각 목록을 13종으로 채운다.
+ * 타입별 덮어쓰기 정규화 — 덮어쓰기가 있는 타입만 키로 남기고 각 목록을 15종으로 채운다.
  * 빠진 id는 **기본 구성**으로 채운다(해석과 같은 규칙이라 정규화가 뜻을 바꾸지 않는다).
  *
  * 서버와 같은 두 가지 규칙(2026-09-05 백엔드와 확정):
@@ -178,13 +179,14 @@ export function enrichStatuses(data: JiraData, statuses: WorkflowStatus[]): Work
 }
 
 export function enrichBody(data: JiraData, body: SettingsBody): SettingsBody {
-  // 필드 구성은 읽을 때 13종을 다 채운다 — 화면이 없는 id를 만나지 않게(구버전 호환)
+  // 필드 구성은 읽을 때 15종을 다 채운다 — 화면이 없는 id를 만나지 않게(구버전 호환)
   // 덮어쓰기가 없어도 `{}`를 싣는다 — 서버 응답 shape과 같게(키 생략 아님)
   return {
     ...body,
     statuses: enrichStatuses(data, body.statuses),
     fields: normalizeFieldConfigs(body.fields),
     fieldsByType: normalizeFieldsByType(body),
+    workflowsByType: cloneWorkflowsByType(body.workflowsByType),
   };
 }
 
@@ -225,6 +227,31 @@ export function bodyCoversAllKinds(data: JiraData, body: SettingsBody): boolean 
   return STATUS_KIND_LIST.every((kind) => kinds.has(kind));
 }
 
+/** 전환 깊은 복사 — 조건·검증·화면·후처리(C1~C3)까지 왕복한다(빠지면 저장할 때 규칙이 사라진다) */
+export function cloneTransition(t: WorkflowTransition): WorkflowTransition {
+  return {
+    ...t,
+    from: [...t.from],
+    ...(t.conditions ? { conditions: t.conditions.map((c) => ({ ...c })) } : {}),
+    ...(t.validators ? { validators: [...t.validators] } : {}),
+    ...(t.screenFields ? { screenFields: [...t.screenFields] } : {}),
+    ...(t.postFunctions ? { postFunctions: t.postFunctions.map((f) => ({ ...f })) } : {}),
+  };
+}
+
+/** 타입별 워크플로(C5) 깊은 복사 — 없으면 `{}` */
+export function cloneWorkflowsByType(map: SettingsBody["workflowsByType"]): Record<string, TypeWorkflow> {
+  return Object.fromEntries(
+    Object.entries(map ?? {}).map(([typeId, flow]) => [
+      typeId,
+      {
+        statuses: [...(flow?.statuses ?? [])],
+        transitions: flow?.transitions == null ? null : flow.transitions.map(cloneTransition),
+      },
+    ]),
+  );
+}
+
 export function cloneBody(body: SettingsBody): SettingsBody {
   return {
     // 해석 필드(kind/color)는 저장하지 않는다 — 레지스트리에서 매번 파생한다
@@ -234,9 +261,8 @@ export function cloneBody(body: SettingsBody): SettingsBody {
     defaultPriority: body.defaultPriority ?? "medium",
     fields: normalizeFieldConfigs(body.fields),
     fieldsByType: normalizeFieldsByType(body),
-    ...(body.transitions
-      ? { transitions: body.transitions.map((t) => ({ ...t, from: [...t.from] })) }
-      : {}),
+    workflowsByType: cloneWorkflowsByType(body.workflowsByType),
+    ...(body.transitions ? { transitions: body.transitions.map(cloneTransition) } : {}),
     ...(body.layout
       ? {
           layout: Object.fromEntries(
@@ -267,6 +293,10 @@ export function defaultBoard(
     swimlane: "none",
     isDefault: true,
     createdAt: new Date().toISOString(),
+    // 읽을 때(`resolveBoard`) 워크플로에서 다시 계산한다 — 저장 값은 의미가 없다
+    columnMode: "status",
+    resolvedColumns: [],
+    unmappedStatuses: [],
   };
 }
 
@@ -302,7 +332,17 @@ function normalize(data: JiraData): JiraData {
     issue.fixVersionId ??= null;
     // 버전 이전 데이터 — 서버처럼 1부터 센다
     issue.version ??= 1;
+    // V30·V35 이전 데이터
+    issue.startDate ??= null;
+    issue.storyPoints ??= null;
+    issue.flagged ??= false;
+    issue.triageState ??= null;
   }
+  data.views ??= [];
+  data.triageProjects ??= [];
+  data.triageEntries ??= [];
+  data.automationRules ??= [];
+  data.automationRuns ??= [];
   data.notifications ??= [];
   data.boards ??= [];
   data.links ??= [];
@@ -349,6 +389,10 @@ function normalize(data: JiraData): JiraData {
   data.archivedIssues ??= [];
   // 보관 이슈도 AQL `resolved`를 탄다 — 해결 시각 도입 전 데이터는 마지막 수정 시각으로 본다
   for (const issue of data.archivedIssues) {
+    issue.startDate ??= null;
+    issue.storyPoints ??= null;
+    issue.flagged ??= false;
+    issue.triageState ??= null;
     issue.resolvedAt ??= issue.resolution ? issue.updatedAt : null;
     // 버전 이전에 보관된 이슈 — 복원 뒤 편집이 NaN 비교로 영원히 409가 되지 않게 1부터 센다
     issue.version ??= 1;
@@ -463,6 +507,16 @@ export function __resetForTest(): void {
   resetAgentMockState();
   resetTeamMockState();
   resetMockOfficeStream();
+  resetAutomationMockState();
+}
+
+/**
+ * 자동화 실행 실패 때 되돌리기 — 규칙 하나의 액션 묶음은 원자적이다(서버의 한 트랜잭션과 같다).
+ * 캐시를 실행 직전 사본으로 바꿔 끼운다. 호출자는 이 뒤에 `load()`로 다시 읽어야 한다.
+ */
+export function replaceDataForRollback(snapshot: JiraData): void {
+  cache = snapshot;
+  persist();
 }
 
 /** 저장된 아바타(dataURL)를 붙여 돌려준다 — 없으면 null(화면은 이니셜 아바타로 떨어진다) */

@@ -123,6 +123,11 @@ export function canDeleteOwnedEntry(data: JiraData, authorId: string, issueId: s
   return projectId !== undefined && myRole(data, projectId) === "admin";
 }
 
+/** 현재 사용자의 프로젝트 역할 — 전환 조건(role)이 쓴다 */
+export function myProjectRole(data: JiraData, projectId: string): ProjectRole | null {
+  return myRole(data, projectId);
+}
+
 function myRole(data: JiraData, projectId: string): ProjectRole | null {
   return (
     data.members.find((m) => m.projectId === projectId && m.userId === CURRENT_USER_ID)?.role ??

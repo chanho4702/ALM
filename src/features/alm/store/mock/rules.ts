@@ -156,31 +156,6 @@ function statusNameOf(data: JiraData, projectId: string, statusId: string): stri
   return resolvedStatuses(data, projectId).find((s) => s.id === statusId)?.name ?? statusId;
 }
 
-/** 상태 id가 프로젝트 워크플로에 존재하는지 검증 — create/update/moveIssue의 쓰기 가드 */
-/**
- * 전이 검사 — 목록이 비면 모두 허용(호환 기본값), 정의돼 있으면 목록에 있는 이동만 허용한다.
- * 같은 상태로의 저장은 전이가 아니다.
- */
-export function assertTransitionAllowed(
-  data: JiraData,
-  projectId: string,
-  from: string,
-  to: string,
-): void {
-  if (from === to) return;
-  const transitions = resolvedBody(data, projectId).transitions ?? [];
-  if (transitions.length === 0) return;
-  const allowed = transitions.some(
-    (transition) =>
-      transition.to === to && (transition.from.length === 0 || transition.from.includes(from)),
-  );
-  if (!allowed) {
-    throw new Error(
-      `${statusNameOf(data, projectId, from)}에서 ${statusNameOf(data, projectId, to)}로 옮길 수 없습니다`,
-    );
-  }
-}
-
 /**
  * 없는 상태를 가리키는 전이는 남기지 않는다 — 상태를 지우면 그 전이도 함께 사라진다.
  * 원래 전역 전이(from 비었음)는 그대로 두고, from을 전부 잃은 전이만 버린다.
@@ -205,16 +180,23 @@ export function pruneTransitions(body: SettingsBody): WorkflowTransition[] | und
 }
 
 /**
- * 해결 규칙(지라와 동일): 완료 카테고리로 **들어가면** "완료됨"이 기본값, 벗어나면 비운다.
- * 명시한 값은 기본값보다 우선하되 완료가 아닌 이슈에는 설정할 수 없다.
- * @param explicit undefined = 지정 안 함
+ * 해결 규칙 — **서버 `ResolutionRule`이 정본**이고 이 함수는 같은 규칙의 목업 대역이다(2026-10-24 A1).
+ * 완료 의미로 **들어가면** 기본값(후처리 setResolution 값, 없으면 "done"), 완료에서 **나가면** 비운다.
+ * 완료 안에서 지정한 값은 그대로, `null`을 지정하면 기본값(완료 이슈는 해결이 비지 않는다).
+ * 완료가 아닌 상태에 값을 지정하면 거부한다.
+ *
+ * @param explicit undefined = 지정 안 함. 수정(PUT) 경로는 **현재 값과 다를 때만** 지정으로 넘긴다
+ *                 (화면이 들고 있던 값을 그대로 다시 보내므로 — 서버와 같은 판정)
+ * @param defaultValue 완료로 들어갈 때의 기본값(전환 후처리 setResolution). null/undefined면 "done"
  */
 export function applyResolutionRule(
   data: JiraData,
   issue: Issue,
   previousStatus: string,
   explicit: IssueResolution | null | undefined,
+  defaultValue?: IssueResolution | null,
 ): void {
+  const fallback = defaultValue ?? "done";
   const wasDone = statusKindOf(data, issue.projectId, previousStatus) === "complete";
   const isDone = statusKindOf(data, issue.projectId, issue.status) === "complete";
   if (!isDone) {
@@ -225,9 +207,9 @@ export function applyResolutionRule(
     return;
   }
   if (explicit !== undefined) {
-    setResolution(issue, explicit ?? "done");
+    setResolution(issue, explicit ?? fallback);
   } else if (!wasDone || issue.resolution === null) {
-    setResolution(issue, "done");
+    setResolution(issue, fallback);
   }
 }
 

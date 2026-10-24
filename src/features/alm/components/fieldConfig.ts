@@ -1,5 +1,7 @@
 import {
   AlignLeft,
+  CalendarArrowUp,
+  Gauge,
   CalendarCheck,
   CalendarDays,
   CircleCheck,
@@ -47,7 +49,7 @@ export const NEVER_REQUIRED: readonly IssueFieldId[] = Object.keys(
  */
 export const REQUIRED_NOT_ENFORCED_AT_CREATE: readonly IssueFieldId[] = ["attachments", "links"];
 
-/** 기본 구성 — 13종 전부 보이고, 필수는 없다 */
+/** 기본 구성 — 15종 전부 보이고, 필수는 없다 */
 export const DEFAULT_FIELDS: IssueFieldConfig[] = FIELD_IDS.map((id) => ({
   id,
   visible: true,
@@ -61,7 +63,7 @@ export type FieldConfigSource = Pick<SettingsBody, "fields" | "fieldsByType">;
 
 /**
  * 본문의 필드 구성을 id → 설정 맵으로 해석한다. 없는 id는 기본값(표시·비필수)으로 채우므로
- * 화면은 언제나 13종 전부를 조회할 수 있다.
+ * 화면은 언제나 15종 전부를 조회할 수 있다.
  *
  * `typeId`를 주면 그 타입의 덮어쓰기(`fieldsByType[typeId]`)를 **필드 단위로** 기본 구성 위에
  * 얹는다 — 덮어쓰기에 없는 id는 기본 구성을 그대로 따른다(서버·목업과 같은 규칙).
@@ -82,7 +84,7 @@ export function resolveFields(
   ) as Record<IssueFieldId, IssueFieldConfig>;
 }
 
-/** 본문의 필드 구성을 13종 전부·고정 순서의 배열로 — 편집기 초안의 원천 */
+/** 본문의 필드 구성을 15종 전부·고정 순서의 배열로 — 편집기 초안의 원천 */
 export const normalizeFields = (
   body?: FieldConfigSource | null,
   typeId?: string | null,
@@ -103,7 +105,7 @@ export const hasTypeOverride = (body: FieldConfigSource | null | undefined, type
 
 /**
  * 본문의 타입별 덮어쓰기를 편집기 초안 형태로 — 덮어쓰기가 있는 타입만 키로 남기고
- * 각 목록을 13종·고정 순서로 채운다. 빠진 id는 **기본 구성**을 따른다(해석과 같은 규칙).
+ * 각 목록을 15종·고정 순서로 채운다. 빠진 id는 **기본 구성**을 따른다(해석과 같은 규칙).
  * 빈 목록 키는 "기본 구성 따름"이므로 버린다(서버 정규화와 같다).
  */
 export const normalizeFieldsByType = (
@@ -143,7 +145,7 @@ export const withRequiredMark = (label: string, required: boolean) =>
   required ? `${label} *` : label;
 
 /**
- * 필드 라벨 앞에 세우는 아이콘 키 — 구성 가능한 13종에 더해, 구성 대상은 아니지만
+ * 필드 라벨 앞에 세우는 아이콘 키 — 구성 가능한 15종에 더해, 구성 대상은 아니지만
  * 같은 자리에 서는 필드(타입·상태·프로젝트·요약)까지 포함한다.
  */
 export type FieldIconId =
@@ -178,4 +180,6 @@ export const FIELD_ICONS: Record<FieldIconId, LucideIcon> = {
   project: FolderKanban,
   summary: Type,
   resolved: CalendarCheck,
+  startDate: CalendarArrowUp,
+  storyPoints: Gauge,
 };

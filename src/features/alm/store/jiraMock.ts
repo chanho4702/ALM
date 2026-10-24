@@ -328,3 +328,35 @@ export {
 } from "./shared";
 
 export { CHANGE_HISTORY_MAX_LIMIT } from "./shared";
+export {
+  listIssueTransitions,
+  transitionIssue,
+} from "./mock/workflow";
+export {
+  setIssueFlag,
+  getEstimationSummary,
+  getVelocity,
+  listMyViews,
+  listProjectViews,
+  getView,
+  createView,
+  updateView,
+  deleteView,
+  getTriageSettings,
+  saveTriageSettings,
+  listTriage,
+  sendToTriage,
+  acceptTriage,
+  declineTriage,
+  duplicateTriage,
+  snoozeTriage,
+} from "./mock/planning";
+export {
+  listAutomationRules,
+  getAutomationRule,
+  createAutomationRule,
+  updateAutomationRule,
+  deleteAutomationRule,
+  listAutomationRuleRuns,
+  listProjectAutomationRuns,
+} from "./mock/automation";

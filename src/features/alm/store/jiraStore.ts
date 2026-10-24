@@ -290,3 +290,35 @@ export const listSharedFilters = impl.listSharedFilters;
 export const queryIssuesAql = impl.queryIssuesAql;
 export const validateAql = impl.validateAql;
 export const aqlFields = impl.aqlFields;
+/** 워크플로 엔진(웨이브 A) — 지금 갈 수 있는 전환(못 하는 것도 이유와 함께)과 전환 실행(전환 화면 값·코멘트 포함) */
+export const listIssueTransitions = impl.listIssueTransitions;
+export const transitionIssue = impl.transitionIssue;
+/** 플래그(D2) — 버전을 올리지 않는다. 이유를 주면 코멘트가 남는다 */
+export const setIssueFlag = impl.setIssueFlag;
+/** 추정 합계·속도(D, V30) */
+export const getEstimationSummary = impl.getEstimationSummary;
+export const getVelocity = impl.getVelocity;
+/** 저장된 보기(D1, V31) — 필터 + 표시 옵션, 개인/프로젝트 공유 */
+export const listMyViews = impl.listMyViews;
+export const listProjectViews = impl.listProjectViews;
+export const getView = impl.getView;
+export const createView = impl.createView;
+export const updateView = impl.updateView;
+export const deleteView = impl.deleteView;
+/** 트리아지(V35) — 설정·대기열·수락/중복/거절/보류 */
+export const getTriageSettings = impl.getTriageSettings;
+export const saveTriageSettings = impl.saveTriageSettings;
+export const listTriage = impl.listTriage;
+export const sendToTriage = impl.sendToTriage;
+export const acceptTriage = impl.acceptTriage;
+export const declineTriage = impl.declineTriage;
+export const duplicateTriage = impl.duplicateTriage;
+export const snoozeTriage = impl.snoozeTriage;
+/** 자동화 규칙(V36·V37) — 프로젝트 관리자 전용 */
+export const listAutomationRules = impl.listAutomationRules;
+export const getAutomationRule = impl.getAutomationRule;
+export const createAutomationRule = impl.createAutomationRule;
+export const updateAutomationRule = impl.updateAutomationRule;
+export const deleteAutomationRule = impl.deleteAutomationRule;
+export const listAutomationRuleRuns = impl.listAutomationRuleRuns;
+export const listProjectAutomationRuns = impl.listProjectAutomationRuns;

@@ -1,7 +1,8 @@
 // localStorage 목업 스토어 — settings (jiraMock.ts에서 분할, 동작 불변)
-import { type JiraData, type SettingsBody, type StatusKind, type IssueFieldConfig, ISSUE_FIELD_IDS, ISSUE_FIELD_NAMES, type ProjectSettingsEntry, type SettingsScheme } from "../types";
+import { type JiraData, type SettingsBody, type StatusKind, type IssueFieldConfig, ISSUE_FIELD_IDS, ISSUE_FIELD_NAMES, type ProjectSettingsEntry, type SettingsScheme, type WorkflowTransition, TRANSITION_VALIDATOR_FIELDS, TRANSITION_SCREEN_FIELDS } from "../types";
 import { categoryById, STATUS_KIND_LIST, defaultSettingsBody, NEVER_REQUIRED_FIELDS, load, clone, enrichBody, enrichScheme, nextId, persist, applyBodyToRegistry, cloneBody } from "./db";
-import { typeDefOf, typeLevelOf, priorityDefOf, resolvedStatuses, pruneTransitions, pruneLayout, logChange } from "./rules";
+import { typeDefOf, typeLevelOf, typeNameOf, priorityDefOf, resolvedStatuses, pruneTransitions, pruneLayout, logChange } from "./rules";
+import { workflowForBody } from "./workflow";
 import { assertCanAdmin } from "./members";
 
 // ── settings schemes (지라 구조: 전역 정의 → 배정 → 프로젝트 커스텀) ──
@@ -48,11 +49,87 @@ function validateSettingsBody(data: JiraData, body: SettingsBody): void {
   if (!enabledPriorities.includes(body.defaultPriority ?? "medium")) {
     throw new Error("기본 우선순위는 활성화된 우선순위 중에서 골라야 합니다");
   }
+  validateWorkflows(data, body);
   validateFieldConfigs(body.fields);
   // 타입별 덮어쓰기 — 키는 레지스트리에 있는 타입이어야 하고, 각 목록은 기본 구성과 같은 규칙을 탄다
   for (const [typeId, fields] of Object.entries(body.fieldsByType ?? {})) {
     if (!typeDefOf(data, typeId)) throw new Error(`없는 이슈 타입입니다: ${typeId}`);
     validateFieldConfigs(fields);
+  }
+}
+
+const CONDITION_TYPES = ["assignee", "role", "subtasksDone"];
+const POST_FUNCTION_TYPES = ["assignToActor", "clearAssignee", "setResolution"];
+const SERVER_RESOLUTIONS = ["DONE", "WONT_DO", "DUPLICATE", "CANNOT_REPRODUCE"];
+
+/**
+ * 전환 규칙(C1~C3)과 타입별 워크플로(C5) — 서버 `SchemeService.validateWorkflows`와 같은 규칙·같은 문구.
+ * 대상·출발 상태가 워크플로에 있어야 하고, 조건·검증·화면 칸·후처리는 정해진 어휘만. 해결 칸·해결 후처리는
+ * 완료 의미로 가는 전환에만.
+ */
+function validateWorkflows(data: JiraData, body: SettingsBody): void {
+  const kindById = new Map<string, StatusKind>();
+  for (const status of body.statuses) kindById.set(status.id, categoryById(data, status.category).kind);
+  validateTransitions(body.transitions ?? [], kindById);
+  for (const [typeId, flow] of Object.entries(body.workflowsByType ?? {})) {
+    if (!typeId.trim() || !typeDefOf(data, typeId)) throw new Error(`없는 이슈 타입입니다: ${typeId}`);
+    if (!flow) throw new Error(`이슈 타입 워크플로가 비어 있습니다: ${typeNameOf(data, typeId)}`);
+    const subset = flow.statuses ?? [];
+    const scoped = new Map<string, StatusKind>();
+    for (const id of subset) {
+      const kind = kindById.get(id);
+      if (!kind) throw new Error(`${typeNameOf(data, typeId)} 워크플로에 프로젝트에 없는 상태가 있습니다: ${id}`);
+      scoped.set(id, kind);
+    }
+    if (subset.length === 0) kindById.forEach((kind, id) => scoped.set(id, kind));
+    const kinds = new Set(scoped.values());
+    if (!STATUS_KIND_LIST.every((kind) => kinds.has(kind))) {
+      throw new Error(`${typeNameOf(data, typeId)} 워크플로에도 카테고리(할 일/진행 중/완료)마다 상태가 최소 1개 필요합니다`);
+    }
+    if (flow.transitions != null) validateTransitions(flow.transitions, scoped);
+  }
+}
+
+function validateTransitions(transitions: WorkflowTransition[], kindById: Map<string, StatusKind>): void {
+  const ids = new Set<string>();
+  for (const t of transitions) {
+    if (!t || !t.to || !kindById.has(t.to)) throw new Error("전환의 대상 상태가 워크플로에 없습니다");
+    if (t.id?.trim()) {
+      if (ids.has(t.id)) throw new Error(`같은 전환 id가 두 번 있습니다: ${t.id}`);
+      ids.add(t.id);
+    }
+    for (const from of t.from ?? []) {
+      if (!kindById.has(from)) throw new Error(`전환의 출발 상태가 워크플로에 없습니다: ${from}`);
+    }
+    const toComplete = kindById.get(t.to) === "complete";
+    for (const c of t.conditions ?? []) {
+      if (!c || !CONDITION_TYPES.includes(c.type)) throw new Error(`없는 전환 조건입니다: ${c?.type ?? null}`);
+      if (c.type === "role" && c.role !== "ADMIN" && c.role !== "EDIT") throw new Error("역할 조건은 ADMIN 또는 EDIT여야 합니다");
+    }
+    const seen = new Set<string>();
+    for (const field of t.validators ?? []) {
+      if (!(TRANSITION_VALIDATOR_FIELDS as readonly string[]).includes(field)) throw new Error(`전환 검증에 쓸 수 없는 필드입니다: ${field}`);
+      if (seen.has(field)) throw new Error(`같은 필드를 두 번 넣을 수 없습니다: ${(ISSUE_FIELD_NAMES as Record<string, string>)[field] ?? field}`);
+      seen.add(field);
+    }
+    seen.clear();
+    for (const field of t.screenFields ?? []) {
+      if (!(TRANSITION_SCREEN_FIELDS as readonly string[]).includes(field)) throw new Error(`전환 화면에 넣을 수 없는 칸입니다: ${field}`);
+      if (seen.has(field)) throw new Error(`같은 칸을 두 번 넣을 수 없습니다: ${field}`);
+      seen.add(field);
+      if (field === "resolution" && !toComplete) throw new Error("해결 칸은 완료 상태로 가는 전환에만 넣을 수 있습니다");
+    }
+    for (const f of t.postFunctions ?? []) {
+      if (!f || !POST_FUNCTION_TYPES.includes(f.type)) throw new Error(`없는 후처리입니다: ${f?.type ?? null}`);
+      if (f.type === "setResolution") {
+        if (!toComplete) throw new Error("해결 설정 후처리는 완료 상태로 가는 전환에만 쓸 수 있습니다");
+        if (!SERVER_RESOLUTIONS.includes(f.value ?? "")) throw new Error(`없는 해결 값입니다: ${f.value ?? null}`);
+      }
+    }
+    const types = (t.postFunctions ?? []).map((f) => f.type);
+    if (types.includes("assignToActor") && types.includes("clearAssignee")) {
+      throw new Error("담당자를 나로 지정하면서 비울 수는 없습니다");
+    }
   }
 }
 
@@ -214,8 +291,24 @@ function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: Set
     .sort((a, b) => a.order - b.order)
     .map((s) => ({ ...s, kind: categoryById(data, s.category).kind }));
   const at = new Date().toISOString();
+  // 타입별 워크플로(C5) — 그 타입 워크플로에 없는 상태의 이슈도 같은 규칙으로 옮긴다
+  const enrichedNew = { ...newBody, statuses: sorted };
   for (const issue of data.issues) {
-    if (!targets.has(issue.projectId) || valid.has(issue.status)) continue;
+    if (!targets.has(issue.projectId)) continue;
+    if (valid.has(issue.status)) {
+      const flow = workflowForBody(data, enrichedNew, issue.type);
+      if (!flow.typeSpecific || flow.statuses.some((s) => s.id === issue.status)) continue;
+      const current = sorted.find((s) => s.id === issue.status);
+      const target =
+        flow.statuses.find((s) => s.category === current?.category) ??
+        flow.statuses.find((s) => s.kind === current?.kind) ??
+        flow.statuses[0];
+      if (!target || target.id === issue.status) continue;
+      const previous = issue.status;
+      issue.status = target.id;
+      logChange(data, issue, "status", previous, issue.status, new Date().toISOString());
+      continue;
+    }
     const old = resolvedStatuses(data, issue.projectId).find((s) => s.id === issue.status);
     const oldCategory = old?.category ?? issue.status;
     const oldKind = old?.kind ?? categoryById(data, issue.status).kind;
@@ -232,6 +325,8 @@ function migrateIssueStatuses(data: JiraData, projectIds: string[], newBody: Set
   // 보드 컬럼도 함께 정리 — 사라진 상태의 컬럼(이름/WIP 오버라이드)이 잔존하지 않게
   for (const board of data.boards) {
     if (!targets.has(board.projectId)) continue;
+    // 매핑 형식(C4) 열은 읽을 때 빠진 상태를 거른다(서버와 같다) — 상태 형식 덮어쓰기만 정리
+    if (board.columns.some((c) => Array.isArray(c.statuses))) continue;
     board.columns = board.columns.filter((c) => valid.has(c.status));
   }
 }

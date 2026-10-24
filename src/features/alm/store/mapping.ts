@@ -61,6 +61,12 @@ export interface IssueDto {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** V30 — 없으면(구 서버) null/false로 읽는다 */
+  startDate?: string | null;
+  storyPoints?: number | string | null;
+  flagged?: boolean | null;
+  /** V35 — PENDING·SNOOZED, 대기열 밖이면 null */
+  triageState?: string | null;
 }
 
 export function toBackendId(id: string): number {
@@ -141,6 +147,11 @@ const RESOLUTIONS_FROM_API: Record<IssueResolutionDto, IssueResolution> = {
   DUPLICATE: "duplicate",
   CANNOT_REPRODUCE: "cannot_reproduce",
 };
+
+/** 서버 해결 어휘 → 화면 모델. 모르는 값은 null */
+export function fromApiResolution(resolution: string | null | undefined): IssueResolution | null {
+  return resolution && resolution in RESOLUTIONS_FROM_API ? RESOLUTIONS_FROM_API[resolution as IssueResolutionDto] : null;
+}
 
 export function toApiResolution(resolution: IssueResolution | null): IssueResolutionDto | null {
   if (resolution === null) return null;
@@ -278,6 +289,11 @@ export function mapIssue(dto: IssueDto, order = 1): Issue {
     version: dto.version,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
+    startDate: dto.startDate ?? null,
+    // BigDecimal은 수 또는 문자열로 올 수 있다 — 화면은 언제나 number
+    storyPoints: dto.storyPoints === null || dto.storyPoints === undefined || dto.storyPoints === "" ? null : Number(dto.storyPoints),
+    flagged: Boolean(dto.flagged),
+    triageState: dto.triageState === "PENDING" ? "pending" : dto.triageState === "SNOOZED" ? "snoozed" : null,
   };
 }
 

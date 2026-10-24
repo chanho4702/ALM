@@ -251,6 +251,10 @@ interface BoardDto {
   swimlane: BoardSwimlane;
   isDefault: boolean;
   createdAt: string;
+  /** C4(2026-10-24) — 구 서버 응답에는 없다 */
+  columnMode?: "status" | "mapped" | null;
+  resolvedColumns?: { id: string; name: string; statuses: string[] | null; wipLimit: number | null }[] | null;
+  unmappedStatuses?: string[] | null;
 }
 
 function mapBoard(dto: BoardDto): Board {
@@ -265,13 +269,24 @@ function mapBoard(dto: BoardDto): Board {
       labels: dto.filter?.labels ?? [],
     },
     columns: (dto.columns ?? []).map((column) => ({
-      status: column.status,
+      ...(column.id ? { id: column.id } : {}),
+      status: column.status ?? column.statuses?.[0] ?? "",
       name: column.name,
+      ...(Array.isArray(column.statuses) ? { statuses: [...column.statuses] } : {}),
       wipLimit: column.wipLimit ?? null,
     })),
     swimlane: dto.swimlane,
     isDefault: dto.isDefault,
     createdAt: dto.createdAt,
+    columnMode: dto.columnMode === "mapped" ? "mapped" : "status",
+    // 구 서버(필드 없음)는 빈 목록 — 화면이 프로젝트 상태 목록으로 열을 파생한다(boardColumns.ts)
+    resolvedColumns: (dto.resolvedColumns ?? []).map((column) => ({
+      id: String(column.id),
+      name: column.name,
+      statuses: [...(column.statuses ?? [])],
+      wipLimit: column.wipLimit ?? null,
+    })),
+    unmappedStatuses: [...(dto.unmappedStatuses ?? [])],
   };
 }
 

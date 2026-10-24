@@ -52,6 +52,8 @@ export interface BulkIssuePatch {
   fixVersionId?: string | null;
   addLabels?: string[];
   removeLabels?: string[];
+  /** 플래그(D2) — 서버 `changes.flagged`. 버전을 올리지 않는다 */
+  flagged?: boolean;
 }
 
 export interface BulkIssueTarget {
@@ -105,6 +107,7 @@ function bulkChanges(patch: BulkIssuePatch): Record<string, unknown> {
     ...(patch.fixVersionId !== undefined ? { fixVersionId: optionalId(patch.fixVersionId) } : {}),
     ...(patch.addLabels !== undefined ? { addLabels: patch.addLabels } : {}),
     ...(patch.removeLabels !== undefined ? { removeLabels: patch.removeLabels } : {}),
+    ...(patch.flagged !== undefined ? { flagged: patch.flagged } : {}),
   };
 }
 

@@ -91,6 +91,9 @@ export interface IssueTypeDef {
   builtIn: boolean;
 }
 
+/** 트리아지 대기 상태 — 서버 `PENDING`·`SNOOZED`를 소문자로 */
+export type TriageState = "pending" | "snoozed";
+
 /** 해결 — "왜 끝났는가". 지라 기본 4종. 완료 카테고리에서만 값을 갖고, 다시 열면 비워진다 */
 export type IssueResolution = "done" | "wont_do" | "duplicate" | "cannot_reproduce";
 
@@ -126,6 +129,17 @@ export interface Issue {
   fixVersionId: string | null;
   /** 보관 시각 — 보관함 목록에서만 값이 있다(활성 이슈는 null/없음) */
   archivedAt?: string | null;
+  /** 시작일 "YYYY-MM-DD"(V30) — 타임라인 막대의 시작. 마감일보다 늦을 수 없다 */
+  startDate: string | null;
+  /** 스토리 포인트(V30) — 0~9999, 소수 첫째 자리. null = 추정 안 함 */
+  storyPoints: number | null;
+  /** 플래그(막힘, V30) — 보드 카드·목록 행에 장애물 표시. 버전을 올리지 않는다 */
+  flagged: boolean;
+  /**
+   * 트리아지 대기열(V35) — `pending`·`snoozed`, 대기열 밖이면 null. 보류 시각이 지났으면 pending.
+   * 대기열 이슈는 보드·백로그·추정 합계에서 빠지고 검색·AQL(`triage = true`)에는 나온다.
+   */
+  triageState: TriageState | null;
   labels: string[]; // 자유 문자열 라벨
   /** 컴포넌트 id 목록(순서 유지). 없으면 빈 배열로 본다 */
   componentIds?: string[];
@@ -166,7 +180,9 @@ export interface Activity {
     | "worklog"
     | "resolution"
     | "fixversion"
-    | "attachment";
+    | "attachment"
+    | "flag"
+    | "triage";
   detail: string; // 예: "할 일 → 진행 중"
   at: string;
 }

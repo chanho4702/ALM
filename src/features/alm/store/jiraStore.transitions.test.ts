@@ -1,3 +1,4 @@
+import { pruneWorkflowRefs } from "../components/workflowRules";
 import { beforeEach, describe, expect, it } from "vitest";
 import { __versionForTest } from "./jiraStore";
 import {
@@ -92,7 +93,7 @@ describe("워크플로 전이 규칙", () => {
     );
   });
 
-  it("상태를 지우면 그 상태를 쓰던 전이도 함께 사라진다", async () => {
+  it("빠진 상태를 가리키는 전이를 실어 저장하면 거부한다 — 서버와 같다(화면이 pruneWorkflowRefs로 정리해 보낸다)", async () => {
     await setProjectCustom("p1", true);
     const { body } = await resolveSettings("p1");
     const withReview: SettingsBody = {
@@ -106,8 +107,12 @@ describe("워크플로 전이 규칙", () => {
     };
     await updateProjectCustomSettings("p1", withReview);
 
-    // review 상태를 뺀다 — 그 상태를 쓰던 t1·t2는 남으면 안 된다
-    await updateProjectCustomSettings("p1", { ...body, transitions: withReview.transitions });
+    // review 상태를 빼면서 그 상태를 쓰던 t1·t2를 그대로 실으면 400(2026-10-24 서버 저장 검증)
+    await expect(
+      updateProjectCustomSettings("p1", { ...body, transitions: withReview.transitions }),
+    ).rejects.toThrow("전환의 대상 상태가 워크플로에 없습니다");
+    // 화면 경로: 정리한 본문을 보내면 t3만 남는다
+    await updateProjectCustomSettings("p1", pruneWorkflowRefs({ ...body, transitions: withReview.transitions }));
 
     const { body: after } = await resolveSettings("p1");
     expect(after.transitions?.map((t) => t.id)).toEqual(["t3"]);

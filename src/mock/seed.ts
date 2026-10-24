@@ -75,6 +75,10 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     estimateHours: null as number | null,
     resolution: null as Issue["resolution"],
     resolvedAt: null as string | null,
+    startDate: null as string | null,
+    storyPoints: null as number | null,
+    flagged: false,
+    triageState: null as Issue["triageState"],
     fixVersionId: null as string | null,
     version: 1,
     labels: [] as string[],
@@ -151,6 +155,9 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
       swimlane: "none",
       isDefault: true,
       createdAt: now,
+      columnMode: "status",
+      resolvedColumns: [],
+      unmappedStatuses: [],
     },
     {
       id: "b2",
@@ -166,6 +173,9 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
       swimlane: "none",
       isDefault: false,
       createdAt: now,
+      columnMode: "status",
+      resolvedColumns: [],
+      unmappedStatuses: [],
     },
   ];
 
@@ -281,6 +291,11 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     preferences: {},
     avatars: {},
     banner: { enabled: false, level: "info", message: "" },
+    views: [],
+    triageProjects: [],
+    triageEntries: [],
+    automationRules: [],
+    automationRuns: [],
     issueCounters: { p1: 8 },
   };
 
@@ -327,6 +342,10 @@ function applyRichSeed(
     estimateHours: null as number | null,
     resolution: null as Issue["resolution"],
     resolvedAt: null as string | null,
+    startDate: null as string | null,
+    storyPoints: null as number | null,
+    flagged: false,
+    triageState: null as Issue["triageState"],
     fixVersionId: null as string | null,
     version: 1,
     labels: [] as string[],
@@ -403,6 +422,9 @@ function applyRichSeed(
     swimlane: "none",
     isDefault: true,
     createdAt: now,
+    columnMode: "status",
+    resolvedColumns: [],
+    unmappedStatuses: [],
   };
 
   const newIssues = [...almExtra, ...wikiIssues];

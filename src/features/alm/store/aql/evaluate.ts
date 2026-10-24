@@ -393,6 +393,10 @@ function present(issue: Issue, field: string): boolean {
       return Boolean(issue.parentId);
     case "due":
       return Boolean(issue.dueDate);
+    case "startDate":
+      return Boolean(issue.startDate);
+    case "storyPoints":
+      return issue.storyPoints !== null && issue.storyPoints !== undefined;
     case "resolved":
       return instantOf(issue, "resolved") !== null;
     case "estimate":
@@ -419,6 +423,17 @@ function instantOf(issue: Issue, field: string): number | null {
  */
 function dueOf(issue: Issue): string | null {
   return issue.dueDate ? issue.dueDate : null;
+}
+
+/** 날짜 필드(마감일·시작일)의 값 — 둘 다 시각 없는 `YYYY-MM-DD` */
+function dateOf(issue: Issue, field: string): string | null {
+  return field === "startDate" ? (issue.startDate ?? null) : dueOf(issue);
+}
+
+/** 수 필드(예상 시간·스토리 포인트)의 값 */
+function numberFieldOf(issue: Issue, field: string): number | null {
+  const value = field === "storyPoints" ? issue.storyPoints : issue.estimateHours;
+  return value === null || value === undefined ? null : value;
 }
 
 // ── 술어 ──────────────────────────────────────────────────────
@@ -492,14 +507,20 @@ function matches(
       return values.some((v) => lower(issue.title) === lower(text(v)));
     case "archived":
       return values.some((v) => boolOf(v) === Boolean(issue.archivedAt));
-    case "due": {
-      const mine = dueOf(issue);
+    case "flagged":
+      return values.some((v) => boolOf(v) === Boolean(issue.flagged));
+    case "triage":
+      return values.some((v) => boolOf(v) === Boolean(issue.triageState));
+    case "due":
+    case "startDate": {
+      const mine = dateOf(issue, def.name);
       if (mine === null) return false;
       return values.some((v) => mine === moment(ctx, v).date);
     }
-    case "estimate": {
-      const mine = issue.estimateHours;
-      if (mine === null || mine === undefined) return false;
+    case "estimate":
+    case "storyPoints": {
+      const mine = numberFieldOf(issue, def.name);
+      if (mine === null) return false;
       return values.some((v) => mine === numberOf(v));
     }
     case "created":
@@ -612,8 +633,8 @@ function ordered(
         return mine >= at.start;
     }
   }
-  if (def.name === "due") {
-    const mine = dueOf(issue);
+  if (def.name === "due" || def.name === "startDate") {
+    const mine = dateOf(issue, def.name);
     if (mine === null) return false;
     const target = moment(ctx, value).date;
     switch (operator) {
@@ -627,9 +648,9 @@ function ordered(
         return mine >= target;
     }
   }
-  if (def.name === "estimate") {
-    const mine = issue.estimateHours;
-    if (mine === null || mine === undefined) return false;
+  if (def.name === "estimate" || def.name === "storyPoints") {
+    const mine = numberFieldOf(issue, def.name);
+    if (mine === null) return false;
     const target = numberOf(value);
     switch (operator) {
       case "<":
@@ -730,6 +751,10 @@ function sortKey(issue: Issue, field: string, ctx: AqlEvalContext): (number | st
       return [issue.assigneeId];
     case "estimate":
       return [issue.estimateHours ?? null];
+    case "startDate":
+      return [issue.startDate ?? null];
+    case "storyPoints":
+      return [issue.storyPoints ?? null];
     default: {
       const [, number] = issue.key.split("-");
       return [issue.projectId, Number(number) || 0];

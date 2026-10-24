@@ -130,6 +130,11 @@ export const AQL_FIELDS: AqlFieldDef[] = [
   f("text", ["텍스트", "내용"], "TEXT", MATCH_ONLY, false, false),
   f("summary", ["요약", "제목"], "TEXT", TEXT_OPS, true, false),
   f("archived", ["보관"], "BOOL", ["=", "!="], false, false),
+  // V30·V35(2026-10-24 웨이브 D) — 서버 `AqlFields.ALL` 뒤쪽과 같은 순서
+  f("startDate", ["시작일"], "DATE", DATE_OPS, true, true),
+  f("storyPoints", ["스토리포인트", "포인트"], "NUMBER", NUMBER_OPS, true, true),
+  f("flagged", ["플래그", "막힘"], "BOOL", ["=", "!="], false, false),
+  f("triage", ["트리아지"], "BOOL", ["=", "!="], false, false),
 ];
 
 function f(

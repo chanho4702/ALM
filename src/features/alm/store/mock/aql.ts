@@ -22,7 +22,7 @@ const AQL_RESOLUTIONS: { id: string; name: string }[] = [
 ];
 
 /** 이름→id 해석의 원천 — 서버 `AqlResolver`가 DB에서 읽는 것과 같은 레지스트리들 */
-function aqlContext(data: JiraData): AqlEvalContext {
+export function aqlContext(data: JiraData): AqlEvalContext {
   return {
     currentUserId: CURRENT_USER_ID,
     users: data.users.map((u) => ({ id: u.id, name: u.name })),

@@ -1,6 +1,8 @@
 // localStorage 목업 스토어 — issueOps (jiraMock.ts에서 분할, 동작 불변)
 import type { IssueType, IssuePriority } from "../types";
-import { createIssue, updateIssue } from "./issues";
+import { createIssue, updateIssue, ISSUE_CONFLICT_MESSAGE } from "./issues";
+import { setIssueFlag } from "./planning";
+import { ApiError } from "../mapping";
 import { load, persist } from "./db";
 import { resolvePriority } from "./rules";
 import { assertCanEdit } from "./members";
@@ -59,6 +61,8 @@ export interface BulkIssuePatch {
   fixVersionId?: string | null;
   addLabels?: string[];
   removeLabels?: string[];
+  /** 플래그(D2) — 서버 `changes.flagged`. 버전을 올리지 않는다 */
+  flagged?: boolean;
 }
 
 /** 대량 변경 대상 — 화면이 목록을 그릴 때 본 버전을 함께 보낸다(그 뒤 남이 고쳤으면 그 이슈만 실패) */
@@ -87,10 +91,11 @@ export async function bulkUpdateIssues(
   patch: BulkIssuePatch,
 ): Promise<BulkResult> {
   if (targets.length === 0) throw new Error("선택한 이슈가 없습니다");
-  const data = load();
   let updated = 0;
   const failed: BulkResult["failed"] = [];
   for (const { id, key, version } of targets) {
+    // 자동화 실패 되돌리기가 캐시를 바꿔 끼울 수 있어 이슈마다 다시 읽는다
+    const data = load();
     const issue = data.issues.find((i) => i.id === id);
     if (!issue) {
       failed.push({ id, key: key ?? id, reason: "이슈를 찾을 수 없습니다" });
@@ -117,9 +122,12 @@ export async function bulkUpdateIssues(
       ];
       if (labels.join("\u0000") !== issue.labels.join("\u0000")) next.labels = labels;
     }
-    if (Object.keys(next).length === 0) continue;
+    const flagChange = patch.flagged !== undefined && patch.flagged !== Boolean(issue.flagged);
+    if (Object.keys(next).length === 0 && !flagChange) continue;
     try {
-      await updateIssue(id, next, version);
+      if (Object.keys(next).length > 0) await updateIssue(id, next, version);
+      else if (issue.version !== version) throw new ApiError(409, ISSUE_CONFLICT_MESSAGE);
+      if (flagChange) await setIssueFlag(id, patch.flagged!);
       updated += 1;
     } catch (error) {
       failed.push({

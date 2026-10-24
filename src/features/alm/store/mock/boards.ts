@@ -1,11 +1,55 @@
 // localStorage 목업 스토어 — boards (jiraMock.ts에서 분할, 동작 불변)
-import type { Board, BoardType, Issue } from "../types";
-import { clone, load, defaultBoard, persist } from "./db";
+import type { Board, BoardColumn, BoardType, Issue, JiraData, ResolvedBoardColumn } from "../types";
+import { clone, load, defaultBoard, persist, nextId } from "./db";
+import { resolvedStatuses } from "./rules";
+
+/**
+ * 읽을 때의 열 해석 — 서버 `BoardService.response`와 같은 규칙(C4).
+ * 상태 형식: 워크플로 상태 전부(order 순) + 열 이름·WIP 덮어쓰기. 매핑 형식: 저장 열 순서, 워크플로에서 빠진 상태는 뺀다.
+ */
+export function resolveBoard(data: JiraData, board: Board): Board {
+  const statuses = [...resolvedStatuses(data, board.projectId)].sort((a, b) => a.order - b.order);
+  const known = new Set(statuses.map((s) => s.id));
+  const mapped = board.columns.some((c) => Array.isArray(c.statuses));
+  const resolved: ResolvedBoardColumn[] = [];
+  const unmapped: string[] = [];
+  let columns: BoardColumn[];
+  if (mapped) {
+    const placed = new Set<string>();
+    columns = board.columns.map((c) => {
+      const live = (c.statuses ?? []).filter((id) => known.has(id));
+      live.forEach((id) => placed.add(id));
+      resolved.push({ id: c.id ?? "", name: c.name, statuses: live, wipLimit: c.wipLimit ?? null });
+      return { id: c.id, status: live[0] ?? "", name: c.name, statuses: live, wipLimit: c.wipLimit ?? null };
+    });
+    for (const s of statuses) if (!placed.has(s.id)) unmapped.push(s.id);
+  } else {
+    columns = board.columns.map((c) => ({ status: c.status, name: c.name, wipLimit: c.wipLimit ?? null }));
+    for (const s of statuses) {
+      const override = board.columns.find((c) => c.status === s.id);
+      resolved.push({
+        id: s.id,
+        name: override?.name?.trim() ? override.name : s.name,
+        statuses: [s.id],
+        wipLimit: override?.wipLimit ?? null,
+      });
+    }
+  }
+  return {
+    ...board,
+    columns,
+    columnMode: mapped ? "mapped" : "status",
+    resolvedColumns: resolved,
+    unmappedStatuses: unmapped,
+  };
+}
 
 export async function listBoards(projectId: string): Promise<Board[]> {
+  const data = load();
   return clone(
-    load()
+    data
       .boards.filter((b) => b.projectId === projectId)
+      .map((b) => resolveBoard(data, b))
       .sort((a, b) =>
         a.isDefault === b.isDefault
           ? a.createdAt.localeCompare(b.createdAt)
@@ -17,8 +61,9 @@ export async function listBoards(projectId: string): Promise<Board[]> {
 }
 
 export async function getBoard(id: string): Promise<Board | null> {
-  const board = load().boards.find((b) => b.id === id);
-  return board ? clone(board) : null;
+  const data = load();
+  const board = data.boards.find((b) => b.id === id);
+  return board ? clone(resolveBoard(data, board)) : null;
 }
 
 export async function createBoard(input: {
@@ -35,21 +80,48 @@ export async function createBoard(input: {
   const board = { ...defaultBoard(input.projectId, name, input.type), isDefault: false };
   data.boards.push(board);
   persist();
-  return clone(board);
+  return clone(resolveBoard(data, board));
 }
 
-/** columns 패치는 status 3종 각 1개·WIP(null 또는 1 이상 정수)를 검증한다 */
-/** 컬럼은 상태별 최대 1개 오버라이드 — 실제 컬럼 구성은 프로젝트 상태 목록에서 파생된다 */
-function validateColumns(columns: Board["columns"]): void {
-  const seen = new Set<string>();
+/**
+ * 저장 전 검증·정리 — 서버 `normalizeColumns`와 같은 규칙·같은 문구.
+ * 상태 형식(구): 상태마다 하나. 매핑 형식: 열 하나라도 `statuses`가 있으면 모든 열에 있어야 하고, 상태는 한 열에만.
+ */
+function normalizeColumns(data: JiraData, projectId: string, columns: BoardColumn[]): BoardColumn[] {
   for (const column of columns) {
-    if (seen.has(column.status)) throw new Error("컬럼은 상태마다 하나여야 합니다");
-    seen.add(column.status);
-    if (!column.name.trim()) throw new Error("컬럼 이름을 입력하세요");
-    if (column.wipLimit !== null && (!Number.isInteger(column.wipLimit) || column.wipLimit < 1)) {
+    if (!column) throw new Error("컬럼이 비어 있습니다");
+    if (!column.name?.trim()) throw new Error("컬럼 이름을 입력하세요");
+    if (column.wipLimit !== null && column.wipLimit !== undefined && (!Number.isInteger(column.wipLimit) || column.wipLimit < 1)) {
       throw new Error("WIP 제한은 1 이상의 정수여야 합니다");
     }
   }
+  const mapped = columns.some((c) => Array.isArray(c.statuses));
+  if (!mapped) {
+    const seen = new Set<string>();
+    for (const column of columns) {
+      if (!column.status || seen.has(column.status)) throw new Error("컬럼은 상태마다 하나여야 합니다");
+      seen.add(column.status);
+    }
+    return columns.map((c) => ({ status: c.status, name: c.name, wipLimit: c.wipLimit ?? null }));
+  }
+  const known = new Set(resolvedStatuses(data, projectId).map((s) => s.id));
+  const seenStatus = new Set<string>();
+  const seenId = new Set<string>();
+  return columns.map((column) => {
+    if (!Array.isArray(column.statuses)) {
+      throw new Error("열 매핑을 쓰는 보드는 모든 열에 상태 목록(statuses)이 있어야 합니다");
+    }
+    const statuses = [...new Set(column.statuses)];
+    for (const status of statuses) {
+      if (!known.has(status)) throw new Error(`이 프로젝트에 없는 상태입니다: ${status}`);
+      if (seenStatus.has(status)) throw new Error(`상태 하나는 한 열에만 넣을 수 있습니다: ${status}`);
+      seenStatus.add(status);
+    }
+    const id = column.id?.trim() ? column.id.trim() : `col-${nextId().slice(0, 8)}`;
+    if (seenId.has(id)) throw new Error(`같은 열 id가 두 번 있습니다: ${id}`);
+    seenId.add(id);
+    return { id, status: statuses[0] ?? "", name: column.name.trim(), statuses, wipLimit: column.wipLimit ?? null };
+  });
 }
 
 export async function updateBoard(
@@ -65,8 +137,7 @@ export async function updateBoard(
     board.name = name;
   }
   if (patch.columns !== undefined) {
-    validateColumns(patch.columns);
-    board.columns = patch.columns;
+    board.columns = normalizeColumns(data, board.projectId, patch.columns);
   }
   if (patch.filter !== undefined) board.filter = patch.filter;
   if (patch.swimlane !== undefined) board.swimlane = patch.swimlane;
@@ -76,7 +147,7 @@ export async function updateBoard(
     }
   }
   persist();
-  return clone(board);
+  return clone(resolveBoard(data, board));
 }
 
 export async function deleteBoard(id: string): Promise<void> {
@@ -104,7 +175,8 @@ export async function listBoardIssues(boardId: string): Promise<Issue[]> {
   const data = load();
   const board = data.boards.find((b) => b.id === boardId);
   if (!board) throw new Error("보드를 찾을 수 없습니다");
-  let issues = data.issues.filter((i) => i.projectId === board.projectId);
+  // 트리아지 대기열(V35)은 보드에 나오지 않는다 — 수락돼야 워크플로에 들어온다
+  let issues = data.issues.filter((i) => i.projectId === board.projectId && !i.triageState);
   if (board.type === "scrum") {
     const active = data.sprints.find((s) => s.projectId === board.projectId && s.state === "active");
     if (!active) return [];
@@ -118,5 +190,11 @@ export async function listBoardIssues(boardId: string): Promise<Issue[]> {
   }
   if (types.length > 0) issues = issues.filter((i) => types.includes(i.type));
   if (labels.length > 0) issues = issues.filter((i) => i.labels.some((l) => labels.includes(l)));
+  // 열 매핑 보드(C4): 어느 열에도 없는 상태의 이슈는 보드에 나오지 않는다(지라와 같다)
+  const layout = resolveBoard(data, board);
+  if (layout.columnMode === "mapped") {
+    const placed = new Set(layout.resolvedColumns.flatMap((c) => c.statuses));
+    issues = issues.filter((i) => placed.has(i.status));
+  }
   return clone([...issues].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key)));
 }

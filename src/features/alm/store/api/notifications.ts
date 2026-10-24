@@ -45,7 +45,7 @@ interface NotificationDto {
   issueId: number | null;
   issueKey: string;
   actorId: number;
-  type: "ASSIGNED" | "STATUS_CHANGED" | "COMMENTED" | "MENTIONED";
+  type: "ASSIGNED" | "STATUS_CHANGED" | "COMMENTED" | "MENTIONED" | "AUTOMATION";
   detail: string | null;
   read: boolean;
   createdAt: string;
@@ -64,6 +64,9 @@ function notificationMessage(dto: NotificationDto): string {
       return `${actor} 님이 ${dto.issueKey}를 ${dto.detail ?? ""}(으)로 옮겼습니다`;
     case "MENTIONED":
       return `${actor} 님이 ${dto.issueKey}에서 나를 멘션했습니다`;
+    case "AUTOMATION":
+      // 자동화 규칙(V37)의 NOTIFY — 문장은 규칙이 정한 detail 그대로
+      return dto.detail?.trim() ? dto.detail : `${dto.issueKey}: 자동화 알림`;
     default:
       return `${actor} 님이 ${dto.issueKey}에 코멘트를 남겼습니다`;
   }
@@ -77,6 +80,7 @@ export async function listNotifications(): Promise<Notification[]> {
     issueId: dto.issueId === null ? "" : String(dto.issueId),
     issueKey: dto.issueKey,
     actorId: String(dto.actorId),
+    type: dto.type.toLowerCase() as Notification["type"],
     message: notificationMessage(dto),
     at: dto.createdAt,
     read: dto.read,

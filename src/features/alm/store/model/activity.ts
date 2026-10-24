@@ -27,8 +27,13 @@ export interface IssueWatcher {
   createdAt: string;
 }
 
+/** 알림 종류 — 서버 `type`의 소문자. 목업 옛 데이터·구 응답에는 없을 수 있다 */
+export type NotificationType = "assigned" | "status_changed" | "commented" | "mentioned" | "automation";
+
 export interface Notification {
   id: string;
+  /** 종류 — 자동화 알림(`automation`)은 화면이 규칙 아이콘으로 구분한다 */
+  type?: NotificationType;
   /** 수신자 */
   userId: string;
   issueId: string;

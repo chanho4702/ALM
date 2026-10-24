@@ -27,7 +27,7 @@ describe("전역 관리 > 필드 구성 (지라 필드 구성 스킴)", () => {
     const view = renderAt("/settings/fields");
 
     const table = await screen.findByRole("table", { name: "기본 스킴 필드 구성" });
-    expect(within(table).getAllByRole("row")).toHaveLength(14); // 머리글 + 13종
+    expect(within(table).getAllByRole("row")).toHaveLength(16); // 머리글 + 15종
     await user.click(screen.getByRole("switch", { name: "기본 스킴 마감일 표시" }));
     await user.click(screen.getByRole("button", { name: "저장" }));
     expect(await screen.findByText("필드 구성을 저장했습니다")).toBeInTheDocument();

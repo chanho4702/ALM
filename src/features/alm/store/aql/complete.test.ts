@@ -38,7 +38,7 @@ describe("AQL 자동완성 — 문맥", () => {
   });
 
   it("필드 접두어는 이름과 한국어 별칭 둘 다로 걸린다", () => {
-    expect(labels("sta")).toEqual(["status", "statusCategory"]);
+    expect(labels("sta")).toEqual(["status", "statusCategory", "startDate"]);
     expect(labels("담당")).toEqual(["assignee"]);
     expect(labels("상")).toEqual(["status", "statusCategory", "parent"]);
   });

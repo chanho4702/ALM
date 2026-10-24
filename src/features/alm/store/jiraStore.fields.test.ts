@@ -34,12 +34,12 @@ async function saveSchemeFields(fields: IssueFieldConfig[]): Promise<void> {
 }
 
 describe("필드 구성 — 기본값", () => {
-  it("스킴·프로젝트 해석 결과에 13종이 전부 표시·비필수로 실린다", async () => {
+  it("스킴·프로젝트 해석 결과에 15종이 전부 표시·비필수로 실린다", async () => {
     const [scheme] = await listSchemes();
     expect(scheme.body.fields?.map((f) => f.id)).toEqual([...ISSUE_FIELD_IDS]);
 
     const resolved = await resolveSettings(PROJECT);
-    expect(resolved.body.fields).toHaveLength(13);
+    expect(resolved.body.fields).toHaveLength(15);
     expect(resolved.body.fields?.every((f) => f.visible && !f.required)).toBe(true);
   });
 
@@ -200,7 +200,7 @@ describe("필드 구성 — 만들기 필수 검사", () => {
       body: { ...scheme.body, enabledTypes: ["task", "subtask"] },
     });
     const resolved = await resolveSettings(PROJECT);
-    expect(resolved.body.fields).toHaveLength(13);
+    expect(resolved.body.fields).toHaveLength(15);
     expect(resolved.body.fields?.find((f) => f.id === "dueDate")?.visible).toBe(false);
   });
 
@@ -231,12 +231,12 @@ async function saveSchemeFieldsByType(
 }
 
 describe("필드 구성 — 이슈 타입별 구성", () => {
-  it("덮어쓰기가 있는 타입만 키로 남고, 각 목록은 13종으로 채워진다", async () => {
+  it("덮어쓰기가 있는 타입만 키로 남고, 각 목록은 15종으로 채워진다", async () => {
     await saveSchemeFieldsByType({ bug: fieldsWith("dueDate", { visible: false }) });
 
     const resolved = await resolveSettings(PROJECT);
     expect(Object.keys(resolved.body.fieldsByType ?? {})).toEqual(["bug"]);
-    expect(resolved.body.fieldsByType?.bug).toHaveLength(13);
+    expect(resolved.body.fieldsByType?.bug).toHaveLength(15);
     expect(resolved.body.fieldsByType?.bug.find((f) => f.id === "dueDate")?.visible).toBe(false);
     // 기본 구성은 그대로다 — 덮어쓰기는 그 타입에만 산다
     expect(resolved.body.fields?.find((f) => f.id === "dueDate")?.visible).toBe(true);
@@ -324,7 +324,7 @@ describe("필드 구성 — 이슈 타입별 구성", () => {
         fieldsByType: { [custom.id]: fieldsWith("dueDate", { visible: false }) },
       },
     });
-    expect((await resolveSettings(PROJECT)).body.fieldsByType?.[custom.id]).toHaveLength(13);
+    expect((await resolveSettings(PROJECT)).body.fieldsByType?.[custom.id]).toHaveLength(15);
 
     await deleteIssueType(custom.id);
 

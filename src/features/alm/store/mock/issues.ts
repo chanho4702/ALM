@@ -7,8 +7,11 @@ import { CURRENT_USER_ID } from "../../../../mock/users";
 import { ApiError } from "../mapping";
 import { load, clone, assertRequiredFields, nextId, persist, defaultSettingsBody } from "./db";
 import { type IssuePage, findIssues } from "./search";
-import { resolvedBody, typeLevelOf, typeDefOf, typeNameOf, assertValidStatus, assertVersionAssignable, resolvedStatuses, resolvePriority, assertParentAllowed, applyResolutionRule, addWatcher, logChange, assertTransitionAllowed, recordChanges } from "./rules";
-import { assertCanEdit } from "./members";
+import { resolvedBody, typeLevelOf, typeDefOf, typeNameOf, assertVersionAssignable, resolvePriority, assertParentAllowed, applyResolutionRule, addWatcher, logChange, recordChanges } from "./rules";
+import { assertCanEdit, myProjectRole } from "./members";
+import { applyPostFunctions, assertStatusInWorkflow, assertValidators, chooseTransition, defaultResolution, defaultStatusFor, mappedStatus, workflowFor, type EvaluatedTransition } from "./workflow";
+import { emitIssueEvent, snapshotForAutomation } from "./automation";
+import { assertPlanning, enterTriage } from "./planning";
 import { validateComponentIds, resolveDefaultAssigneeFor } from "./components";
 import { preferencesOf } from "./personal";
 
@@ -26,7 +29,8 @@ export async function listIssues(
     type?: IssueType;
   },
 ): Promise<Issue[]> {
-  let issues = load().issues.filter((i) => i.projectId === projectId);
+  // 트리아지 대기열(V35)은 일반 워크플로 밖 — 보드·백로그가 읽는 목록에 넣지 않는다(대기열은 listTriage)
+  let issues = load().issues.filter((i) => i.projectId === projectId && !i.triageState);
   if (filter?.text) {
     const text = filter.text.toLowerCase();
     issues = issues.filter(
@@ -96,6 +100,12 @@ export async function createIssue(input: {
   fixVersionId?: string | null;
   /** 보존할 키(이관·CSV) — `{프로젝트키}-{번호}` 형식, 유일해야 한다. 번호는 카운터를 앞당긴다 */
   key?: string;
+  /** 시작일 "YYYY-MM-DD"(V30) — 마감일보다 늦으면 거부 */
+  startDate?: string | null;
+  /** 스토리 포인트(V30) — 0~9999, 소수 첫째 자리 */
+  storyPoints?: number | null;
+  /** 트리아지 대기열로 만든다(V35, 편집자) — 트리아지를 켠 프로젝트만 */
+  triage?: boolean;
 }): Promise<Issue> {
   const data = load();
   const project = data.projects.find((p) => p.id === input.projectId);
@@ -128,8 +138,14 @@ export async function createIssue(input: {
   if (typeLevelOf(data, resolvedType) !== "subtask" && !enabledTypes.includes(resolvedType)) {
     throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${typeNameOf(data, resolvedType)}`);
   }
-  assertCanEdit(data, project.id);
-  if (input.status !== undefined) assertValidStatus(data, project.id, input.status);
+  // 트리아지(V35): 켠 프로젝트에서 편집 권한이 없는 열람자의 생성은 대기열로(EXTERNAL), 꺼져 있으면 예전처럼 거부
+  const triageOn = data.triageProjects.includes(project.id);
+  const external = triageOn && myProjectRole(data, project.id) === "viewer" && !project.archivedAt;
+  if (!external) assertCanEdit(data, project.id);
+  if (input.triage && !triageOn) throw new Error("트리아지를 켠 프로젝트에서만 대기열로 보낼 수 있습니다");
+  const toTriage = external || Boolean(input.triage);
+  if (input.status !== undefined) assertStatusInWorkflow(data, project.id, resolvedType, input.status);
+  assertPlanning(input.startDate, input.storyPoints, input.dueDate ?? null);
   const componentIdsForCreate = validateComponentIds(data, project.id, input.componentIds);
   if (input.fixVersionId) assertVersionAssignable(data, input.fixVersionId, project.id);
   // 필드 구성의 필수 검사 — 만들기에서만 한다(수정은 기존 이슈를 갑자기 막지 않으려고 검사하지 않는다).
@@ -144,6 +160,8 @@ export async function createIssue(input: {
     dueDate: input.dueDate,
     fixVersion: input.fixVersionId,
     estimate: input.estimateHours,
+    startDate: input.startDate,
+    storyPoints: input.storyPoints,
   });
   const seq = preservedSeq ?? (data.issueCounters[project.id] ?? 0) + 1;
   // 삭제돼도 감소하지 않는다 → 키 미재사용. 보존 키는 카운터를 그 번호 이상으로 앞당긴다
@@ -159,16 +177,15 @@ export async function createIssue(input: {
     title,
     description: input.description ?? "",
     type: resolvedType,
-    // 기본 상태 = 프로젝트 워크플로의 첫 todo 카테고리 상태
-    status:
-      input.status ??
-      (resolvedStatuses(data, project.id)
-        .sort((a, b) => a.order - b.order)
-        .find((s) => s.kind === "new")?.id ?? "todo"),
+    // 기본 상태 = 그 타입 워크플로(없으면 프로젝트)의 첫 '할 일' 의미 상태. 트리아지는 항상 첫 '할 일'
+    status: toTriage
+      ? defaultStatusFor(data, project.id, resolvedType)
+      : (input.status ?? defaultStatusFor(data, project.id, resolvedType)),
     priority: resolvePriority(data, project.id, input.priority),
     assigneeId: input.assigneeId ?? resolveDefaultAssigneeFor(data, project, componentIdsForCreate),
     reporterId: CURRENT_USER_ID,
-    sprintId: input.sprintId ?? null,
+    // 대기열 이슈는 스프린트에 들어가지 않는다
+    sprintId: toTriage ? null : (input.sprintId ?? null),
     parentId: null, // 계층 검증 후 아래에서 지정
     dueDate: input.dueDate ?? null,
     estimateHours: input.estimateHours ?? null,
@@ -177,6 +194,10 @@ export async function createIssue(input: {
     fixVersionId: input.fixVersionId ?? null,
     labels: input.labels ?? [],
     componentIds: componentIdsForCreate,
+    startDate: input.startDate ?? null,
+    storyPoints: input.storyPoints ?? null,
+    flagged: false,
+    triageState: null,
     order: maxOrder + 1,
     version: 1,
     createdAt: now,
@@ -201,8 +222,10 @@ export async function createIssue(input: {
   });
   logChange(data, issue, "status", null, issue.status, now);
   if (issue.sprintId !== null) logChange(data, issue, "sprint", null, issue.sprintId, now);
+  if (toTriage) enterTriage(data, issue, external ? "EXTERNAL" : "MANUAL", now);
   persist();
-  return clone(issue);
+  await emitIssueEvent(issue.id, null);
+  return clone(load().issues.find((i) => i.id === issue.id) ?? issue);
 }
 
 export async function updateIssue(
@@ -223,6 +246,8 @@ export async function updateIssue(
       | "estimateHours"
       | "resolution"
       | "fixVersionId"
+      | "startDate"
+      | "storyPoints"
     >
   >,
   expectedVersion: number,
@@ -231,6 +256,11 @@ export async function updateIssue(
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   assertIssueVersion(issue, expectedVersion);
+  assertPlanning(
+    patch.startDate === undefined ? issue.startDate : patch.startDate,
+    patch.storyPoints === undefined ? issue.storyPoints : patch.storyPoints,
+    patch.dueDate === undefined ? issue.dueDate : patch.dueDate,
+  );
   if (patch.estimateHours !== undefined && patch.estimateHours !== null && !(patch.estimateHours > 0)) {
     throw new Error("예상 시간은 0보다 커야 합니다");
   }
@@ -238,11 +268,22 @@ export async function updateIssue(
   if (patch.fixVersionId !== undefined && patch.fixVersionId !== null) {
     assertVersionAssignable(data, patch.fixVersionId, issue.projectId);
   }
-  if (patch.status !== undefined) {
-    assertValidStatus(data, issue.projectId, patch.status);
-    assertTransitionAllowed(data, issue.projectId, issue.status, patch.status);
+  const nextType = patch.type ?? issue.type;
+  const flow = workflowFor(data, issue.projectId, nextType);
+  const inFlow = flow.statuses.some((s) => s.id === issue.status);
+  const requested = patch.status ?? issue.status;
+  let nextStatus = requested;
+  let used: EvaluatedTransition | null = null;
+  if (!inFlow && requested === issue.status) {
+    // 타입을 바꿨더니 새 타입 워크플로(C5)에 지금 상태가 없다 — 설정 변경 이관과 같은 규칙(전환 규칙 없음)
+    nextStatus = mappedStatus(data, issue.projectId, issue.status, flow.statuses);
+  } else if (patch.status !== undefined) {
+    assertStatusInWorkflow(data, issue.projectId, nextType, patch.status);
+    // 전환 규칙(조건 포함)은 지금 상태가 그 워크플로 안에 있을 때만 — 밖이면 타입 변경에 따른 이관이다
+    if (patch.status !== issue.status && inFlow) used = chooseTransition(data, issue, flow, patch.status);
   }
   const before = { ...issue, labels: [...issue.labels] };
+  const automationBefore = snapshotForAutomation(issue);
   // 타입 전환 — 프로젝트 설정(enabledTypes) 검증. 계층은 타입과 무관하므로 부모·자식은 그대로 둔다
   if (patch.type !== undefined && patch.type !== issue.type) {
     // 프로젝트 설정(enabledTypes) 검증 — subtask는 계층 기능이라 예외
@@ -257,11 +298,24 @@ export async function updateIssue(
       throw new Error(`이 프로젝트에서 사용할 수 없는 타입입니다: ${typeNameOf(data, patch.type)}`);
     }
   }
-  const { resolution: explicitResolution, ...rest } = patch;
+  const { resolution: requestedResolution, ...rest } = patch;
   if (rest.priority !== undefined) rest.priority = resolvePriority(data, issue.projectId, rest.priority);
   if (rest.componentIds !== undefined) rest.componentIds = validateComponentIds(data, issue.projectId, rest.componentIds);
-  Object.assign(issue, rest);
-  applyResolutionRule(data, issue, before.status, explicitResolution);
+  // 해결(A1, 서버 정본과 같은 판정): 화면이 들고 있던 값을 다시 보내므로 **현재 값과 다를 때만** 지정으로 본다
+  const explicitResolution =
+    requestedResolution !== undefined && requestedResolution !== before.resolution ? requestedResolution : undefined;
+  // 검증 실패 시 아무것도 남지 않게 작업 사본에 먼저 반영한다
+  const draft: Issue = {
+    ...issue,
+    ...rest,
+    labels: rest.labels ? [...rest.labels] : [...issue.labels],
+    status: nextStatus,
+  };
+  applyResolutionRule(data, draft, before.status, explicitResolution, defaultResolution(used));
+  // 전환 검증은 요청 값을 반영한 뒤, 후처리는 검증 뒤(지라와 같은 순서)
+  assertValidators(used, draft);
+  applyPostFunctions(used, draft);
+  Object.assign(issue, draft);
   if (patch.type !== undefined && issue.parentId !== null) {
     try {
       assertParentAllowed(data, issue, issue.parentId);
@@ -297,7 +351,8 @@ export async function updateIssue(
   issue.updatedAt = new Date().toISOString();
   recordChanges(data, before, issue, issue.updatedAt);
   persist();
-  return clone(issue);
+  await emitIssueEvent(issue.id, automationBefore, used?.transition ? used.id : null);
+  return clone(load().issues.find((i) => i.id === id) ?? issue);
 }
 
 /** 서버 PUT과 같은 낙관적 락 — 편집을 시작할 때 본 버전이 아니면 409로 막는다(남의 저장을 덮지 않는다) */
@@ -318,11 +373,22 @@ export async function moveIssue(
   const issue = data.issues.find((i) => i.id === id);
   if (!issue) throw new Error("이슈를 찾을 수 없습니다");
   assertCanEdit(data, issue.projectId);
-  assertValidStatus(data, issue.projectId, to.status);
-  assertTransitionAllowed(data, issue.projectId, issue.status, to.status);
+  assertStatusInWorkflow(data, issue.projectId, issue.type, to.status);
+  const flow = workflowFor(data, issue.projectId, issue.type);
+  // 같은 열 안 순서 변경은 전환이 아니다. 지금 상태가 워크플로 밖(옛 데이터)이면 규칙 없이 옮긴다(이관)
+  const used =
+    to.status === issue.status || !flow.statuses.some((s) => s.id === issue.status)
+      ? null
+      : chooseTransition(data, issue, flow, to.status);
   const before = { ...issue };
-  issue.status = to.status;
-  applyResolutionRule(data, issue, before.status, undefined);
+  const automationBefore = snapshotForAutomation(issue);
+  const draft: Issue = { ...issue, labels: [...issue.labels], status: to.status };
+  // 해결(A1): 보드 이동은 해결을 지정하지 않는다 — 완료로 들어가면 기본값, 나가면 비움
+  applyResolutionRule(data, draft, before.status, undefined, defaultResolution(used));
+  assertValidators(used, draft);
+  // 후처리가 담당자를 바꾸면 편집 폼이 보는 값이 바뀐 것이라 버전을 올린다
+  if (applyPostFunctions(used, draft)) draft.version += 1;
+  Object.assign(issue, draft);
   // 대상 컬럼: 같은 프로젝트·같은 스프린트·대상 상태 (이동 이슈 제외, order 순)
   const column = data.issues
     .filter(
@@ -344,5 +410,6 @@ export async function moveIssue(
   issue.updatedAt = new Date().toISOString();
   recordChanges(data, before, issue, issue.updatedAt);
   persist();
-  return clone(issue);
+  await emitIssueEvent(issue.id, automationBefore, used?.transition ? used.id : null);
+  return clone(load().issues.find((i) => i.id === id) ?? issue);
 }

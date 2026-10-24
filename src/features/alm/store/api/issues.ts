@@ -131,13 +131,19 @@ export async function listIssuesPage(
   return findIssues(filterCriteria(projectId, filter), paging, sort);
 }
 
-/** 전량이 필요한 화면(보드·백로그·리포트)용 — 서버 최대 페이지 크기로 끝까지 읽는다 */
+/**
+ * 전량이 필요한 화면(보드·백로그·리포트)용 — 서버 최대 페이지 크기로 끝까지 읽는다.
+ * 트리아지 대기열(V35)은 빼고 돌려준다 — 서버 `/projects/{id}/issues`(보드·백로그 목록)와 같은 의미.
+ * 검색 API(`/issues/search`)에 트리아지 조건이 없어 여기서 거른다(백엔드에 `triage` 파라미터 요청함).
+ */
 export async function listIssues(projectId: string, filter?: IssueFilter): Promise<Issue[]> {
   const all: Issue[] = [];
+  let seen = 0;
   for (let page = 0; ; page += 1) {
     const chunk = await listIssuesPage(projectId, filter, { page, size: MAX_SEARCH_PAGE_SIZE });
-    all.push(...chunk.items);
-    if (all.length >= chunk.total || chunk.items.length === 0) break;
+    seen += chunk.items.length;
+    all.push(...chunk.items.filter((issue) => !issue.triageState));
+    if (seen >= chunk.total || chunk.items.length === 0) break;
   }
   return all;
 }
@@ -175,6 +181,19 @@ export interface IssueCreateInput {
   componentIds?: string[];
   fixVersionId?: string | null;
   estimateHours?: number | null;
+  /** V30 계획 필드 — `planning`으로 보낸다(보낸 키만) */
+  startDate?: string | null;
+  storyPoints?: number | null;
+  /** V35 — 트리아지 대기열로 만든다(편집자, 트리아지를 켠 프로젝트) */
+  triage?: boolean;
+}
+
+/** 계획 필드(V30) 본문 — `details`와 달리 **보낸 키만** 바뀐다(생략 = 그대로, null = 비우기) */
+export function planningBody(input: { startDate?: string | null; storyPoints?: number | null }): Record<string, unknown> | undefined {
+  const body: Record<string, unknown> = {};
+  if (input.startDate !== undefined) body.startDate = input.startDate;
+  if (input.storyPoints !== undefined) body.storyPoints = input.storyPoints;
+  return Object.keys(body).length > 0 ? body : undefined;
 }
 
 function assertCreateFieldsSupported(_input: IssueCreateInput): void {
@@ -205,6 +224,8 @@ export async function createIssue(input: IssueCreateInput): Promise<Issue> {
           componentIds: (input.componentIds ?? []).map(toBackendId),
           fixVersionId: input.fixVersionId == null ? null : toBackendId(input.fixVersionId),
         },
+        planning: planningBody(input),
+        ...(input.triage ? { triage: true } : {}),
       }),
     },
   );
@@ -228,6 +249,8 @@ type IssuePatch = Partial<
     | "estimateHours"
     | "resolution"
     | "fixVersionId"
+    | "startDate"
+    | "storyPoints"
   >
 >;
 
@@ -279,7 +302,8 @@ export async function updateIssue(id: string, patch: IssuePatch, expectedVersion
             : patch.estimateHours,
         labels: patch.labels === undefined ? (current.labels ?? []) : patch.labels,
         componentIds: patch.componentIds === undefined ? (current.componentIds ?? []) : patch.componentIds.map(toBackendId),
-        // 기본값·해제 규칙은 목업 스토어와 같이 프론트 몫이다 — 여기서는 값만 옮긴다
+        // 해결 규칙은 **서버가 정본**이다(2026-10-24 A1, 완료 진입 시 DONE·이탈 시 비움) — 프론트는 값만 보낸다.
+        // 서버는 이 값이 현재 값과 다를 때만 "지정"으로 보므로, 건드리지 않았으면 현재 값을 그대로 실어도 된다
         resolution:
           patch.resolution === undefined ? (current.resolution ?? null) : toApiResolution(patch.resolution),
         fixVersionId:
@@ -290,6 +314,7 @@ export async function updateIssue(id: string, patch: IssuePatch, expectedVersion
               : toBackendId(patch.fixVersionId),
       },
       expectedVersion,
+      planning: planningBody(patch),
       mentionedUserIds:
         patch.description === undefined
           ? []
