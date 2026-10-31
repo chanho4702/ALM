@@ -898,7 +898,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               </span>
             </span>
           ))}
-          <span className="issue-ancestor-current">{issue.key}</span>
+          <span className="issue-ancestor-current">
+            <IssueTypeGlyph type={issue.type} types={issueTypes} variant="icon" />
+            {issue.key}
+          </span>
         </nav>
         <div className="issue-detail-toolbar">
           {remoteNote ? (
@@ -1220,7 +1223,21 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               차단됨
             </Lozenge>
           ) : null}
-          {/* 속성 패널의 시각 라벨은 아이콘 + 텍스트다 — DS 라벨은 접근 이름으로만 남긴다 */}
+          {/* 지라 이슈 뷰의 상태 버튼(A2) — 모든 상태가 아니라 지금 갈 수 있는 전환만, 못 하는 전환은 이유와 함께
+              흐리게. 전환 화면이 있는 전환은 창을 띄운다(A4). 저장은 서버 워크플로 엔진이 한다(조건·검증·후처리) */}
+          <div className="alm-field issue-status-field">
+            <FieldLabel field="status">상태</FieldLabel>
+            <StatusTransitionButton
+              issue={issue}
+              statuses={statuses}
+              openSignal={statusMenuSignal}
+              onTransitioned={(updated) => afterSaved(updated, "상태를 변경했습니다")}
+            />
+          </div>
+          {/* 세부 정보 카드 — 지라 이슈 뷰처럼 라벨 | 값 두 열. 속성 패널의 시각 라벨은 아이콘 + 텍스트이고
+              DS 라벨은 접근 이름으로만 남긴다 */}
+          <section className="issue-props-card" aria-labelledby="issue-props-card-title">
+          <h3 id="issue-props-card-title" className="issue-props-card-title">세부 정보</h3>
           <div className="alm-field">
             <FieldLabel field="type">타입</FieldLabel>
             <Select
@@ -1236,17 +1253,6 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   icon: <IssueTypeGlyph type={t.id} types={issueTypes} variant="icon" />,
                 }))}
               onValueChange={(v) => void applyPatch({ type: v }, "타입을 변경했습니다")}
-            />
-          </div>
-          {/* 지라 이슈 뷰의 상태 버튼(A2) — 모든 상태가 아니라 지금 갈 수 있는 전환만, 못 하는 전환은 이유와 함께
-              흐리게. 전환 화면이 있는 전환은 창을 띄운다(A4). 저장은 서버 워크플로 엔진이 한다(조건·검증·후처리) */}
-          <div className="alm-field">
-            <FieldLabel field="status">상태</FieldLabel>
-            <StatusTransitionButton
-              issue={issue}
-              statuses={statuses}
-              openSignal={statusMenuSignal}
-              onTransitioned={(updated) => afterSaved(updated, "상태를 변경했습니다")}
             />
           </div>
           {/* 해결은 완료 카테고리에서만 의미가 있다 — 지라도 완료 전이 화면에서만 묻는다 */}
@@ -1516,6 +1522,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
               ) : null}
             </div>
           ) : null}
+          </section>
           <dl className="issue-dates">
             <dt>생성일</dt>
             <dd>{formatDateTime(issue.createdAt)}</dd>
