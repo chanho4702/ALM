@@ -39,6 +39,7 @@ export function aqlContext(data: JiraData): AqlEvalContext {
     sprints: data.sprints.map((s) => ({ id: s.id, name: s.name, state: s.state })),
     versions: data.versions.map((v) => ({ id: v.id, name: v.name })),
     components: data.components.map((c) => ({ id: c.id, name: c.name })),
+    issuesWithCommits: new Set((data.devCommits ?? []).flatMap((c) => c.issueIds)),
   };
 }
 

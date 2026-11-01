@@ -239,6 +239,10 @@ function present(field: string, issue: Issue): boolean {
       return issue.fixVersionId !== null;
     case "estimate":
       return issue.estimateHours !== null;
+    case "startDate":
+      return (issue.startDate ?? null) !== null;
+    case "storyPoints":
+      return (issue.storyPoints ?? null) !== null;
     default:
       return true;
   }

@@ -328,4 +328,6 @@ export {
   saveProjectRepositories,
   getIssueDevelopment,
   listProjectCommits,
+  getDevSettings,
+  updateDevSettings,
 } from "./api/development";

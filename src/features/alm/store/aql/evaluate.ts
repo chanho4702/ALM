@@ -40,6 +40,8 @@ export interface AqlEvalContext {
   sprints: { id: string; name: string; state: string }[];
   versions: { id: string; name: string }[];
   components: { id: string; name: string }[];
+  /** 커밋이 하나라도 이어진 이슈 id(V41) — 없으면 아무 이슈도 커밋이 없다 */
+  issuesWithCommits?: ReadonlySet<string>;
   /** 상대 날짜·함수의 기준 시각. 테스트가 고정한다 */
   now?: Date;
 }
@@ -511,6 +513,8 @@ function matches(
       return values.some((v) => boolOf(v) === Boolean(issue.flagged));
     case "triage":
       return values.some((v) => boolOf(v) === Boolean(issue.triageState));
+    case "hasCommits":
+      return values.some((v) => boolOf(v) === Boolean(ctx.issuesWithCommits?.has(issue.id)));
     case "due":
     case "startDate": {
       const mine = dateOf(issue, def.name);

@@ -5,6 +5,7 @@
 // `__ingestMockCommits`만 커밋을 넣는다 — 그 훅이 활동 `commit_linked`·실시간 `development` 신호·자동화 `COMMIT_LINKED`를
 // 서버와 같은 순서로 낸다.
 import type {
+  DevSettings,
   DevCommit,
   DevRepository,
   DevRepositoryInput,
@@ -15,6 +16,8 @@ import type {
   ProjectCommitQuery,
 } from "../types";
 import {
+  branchPrefixError,
+  trimBranchPrefix,
   MAX_PROJECT_REPOSITORIES,
   PROJECT_COMMITS_DEFAULT_LIMIT,
   PROJECT_COMMITS_MAX_LIMIT,
@@ -328,4 +331,32 @@ export async function __ingestMockCommits(
     await emitCommitLinked(issueId);
   }
   return { linksCreated };
+}
+
+/** 프로젝트 개발 설정(V43) — 읽기 누구나. 저장한 적 없으면 접두 ""·version 0 */
+export async function getDevSettings(projectId: string): Promise<DevSettings> {
+  const data = load();
+  requireProject(data, projectId);
+  const row = data.devSettings[projectId];
+  return { projectId, branchPrefix: row?.branchPrefix ?? "", version: row?.version ?? 0 };
+}
+
+/** 관리자만 — expectedVersion이 어긋나면 409, git 참조 규칙에 걸리면 400(서버와 같은 문구) */
+export async function updateDevSettings(
+  projectId: string,
+  input: { branchPrefix: string; expectedVersion: number },
+): Promise<DevSettings> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  const current = data.devSettings[projectId]?.version ?? 0;
+  if (current !== input.expectedVersion) {
+    throw new ApiError(409, `다른 사용자가 먼저 개발 설정을 수정했습니다. 현재 ${current}, 요청 ${input.expectedVersion}`);
+  }
+  const error = branchPrefixError(input.branchPrefix ?? "");
+  if (error) throw bad(error);
+  const next = { branchPrefix: trimBranchPrefix(input.branchPrefix ?? ""), version: current + 1 };
+  data.devSettings[projectId] = next;
+  persist();
+  return { projectId, ...next };
 }

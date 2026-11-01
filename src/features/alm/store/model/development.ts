@@ -21,6 +21,40 @@ export interface DevRepositoryInput {
 /** 프로젝트당 저장소 상한(서버 `CodeRepositoryService.MAX_REPOSITORIES`) */
 export const MAX_PROJECT_REPOSITORIES = 20;
 
+/** 프로젝트 개발 설정(V43) — git 브랜치 이름 접두. 저장한 적 없으면 접두 ""·version 0 */
+export interface DevSettings {
+  projectId: string;
+  /** 브랜치 이름 `[<접두>/]<키 소문자>-<슬러그>`의 접두. 빈 문자열 = 접두 없음 */
+  branchPrefix: string;
+  version: number;
+}
+
+export const BRANCH_PREFIX_MAX = 50;
+
+/** 앞뒤 공백·끝 `/`를 지운다 — 서버 `DevSettingsService.normalizePrefix`와 같다 */
+export function trimBranchPrefix(raw: string): string {
+  return raw.trim().replace(/\/+$/, "");
+}
+
+/**
+ * 접두가 git 참조 규칙에 걸리면 서버와 같은 문구, 아니면 null. 서버 `DevSettingsService.normalizePrefix`의 검사 순서·문구 그대로 —
+ * 화면이 저장 전에 같은 말을 미리 보여 주고, 목업도 이 함수로 거절한다.
+ */
+export function branchPrefixError(raw: string): string | null {
+  const prefix = trimBranchPrefix(raw);
+  if (prefix === "") return null;
+  if (prefix.length > BRANCH_PREFIX_MAX) return `브랜치 접두는 ${BRANCH_PREFIX_MAX}자 이하여야 합니다`;
+  if (!/^[A-Za-z0-9._/-]+$/.test(prefix)) return "브랜치 접두에는 영문·숫자와 . _ - / 만 쓸 수 있습니다";
+  if (prefix.startsWith("/") || prefix.includes("//")) return "브랜치 접두는 /로 시작하거나 //를 담을 수 없습니다";
+  if (prefix.includes("..")) return "브랜치 접두에는 ..를 쓸 수 없습니다";
+  for (const part of prefix.split("/")) {
+    if (part.startsWith(".") || part.startsWith("-") || part.endsWith(".") || part.endsWith(".lock")) {
+      return "브랜치 접두의 각 부분은 . 또는 -로 시작하거나 . 또는 .lock으로 끝날 수 없습니다";
+    }
+  }
+  return null;
+}
+
 /** COMMIT = 수집한 커밋, WEB_LINK = 웹 링크(kind=COMMIT)로만 붙은 옛 연결(작성 시각·작성자가 없을 수 있다) */
 export type DevCommitSource = "COMMIT" | "WEB_LINK";
 

@@ -135,6 +135,8 @@ export const AQL_FIELDS: AqlFieldDef[] = [
   f("storyPoints", ["스토리포인트", "포인트"], "NUMBER", NUMBER_OPS, true, true),
   f("flagged", ["플래그", "막힘"], "BOOL", ["=", "!="], false, false),
   f("triage", ["트리아지"], "BOOL", ["=", "!="], false, false),
+  // V41 — 커밋이 하나라도 이어졌는가(issue_commit). 지라 development[commits] > 0
+  f("hasCommits", ["커밋있음", "커밋"], "BOOL", ["=", "!="], false, false),
 ];
 
 function f(

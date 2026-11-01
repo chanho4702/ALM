@@ -374,6 +374,8 @@ export {
   saveProjectRepositories,
   getIssueDevelopment,
   listProjectCommits,
+  getDevSettings,
+  updateDevSettings,
 } from "./mock/development";
 export { __ingestMockCommits } from "./mock/development";
 export type { MockCommitIngest } from "./mock/development";

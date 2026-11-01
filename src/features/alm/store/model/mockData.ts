@@ -79,6 +79,8 @@ export interface JiraData {
   repositories: MockRepository[];
   /** 수집한 커밋(V41) — 화면은 수집하지 않는다. 시드와 테스트 훅(`__ingestMockCommits`)만 넣는다 */
   devCommits: MockDevCommit[];
+  /** 프로젝트 개발 설정(V43, 브랜치 접두) — 옛 저장분에는 없다(normalize가 채운다) */
+  devSettings: Record<string, { branchPrefix: string; version: number }>;
 }
 
 /** 목업 저장소 한 줄 — 서버 code_repository */

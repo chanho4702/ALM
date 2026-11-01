@@ -123,6 +123,16 @@ describe("AQL 실행 — 필드·연산자", () => {
     expect(keys('프로젝트 = "위키 제품" AND 타입 = 버그')).toEqual(["WIKI-6"]);
   });
 
+  it("hasCommits — 커밋이 이어진 이슈(V41)만, 별칭·부정까지", () => {
+    const ctx = { ...CTX, issuesWithCommits: new Set(["i2", "i9"]) };
+    const run = (aql: string) => evaluateAql(parseAql(aql), ISSUES, ctx).map((i) => i.key);
+    expect(run("hasCommits = true")).toEqual(["ALM-2", "ALM-9"]);
+    expect(run("커밋있음 = true AND type = bug")).toEqual(["ALM-9"]);
+    expect(run("hasCommits = false")).toHaveLength(17);
+    // 커밋 정보가 없는 문맥이면 어느 이슈에도 커밋이 없다
+    expect(keys("hasCommits = true")).toEqual([]);
+  });
+
   it("currentUser()", () => {
     expect(keys("assignee = currentUser()")).toEqual(["ALM-1", "ALM-3", "ALM-9", "ALM-12", "WIKI-1", "WIKI-6"]);
   });

@@ -350,3 +350,6 @@ export const listProjectRepositories = impl.listProjectRepositories;
 export const saveProjectRepositories = impl.saveProjectRepositories;
 export const getIssueDevelopment = impl.getIssueDevelopment;
 export const listProjectCommits = impl.listProjectCommits;
+/** 프로젝트 개발 설정(V43) — git 브랜치 이름 접두(읽기 누구나, 쓰기 관리자·expectedVersion 409) */
+export const getDevSettings = impl.getDevSettings;
+export const updateDevSettings = impl.updateDevSettings;

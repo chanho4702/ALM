@@ -267,8 +267,12 @@ export type {
   IssueDevelopment,
   ProjectCommitQuery,
   ProjectCommitPage,
+  DevSettings,
 } from "./model/development";
 export {
+  BRANCH_PREFIX_MAX,
+  branchPrefixError,
+  trimBranchPrefix,
   MAX_PROJECT_REPOSITORIES,
   PROJECT_COMMITS_DEFAULT_LIMIT,
   PROJECT_COMMITS_MAX_LIMIT,

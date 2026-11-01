@@ -2,6 +2,7 @@
 // (`DevDtos`): 저장소 등록 `GET/PUT /projects/{id}/settings/repositories`, 이슈 개발 정보 `GET /issues/{id}/development`,
 // 프로젝트 최근 커밋 `GET /projects/{id}/commits?cursor=&limit=`. id(Long)는 여기서만 문자열로 바꾼다.
 import type {
+  DevSettings,
   DevCommit,
   DevIssueRef,
   DevPullRequest,
@@ -157,4 +158,38 @@ export async function listProjectCommits(projectId: string, query: ProjectCommit
     await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/commits${qs ? `?${qs}` : ""}`),
   );
   return { items: (page.items ?? []).map(mapCommitView), nextCursor: page.nextCursor ?? null };
+}
+
+interface DevSettingsDto {
+  projectId: number;
+  branchPrefix: string | null;
+  version: number;
+}
+
+const mapDevSettings = (dto: DevSettingsDto): DevSettings => ({
+  projectId: String(dto.projectId),
+  branchPrefix: dto.branchPrefix ?? "",
+  version: dto.version,
+});
+
+/** 프로젝트 개발 설정(V43) — 브랜치 이름 접두. 저장한 적 없으면 접두 ""·version 0 */
+export async function getDevSettings(projectId: string): Promise<DevSettings> {
+  return mapDevSettings(
+    await json<DevSettingsDto>(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/development`)),
+  );
+}
+
+/** 관리자만. expectedVersion이 어긋나면 409(서버 `{error}` 문구) */
+export async function updateDevSettings(
+  projectId: string,
+  input: { branchPrefix: string; expectedVersion: number },
+): Promise<DevSettings> {
+  return mapDevSettings(
+    await json<DevSettingsDto>(
+      await sharedApiFetch(
+        `/api/alm/projects/${toBackendId(projectId)}/settings/development`,
+        jsonBody({ branchPrefix: input.branchPrefix, expectedVersion: input.expectedVersion }),
+      ),
+    ),
+  );
 }

@@ -335,6 +335,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
       { id: "repo1", projectId: "p1", name: "chanho4702/alm-front", url: "https://github.com/chanho4702/alm-front", defaultBranch: "main" },
     ],
     devCommits: seedCommits(daysAgo),
+    devSettings: {},
     triageEntries: [],
     automationRules: [],
     automationRuns: [],

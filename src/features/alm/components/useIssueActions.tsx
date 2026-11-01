@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ConfirmDialog, useToast } from "@chanho/react";
 import type { Issue, IssueTransitionOption, User, WorkflowStatus } from "../store/types";
-import { bulkDeleteIssues, bulkUpdateIssues, cloneIssue, getCurrentUser, listIssueTransitions } from "../store/jiraStore";
+import { bulkDeleteIssues, bulkUpdateIssues, cloneIssue, getCurrentUser, getDevSettings, listIssueTransitions } from "../store/jiraStore";
 import type { BulkIssuePatch } from "../store/jiraStore";
 import { branchName } from "./branchName";
 import { useTransitionRunner } from "./transitions/useTransitionRunner";
@@ -175,13 +175,26 @@ export function useIssueActions({ setIssues, reload, onDeleted, statuses = NO_ST
     [copy],
   );
 
+  // 접두는 프로젝트 개발 설정(V43)이 정본 — 복사할 때마다 읽는다(관리자가 바꾼 값이 바로 반영되게).
+  // 못 읽으면 접두 없이 조용히 복사하지 않는다 — 설정과 다른 브랜치가 만들어진다
   const copyBranchName = useCallback(
-    (targets: Issue[]) =>
-      copy(
-        targets.map((issue) => branchName(issue)).join("\n"),
-        targets.length === 1 ? `브랜치 이름 ${branchName(targets[0])}을(를) 복사했습니다` : `브랜치 이름 ${targets.length}개를 복사했습니다`,
-      ),
-    [copy],
+    async (targets: Issue[]) => {
+      let names: string[];
+      try {
+        const projectIds = [...new Set(targets.map((issue) => issue.projectId))];
+        const settings = await Promise.all(projectIds.map((id) => getDevSettings(id)));
+        const prefixOf = new Map(settings.map((s, i) => [projectIds[i], s.branchPrefix]));
+        names = targets.map((issue) => branchName(issue, prefixOf.get(issue.projectId) ?? ""));
+      } catch (error) {
+        toast({ title: "복사하지 못했습니다", description: `브랜치 접두를 읽지 못했습니다 — ${message(error)}`, appearance: "danger" });
+        return;
+      }
+      await copy(
+        names.join("\n"),
+        targets.length === 1 ? `브랜치 이름 ${names[0]}을(를) 복사했습니다` : `브랜치 이름 ${targets.length}개를 복사했습니다`,
+      );
+    },
+    [copy, toast],
   );
 
   const runner = useTransitionRunner(statuses);

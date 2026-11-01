@@ -38,6 +38,8 @@ export const TRANSITION_VALIDATOR_FIELDS = [
   "dueDate",
   "fixVersion",
   "estimate",
+  "startDate",
+  "storyPoints",
 ] as const;
 export type TransitionValidatorField = (typeof TRANSITION_VALIDATOR_FIELDS)[number];
 

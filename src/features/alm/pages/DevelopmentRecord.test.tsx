@@ -221,6 +221,53 @@ describe("프로젝트 설정 › 저장소", () => {
   });
 });
 
+describe("프로젝트 설정 › 브랜치 이름 접두(V43)", () => {
+  it("git 참조 규칙 위반은 저장 전에 막고, 저장하면 브랜치 이름 복사에 붙는다 — 옛 version이면 409 배너", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderAt("/projects/p1/settings/repositories");
+    const form = await screen.findByRole("form", { name: "브랜치 접두 편집" });
+    const input = within(form).getByLabelText("브랜치 접두");
+    const save = within(form).getByRole("button", { name: "저장" });
+
+    await user.type(input, "my branch");
+    expect(within(form).getByText("브랜치 접두에는 영문·숫자와 . _ - / 만 쓸 수 있습니다")).toBeInTheDocument();
+    expect(save).toBeDisabled();
+
+    await user.clear(input);
+    await user.type(input, "feature/");
+    expect(within(form).getByLabelText("브랜치 이름 예")).toHaveTextContent("feature/alm-12-fix-login-redirect");
+    await user.click(save);
+    expect(await screen.findByText("브랜치 접두를 저장했습니다")).toBeInTheDocument();
+    await waitFor(() => expect(input).toHaveValue("feature"));
+    expect((await store.getDevSettings("p1")).branchPrefix).toBe("feature");
+
+    // 다른 관리자가 먼저 바꿨다 — 화면이 든 version은 1, 저장소는 2
+    await store.updateDevSettings("p1", { branchPrefix: "fix", expectedVersion: 1 });
+    await user.clear(input);
+    await user.type(input, "hotfix");
+    await user.click(save);
+    expect(await within(form).findByText(/다른 사용자가 먼저 개발 설정을 수정했습니다/)).toBeInTheDocument();
+    unmount();
+
+    // 상세의 브랜치 버튼 — 저장된 접두(fix)가 붙는다
+    renderAt("/projects/p1/issues?issue=ALM-5");
+    const dialog = await screen.findByRole("dialog");
+    await user.click(await within(dialog).findByRole("button", { name: "브랜치 이름 복사" }));
+    await waitFor(async () => expect(await navigator.clipboard.readText()).toMatch(/^fix\/alm-5/));
+  });
+
+  it("접두를 못 읽으면 접두 없이 복사하지 않고 오류를 알린다", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(store, "getDevSettings").mockRejectedValue(new ApiError(503, "unavailable"));
+    renderAt("/projects/p1/issues?issue=ALM-5");
+    const dialog = await screen.findByRole("dialog");
+    await navigator.clipboard.writeText("이전 값");
+    await user.click(await within(dialog).findByRole("button", { name: "브랜치 이름 복사" }));
+    expect(await screen.findByText("복사하지 못했습니다")).toBeInTheDocument();
+    expect(await navigator.clipboard.readText()).toBe("이전 값");
+  });
+});
+
 describe("자동화 트리거 COMMIT_LINKED", () => {
   it("편집기 트리거에 '커밋이 연결되면' — 고르면 그 트리거로 저장된다", async () => {
     const user = userEvent.setup();
