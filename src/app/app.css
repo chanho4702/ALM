@@ -1797,6 +1797,28 @@ body {
 }
 
 /* 컬럼 수는 워크플로 상태 수를 따른다 — 최소 폭 보장, 모자라면 가로 스크롤 */
+/* 다중 선택 드래그 — 잡은 카드 위에 함께 옮기는 개수 */
+.board-drag-overlay {
+  position: relative;
+}
+
+.board-drag-count {
+  position: absolute;
+  top: calc(-1 * var(--chanho-space-100, 8px));
+  right: calc(-1 * var(--chanho-space-100, 8px));
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--chanho-color-background-brand);
+  color: var(--chanho-color-text-inverse);
+}
+
 .board-columns {
   display: grid;
   grid-auto-flow: column;

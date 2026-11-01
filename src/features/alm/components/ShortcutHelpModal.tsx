@@ -67,6 +67,8 @@ export const SHORTCUT_GROUPS: { title: string; rows: ShortcutRow[] }[] = [
       { id: "select", keys: "x", label: "이슈 선택·해제(다중 선택)" },
       { id: "select-toggle", keys: "Ctrl+클릭", label: "하나씩 더하거나 빼기(맥은 ⌘+클릭)" },
       { id: "select-range", keys: "Shift+클릭", label: "범위 선택" },
+      { id: "board-move", keys: "]", label: "보드에서 이슈를 다음 열로(`[`는 이전 열) — 선택이 있으면 선택 전부" },
+      { id: "board-drag-many", keys: "선택 후 드래그", label: "보드에서 선택한 카드를 한 번에 옮기기" },
       { id: "context", keys: "Shift+F10", label: "이슈 메뉴 열기(우클릭과 같다)" },
       { id: "clear", keys: "Esc", label: "미리보기 닫기, 그다음 선택 해제" },
     ],

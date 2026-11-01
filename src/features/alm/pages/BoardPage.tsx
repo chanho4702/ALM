@@ -38,9 +38,11 @@ import type { QuickFilter } from "../components/BoardFilterBar";
 import { IssueCard } from "../components/IssueCard";
 import { useIssueModal } from "../components/useIssueModal";
 import { UserAvatar } from "../components/UserAvatar";
-import { resolveMove } from "./boardDnd";
+import { adjacentColumnId, groupDropBefore, resolveMove } from "./boardDnd";
 import { applyOptimisticMove, boardColumnsOf, columnAvailability, columnIssueIds } from "./boardColumns";
 import type { ColumnAvailability } from "./boardColumns";
+
+type BoardColumnDef = ReturnType<typeof boardColumnsOf>[number];
 import { useTransitionRunner } from "../components/transitions/useTransitionRunner";
 import { BulkEditModal } from "../components/BulkEditModal";
 import { SelectionBar } from "../components/SelectionBar";
@@ -50,6 +52,7 @@ import { useIssueInteractions } from "../components/useIssueInteractions";
 import { BoardSkeleton } from "../components/Skeletons";
 import { useSprintCompletion } from "../components/useSprintCompletion";
 import { useRealtimeIssueSync } from "../components/realtime/ProjectRealtime";
+import { useKeyboardShortcuts } from "../components/useKeyboardShortcuts";
 
 const BOARD_TYPE_LABELS: Record<Board["type"], string> = { scrum: "스크럼", kanban: "칸반" };
 
@@ -74,6 +77,8 @@ export function BoardPage() {
   /** epicId → 이름 (카드 에픽 태그) */
   const [epicsById, setEpicsById] = useState<Record<string, string>>({});
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  /** 다중 선택 드래그 — 선택에 든 카드를 잡으면 선택 전부(보이는 순서)가 함께 간다. 하나만 끌면 null */
+  const [dragGroup, setDragGroup] = useState<string[] | null>(null);
   /**
    * 드래그 중인 이슈의 가용 전환(A3) — 들어 올리는 순간 서버에 묻는다. 응답 전에는 열을 흐리지 않고(모름),
    * 응답이 오면 갈 수 없는 열을 흐리고 놓을 수 없게 한다. 놓을 때 아직 모르면 그때 기다린다.
@@ -272,6 +277,12 @@ export function BoardPage() {
     setActiveIssue(issue);
     setDragOptions(null);
     dragOptionsRequest.current = null;
+    // 선택에 든 카드를 잡았고 선택이 둘 이상이면 선택 전부를 함께 옮긴다(열 흐림은 카드마다 달라 하지 않는다)
+    if (issue && interactions.selected.has(issue.id) && interactions.selected.size > 1) {
+      setDragGroup(orderedIssues.filter((i) => interactions.selected.has(i.id)).map((i) => i.id));
+      return;
+    }
+    setDragGroup(null);
     if (issue) void optionsFor(issue.id).catch(() => undefined);
   };
 
@@ -283,21 +294,11 @@ export function BoardPage() {
     });
 
   /**
-   * 놓기(A3) — **낙관적**: 서버 응답 전에 카드를 새 열에 먼저 그린다. 거부(400 조건·검증)·409면 원래 자리로 돌리고
+   * 이슈 하나를 열로(A3) — **낙관적**: 서버 응답 전에 카드를 새 열에 먼저 그린다. 거부(400 조건·검증)·409면 원래 자리로 돌리고
    * 이유 토스트. 전환 화면이 있는 전환이면 창을 띄우고, 취소하면 제자리로 돌린다(A4). 끝나면 조용히 다시 읽어 맞춘다.
+   * 드래그 놓기와 키보드 이동(`[`·`]`)이 같은 길을 쓴다.
    */
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const dragged = activeIssue;
-    setActiveIssue(null);
-    const { active, over } = event;
-    if (!over || !dragged) return;
-    // 스윔레인 컬럼 id("밴드키:열")는 열 id로 정규화 — 밴드는 시각적 그룹일 뿐이다
-    const rawOver = String(over.id);
-    const overId = rawOver.includes(":") ? rawOver.split(":").pop()! : rawOver;
-    const target = resolveMove(String(active.id), overId, columnIds);
-    if (!target) return;
-    const column = columns.find((c) => c.id === target.status);
-    if (!column) return;
+  const moveOne = async (dragged: Issue, column: BoardColumnDef, beforeId: string | undefined) => {
     let decision: ColumnAvailability;
     try {
       decision = columnAvailability(column, dragged, await optionsFor(dragged.id));
@@ -313,7 +314,7 @@ export function BoardPage() {
     const option = decision.option;
     const toStatus = option ? option.to : dragged.status;
     const previous = issues;
-    setIssues(applyOptimisticMove(issues, dragged.id, toStatus, target.beforeId, column.statuses));
+    setIssues(applyOptimisticMove(issues, dragged.id, toStatus, beforeId, column.statuses));
     try {
       if (option?.hasScreen) {
         const outcome = await runTransition(dragged, option);
@@ -323,9 +324,9 @@ export function BoardPage() {
         }
         if (outcome.kind === "failed") throw outcome.error;
         // 전환 실행은 순서를 모른다 — 놓은 자리로 순서만 맞춘다(같은 상태 안 이동은 전환이 아니다)
-        if (target.beforeId) await moveIssue(dragged.id, { status: toStatus, beforeId: target.beforeId });
+        if (beforeId) await moveIssue(dragged.id, { status: toStatus, beforeId });
       } else {
-        await moveIssue(dragged.id, { status: toStatus, beforeId: target.beforeId });
+        await moveIssue(dragged.id, { status: toStatus, beforeId });
       }
     } catch (error) {
       setIssues(previous);
@@ -337,6 +338,102 @@ export function BoardPage() {
     }
     void reload(); // 서버 기준으로 조용히 맞춘다(화면은 이미 옮겨져 있다)
   };
+
+  /**
+   * 여러 이슈를 한 열로 — 보이는 순서대로 하나씩(전환 화면이 있으면 창을 하나씩 띄운다). 각자 가용 전환을 따로 판정하고,
+   * 못 옮긴 이슈는 건너뛰어 키와 이유를 한 토스트로 알린다. 끝나면 서버 기준으로 다시 읽는다(실패분은 제자리로 돌아온다).
+   */
+  const moveMany = async (group: Issue[], column: BoardColumnDef, beforeId: string | undefined) => {
+    let moved = 0;
+    const failed: string[] = [];
+    for (const issue of group) {
+      try {
+        const decision = columnAvailability(column, issue, (await listIssueTransitions(issue.id)).transitions);
+        if (!decision.allowed) {
+          failed.push(`${issue.key} — ${decision.reason}`);
+          continue;
+        }
+        const option = decision.option;
+        const toStatus = option ? option.to : issue.status;
+        setIssues((list) => applyOptimisticMove(list, issue.id, toStatus, beforeId, column.statuses));
+        if (option?.hasScreen) {
+          const outcome = await runTransition(issue, option);
+          if (outcome.kind === "cancelled") continue;
+          if (outcome.kind === "failed") throw outcome.error;
+          if (beforeId) await moveIssue(issue.id, { status: toStatus, beforeId });
+        } else {
+          await moveIssue(issue.id, { status: toStatus, beforeId });
+        }
+        moved += 1;
+      } catch (error) {
+        failed.push(`${issue.key} — ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    if (moved > 0) toast({ title: `이슈 ${moved}개를 ${column.name}(으)로 옮겼습니다`, appearance: "success" });
+    if (failed.length > 0) {
+      toast({ title: `${failed.length}개는 옮기지 못했습니다`, description: failed.join("\n"), appearance: "danger" });
+    }
+    await reload();
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const dragged = activeIssue;
+    const group = dragGroup;
+    setActiveIssue(null);
+    setDragGroup(null);
+    const { active, over } = event;
+    if (!over || !dragged) return;
+    // 스윔레인 컬럼 id("밴드키:열")는 열 id로 정규화 — 밴드는 시각적 그룹일 뿐이다
+    const rawOver = String(over.id);
+    const overId = rawOver.includes(":") ? rawOver.split(":").pop()! : rawOver;
+    if (group) {
+      const target = groupDropBefore(String(active.id), overId, columnIds, group);
+      const column = target ? columns.find((c) => c.id === target.status) : undefined;
+      if (!target || !column) return;
+      const members = group
+        .map((id) => visibleIssues.find((i) => i.id === id))
+        .filter((i): i is Issue => i !== undefined);
+      await moveMany(members, column, target.beforeId);
+      return;
+    }
+    const target = resolveMove(String(active.id), overId, columnIds);
+    if (!target) return;
+    const column = columns.find((c) => c.id === target.status);
+    if (!column) return;
+    await moveOne(dragged, column, target.beforeId);
+  };
+
+  /**
+   * 키보드 이동 — `[` 이전 열, `]` 다음 열(그 열 맨 끝으로). 대상은 다른 속성 단축키와 같다(선택 전부, 없으면
+   * 미리보기·포커스·마우스가 가리킨 이슈). Space(미리보기)·화살표·j/k(미리보기 이웃 이동)와 겹치지 않는 키다.
+   * 여러 개면 각자 자기 열에서 한 칸씩, 같은 목적지끼리 묶어 옮긴다.
+   */
+  const moveByKeyboard = (delta: -1 | 1) => {
+    if (!board || (board.type === "scrum" && !sprint)) return;
+    const targets = interactions.targets();
+    if (targets.length === 0) return;
+    const plans: { issue: Issue; column: BoardColumnDef }[] = [];
+    for (const issue of targets) {
+      const columnId = adjacentColumnId(columns, issue.status, delta);
+      const column = columnId ? columns.find((c) => c.id === columnId) : undefined;
+      if (column) plans.push({ issue, column });
+    }
+    if (plans.length === 0) {
+      toast({ title: delta > 0 ? "마지막 열입니다" : "첫 열입니다", appearance: "info" });
+      return;
+    }
+    if (targets.length === 1) {
+      void moveOne(plans[0].issue, plans[0].column, undefined);
+      return;
+    }
+    void (async () => {
+      for (const column of columns) {
+        const group = plans.filter((plan) => plan.column.id === column.id).map((plan) => plan.issue);
+        if (group.length > 0) await moveMany(group, column, undefined);
+      }
+    })();
+  };
+  useKeyboardShortcuts({ "[": () => moveByKeyboard(-1), "]": () => moveByKeyboard(1) });
 
   if (board === undefined) {
     return (
@@ -371,6 +468,7 @@ export function BoardPage() {
           onDragEnd={handleDragEnd}
           onDragCancel={() => {
             setActiveIssue(null);
+            setDragGroup(null);
             setDragOptions(null);
             dragOptionsRequest.current = null;
           }}
@@ -444,12 +542,19 @@ export function BoardPage() {
           )}
           <DragOverlay>
             {activeIssue ? (
-              <IssueCard
-                issue={activeIssue}
-                assignee={
-                  activeIssue.assigneeId ? usersById[activeIssue.assigneeId] : undefined
-                }
-              />
+              <div className="board-drag-overlay">
+                <IssueCard
+                  issue={activeIssue}
+                  assignee={
+                    activeIssue.assigneeId ? usersById[activeIssue.assigneeId] : undefined
+                  }
+                />
+                {dragGroup ? (
+                  <span className="board-drag-count" aria-label={`이슈 ${dragGroup.length}개를 옮기는 중`}>
+                    {dragGroup.length}
+                  </span>
+                ) : null}
+              </div>
             ) : null}
           </DragOverlay>
         </DndContext>

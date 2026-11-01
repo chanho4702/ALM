@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveMove } from "./boardDnd";
+import { adjacentColumnId, groupDropBefore, resolveMove } from "./boardDnd";
 
 // status → order순 이슈 id 배열
 const columns = {
@@ -43,5 +43,39 @@ describe("resolveMove — 드래그 결과를 moveIssue 파라미터로 변환",
 
   it("모르는 overId면 null", () => {
     expect(resolveMove("a", "unknown", columns)).toBeNull();
+  });
+});
+
+describe("groupDropBefore — 다중 선택 드래그의 놓을 자리", () => {
+  it("다른 열 카드 위: 그 카드 앞에", () => {
+    expect(groupDropBefore("a", "d", columns, ["a", "b"])).toEqual({ status: "inprogress", beforeId: "d" });
+  });
+
+  it("열 영역: 그 열 맨 끝", () => {
+    expect(groupDropBefore("a", "done", columns, ["a", "c"])).toEqual({ status: "done", beforeId: undefined });
+  });
+
+  it("앞 카드가 묶음이면 그 뒤 첫 비묶음 카드 앞(없으면 끝)", () => {
+    expect(groupDropBefore("d", "a", columns, ["d", "a"])).toEqual({ status: "todo", beforeId: "b" });
+    expect(groupDropBefore("d", "c", columns, ["d", "c"])).toEqual({ status: "todo", beforeId: undefined });
+  });
+
+  it("묶음이 이미 그 열 끝에 그 순서로 있으면 null", () => {
+    expect(groupDropBefore("b", "todo", columns, ["b", "c"])).toBeNull();
+  });
+});
+
+describe("adjacentColumnId — 키보드 이동 목적지", () => {
+  const board = [
+    { id: "todo", statuses: ["todo"] },
+    { id: "doing", statuses: ["inprogress", "review"] },
+    { id: "done", statuses: ["done"] },
+  ];
+  it("이웃 열, 끝이면 null, 보드에 없는 상태면 null", () => {
+    expect(adjacentColumnId(board, "review", 1)).toBe("done");
+    expect(adjacentColumnId(board, "review", -1)).toBe("todo");
+    expect(adjacentColumnId(board, "done", 1)).toBeNull();
+    expect(adjacentColumnId(board, "todo", -1)).toBeNull();
+    expect(adjacentColumnId(board, "ghost", 1)).toBeNull();
   });
 });
