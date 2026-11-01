@@ -6179,9 +6179,44 @@ th:last-child > [role="separator"] {
   width: min(1120px, calc(100vw - 32px));
 }
 
+/* 스크롤은 모달 안에서 — 모달 높이를 화면에 고정하고 헤더 줄은 세운 채, 본문 열과 속성 패널이
+   각자 스크롤한다(지라 이슈 뷰). DS 모달 콘텐츠 자체의 스크롤(overflow-y:auto)은 끈다 */
+@media (min-width: 641px) {
+  .issue-detail-modal.issue-detail-modal {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 64px);
+    overflow: hidden;
+  }
+
+  .issue-detail-modal > * {
+    flex: none;
+  }
+
+  .issue-detail-modal > .issue-detail-body {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .issue-detail-body > .issue-detail-main,
+  .issue-detail-body > .issue-props {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    /* 포커스 링·카드 테두리가 스크롤 상자 가장자리에서 잘리지 않게 */
+    padding: 2px var(--chanho-space-100) var(--chanho-space-300) 2px;
+  }
+  /* 스크롤 상자 안의 덩어리는 줄어들지 않는다 — 넘치면 찌그러지지 말고 스크롤 */
+  .issue-detail-main > *,
+  .issue-props > * {
+    flex-shrink: 0;
+  }
+}
+
 .issue-detail-body {
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: var(--chanho-space-400);
+  gap: var(--chanho-space-300);
 }
 
 /* 헤더 — 현재 이슈 키 앞에 타입 아이콘, 키는 고정폭 글꼴로 */

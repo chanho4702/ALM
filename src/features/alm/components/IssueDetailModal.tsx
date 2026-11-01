@@ -1215,6 +1215,181 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
             refreshKey={devRefresh}
             onCopyBranch={() => void commandActions.copyBranchName([issue])}
           />
+          {/* 기록 탭은 본문 열 안에 — 지라처럼 본문 열과 속성 패널이 모달 안에서 각자 스크롤한다 */}
+        <Tabs
+          label="이슈 기록"
+          className="issue-tabs"
+          value={historyTab}
+          onValueChange={setHistoryTab}
+          items={[
+            {
+              value: "comments",
+              label: `코멘트 (${comments.length})`,
+              content: (
+                <div className="issue-comments" data-testid="issue-comments">
+                  {comments.map((comment) => {
+                    const mine = me !== null && comment.authorId === me.id;
+                    const editing = editingCommentId === comment.id;
+                    return (
+                      <CommentBlock
+                        key={comment.id}
+                        author={userName(comment.authorId)}
+                        avatar={
+                          <UserAvatar
+                            user={userOf(comment.authorId)}
+                            name={userName(comment.authorId)}
+                            size="small"
+                          />
+                        }
+                        time={
+                          comment.updatedAt
+                            ? `${formatDateTime(comment.createdAt)} (수정됨)`
+                            : formatDateTime(comment.createdAt)
+                        }
+                        // 수정은 본인만, 삭제는 본인 또는 프로젝트 관리자. 수정 중엔 편집 폼의 저장/취소가 대신한다
+                        actions={
+                          editing || !(mine || isProjectAdmin)
+                            ? undefined
+                            : [
+                                ...(mine ? [{ label: "수정", onClick: () => startCommentEdit(comment) }] : []),
+                                {
+                                  label: "삭제",
+                                  danger: true,
+                                  onClick: () => void handleCommentDelete(comment.id),
+                                },
+                              ]
+                        }
+                      >
+                        {editing ? (
+                          <div className="issue-comment-edit">
+                            <RichTextEditor
+                              label="코멘트 수정"
+                              value={commentEditDraft}
+                              onChange={setCommentEditDraft}
+                              users={users}
+                              minHeight={72}
+                              autoFocus
+                            />
+                            <div className="issue-comment-edit-actions">
+                              <Button
+                                size="small"
+                                variant="ghost"
+                                onClick={() => setEditingCommentId(null)}
+                              >
+                                취소
+                              </Button>
+                              <Button size="small" onClick={() => void handleCommentEditSave()}>
+                                저장
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <RichTextView html={comment.body} />
+                        )}
+                      </CommentBlock>
+                    );
+                  })}
+                  {comments.length === 0 ? (
+                    <p className="issue-comment-empty">아직 코멘트가 없습니다</p>
+                  ) : null}
+                  <form className="issue-comment-form" onSubmit={handleCommentSubmit}>
+                    <RichTextEditor
+                      label="코멘트"
+                      value={commentDraft}
+                      onChange={setCommentDraft}
+                      users={users}
+                      placeholder="코멘트를 입력하세요 — @로 멘션"
+                      minHeight={72}
+                    />
+                    <Button type="submit" size="small">
+                      코멘트 남기기
+                    </Button>
+                  </form>
+                </div>
+              ),
+            },
+            {
+              value: "worklog",
+              label: `워크로그 (${worklogs.length})`,
+              content: (
+                <div className="issue-worklogs" data-testid="issue-worklogs">
+                  <form className="issue-worklog-form" onSubmit={handleWorklogSubmit}>
+                    <TextField
+                      label="시간 (h)"
+                      type="number"
+                      min={0.5}
+                      step={0.5}
+                      value={worklogHours}
+                      onChange={(e) => setWorklogHours(e.target.value)}
+                    />
+                    <TextField
+                      label="작업일"
+                      type="date"
+                      value={worklogDate}
+                      onChange={(e) => setWorklogDate(e.target.value)}
+                    />
+                    <TextField
+                      label="메모"
+                      placeholder="무슨 작업이었나요? (선택)"
+                      value={worklogComment}
+                      onChange={(e) => setWorklogComment(e.target.value)}
+                    />
+                    <Button type="submit" size="small" disabled={!(Number(worklogHours) > 0)}>
+                      기록
+                    </Button>
+                  </form>
+                  {worklogs.length === 0 ? (
+                    <p className="issue-comment-empty">아직 기록된 작업 시간이 없습니다</p>
+                  ) : (
+                    <ul className="issue-worklog-list">
+                      {worklogs.map((worklog) => (
+                        <li key={worklog.id} className="issue-worklog-row">
+                          <UserAvatar
+                            user={userOf(worklog.authorId)}
+                            name={userName(worklog.authorId)}
+                            size="small"
+                          />
+                          <span className="issue-worklog-author">{userName(worklog.authorId)}</span>
+                          <span className="issue-worklog-date">{worklog.workedOn}</span>
+                          <strong className="issue-worklog-hours">{worklog.hours}h</strong>
+                          <span className="issue-worklog-comment">{worklog.comment}</span>
+                          {(me !== null && worklog.authorId === me.id) || isProjectAdmin ? (
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              aria-label="워크로그 삭제"
+                              onClick={() => void handleWorklogDelete(worklog.id)}
+                            >
+                              ×
+                            </Button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ),
+            },
+            {
+              value: "activity",
+              label: "활동",
+              content: (
+                <ul className="issue-activity" data-testid="issue-activity">
+                  {activities.map((activity) => (
+                    <li key={activity.id} data-activity-type={activity.type}>
+                      {activity.type === "commit_linked" ? (
+                        <GitCommitHorizontal size={14} aria-label="커밋 연결" className="issue-activity-icon" />
+                      ) : null}
+                      <strong>{userName(activity.actorId)}</strong> —{" "}
+                      <span className="issue-activity-detail">{activity.detail}</span>
+                      <span className="issue-activity-time">{formatDateTime(activity.at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ),
+            },
+          ]}
+        />
         </div>
         <aside className="issue-props">
           {issue.flagged ? <IssueFlagMark /> : null}
@@ -1618,180 +1793,6 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           </div>
         </Modal>
       ) : null}
-      <Tabs
-        label="이슈 기록"
-        className="issue-tabs"
-        value={historyTab}
-        onValueChange={setHistoryTab}
-        items={[
-          {
-            value: "comments",
-            label: `코멘트 (${comments.length})`,
-            content: (
-              <div className="issue-comments" data-testid="issue-comments">
-                {comments.map((comment) => {
-                  const mine = me !== null && comment.authorId === me.id;
-                  const editing = editingCommentId === comment.id;
-                  return (
-                    <CommentBlock
-                      key={comment.id}
-                      author={userName(comment.authorId)}
-                      avatar={
-                        <UserAvatar
-                          user={userOf(comment.authorId)}
-                          name={userName(comment.authorId)}
-                          size="small"
-                        />
-                      }
-                      time={
-                        comment.updatedAt
-                          ? `${formatDateTime(comment.createdAt)} (수정됨)`
-                          : formatDateTime(comment.createdAt)
-                      }
-                      // 수정은 본인만, 삭제는 본인 또는 프로젝트 관리자. 수정 중엔 편집 폼의 저장/취소가 대신한다
-                      actions={
-                        editing || !(mine || isProjectAdmin)
-                          ? undefined
-                          : [
-                              ...(mine ? [{ label: "수정", onClick: () => startCommentEdit(comment) }] : []),
-                              {
-                                label: "삭제",
-                                danger: true,
-                                onClick: () => void handleCommentDelete(comment.id),
-                              },
-                            ]
-                      }
-                    >
-                      {editing ? (
-                        <div className="issue-comment-edit">
-                          <RichTextEditor
-                            label="코멘트 수정"
-                            value={commentEditDraft}
-                            onChange={setCommentEditDraft}
-                            users={users}
-                            minHeight={72}
-                            autoFocus
-                          />
-                          <div className="issue-comment-edit-actions">
-                            <Button
-                              size="small"
-                              variant="ghost"
-                              onClick={() => setEditingCommentId(null)}
-                            >
-                              취소
-                            </Button>
-                            <Button size="small" onClick={() => void handleCommentEditSave()}>
-                              저장
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <RichTextView html={comment.body} />
-                      )}
-                    </CommentBlock>
-                  );
-                })}
-                {comments.length === 0 ? (
-                  <p className="issue-comment-empty">아직 코멘트가 없습니다</p>
-                ) : null}
-                <form className="issue-comment-form" onSubmit={handleCommentSubmit}>
-                  <RichTextEditor
-                    label="코멘트"
-                    value={commentDraft}
-                    onChange={setCommentDraft}
-                    users={users}
-                    placeholder="코멘트를 입력하세요 — @로 멘션"
-                    minHeight={72}
-                  />
-                  <Button type="submit" size="small">
-                    코멘트 남기기
-                  </Button>
-                </form>
-              </div>
-            ),
-          },
-          {
-            value: "worklog",
-            label: `워크로그 (${worklogs.length})`,
-            content: (
-              <div className="issue-worklogs" data-testid="issue-worklogs">
-                <form className="issue-worklog-form" onSubmit={handleWorklogSubmit}>
-                  <TextField
-                    label="시간 (h)"
-                    type="number"
-                    min={0.5}
-                    step={0.5}
-                    value={worklogHours}
-                    onChange={(e) => setWorklogHours(e.target.value)}
-                  />
-                  <TextField
-                    label="작업일"
-                    type="date"
-                    value={worklogDate}
-                    onChange={(e) => setWorklogDate(e.target.value)}
-                  />
-                  <TextField
-                    label="메모"
-                    placeholder="무슨 작업이었나요? (선택)"
-                    value={worklogComment}
-                    onChange={(e) => setWorklogComment(e.target.value)}
-                  />
-                  <Button type="submit" size="small" disabled={!(Number(worklogHours) > 0)}>
-                    기록
-                  </Button>
-                </form>
-                {worklogs.length === 0 ? (
-                  <p className="issue-comment-empty">아직 기록된 작업 시간이 없습니다</p>
-                ) : (
-                  <ul className="issue-worklog-list">
-                    {worklogs.map((worklog) => (
-                      <li key={worklog.id} className="issue-worklog-row">
-                        <UserAvatar
-                          user={userOf(worklog.authorId)}
-                          name={userName(worklog.authorId)}
-                          size="small"
-                        />
-                        <span className="issue-worklog-author">{userName(worklog.authorId)}</span>
-                        <span className="issue-worklog-date">{worklog.workedOn}</span>
-                        <strong className="issue-worklog-hours">{worklog.hours}h</strong>
-                        <span className="issue-worklog-comment">{worklog.comment}</span>
-                        {(me !== null && worklog.authorId === me.id) || isProjectAdmin ? (
-                          <Button
-                            variant="ghost"
-                            size="small"
-                            aria-label="워크로그 삭제"
-                            onClick={() => void handleWorklogDelete(worklog.id)}
-                          >
-                            ×
-                          </Button>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ),
-          },
-          {
-            value: "activity",
-            label: "활동",
-            content: (
-              <ul className="issue-activity" data-testid="issue-activity">
-                {activities.map((activity) => (
-                  <li key={activity.id} data-activity-type={activity.type}>
-                    {activity.type === "commit_linked" ? (
-                      <GitCommitHorizontal size={14} aria-label="커밋 연결" className="issue-activity-icon" />
-                    ) : null}
-                    <strong>{userName(activity.actorId)}</strong> —{" "}
-                    <span className="issue-activity-detail">{activity.detail}</span>
-                    <span className="issue-activity-time">{formatDateTime(activity.at)}</span>
-                  </li>
-                ))}
-              </ul>
-            ),
-          },
-        ]}
-      />
       {commandDialogs}
     </Modal>
   );
