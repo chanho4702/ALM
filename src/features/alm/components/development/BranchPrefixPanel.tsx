@@ -5,6 +5,7 @@ import { FormSkeleton } from "../Skeletons";
 import type { DevSettings } from "../../store/types";
 import { BRANCH_PREFIX_MAX, branchPrefixError, trimBranchPrefix } from "../../store/types";
 import { getDevSettings, updateDevSettings } from "../../store/jiraStore";
+import { errorStatus } from "../../store/mapping";
 import { branchName } from "../branchName";
 import { describeDevelopmentError } from "./IssueDevelopmentPanel";
 import "./development.css";
@@ -61,6 +62,17 @@ export function BranchPrefixPanel({ projectId, projectKey, canManage }: BranchPr
       setSaveError(null);
       toast({ title: "브랜치 접두를 저장했습니다", appearance: "success" });
     } catch (error) {
+      if (errorStatus(error) === 409) {
+        // 다른 관리자가 먼저 바꿨다 — 최신 값·version을 다시 읽어 바로 다시 저장할 수 있게 한다(입력은 그대로 둔다)
+        try {
+          setSaved(await getDevSettings(projectId));
+          setSaveError("다른 관리자가 먼저 바꿨습니다 — 최신 값으로 갱신했습니다. 입력을 확인한 뒤 다시 저장하세요.");
+        } catch (reloadError) {
+          setSaveError(`다른 관리자가 먼저 바꿨습니다 — 최신 값을 불러오지 못했습니다: ${describeDevelopmentError(reloadError)}`);
+        }
+        toast({ title: "다른 관리자가 먼저 브랜치 접두를 바꿨습니다", appearance: "info" });
+        return;
+      }
       const message = describeDevelopmentError(error);
       setSaveError(message);
       toast({ title: "브랜치 접두를 저장하지 못했습니다", description: message, appearance: "danger" });

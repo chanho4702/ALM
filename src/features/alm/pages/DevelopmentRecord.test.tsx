@@ -246,7 +246,12 @@ describe("프로젝트 설정 › 브랜치 이름 접두(V43)", () => {
     await user.clear(input);
     await user.type(input, "hotfix");
     await user.click(save);
-    expect(await within(form).findByText(/다른 사용자가 먼저 개발 설정을 수정했습니다/)).toBeInTheDocument();
+    expect(await within(form).findByText(/다른 관리자가 먼저 바꿨습니다 — 최신 값으로 갱신했습니다/)).toBeInTheDocument();
+    // 최신 version으로 갱신됐으니 새로 고치지 않고 바로 다시 저장된다(입력은 그대로)
+    expect(input).toHaveValue("hotfix");
+    await user.click(save);
+    await waitFor(async () => expect(await store.getDevSettings("p1")).toMatchObject({ branchPrefix: "hotfix", version: 3 }));
+    await store.updateDevSettings("p1", { branchPrefix: "fix", expectedVersion: 3 });
     unmount();
 
     // 상세의 브랜치 버튼 — 저장된 접두(fix)가 붙는다
