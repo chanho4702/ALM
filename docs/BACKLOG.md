@@ -4,7 +4,7 @@
 화면은 `src/features/alm/store/jiraStore.ts` 파사드만 호출하고, 프로덕션 빌드는 alm-backend REST(`jiraApi.ts`),
 테스트·목업 개발은 localStorage 목업(`jiraMock.ts`)을 쓴다 — 구현은 빌드 시점에 고른다(docs/areas/store.md).
 
-관련: `roadmap/2026-08-28-jira-parity-requirements.md` — 아래 1~6번 항목은 그 문서에서
+관련: `roadmap/2026-08-28-core-feature-gap-requirements.md` — 아래 1~6번 항목은 그 문서에서
 지라 갭 인벤토리의 Should/Could 항목으로 편성돼 있다.
 
 ## 1. 첨부파일 — ✅ 해소(2026-08-30)

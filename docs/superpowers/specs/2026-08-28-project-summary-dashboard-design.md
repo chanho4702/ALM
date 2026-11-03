@@ -3,7 +3,7 @@
 - **작성일**: 2026-08-28
 - **대상**: `alm-front` `/projects/:projectId/dashboard` (뷰 탭 "요약")
 - **레퍼런스**: 지라 프로젝트 Summary 뷰(상태 분포·담당자 작업량·최근 활동·마감 임박)
-- **관련**: `../../roadmap/2026-08-28-jira-parity-requirements.md` §5.6 리포트, §10-5 리포트 화면 위치
+- **관련**: `../../roadmap/2026-08-28-core-feature-gap-requirements.md` §5.6 리포트, §10-5 리포트 화면 위치
 
 ## 1. 목적과 판단 기준
 

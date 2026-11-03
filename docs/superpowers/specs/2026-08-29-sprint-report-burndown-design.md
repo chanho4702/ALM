@@ -2,7 +2,7 @@
 
 - **작성일**: 2026-08-29
 - **대상**: `alm-front` 프로젝트 요약 하위 리포트 화면, `alm-backend` 집계 API
-- **요구사항**: `../../roadmap/2026-08-28-jira-parity-requirements.md` S4·S5
+- **요구사항**: `../../roadmap/2026-08-28-core-feature-gap-requirements.md` S4·S5
 - **레퍼런스**: 지라 [번다운 차트](https://support.atlassian.com/jira-software-cloud/docs/view-and-understand-the-burndown-chart/) · [스프린트 리포트](https://support.atlassian.com/jira-software-cloud/docs/generate-a-report/)
 
 ## 1. 무엇을 답하는 화면인가
