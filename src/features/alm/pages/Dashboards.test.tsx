@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -8,6 +8,13 @@ import { __resetForTest, addWorklog, createDashboard, getIssueByKey, listDashboa
 import * as store from "../store/jiraStore";
 
 afterEach(() => vi.restoreAllMocks());
+
+// 대시보드 목록·보기·리포트는 라우트 lazy 청크다. 전체 스위트 병렬 실행에서 콜드 변환이 findBy/waitFor 한도(5초)를
+// 넘기면, 라우터 이동이 전환(startTransition) 안에서 lazy 보기 화면을 기다리느라 위치가 /dashboards에 머문다.
+// 청크를 미리 받아 첫 테스트가 모듈 변환 비용을 떠안지 않게 한다(AiOffice 테스트들과 같은 방식).
+beforeAll(async () => {
+  await Promise.all([import("./DashboardsPage"), import("./DashboardViewPage"), import("./ReportsPage")]);
+}, 60_000);
 
 function LocationProbe() {
   const location = useLocation();

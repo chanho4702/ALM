@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -40,6 +40,12 @@ function renderAt(path = "/projects/p1/settings/automation") {
     </ToastProvider>,
   );
 }
+
+// 프로젝트 설정은 라우트 lazy 청크(워크플로 캔버스 @xyflow/react 포함)다 — 전체 스위트 병렬 실행에서 첫 테스트가
+// 콜드 변환에 findBy 한도(5초)를 다 써 Suspense 폴백("설정 불러오는 중")에 머무르지 않게 미리 받는다
+beforeAll(async () => {
+  await import("../pages/ProjectSettingsPage");
+}, 60_000);
 
 beforeEach(() => {
   localStorage.clear();
