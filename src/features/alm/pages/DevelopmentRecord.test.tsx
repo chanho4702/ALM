@@ -11,6 +11,9 @@ import { ApiError } from "../store/mapping";
 import "../components/IssueDetailModal";
 import "./IssueListPage";
 import "./CommitsPage";
+// 저장소·브랜치 접두 설정은 프로젝트 설정(lazy 청크, @xyflow/react 포함)에 있다 — 위와 같이 미리 받아 둬
+// 전체 실행에서 첫 설정 테스트가 "설정 불러오는 중"에 머무르지 않게 한다
+import "./ProjectSettingsPage";
 
 /** 개발 기록(V41) — 이슈 개발 패널·미리보기 요약·프로젝트 커밋 탭·저장소 설정·활동·자동화 트리거 */
 function LocationProbe() {

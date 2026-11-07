@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -11,6 +11,20 @@ function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{location.pathname + location.search}</div>;
 }
+
+// 라우트·모달이 lazy 청크라 전체 스위트 병렬 실행에서 첫 테스트가 콜드 변환에 findBy 한도(5초)를 다 써
+// 스켈레톤("… 불러오는 중")에 머무른다 — 청크를 미리 받아 둔다(AiOffice·Dashboards 테스트와 같은 방식)
+beforeAll(async () => {
+  await Promise.all([
+    import("./CreateIssueModal"),
+    import("./SearchModal"),
+    import("./IssueDetailModal"),
+    import("../pages/IssueListPage"),
+    import("../pages/BoardPage"),
+    import("../pages/InboxPage"),
+    import("../pages/ProjectSettingsPage"),
+  ]);
+}, 60_000);
 
 function renderShell(initialPath: string) {
   return render(

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -18,6 +18,13 @@ function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{location.pathname}</div>;
 }
+
+// 라우트·모달이 lazy 청크라 전체 스위트 병렬 실행에서 첫 테스트가 콜드 변환에 findBy 한도(5초)를 다 써
+// 스켈레톤("… 불러오는 중")에 머무른다 — 청크를 미리 받아 둔다(AiOffice·Dashboards 테스트와 같은 방식)
+beforeAll(async () => {
+  // 보드 + 활성 스프린트가 없을 때 이동하는 백로그(이동은 startTransition이라 lazy 화면이 와야 위치가 바뀐다)
+  await Promise.all([import("./BoardPage"), import("./BacklogPage")]);
+}, 60_000);
 
 function renderBoard(initialPath = "/projects/p1/board") {
   return render(
