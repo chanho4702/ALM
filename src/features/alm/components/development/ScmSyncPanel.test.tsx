@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen, within } from "@testing-library/react";
+import * as store from "../../store/jiraStore";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "@chanho/react";
 import {
@@ -11,6 +12,7 @@ import {
   updateProjectMemberRole,
 } from "../../store/jiraStore";
 import { RepositoriesPanel } from "./RepositoriesPanel";
+import { SCM_RUNNING_REFRESH_MS } from "./ScmSyncPanel";
 
 /** 프로젝트 설정 › 저장소 › 폴링 동기화(V45) — 관리자만, 토큰은 저장 뒤 입력칸을 비우고 다시 보이지 않는다, 지금 동기화 */
 const REPO = "https://github.com/chanho4702/alm-front";
@@ -26,6 +28,10 @@ function renderPanel(canManage: boolean) {
 beforeEach(() => {
   localStorage.clear();
   __resetForTest();
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("폴링 동기화 패널", () => {
@@ -46,6 +52,61 @@ describe("폴링 동기화 패널", () => {
     expect(await within(item).findByText("변경 없음")).toBeTruthy();
     expect(within(item).getByText("성공")).toBeTruthy();
     expect(screen.getByText("웹훅 + 폴링")).toBeTruthy();
+  });
+
+  it("토큰 교체·토글은 저장된 API 주소와 꺼짐 상태를 함께 보낸다(GHES 주소를 기본값으로 덮거나 다시 켜지 않는다)", async () => {
+    const custom = "https://github.com/api/v3";
+    await saveScmSync("p1", { repositoryUrl: REPO, provider: "GITHUB", apiBaseUrl: custom, token: "t1" });
+    await saveScmSync("p1", { repositoryUrl: REPO, provider: "GITHUB", enabled: false });
+    const save = vi.spyOn(store, "saveScmSync");
+    const user = userEvent.setup();
+    renderPanel(true);
+    const item = await screen.findByTestId("scm-sync-item");
+    expect(await within(item).findByText(custom)).toBeTruthy();
+
+    await user.type(within(item).getByLabelText("새 읽기 토큰"), "t2");
+    await user.click(within(item).getByRole("button", { name: "토큰 바꾸기" }));
+    expect(save).toHaveBeenLastCalledWith("p1", {
+      repositoryUrl: REPO,
+      provider: "GITHUB",
+      apiBaseUrl: custom,
+      enabled: false,
+      token: "t2",
+    });
+    const after = (await listScmSyncs("p1")).repositories[0];
+    expect(after.enabled).toBe(false);
+    expect(after.apiBaseUrl).toBe(custom);
+
+    await user.click(within(item).getByRole("switch", { name: "이 저장소 폴링" }));
+    expect(save).toHaveBeenLastCalledWith("p1", { repositoryUrl: REPO, provider: "GITHUB", apiBaseUrl: custom, enabled: true });
+    expect((await listScmSyncs("p1")).repositories[0].apiBaseUrl).toBe(custom);
+  });
+
+  it("다른 곳에서 동기화 중이면 끝날 때까지 주기적으로 다시 읽는다", async () => {
+    await saveScmSync("p1", { repositoryUrl: REPO, provider: "GITHUB", token: "t" });
+    const real = await listScmSyncs("p1");
+    const running = { ...real, repositories: real.repositories.map((r) => ({ ...r, running: true })) };
+    const done = {
+      ...real,
+      repositories: real.repositories.map((r) => ({ ...r, running: false, lastOutcome: "OK" as const, lastMessage: "끝남" })),
+    };
+    const list = vi.spyOn(store, "listScmSyncs").mockResolvedValueOnce(running).mockResolvedValue(done);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderPanel(true);
+    const item = await screen.findByTestId("scm-sync-item");
+    expect(await within(item).findByText("동기화 중")).toBeTruthy();
+    expect(within(item).getByRole("button", { name: "지금 동기화" }).hasAttribute("disabled")).toBe(true);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SCM_RUNNING_REFRESH_MS + 100);
+    });
+    expect(await within(item).findByText("끝남")).toBeTruthy();
+    expect(within(item).getByRole("button", { name: "지금 동기화" }).hasAttribute("disabled")).toBe(false);
+    const calls = list.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SCM_RUNNING_REFRESH_MS * 2);
+    });
+    expect(list.mock.calls.length).toBe(calls); // 끝났으면 더 묻지 않는다
   });
 
   it("관리자가 아니면 그리지 않는다", async () => {

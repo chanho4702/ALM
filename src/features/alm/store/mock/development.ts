@@ -512,13 +512,19 @@ export async function saveScmSync(projectId: string, input: ScmSyncInput): Promi
     throw bad(`먼저 저장소를 프로젝트에 등록하세요: ${url}`);
   }
   if (input.provider !== "GITHUB" && input.provider !== "GITLAB") throw bad("제공자는 GITHUB 또는 GITLAB이어야 합니다");
-  const apiBaseUrl = input.apiBaseUrl?.trim() ? validateApiBase(input.apiBaseUrl, url) : defaultApiBase(input.provider, url);
+  const existing = data.scmSyncs.find((s) => s.projectId === projectId && s.repositoryUrl === url);
+  // PATCH 의미(서버와 같다) — 이미 있으면 보내지 않은 API 주소는 같은 제공자일 때 그대로, 꺼짐·토큰도 그대로
+  const apiBaseUrl = input.apiBaseUrl?.trim()
+    ? validateApiBase(input.apiBaseUrl, url)
+    : existing && existing.provider === input.provider
+      ? existing.apiBaseUrl
+      : defaultApiBase(input.provider, url);
   const token = input.token?.trim() || null;
   if (token && (token.length > 1000 || /[\s\u0000-\u001f\u007f]/.test(token))) {
     throw bad("토큰 형식이 올바르지 않습니다(공백·제어 문자 없이 1000자 이하)");
   }
   const now = new Date().toISOString();
-  let sync = data.scmSyncs.find((s) => s.projectId === projectId && s.repositoryUrl === url);
+  let sync = existing;
   if (!sync) {
     if (!token) throw bad("읽기 토큰을 입력하세요");
     sync = {

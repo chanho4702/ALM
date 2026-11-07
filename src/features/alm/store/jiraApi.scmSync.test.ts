@@ -73,9 +73,25 @@ describe("폴링 동기화 REST", () => {
       provider: "GITHUB",
       token: "ghp_x",
     });
+    // 패널의 토큰 교체 — 저장된 API 주소·꺼짐을 그대로 실어 보낸다(서버가 기본값으로 덮거나 다시 켜지 않게)
+    await saveScmSync("7", {
+      repositoryUrl: SYNC.repositoryUrl,
+      provider: "GITHUB",
+      apiBaseUrl: SYNC.apiBaseUrl,
+      enabled: false,
+      token: "ghp_y",
+    });
+    expect(JSON.parse(spy.mock.calls[2][1]!.body as string)).toEqual({
+      repositoryUrl: SYNC.repositoryUrl,
+      provider: "GITHUB",
+      apiBaseUrl: SYNC.apiBaseUrl,
+      enabled: false,
+      token: "ghp_y",
+    });
+    spy.mockClear();
     await runScmSync("7", "9");
-    expect(spy.mock.calls[2][0]).toBe("/api/alm/projects/7/settings/scm-sync/9/run");
-    expect(spy.mock.calls[2][1]?.method).toBe("POST");
+    expect(spy.mock.calls[0][0]).toBe("/api/alm/projects/7/settings/scm-sync/9/run");
+    expect(spy.mock.calls[0][1]?.method).toBe("POST");
   });
 
   it("409 {error}(실행 중·레이트 리밋)를 그대로 던진다", async () => {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Banner, Button, Card, ConfirmDialog, Lozenge, Select, Switch, TextField, useToast } from "@chanho/react";
-import { CircleCheck, CircleX, GitBranch, GitMerge, Hourglass, KeyRound, RefreshCw, Trash2 } from "lucide-react";
+import { CircleCheck, CircleX, GitBranch, GitMerge, Hourglass, KeyRound, RefreshCw, RotateCw, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DevRepository, DevWebhookProvider, ScmSync, ScmSyncList, ScmSyncMode, ScmSyncOutcome } from "../../store/types";
 import { deleteScmSync, listScmSyncs, runScmSync, saveScmSync } from "../../store/jiraStore";
@@ -18,6 +18,9 @@ export interface ScmSyncPanelProps {
 
 const PROVIDER_LABELS: Record<DevWebhookProvider, string> = { GITHUB: "GitHub", GITLAB: "GitLab" };
 const PROVIDER_ICONS: Record<DevWebhookProvider, LucideIcon> = { GITHUB: GitBranch, GITLAB: GitMerge };
+/** 동기화 중일 때 상태를 다시 읽는 간격 */
+export const SCM_RUNNING_REFRESH_MS = 5000;
+
 const MODE_LABELS: Record<ScmSyncMode, string> = { both: "웹훅 + 폴링", webhook: "웹훅만", polling: "폴링만" };
 
 export const SCM_OUTCOME_LABELS: Record<ScmSyncOutcome, string> = { OK: "성공", RATE_LIMITED: "레이트 리밋 대기", FAILED: "실패" };
@@ -92,6 +95,14 @@ export function ScmSyncPanel({ projectId, repositories }: ScmSyncPanelProps) {
     setList(null);
     void reload();
   }, [reload, repositories]);
+
+  // 어느 저장소든 동기화 중이면(다른 인스턴스의 주기 실행 포함) 끝날 때까지 주기적으로 다시 읽는다 — 버튼이 꺼진 채 굳지 않게
+  const anyRunning = list?.repositories.some((s) => s.running) ?? false;
+  useEffect(() => {
+    if (!anyRunning) return;
+    const timer = setInterval(() => void reload(), SCM_RUNNING_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [anyRunning, reload]);
 
   const draftOf = (repo: DevRepository, sync: ScmSync | null): Draft =>
     drafts[repo.url] ?? { provider: sync?.provider ?? guessProvider(repo.url), apiBaseUrl: "", token: "" };
@@ -210,7 +221,14 @@ export function ScmSyncPanel({ projectId, repositories }: ScmSyncPanelProps) {
                       onCheckedChange={(checked) =>
                         void act(
                           repo,
-                          () => saveScmSync(projectId, { repositoryUrl: repo.url, provider: sync.provider, enabled: checked }),
+                          // 저장된 API 주소를 함께 보낸다 — 빠뜨리면 옛 서버가 기본값으로 덮는다(GHES·사내 GitLab, Codex P2)
+                          () =>
+                            saveScmSync(projectId, {
+                              repositoryUrl: repo.url,
+                              provider: sync.provider,
+                              apiBaseUrl: sync.apiBaseUrl,
+                              enabled: checked,
+                            }),
                           checked ? "폴링을 켰습니다" : "폴링을 껐습니다",
                           "설정을 바꾸지 못했습니다",
                         )
@@ -233,7 +251,15 @@ export function ScmSyncPanel({ projectId, repositories }: ScmSyncPanelProps) {
                         onClick={() =>
                           void act(
                             repo,
-                            () => saveScmSync(projectId, { repositoryUrl: repo.url, provider: sync.provider, token: draft.token }),
+                            // 꺼 둔 저장소의 토큰을 바꿔도 다시 켜지지 않게 enabled·API 주소를 그대로 보낸다(Codex P2)
+                            () =>
+                              saveScmSync(projectId, {
+                                repositoryUrl: repo.url,
+                                provider: sync.provider,
+                                apiBaseUrl: sync.apiBaseUrl,
+                                enabled: sync.enabled,
+                                token: draft.token,
+                              }),
                             "토큰을 바꿨습니다",
                             "토큰을 바꾸지 못했습니다",
                           )
@@ -321,7 +347,10 @@ export function ScmSyncPanel({ projectId, repositories }: ScmSyncPanelProps) {
       {list ? (
         <p className="settings-help">
           설치 방식: <strong>{MODE_LABELS[list.syncMode]}</strong>
-          {list.pollingEnabled ? ` · 주기 ${Math.round(list.pollIntervalSeconds / 60)}분` : ""}
+          {list.pollingEnabled ? ` · 주기 ${Math.round(list.pollIntervalSeconds / 60)}분` : ""}{" "}
+          <Button type="button" variant="ghost" iconBefore={<RotateCw size={14} />} onClick={() => void reload()}>
+            상태 새로고침
+          </Button>
         </p>
       ) : null}
       {body}
