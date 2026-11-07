@@ -32,11 +32,11 @@ beforeEach(() => {
 });
 
 describe("HomePage (For you)", () => {
-  it("인사말·이어서 하기 카드·추천 작업(기본 탭)을 보여준다", async () => {
+  it("오늘의 작업·이어서 하기 카드·추천 작업(기본 탭)을 보여준다", async () => {
     renderHome();
 
     expect(
-      await screen.findByRole("heading", { name: /안녕하세요, 김찬호님/ }),
+      await screen.findByRole("heading", { name: "오늘의 작업" }),
     ).toBeInTheDocument();
 
     // 이어서 하기: 프로젝트 카드 + 최근 이슈 카드
@@ -53,7 +53,7 @@ describe("HomePage (For you)", () => {
 
   it("이어서 하기는 한 줄(최대 4장) — 프로젝트 2장까지, 나머지는 최근 이슈", async () => {
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     const cards = within(screen.getByTestId("resume-cards")).getAllByRole("button");
     expect(cards).toHaveLength(4);
@@ -62,7 +62,7 @@ describe("HomePage (For you)", () => {
   it("오늘 요약 줄의 '나에게 배정'을 누르면 해당 탭이 열린다", async () => {
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     // 시드: 김찬호 담당 미완료 1건(ALM-3 — ALM-1은 완료), 마감 임박(7일 내) 2건, 기한 지남 0건
     const summary = screen.getByTestId("home-summary");
@@ -77,7 +77,7 @@ describe("HomePage (For you)", () => {
   it("나에게 배정됨 탭: 내 담당 미완료 이슈만 보여준다 (시드: 김찬호 = ALM-1 완료, ALM-3 진행 중)", async () => {
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     await user.click(screen.getByRole("tab", { name: /나에게 배정됨/ }));
     const mine = await screen.findByTestId("my-issues");
@@ -89,7 +89,7 @@ describe("HomePage (For you)", () => {
   it("최근 업데이트 탭: 날짜 그룹과 함께 목록을 보여준다", async () => {
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     await user.click(screen.getByRole("tab", { name: "최근 업데이트" }));
     const recent = await screen.findByTestId("recent-issues");
@@ -100,7 +100,7 @@ describe("HomePage (For you)", () => {
   it("이슈를 클릭하면 상세가 열린 이슈 목록으로 이동한다", async () => {
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     await user.click(screen.getByRole("tab", { name: /나에게 배정됨/ }));
     const mine = await screen.findByTestId("my-issues");
@@ -118,7 +118,7 @@ describe("HomePage (For you)", () => {
     await recordIssueView("u1", "ALM-5");
     await recordIssueView("u1", "ALM-2");
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     await user.click(screen.getByRole("tab", { name: "최근 본" }));
     const viewed = await screen.findByTestId("viewed-issues");
@@ -133,7 +133,7 @@ describe("HomePage (For you)", () => {
   it("최근 본 탭: 기록이 없으면 안내를 보여 주고, 이슈 상세를 열면 기록된다", async () => {
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     await user.click(screen.getByRole("tab", { name: "최근 본" }));
     expect(await screen.findByText("최근 본 이슈가 없습니다")).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe("HomePage (For you)", () => {
   it("최근 본 탭: 한 번 읽은 뒤 홈에 머문 채 이슈를 열면, 다시 들어올 때 새 기록을 보여 준다", async () => {
     const user = userEvent.setup();
     renderHome();
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
     await user.click(screen.getByRole("tab", { name: "최근 본" }));
     expect(await screen.findByText("최근 본 이슈가 없습니다")).toBeInTheDocument();
 

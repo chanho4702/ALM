@@ -331,8 +331,8 @@ export function HomePage() {
   return (
     <main className="project-list-content home-page">
       <header className="home-greeting">
-        <p className="home-greeting-date">{todayLabel}</p>
-        <h1 className="home-greeting-title">안녕하세요, {me.name}님</h1>
+        <p className="home-greeting-date">{me.name} · {todayLabel}</p>
+        <h1 className="home-greeting-title">오늘의 작업</h1>
         {projects.length > 0 ? (
           // 오늘 요약 — 이미 계산한 값 재사용, 누르면 해당 탭으로 이동한다
           <p className="home-greeting-summary" data-testid="home-summary">

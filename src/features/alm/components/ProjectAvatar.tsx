@@ -29,7 +29,7 @@ export interface ProjectAvatarProps {
 const ICON_PX = { sm: 12, md: 18, lg: 22 } as const;
 
 /**
- * 지라의 프로젝트 아바타 — 프로젝트마다 다른 색의 그라데이션 사각 + 키 이니셜.
+ * 지라의 프로젝트 아바타 — 프로젝트마다 다른 단색 사각 + 키 이니셜.
  * 세부 설정에서 아이콘/색을 고르면 그것을 쓰고, 없으면 키 해시 색 + 이니셜.
  */
 export function ProjectAvatar({ project, size = "md", className }: ProjectAvatarProps) {
@@ -42,7 +42,7 @@ export function ProjectAvatar({ project, size = "md", className }: ProjectAvatar
         .filter(Boolean)
         .join(" ")}
       style={{
-        background: `linear-gradient(135deg, hsl(${hue} 62% 52%), hsl(${(hue + 45) % 360} 62% 40%))`,
+        backgroundColor: `hsl(${hue} 52% 43%)`,
       }}
       aria-hidden
     >
