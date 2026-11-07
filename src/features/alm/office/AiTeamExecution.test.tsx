@@ -244,7 +244,8 @@ describe("직원 토큰 — 만료(D-P4-3b)", () => {
     expect(within(rowOf(table, "예전 노트북")).queryByText("곧 만료")).not.toBeInTheDocument();
   });
 
-  it("만료 기본 90일 — 프로젝트 관리자에게는 '무기한'이 없고, 30일·직접 입력(1~365)을 싣는다", async () => {
+  // 한 테스트에 발급 두 번(약 20단계)을 몰면 전체 실행 부하에서 15초 한도를 넘었다 — 30일 / 직접 입력으로 나눈다
+  it("만료 기본 90일 — 프로젝트 관리자에게는 '무기한'이 없고, 30일을 고르면 30일로 싣는다", async () => {
     const user = userEvent.setup();
     const issue = vi.spyOn(store, "issueAgentToken");
     renderAt();
@@ -264,8 +265,13 @@ describe("직원 토큰 — 만료(D-P4-3b)", () => {
     expect(issue).toHaveBeenLastCalledWith({ label: "한 달짜리", personaSlug: "backend-bot", expiresInDays: 30 });
     await user.click(screen.getByRole("button", { name: "완료" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 
-    // 직접 입력 — 범위 밖이면 발급을 막고, 범위 안이면 그 일수
+  it("만료 직접 입력 — 1~365 범위 밖이면 발급을 막고, 범위 안이면 그 일수로 싣는다", async () => {
+    const user = userEvent.setup();
+    const issue = vi.spyOn(store, "issueAgentToken");
+    renderAt();
+    await tokenTable();
     await user.click(screen.getByRole("combobox", { name: "만료" }));
     await user.click(await screen.findByRole("option", { name: "직접 입력" }));
     await user.click(screen.getByRole("combobox", { name: "직원" }));
