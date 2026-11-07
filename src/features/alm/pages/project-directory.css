@@ -5,6 +5,10 @@
   background: var(--chanho-color-background-surface);
 }
 
+.project-directory {
+  min-width: 0;
+}
+
 .project-directory .project-list-search {
   flex: 1 1 16rem;
   min-width: 0;
@@ -51,7 +55,11 @@
 }
 
 .project-directory-table {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .project-directory-table table {
@@ -61,4 +69,40 @@
 .project-directory-table:focus-visible {
   outline: 2px solid var(--chanho-color-border-focused);
   outline-offset: var(--chanho-space-25);
+}
+
+@media (max-width: 720px) {
+  .project-directory .project-list-toolbar {
+    align-items: stretch;
+    gap: var(--chanho-space-150);
+    padding: var(--chanho-space-200);
+  }
+
+  .project-directory .project-list-search {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .project-directory .project-list-side-actions {
+    justify-content: space-between;
+    gap: var(--chanho-space-100) var(--chanho-space-150);
+  }
+
+  .project-directory .project-view-toggle {
+    width: 100%;
+    padding-top: var(--chanho-space-150);
+    border-top: 1px solid var(--chanho-color-border-default);
+  }
+
+  .project-directory .project-view-toggle button {
+    flex: 1;
+  }
+
+  .project-directory-summary {
+    min-height: 0;
+  }
+
+  .project-card-actions {
+    flex-wrap: wrap;
+  }
 }

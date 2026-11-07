@@ -88,6 +88,8 @@ describe("모바일 셸", () => {
   it("검색 아이콘으로 입력 가능한 전역 검색 모달을 연다", async () => {
     const user = userEvent.setup();
     await renderShell();
+    expect(screen.getByRole("button", { name: "이슈 만들기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /알림/ })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "이슈 검색 열기" }));
     await act(async () => vi.dynamicImportSettled());
     const dialog = await screen.findByRole("dialog", { name: "이슈 검색" });

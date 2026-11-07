@@ -30,7 +30,9 @@ export function ProjectListPage({ projects, onProjectsChanged }: ProjectListPage
   const [countRetry, setCountRetry] = useState(0);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState<Project | null>(null);
-  const [view, setView] = useState<"table" | "cards">("table");
+  const [view, setView] = useState<"table" | "cards">(() =>
+    window.matchMedia?.("(max-width: 720px)").matches ? "cards" : "table",
+  );
   const [filter, setFilter] = useState("");
   const [deletingBusy, setDeletingBusy] = useState(false);
 

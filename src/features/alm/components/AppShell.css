@@ -10,13 +10,17 @@
   padding: var(--chanho-space-50) var(--chanho-space-150);
   border-bottom: 1px solid var(--chanho-color-border-default);
   background: var(--chanho-color-background-surface);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 
 .app-mobile-actions {
   display: flex;
   align-items: center;
-  gap: var(--chanho-space-100);
+  gap: var(--chanho-space-50);
   margin-left: auto;
+  min-width: 0;
 }
 
 .app-mobile-topbar button {
@@ -62,4 +66,19 @@
 .app-shell-mobile .project-list-content,
 .app-shell-mobile .jira-content {
   padding-inline: var(--chanho-space-200);
+}
+
+/* 넓은 표는 자기 스크롤 영역 안에서만 움직이고 셸·상단바 폭을 밀지 않는다. */
+.app-shell-mobile {
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.app-shell-mobile .app-body,
+.app-shell-mobile .app-shell-content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }

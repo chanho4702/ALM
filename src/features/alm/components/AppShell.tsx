@@ -1,5 +1,5 @@
 import { lazy, useEffect, useRef, useState } from "react";
-import { Bell, Command, Menu, Search } from "lucide-react";
+import { Bell, Command, Menu, Plus, Search } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Modal, TopBar } from "@chanho/react";
 import type { Issue, Project, User } from "../store/types";
@@ -146,6 +146,16 @@ export function AppShell({ projects }: AppShellProps) {
   const createAction = projects.length > 0 ? (
     <Button onClick={() => setCreateOpen(true)}>만들기</Button>
   ) : null;
+  const mobileCreateAction = projects.length > 0 ? (
+    <Button
+      iconOnly
+      aria-label="이슈 만들기"
+      title="이슈 만들기"
+      onClick={() => setCreateOpen(true)}
+    >
+      <Plus size={18} aria-hidden="true" />
+    </Button>
+  ) : null;
   /** 벨 = 인박스 열기(Linear Inbox 전체 화면) */
   const openNotifications = () => {
     reloadNotifications();
@@ -224,7 +234,7 @@ export function AppShell({ projects }: AppShellProps) {
               aria-label="이슈 검색 열기"
               onClick={openSearch}
             />
-            {createAction}
+            {mobileCreateAction}
             {notificationAction}
           </div>
         </header>
