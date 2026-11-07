@@ -73,7 +73,8 @@ describe("모바일 셸", () => {
     await renderShell("/projects/p1/board");
     await user.click(screen.getByRole("button", { name: "내비게이션 열기" }));
     const dialog = await screen.findByRole("dialog", { name: "내비게이션" });
-    expect(within(dialog).getByRole("button", { name: "백로그" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "ALM 플랫폼" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("nav-projects")).toBeInTheDocument();
     expect(await isSideNavCollapsed()).toBe(true);
     await act(async () => {
       mobile = false;

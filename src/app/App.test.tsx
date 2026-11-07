@@ -79,24 +79,24 @@ describe("App 라우팅과 전역 셸", () => {
     });
   });
 
-  it("사이드바에서 프로젝트를 바꾸면 해당 보드로 이동하고 하위 페이지가 중첩 확장된다", async () => {
+  it("사이드바에서 프로젝트를 바꾸고 상단 프로젝트 탭으로 화면을 전환한다", async () => {
     const pay = await createProject({ key: "PAY", name: "결제 서비스" }); // 시드 + 2번째 프로젝트
     const user = userEvent.setup();
     renderApp("/projects/p1/board");
     await screen.findByRole("navigation", { name: "브레드크럼" });
 
-    // 현재 프로젝트(ALM 플랫폼)의 하위 페이지가 펼쳐져 있다
     const nav = globalNav();
-    expect(within(nav).getByRole("button", { name: "백로그" })).toBeInTheDocument();
+    expect(within(nav).queryByRole("button", { name: "백로그" })).not.toBeInTheDocument();
 
-    // 다른 프로젝트 클릭 → 그 보드로 이동, 확장도 따라온다
+    // 사이드바는 프로젝트 선택만 담당한다
     await user.click(within(nav).getByRole("button", { name: "결제 서비스" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(`/projects/${pay.id}/board`);
     });
 
-    // 하위 페이지 클릭 → 해당 페이지로
-    await user.click(within(globalNav()).getByRole("button", { name: "백로그" }));
+    // 화면 전환은 프로젝트 헤더의 탭 하나가 담당한다
+    const tabs = await screen.findByRole("navigation", { name: "프로젝트 뷰" });
+    await user.click(within(tabs).getByRole("button", { name: "백로그" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(`/projects/${pay.id}/backlog`);
     });
@@ -113,15 +113,13 @@ describe("App 라우팅과 전역 셸", () => {
     });
   });
 
-  it("프로젝트를 방문하면 '최근' 섹션에 나타난다", async () => {
-    const user = userEvent.setup();
+  it("최근 프로젝트를 별도 복제하지 않고 프로젝트 목록 한 곳에만 둔다", async () => {
     renderApp("/projects/p1/board");
     await screen.findByRole("navigation", { name: "브레드크럼" });
 
-    // 홈으로 이동해도 최근 섹션에 방문한 프로젝트가 남는다
-    await user.click(within(globalNav()).getByRole("button", { name: "홈" }));
-    const recent = await within(globalNav()).findByTestId("nav-recent");
-    expect(within(recent).getByRole("button", { name: "ALM 플랫폼" })).toBeInTheDocument();
+    expect(within(globalNav()).queryByTestId("nav-recent")).not.toBeInTheDocument();
+    const projects = await within(globalNav()).findByTestId("nav-projects");
+    expect(within(projects).getAllByRole("button", { name: "ALM 플랫폼" })).toHaveLength(1);
   });
 
   it("디렉터리에서 별표를 켜면 사이드바 '즐겨찾기' 섹션에 나타나고, 끄면 사라진다", async () => {
@@ -144,18 +142,16 @@ describe("App 라우팅과 전역 셸", () => {
     renderApp("/projects/p1/board");
     await screen.findByRole("navigation", { name: "브레드크럼" });
 
-    // 접기 → 하위 페이지(백로그 등)와 섹션이 사라진다
+    // 접기 → 섹션 라벨이 사라지고 아이콘 프로젝트 이동은 남는다
     await user.click(within(globalNav()).getByRole("button", { name: "사이드바 접기" }));
-    await waitFor(() => {
-      expect(within(globalNav()).queryByRole("button", { name: "백로그" })).not.toBeInTheDocument();
-    });
-    expect(globalNav()).toHaveClass("is-collapsed");
+    await waitFor(() => expect(globalNav()).toHaveClass("is-collapsed"));
     // 아이콘(아바타)으로 프로젝트 이동은 여전히 가능
     expect(within(globalNav()).getByRole("button", { name: "ALM 플랫폼" })).toBeInTheDocument();
 
-    // 펼치기 → 복원
+    // 펼치기 → 프로젝트 목록 복원
     await user.click(within(globalNav()).getByRole("button", { name: "사이드바 펼치기" }));
-    expect(await within(globalNav()).findByRole("button", { name: "백로그" })).toBeInTheDocument();
+    await waitFor(() => expect(globalNav()).not.toHaveClass("is-collapsed"));
+    expect(within(globalNav()).getByTestId("nav-projects")).toBeInTheDocument();
   });
 
   it("리사이즈 핸들 키보드(→/Home)로 사이드바 너비를 조절한다", async () => {
@@ -201,8 +197,8 @@ describe("App 라우팅과 전역 셸", () => {
   });
 });
 
-describe("사이드바 보드 중첩", () => {
-  it("현재 프로젝트의 '보드' 아래 보드 목록이 중첩되고 클릭으로 전환한다", async () => {
+describe("프로젝트 메뉴의 보드 전환", () => {
+  it("현재 프로젝트 메뉴에서 보드를 전환한다", async () => {
     const user = userEvent.setup();
     renderApp("/projects/p1/board");
     await screen.findByRole("navigation", { name: "브레드크럼" });
@@ -212,22 +208,21 @@ describe("사이드바 보드 중첩", () => {
       expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/boards/b1");
     });
 
-    const boardList = await within(globalNav()).findByTestId("nav-boards");
-    expect(within(boardList).getByRole("button", { name: "메인 보드" })).toBeInTheDocument();
-
-    await user.click(within(boardList).getByRole("button", { name: "백엔드 팀" }));
+    const projects = await within(globalNav()).findByTestId("nav-projects");
+    await user.click(within(projects).getByRole("button", { name: "ALM 플랫폼 메뉴" }));
+    await user.click(await screen.findByRole("menuitem", { name: "보드 · 백엔드 팀" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent("/projects/p1/boards/b2");
     });
   });
 
-  it("'+ 새 보드'로 보드를 만들면 목록에 추가되고 그 보드로 이동한다", async () => {
+  it("프로젝트 메뉴에서 새 보드를 만들면 그 보드로 이동한다", async () => {
     const user = userEvent.setup();
     renderApp("/projects/p1/boards/b1");
     await screen.findByRole("navigation", { name: "전역 내비게이션" });
-    const boardList = await within(globalNav()).findByTestId("nav-boards");
-
-    await user.click(within(boardList).getByRole("button", { name: "+ 새 보드" }));
+    const projects = await within(globalNav()).findByTestId("nav-projects");
+    await user.click(within(projects).getByRole("button", { name: "ALM 플랫폼 메뉴" }));
+    await user.click(await screen.findByRole("menuitem", { name: "새 보드" }));
     const dialog = await screen.findByRole("dialog", { name: "새 보드" });
     await user.type(within(dialog).getByLabelText("이름"), "QA 보드");
     await user.click(within(dialog).getByRole("button", { name: "보드 만들기" }));
@@ -237,10 +232,7 @@ describe("사이드바 보드 중첩", () => {
       expect(location).toMatch(/\/projects\/p1\/boards\/.+/);
       expect(location).not.toContain("/boards/b1"); // 새로 만든 보드로 이동
     });
-    expect(
-      within(await within(globalNav()).findByTestId("nav-boards")).getByRole("button", {
-        name: "QA 보드",
-      }),
-    ).toBeInTheDocument();
+    await user.click(within(projects).getByRole("button", { name: "ALM 플랫폼 메뉴" }));
+    expect(await screen.findByRole("menuitem", { name: "보드 · QA 보드" })).toBeInTheDocument();
   });
 });

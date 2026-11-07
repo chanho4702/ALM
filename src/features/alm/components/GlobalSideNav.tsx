@@ -4,18 +4,13 @@ import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Button, Dropdown, useToast } from "@chanho/react";
 import type { Board, Project } from "../store/types";
-import { deleteSavedFilter, listBoards, listProjectViews, listSavedFilters, listSharedFilters, updateSavedFilter } from "../store/jiraStore";
+import { deleteSavedFilter, listBoards, listSavedFilters, listSharedFilters, updateSavedFilter } from "../store/jiraStore";
 import type { SavedFilter } from "../store/jiraStore";
-import type { SavedView } from "../store/types";
-import { VIEWS_CHANGED_EVENT } from "./views/useIssueViews";
 import { BoardCreateModal } from "./BoardCreateModal";
 import { FavoritesNavSection } from "./FavoritesNavSection";
 import { useFavorites } from "./useFavorites";
 import type { Favorite } from "../store/uiStore";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { projectViewTabs } from "./projectViews";
-import { useAiTeamActive } from "./useAiTeamActive";
-import { useTriageEnabled } from "./useTriageEnabled";
 import {
   SIDENAV_DEFAULT_WIDTH,
   SIDENAV_MAX_WIDTH,
@@ -23,7 +18,6 @@ import {
   UI_CHANGED_EVENT,
   getSideNavWidth,
   isSideNavCollapsed,
-  listRecentProjectIds,
   setSideNavCollapsed,
   setSideNavWidth,
 } from "../store/uiStore";
@@ -39,14 +33,12 @@ export interface GlobalSideNavProps {
 
 /**
  * 새 지라 내비게이션의 전역 사이드바 — 모든 화면에 상주한다.
- * 홈/프로젝트 + 최근 · 별표 · 프로젝트 섹션. 접으면 아이콘 레일이 된다.
+ * 홈/검색/대시보드 + 필터 · 별표 · 프로젝트 섹션. 접으면 아이콘 레일이 된다.
  */
 export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNavProps) {
   const navigate = useNavigate();
-  const aiTeamActive = useAiTeamActive();
   const toast = useToast();
   const { pathname, search } = useLocation();
-  const [recentIds, setRecentIds] = useState<string[]>([]);
   const { favorites } = useFavorites();
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   /** 남이 공유한 필터(F-12) — 실행만 한다. 못 읽어도 내 필터 섹션은 그대로 둔다 */
@@ -98,7 +90,6 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
       );
 
   const refresh = useCallback(() => {
-    void listRecentProjectIds().then(setRecentIds);
     void refreshFilters();
     void isSideNavCollapsed().then(setCollapsed);
     void getSideNavWidth().then((w) => {
@@ -139,7 +130,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
     void setSideNavWidth(next);
   };
 
-  // uiStore 변경(방문 기록·별표 토글·접기)을 구독한다 — 발행처는 uiStore.persist
+  // uiStore 변경(별표 토글·접기)을 구독한다 — 발행처는 uiStore.persist
   useEffect(() => {
     refresh();
     window.addEventListener(UI_CHANGED_EVENT, refresh);
@@ -148,12 +139,9 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
 
   const projectMatch = pathname.match(/^\/projects\/([^/]+)(?:\/([^/?]+))?/);
   const currentProjectId = projectMatch && projectMatch[1] !== "new" ? projectMatch[1] : undefined;
-  const triageEnabled = useTriageEnabled(currentProjectId);
   const rawPage = projectMatch?.[2];
-  // /boards/:boardId 는 "보드" 페이지로 취급, 활성 보드 id를 함께 뽑는다
+  // /boards/:boardId 는 "보드" 페이지로 취급한다.
   const currentPage = rawPage === "boards" ? "board" : rawPage;
-  const currentBoardId =
-    rawPage === "boards" ? pathname.split("/")[4] : undefined;
 
   const [boards, setBoards] = useState<Board[]>([]);
   const [createBoardOpen, setCreateBoardOpen] = useState(false);
@@ -178,31 +166,6 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
     };
   }, [currentProjectId]);
 
-  // 현재 프로젝트의 저장된 보기(D1) — 못 읽으면 조용히 뺀다(사이드바를 깨지 않는다)
-  const [projectViews, setProjectViews] = useState<SavedView[]>([]);
-  useEffect(() => {
-    if (!currentProjectId) {
-      setProjectViews([]);
-      return;
-    }
-    let cancelled = false;
-    const loadViews = () => {
-      void listProjectViews(currentProjectId).then(
-        (list) => {
-          if (!cancelled) setProjectViews(list);
-        },
-        () => {
-          if (!cancelled) setProjectViews([]);
-        },
-      );
-    };
-    loadViews();
-    window.addEventListener(VIEWS_CHANGED_EVENT, loadViews);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(VIEWS_CHANGED_EVENT, loadViews);
-    };
-  }, [currentProjectId]);
   const currentViewId = currentPage === "issues" ? new URLSearchParams(search).get("view") : null;
 
   const isHome = pathname === "/home" || pathname === "/";
@@ -210,9 +173,6 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
 
   const itemClass = (active: boolean) =>
     active ? "global-nav-item is-active" : "global-nav-item";
-
-  const byId = (id: string) => projects.find((p) => p.id === id);
-  const recentProjects = recentIds.map(byId).filter((p): p is Project => Boolean(p));
 
   /** 즐겨찾기 열기 — 프로젝트는 보드, 보기는 이슈 목록의 그 보기, 이슈는 상세 */
   const openFavorite = (favorite: Favorite) => {
@@ -268,26 +228,23 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
               label: "이슈 목록",
               onSelect: () => navigate(`/projects/${project.id}/issues`),
             },
+            ...(project.id === currentProjectId
+              ? [
+                  ...boards.map((board) => ({
+                    label: `보드 · ${board.name}`,
+                    onSelect: () => navigate(`/projects/${project.id}/boards/${board.id}`),
+                  })),
+                  {
+                    label: "새 보드",
+                    onSelect: () => setCreateBoardOpen(true),
+                  },
+                ]
+              : []),
           ]}
         />
       )}
     </span>
   );
-
-  /** 섹션 렌더 — 접힘 상태에서는 섹션을 통째로 숨긴다 (아이콘 레일) */
-  const projectSection = (label: string, items: Project[], testId: string) => {
-    if (collapsed || items.length === 0) return null;
-    return (
-      <>
-        <span className="global-nav-section">{label}</span>
-        <ul className="global-nav-list" data-testid={testId}>
-          {items.map((project) => (
-            <li key={project.id}>{projectRow(project, false)}</li>
-          ))}
-        </ul>
-      </>
-    );
-  };
 
   return (
     <nav
@@ -440,7 +397,6 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
         </>
       ) : null}
 
-      {projectSection("최근", recentProjects, "nav-recent")}
       {collapsed ? null : (
         <FavoritesNavSection favorites={favorites} projects={projects} onOpen={openFavorite} isActive={favoriteActive} />
       )}
@@ -453,67 +409,7 @@ export function GlobalSideNav({ projects, forceExpanded = false }: GlobalSideNav
               const isCurrent = project.id === currentProjectId;
               return (
                 <li key={project.id}>
-                  {projectRow(project, isCurrent && !currentPage)}
-                  {isCurrent && !collapsed ? (
-                    <ul className="global-nav-sub">
-                      {projectViewTabs(aiTeamActive, triageEnabled).map((page) => (
-                        <li key={page.id}>
-                          <button
-                            type="button"
-                            className={itemClass(currentPage === page.id && page.id !== "board" && !(page.id === "issues" && currentViewId))}
-                            onClick={() => navigate(`/projects/${project.id}/${page.id}`)}
-                          >
-                            {page.label}
-                          </button>
-                          {/* "보드" 아래 한 단계 더 — 보드 목록 + 새 보드 (지라 사이드바 중첩) */}
-                          {page.id === "board" ? (
-                            <ul className="global-nav-sub" data-testid="nav-boards">
-                              {boards.map((board) => (
-                                <li key={board.id}>
-                                  <button
-                                    type="button"
-                                    className={itemClass(currentBoardId === board.id)}
-                                    onClick={() =>
-                                      navigate(`/projects/${project.id}/boards/${board.id}`)
-                                    }
-                                  >
-                                    {board.name}
-                                  </button>
-                                </li>
-                              ))}
-                              <li>
-                                <button
-                                  type="button"
-                                  className="global-nav-item global-nav-add"
-                                  onClick={() => setCreateBoardOpen(true)}
-                                >
-                                  + 새 보드
-                                </button>
-                              </li>
-                            </ul>
-                          ) : null}
-                          {/* "이슈" 아래 — 이 프로젝트의 저장된 보기 */}
-                          {page.id === "issues" && projectViews.length > 0 ? (
-                            <ul className="global-nav-sub" data-testid="nav-views" aria-label="저장된 보기">
-                              {projectViews.map((view) => (
-                                <li key={view.id}>
-                                  <button
-                                    type="button"
-                                    className={itemClass(currentViewId === view.id)}
-                                    onClick={() =>
-                                      navigate(`/projects/${project.id}/issues?view=${encodeURIComponent(view.id)}`)
-                                    }
-                                  >
-                                    {view.name}
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
+                  {projectRow(project, isCurrent)}
                 </li>
               );
             })}

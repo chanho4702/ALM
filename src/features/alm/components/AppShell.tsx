@@ -99,7 +99,7 @@ export function AppShell({ projects }: AppShellProps) {
   const currentProjectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
   const currentProject = projects.find((p) => p.id === currentProjectId);
 
-  // 프로젝트 방문 기록 → 사이드바 "최근" 섹션
+  // 프로젝트 방문 기록 → 홈의 최근 작업 재개 데이터
   useEffect(() => {
     if (currentProject) void recordProjectVisit(currentProject.id);
   }, [currentProject?.id]);
@@ -225,7 +225,6 @@ export function AppShell({ projects }: AppShellProps) {
               onClick={openSearch}
             />
             {createAction}
-            {paletteAction}
             {notificationAction}
           </div>
         </header>

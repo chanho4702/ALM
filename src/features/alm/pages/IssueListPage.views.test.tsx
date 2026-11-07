@@ -158,7 +158,7 @@ describe("이슈 목록 — 표시 옵션 (D1)", () => {
 });
 
 describe("이슈 목록 — 저장된 보기 (D1)", () => {
-  it("보기로 저장 → 고르기·사이드바에 나오고, ?view= 로 다시 열면 그 보기가 복원된다", async () => {
+  it("보기로 저장 → 고르기에 나오고, ?view= 로 다시 열면 그 보기가 복원된다", async () => {
     const user = userEvent.setup();
     const first = renderIssues();
     await screen.findByRole("table", { name: "이슈 목록" });
@@ -170,8 +170,6 @@ describe("이슈 목록 — 저장된 보기 (D1)", () => {
 
     await waitFor(() => expect(currentViewId()).not.toBeNull());
     expect(await toolbar().findByRole("button", { name: "보기: 담당자 보드" })).toBeInTheDocument();
-    const nav = within(await screen.findByTestId("nav-views"));
-    expect(nav.getByRole("button", { name: "담당자 보드" })).toBeInTheDocument();
 
     // 고르기 목록 — 개인 보기라 공유 배지가 없다
     await user.click(toolbar().getByRole("button", { name: "보기: 담당자 보드" }));
@@ -220,7 +218,6 @@ describe("이슈 목록 — 저장된 보기 (D1)", () => {
     await user.click(confirm.getByRole("button", { name: "삭제" }));
     expect(await screen.findByRole("table", { name: "이슈 목록" })).toBeInTheDocument();
     expect(await listProjectViews("p1")).toEqual([]);
-    await waitFor(() => expect(screen.queryByTestId("nav-views")).not.toBeInTheDocument());
   });
 
   it("남이 먼저 고친 보기를 업데이트하면(409) 최신 보기를 다시 불러올지 묻는다", async () => {
