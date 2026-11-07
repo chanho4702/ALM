@@ -2929,9 +2929,9 @@ body {
 /* ── 홈 (For you) — 지라처럼 가운데 단일 컬럼 ───────────── */
 
 .home-page {
-  /* 이어서 하기 4장이 한 줄에 들어가는 폭 — .project-list-content의 min(960px) 를 덮는다 */
-  width: min(1040px, 100%);
-  max-width: 1040px;
+  /* 프로젝트 디렉터리와 같은 960px 작업 폭 — 4개 이어서 하기 카드도 한 줄을 유지한다. */
+  width: min(960px, 100%);
+  max-width: 960px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;

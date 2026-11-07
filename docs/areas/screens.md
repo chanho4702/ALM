@@ -52,8 +52,9 @@
   진실이라 새로고침·공유가 되고, 페이지 컴포넌트는 `useParams().section`으로 한 구획만 그린다.
   판별은 `isSettingsPath`, 구획 목록은 `PROJECT_SETTINGS_SECTIONS`/`GLOBAL_SETTINGS_SECTIONS`.
 
-- 전역 사이드바: 최근/별표/프로젝트(보드 중첩)/필터 섹션. 프로젝트 행은 호버 시 ⋯ 메뉴(설정·이슈 목록), 접기(플로팅 엣지 셰브런),
-  드래그 너비 조절(role="separator"). uiStore + `UI_CHANGED_EVENT` 구독으로 갱신.
+- 전역 사이드바: 홈/검색/대시보드 + 필터/즐겨찾기/프로젝트 섹션. 프로젝트 행은 현재 위치만 표시하고,
+  호버 시 ⋯ 메뉴에서 설정·이슈 목록·보드 전환/생성을 제공한다. 프로젝트 화면 전환은 상단 뷰 탭이 담당한다.
+  접기(플로팅 엣지 셰브런)와 드래그 너비 조절(role="separator")은 uiStore + `UI_CHANGED_EVENT`로 갱신한다.
 - 상단바: 전역 검색(SearchModal), 전역 만들기(CreateIssueModal, subtask 제외),
   알림 벨, 전역 관리(⚙), 다크 모드, 사용자/로그아웃.
 - 크로스 프로젝트 화면(홈/검색 모달/검색 페이지)의 상태 표기는 `statusMetaByProject()` 메타로,
