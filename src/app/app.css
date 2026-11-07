@@ -1512,6 +1512,7 @@ body {
   display: flex;
   align-items: flex-end;
   gap: var(--chanho-space-100);
+  width: min(100%, 640px);
 }
 
 .admin-create-form > div {
@@ -1531,11 +1532,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--chanho-space-100);
+  box-shadow: none;
 }
 
 .admin-scheme-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--chanho-space-100);
 }
 
@@ -1554,6 +1557,8 @@ body {
 
 .admin-scheme-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--chanho-space-100);
 }
 
@@ -4487,7 +4492,7 @@ th:last-child > [role="separator"] {
 }
 
 /* 설정 저장은 폼의 끝에 놓이는 단일 명령이다. 폼 폭을 채우지 않고 내용 폭으로 통일한다. */
-.settings-main .project-create-form > button[type="submit"] {
+.project-create-form > button[type="submit"] {
   width: auto;
   align-self: flex-end;
 }
@@ -4534,7 +4539,29 @@ th:last-child > [role="separator"] {
 }
 
 .project-list-content.settings-page {
-  width: 100%;
+  width: min(100%, 1040px);
+  max-width: none;
+  container-type: inline-size;
+}
+
+@container (max-width: 560px) {
+  .admin-create-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-create-form > button {
+    align-self: flex-end;
+  }
+
+  .admin-scheme-count {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .admin-scheme-actions {
+    justify-content: flex-start;
+  }
 }
 
 /* ── 이슈 목록 대량 작업 ──────────────────────────────────── */
