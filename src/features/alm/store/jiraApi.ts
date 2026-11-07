@@ -333,4 +333,8 @@ export {
   listRepositoryWebhooks,
   issueRepositoryWebhook,
   deleteRepositoryWebhook,
+  listScmSyncs,
+  saveScmSync,
+  deleteScmSync,
+  runScmSync,
 } from "./api/development";

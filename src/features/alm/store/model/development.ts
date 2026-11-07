@@ -62,6 +62,8 @@ export interface DevWebhook {
 export interface DevWebhookList {
   /** 서버에 시크릿 암호화 키가 있나 — 없으면 발급할 수 없다(400) */
   encryptionConfigured: boolean;
+  /** 설치가 웹훅 수신을 받나(ALM_SCM_SYNC webhook·both). false면 발급할 수 없다 */
+  webhooksEnabled: boolean;
   webhooks: DevWebhook[];
 }
 
@@ -69,6 +71,50 @@ export interface DevWebhookList {
 export interface DevWebhookIssued {
   webhook: DevWebhook;
   secret: string;
+}
+
+/** 설치 스위치 ALM_SCM_SYNC(V45) */
+export type ScmSyncMode = "webhook" | "polling" | "both";
+export type ScmSyncOutcome = "OK" | "RATE_LIMITED" | "FAILED";
+
+/** 저장소 폴링 동기화 — 토큰 원문은 없다(넣을 때만 보낸다) */
+export interface ScmSync {
+  id: string;
+  repositoryUrl: string;
+  provider: DevWebhookProvider;
+  apiBaseUrl: string;
+  enabled: boolean;
+  actorId: string;
+  createdAt: string;
+  tokenUpdatedAt: string;
+  lastRunAt: string | null;
+  lastSuccessAt: string | null;
+  lastOutcome: ScmSyncOutcome | null;
+  lastMessage: string | null;
+  nextRunAt: string | null;
+  rateLimitedUntil: string | null;
+  failureCount: number;
+  running: boolean;
+}
+
+export interface ScmSyncList {
+  syncMode: ScmSyncMode;
+  webhooksEnabled: boolean;
+  pollingEnabled: boolean;
+  /** 주기 실행이 도나 — false면 "지금 동기화"만 */
+  schedulerActive: boolean;
+  encryptionConfigured: boolean;
+  pollIntervalSeconds: number;
+  repositories: ScmSync[];
+}
+
+/** 등록·수정 — token은 처음엔 필수, 이후엔 바꿀 때만. apiBaseUrl 비우면 서버 기본값 */
+export interface ScmSyncInput {
+  repositoryUrl: string;
+  provider: DevWebhookProvider;
+  apiBaseUrl?: string;
+  token?: string;
+  enabled?: boolean;
 }
 
 /** 프로젝트 개발 설정(V43) — git 브랜치 이름 접두. 저장한 적 없으면 접두 ""·version 0 */
@@ -135,12 +181,16 @@ export interface DevCommit {
 }
 
 /** PR — 웹 링크 kind=PR(link_pr 도구·화면에서 붙인 것) */
+/** PR/MR 상태(V45) — 웹훅·폴링이 채운다. 사람이 붙인 링크·옛 행은 null(모름) */
+export type DevPullRequestState = "OPEN" | "MERGED" | "CLOSED";
+
 export interface DevPullRequest {
   id: string;
   url: string;
   title: string | null;
   createdBy: string;
   createdAt: string;
+  state: DevPullRequestState | null;
 }
 
 export interface DevelopmentSummary {

@@ -83,7 +83,7 @@ describe("이슈 개발 정보", () => {
     expect(dev.commits[1]).toEqual(
       expect.objectContaining({ id: null, source: "WEB_LINK", shortSha: "0123456", title: "https://github.com/a/b/commit/0123456789", authoredAt: null }),
     );
-    expect(dev.pullRequests).toEqual([{ id: "5", url: "https://github.com/a/b/pull/9", title: "PR", createdBy: "7", createdAt: "2026-10-24T00:00:00Z" }]);
+    expect(dev.pullRequests).toEqual([{ id: "5", url: "https://github.com/a/b/pull/9", title: "PR", createdBy: "7", createdAt: "2026-10-24T00:00:00Z", state: null }]);
   });
 
   it("503은 에러로 전파한다(빈 패널로 삼키지 않는다)", async () => {

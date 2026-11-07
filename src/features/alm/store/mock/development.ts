@@ -14,6 +14,9 @@ import type {
   DevWebhookList,
   DevWebhookProvider,
   IssueDevelopment,
+  ScmSync,
+  ScmSyncInput,
+  ScmSyncList,
   JiraData,
   MockDevCommit,
   ProjectCommitPage,
@@ -115,6 +118,7 @@ export async function saveProjectRepositories(projectId: string, inputs: DevRepo
   data.repositories = [...data.repositories.filter((r) => r.projectId !== projectId), ...fresh];
   // 등록에서 빠진 저장소의 웹훅은 함께 지운다(서버 CodeRepositoryService.replace와 같다)
   data.repositoryWebhooks = data.repositoryWebhooks.filter((w) => w.projectId !== projectId || seen.has(w.repositoryUrl));
+  data.scmSyncs = data.scmSyncs.filter((s) => s.projectId !== projectId || seen.has(s.repositoryUrl));
   persist();
   return clone(fresh.map(toRepository));
 }
@@ -181,7 +185,7 @@ export async function getIssueDevelopment(issueId: string): Promise<IssueDevelop
   const commits = [...shown.map((c) => toView(c, null)), ...webCommits];
   const pullRequests = links
     .filter((w) => w.kind === "PR")
-    .map((w) => ({ id: w.id, url: w.url, title: w.title, createdBy: w.createdBy, createdAt: w.createdAt }));
+    .map((w) => ({ id: w.id, url: w.url, title: w.title, createdBy: w.createdBy, createdAt: w.createdAt, state: w.state ?? null }));
   return clone({
     issueId: issue.id,
     issueKey: issue.key,
@@ -388,7 +392,11 @@ export async function listRepositoryWebhooks(projectId: string): Promise<DevWebh
   const data = load();
   requireProject(data, projectId);
   assertCanAdmin(data, projectId);
-  return { encryptionConfigured: true, webhooks: data.repositoryWebhooks.filter((w) => w.projectId === projectId).map(toWebhook) };
+  return {
+    encryptionConfigured: true,
+    webhooksEnabled: true,
+    webhooks: data.repositoryWebhooks.filter((w) => w.projectId === projectId).map(toWebhook),
+  };
 }
 
 export async function issueRepositoryWebhook(
@@ -450,4 +458,125 @@ export async function deleteRepositoryWebhook(projectId: string, webhookId: stri
   data.repositoryWebhooks = data.repositoryWebhooks.filter((w) => !(w.projectId === projectId && w.id === webhookId));
   if (data.repositoryWebhooks.length === before) throw new ApiError(404, "웹훅을 찾을 수 없습니다");
   persist();
+}
+
+// ── 저장소 폴링 동기화(V45) — 목업은 관리만 흉내 낸다(Git 서버를 부르지 않는다). 규칙·문구는 서버 ScmSyncService와 같다 ──
+
+/** 목업 설치 스위치 — 서버 기본값(both)과 같다 */
+const MOCK_POLL_INTERVAL_SECONDS = 300;
+
+function defaultApiBase(provider: DevWebhookProvider, repositoryUrl: string): string {
+  const url = new URL(repositoryUrl);
+  if (provider === "GITHUB") return url.hostname === "github.com" ? "https://api.github.com" : `${url.origin}/api/v3`;
+  return `${url.origin}/api/v4`;
+}
+
+function validateApiBase(raw: string, repositoryUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    throw bad("API 주소 형식이 올바르지 않습니다");
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw bad("API 주소는 http(s) 주소여야 합니다");
+  if (url.username || url.password || url.search || url.hash) throw bad("API 주소에 계정 정보·질의·조각을 넣을 수 없습니다");
+  const repoHost = new URL(repositoryUrl).hostname.toLowerCase();
+  const host = url.hostname.toLowerCase();
+  if (host !== repoHost && host !== `api.${repoHost}`) throw bad(`API 주소의 호스트는 저장소 호스트(${repoHost})여야 합니다`);
+  return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}`;
+}
+
+const toScmSync = ({ projectId: _projectId, ...sync }: ScmSync & { projectId: string }): ScmSync => clone(sync);
+
+export async function listScmSyncs(projectId: string): Promise<ScmSyncList> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  return {
+    syncMode: "both",
+    webhooksEnabled: true,
+    pollingEnabled: true,
+    schedulerActive: true,
+    encryptionConfigured: true,
+    pollIntervalSeconds: MOCK_POLL_INTERVAL_SECONDS,
+    repositories: data.scmSyncs.filter((s) => s.projectId === projectId).map(toScmSync),
+  };
+}
+
+export async function saveScmSync(projectId: string, input: ScmSyncInput): Promise<ScmSync> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  const url = normalizeRepositoryUrl(input.repositoryUrl);
+  if (!data.repositories.some((r) => r.projectId === projectId && r.url === url)) {
+    throw bad(`먼저 저장소를 프로젝트에 등록하세요: ${url}`);
+  }
+  if (input.provider !== "GITHUB" && input.provider !== "GITLAB") throw bad("제공자는 GITHUB 또는 GITLAB이어야 합니다");
+  const apiBaseUrl = input.apiBaseUrl?.trim() ? validateApiBase(input.apiBaseUrl, url) : defaultApiBase(input.provider, url);
+  const token = input.token?.trim() || null;
+  if (token && (token.length > 1000 || /[\s\u0000-\u001f\u007f]/.test(token))) {
+    throw bad("토큰 형식이 올바르지 않습니다(공백·제어 문자 없이 1000자 이하)");
+  }
+  const now = new Date().toISOString();
+  let sync = data.scmSyncs.find((s) => s.projectId === projectId && s.repositoryUrl === url);
+  if (!sync) {
+    if (!token) throw bad("읽기 토큰을 입력하세요");
+    sync = {
+      id: nextId(),
+      projectId,
+      repositoryUrl: url,
+      provider: input.provider,
+      apiBaseUrl,
+      enabled: input.enabled ?? true,
+      actorId: CURRENT_USER_ID,
+      createdAt: now,
+      tokenUpdatedAt: now,
+      lastRunAt: null,
+      lastSuccessAt: null,
+      lastOutcome: null,
+      lastMessage: null,
+      nextRunAt: now,
+      rateLimitedUntil: null,
+      failureCount: 0,
+      running: false,
+    };
+    data.scmSyncs.push(sync);
+  } else {
+    sync.provider = input.provider;
+    sync.apiBaseUrl = apiBaseUrl;
+    if (input.enabled !== undefined) sync.enabled = input.enabled;
+    if (token) Object.assign(sync, { actorId: CURRENT_USER_ID, tokenUpdatedAt: now, failureCount: 0, rateLimitedUntil: null, nextRunAt: now });
+  }
+  persist();
+  return toScmSync(sync);
+}
+
+export async function deleteScmSync(projectId: string, syncId: string): Promise<void> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  const before = data.scmSyncs.length;
+  data.scmSyncs = data.scmSyncs.filter((s) => !(s.projectId === projectId && s.id === syncId));
+  if (data.scmSyncs.length === before) throw new ApiError(404, "동기화 설정을 찾을 수 없습니다");
+  persist();
+}
+
+/** 목업 "지금 동기화" — Git 서버가 없으니 늘 "변경 없음"으로 성공한다 */
+export async function runScmSync(projectId: string, syncId: string): Promise<ScmSync> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  const sync = data.scmSyncs.find((s) => s.projectId === projectId && s.id === syncId);
+  if (!sync) throw new ApiError(404, "동기화 설정을 찾을 수 없습니다");
+  const now = new Date();
+  Object.assign(sync, {
+    lastRunAt: now.toISOString(),
+    lastSuccessAt: now.toISOString(),
+    lastOutcome: "OK",
+    lastMessage: "변경 없음",
+    failureCount: 0,
+    nextRunAt: new Date(now.getTime() + MOCK_POLL_INTERVAL_SECONDS * 1000).toISOString(),
+  });
+  persist();
+  return toScmSync(sync);
 }

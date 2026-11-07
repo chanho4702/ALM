@@ -379,6 +379,10 @@ export {
   listRepositoryWebhooks,
   issueRepositoryWebhook,
   deleteRepositoryWebhook,
+  listScmSyncs,
+  saveScmSync,
+  deleteScmSync,
+  runScmSync,
 } from "./mock/development";
 export { __ingestMockCommits } from "./mock/development";
 export type { MockCommitIngest } from "./mock/development";

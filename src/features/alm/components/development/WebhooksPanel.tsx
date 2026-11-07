@@ -181,7 +181,13 @@ export function WebhooksPanel({ projectId, repositories }: WebhooksPanelProps) {
   } else {
     body = (
       <>
-        {!list.encryptionConfigured ? (
+        {!list.webhooksEnabled ? (
+          <Banner variant="info">
+            이 설치는 웹훅 수신을 쓰지 않습니다(ALM_SCM_SYNC=polling) — 아래 폴링 동기화로 커밋·PR을 가져옵니다. 이미 만든 웹훅으로 오는
+            이벤트는 거부됩니다.
+          </Banner>
+        ) : null}
+        {list.webhooksEnabled && !list.encryptionConfigured ? (
           <Banner variant="warning">
             서버에 시크릿 암호화 키(ALM_SETTINGS_ENC_KEY)가 없어 웹훅을 만들 수 없습니다. 운영자에게 설정을 요청하세요.
           </Banner>
@@ -253,7 +259,7 @@ export function WebhooksPanel({ projectId, repositories }: WebhooksPanelProps) {
                         variant="secondary"
                         iconBefore={<KeyRound size={14} />}
                         loading={busy}
-                        disabled={busy || !list.encryptionConfigured}
+                        disabled={busy || !list.encryptionConfigured || !list.webhooksEnabled}
                         onClick={() => void issue(repo.url, hook.provider, true)}
                       >
                         시크릿 재발급
@@ -284,7 +290,7 @@ export function WebhooksPanel({ projectId, repositories }: WebhooksPanelProps) {
                       type="button"
                       iconBefore={<Webhook size={14} />}
                       loading={busy}
-                      disabled={busy || !list.encryptionConfigured}
+                      disabled={busy || !list.encryptionConfigured || !list.webhooksEnabled}
                       onClick={() => void issue(repo.url, provider, false)}
                     >
                       웹훅 만들기

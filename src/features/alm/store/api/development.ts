@@ -13,7 +13,11 @@ import type {
   DevWebhookList,
   DevWebhookOutcome,
   DevWebhookProvider,
+  DevPullRequestState,
   IssueDevelopment,
+  ScmSync,
+  ScmSyncInput,
+  ScmSyncList,
   ProjectCommitPage,
   ProjectCommitQuery,
 } from "../types";
@@ -55,7 +59,10 @@ interface PullRequestDto {
   title: string | null;
   createdBy: number;
   createdAt: string;
+  state?: string | null;
 }
+
+const PR_STATES: readonly DevPullRequestState[] = ["OPEN", "MERGED", "CLOSED"];
 
 interface DevelopmentDto {
   issueId: number;
@@ -104,6 +111,8 @@ const mapPullRequest = (dto: PullRequestDto): DevPullRequest => ({
   title: dto.title ?? null,
   createdBy: String(dto.createdBy),
   createdAt: dto.createdAt,
+  // 모르는 값·옛 서버(필드 없음)는 null — 상태를 그리지 않는다
+  state: PR_STATES.includes(dto.state as DevPullRequestState) ? (dto.state as DevPullRequestState) : null,
 });
 
 export function mapDevelopment(dto: DevelopmentDto): IssueDevelopment {
@@ -256,10 +265,15 @@ export function mapWebhook(dto: WebhookDto): DevWebhook {
 
 /** 관리자만(목록도 — 최근 수신에 저장소 활동이 보인다) */
 export async function listRepositoryWebhooks(projectId: string): Promise<DevWebhookList> {
-  const dto = await json<{ encryptionConfigured: boolean; webhooks?: WebhookDto[] | null }>(
+  const dto = await json<{ encryptionConfigured: boolean; webhooksEnabled?: boolean; webhooks?: WebhookDto[] | null }>(
     await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/webhooks`),
   );
-  return { encryptionConfigured: dto.encryptionConfigured === true, webhooks: (dto.webhooks ?? []).map(mapWebhook) };
+  return {
+    encryptionConfigured: dto.encryptionConfigured === true,
+    // 옛 서버(필드 없음)는 웹훅만 있던 때라 켜진 것으로 본다
+    webhooksEnabled: dto.webhooksEnabled !== false,
+    webhooks: (dto.webhooks ?? []).map(mapWebhook),
+  };
 }
 
 /** 만들기·재발급 — 같은 저장소면 경로는 그대로, 시크릿만 새로. `secret`은 이 응답에서만 보인다 */
@@ -281,5 +295,98 @@ export async function deleteRepositoryWebhook(projectId: string, webhookId: stri
     await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/webhooks/${toBackendId(webhookId)}`, {
       method: "DELETE",
     }),
+  );
+}
+
+// ── 저장소 폴링 동기화(V45) — GET/PUT /projects/{id}/settings/scm-sync, DELETE …/{id}, POST …/{id}/run ──
+
+interface ScmSyncDto {
+  id: number;
+  repositoryUrl: string;
+  provider: string;
+  apiBaseUrl: string;
+  enabled: boolean;
+  actorId: number;
+  createdAt: string;
+  tokenUpdatedAt: string;
+  lastRunAt: string | null;
+  lastSuccessAt: string | null;
+  lastOutcome: string | null;
+  lastMessage: string | null;
+  nextRunAt: string | null;
+  rateLimitedUntil: string | null;
+  failureCount: number;
+  running: boolean;
+}
+
+export function mapScmSync(dto: ScmSyncDto): ScmSync {
+  const outcome = dto.lastOutcome;
+  return {
+    id: String(dto.id),
+    repositoryUrl: dto.repositoryUrl,
+    provider: dto.provider === "GITLAB" ? "GITLAB" : "GITHUB",
+    apiBaseUrl: dto.apiBaseUrl,
+    enabled: dto.enabled !== false,
+    actorId: String(dto.actorId),
+    createdAt: dto.createdAt,
+    tokenUpdatedAt: dto.tokenUpdatedAt,
+    lastRunAt: dto.lastRunAt ?? null,
+    lastSuccessAt: dto.lastSuccessAt ?? null,
+    // 모르는 결과는 실패로 — 문구(lastMessage)는 그대로 뜬다
+    lastOutcome: outcome === "OK" || outcome === "RATE_LIMITED" || outcome === "FAILED" ? outcome : outcome ? "FAILED" : null,
+    lastMessage: dto.lastMessage ?? null,
+    nextRunAt: dto.nextRunAt ?? null,
+    rateLimitedUntil: dto.rateLimitedUntil ?? null,
+    failureCount: dto.failureCount ?? 0,
+    running: dto.running === true,
+  };
+}
+
+/** 관리자만 */
+export async function listScmSyncs(projectId: string): Promise<ScmSyncList> {
+  const dto = await json<{
+    syncMode: string;
+    webhooksEnabled: boolean;
+    pollingEnabled: boolean;
+    schedulerActive: boolean;
+    encryptionConfigured: boolean;
+    pollIntervalSeconds: number;
+    repositories?: ScmSyncDto[] | null;
+  }>(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/scm-sync`));
+  const mode = dto.syncMode === "webhook" || dto.syncMode === "polling" ? dto.syncMode : "both";
+  return {
+    syncMode: mode,
+    webhooksEnabled: dto.webhooksEnabled !== false,
+    pollingEnabled: dto.pollingEnabled === true,
+    schedulerActive: dto.schedulerActive === true,
+    encryptionConfigured: dto.encryptionConfigured === true,
+    pollIntervalSeconds: dto.pollIntervalSeconds,
+    repositories: (dto.repositories ?? []).map(mapScmSync),
+  };
+}
+
+/** 등록·수정 — 빈 토큰·API 주소는 보내지 않는다(서버가 기존 토큰·기본 주소를 쓴다) */
+export async function saveScmSync(projectId: string, input: ScmSyncInput): Promise<ScmSync> {
+  const body: Record<string, unknown> = { repositoryUrl: input.repositoryUrl, provider: input.provider };
+  if (input.apiBaseUrl?.trim()) body.apiBaseUrl = input.apiBaseUrl.trim();
+  if (input.token?.trim()) body.token = input.token.trim();
+  if (input.enabled !== undefined) body.enabled = input.enabled;
+  return mapScmSync(
+    await json<ScmSyncDto>(await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/scm-sync`, jsonBody(body))),
+  );
+}
+
+export async function deleteScmSync(projectId: string, syncId: string): Promise<void> {
+  await json(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/scm-sync/${toBackendId(syncId)}`, { method: "DELETE" }),
+  );
+}
+
+/** 지금 동기화 — 요청 안에서 한 번 돈다. 실행 중·레이트 리밋 대기면 409 {error} */
+export async function runScmSync(projectId: string, syncId: string): Promise<ScmSync> {
+  return mapScmSync(
+    await json<ScmSyncDto>(
+      await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/scm-sync/${toBackendId(syncId)}/run`, postJson({})),
+    ),
   );
 }

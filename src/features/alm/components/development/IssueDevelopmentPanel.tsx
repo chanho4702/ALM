@@ -1,12 +1,41 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, SkeletonListItem } from "@chanho/react";
-import { ChevronDown, ChevronRight, ExternalLink, GitBranch, GitCommitHorizontal, GitPullRequest, RotateCw } from "lucide-react";
-import type { IssueDevelopment } from "../../store/types";
+import { Button, Lozenge, SkeletonListItem } from "@chanho/react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  GitBranch,
+  GitCommitHorizontal,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  RotateCw,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { DevPullRequestState, IssueDevelopment } from "../../store/types";
 import { getIssueDevelopment } from "../../store/jiraStore";
 import { errorStatus } from "../../store/mapping";
 import { formatDateTime, relTime } from "../time";
 import { DevCommitRow } from "./DevCommitRow";
 import "./development.css";
+
+/** PR 상태(V45) — 아이콘 + 텍스트. 모르면(null) 그리지 않는다 */
+const PR_STATE_LABELS: Record<DevPullRequestState, string> = { OPEN: "열림", MERGED: "병합됨", CLOSED: "닫힘" };
+const PR_STATE_ICONS: Record<DevPullRequestState, LucideIcon> = { OPEN: GitPullRequest, MERGED: GitMerge, CLOSED: GitPullRequestClosed };
+const PR_STATE_APPEARANCE: Record<DevPullRequestState, "info" | "success" | "neutral"> = {
+  OPEN: "info",
+  MERGED: "success",
+  CLOSED: "neutral",
+};
+
+export function PullRequestStateLozenge({ state }: { state: DevPullRequestState }) {
+  const Icon = PR_STATE_ICONS[state];
+  return (
+    <Lozenge appearance={PR_STATE_APPEARANCE[state]}>
+      <Icon size={12} aria-hidden /> {PR_STATE_LABELS[state]}
+    </Lozenge>
+  );
+}
 
 export interface IssueDevelopmentPanelProps {
   issueId: string;
@@ -136,6 +165,7 @@ export function IssueDevelopmentPanel({ issueId, issueKey, onCopyBranch, refresh
                             <ExternalLink size={12} aria-hidden />
                           </a>
                           <span className="dev-commit-meta">
+                            {pr.state ? <PullRequestStateLozenge state={pr.state} /> : null}
                             <time dateTime={pr.createdAt} title={formatDateTime(pr.createdAt)}>
                               {relTime(pr.createdAt)}
                             </time>

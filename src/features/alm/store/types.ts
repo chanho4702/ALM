@@ -274,6 +274,12 @@ export type {
   DevWebhook,
   DevWebhookList,
   DevWebhookIssued,
+  DevPullRequestState,
+  ScmSyncMode,
+  ScmSyncOutcome,
+  ScmSync,
+  ScmSyncList,
+  ScmSyncInput,
 } from "./model/development";
 export {
   BRANCH_PREFIX_MAX,

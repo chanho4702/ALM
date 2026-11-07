@@ -6,7 +6,7 @@ import type { Board } from "./board";
 import type { SettingsScheme, ProjectSettingsEntry } from "./settings";
 import type { SavedView, AutomationRule, AutomationRun } from "./planning";
 import type { PlanningSettings } from "./cycles";
-import type { DevRepository, DevWebhook } from "./development";
+import type { DevRepository, DevWebhook, ScmSync } from "./development";
 
 /** 트리아지 대기열 한 줄(목업 전용 저장 — 서버는 issue.triage_* 컬럼) */
 export interface MockTriageEntry {
@@ -83,6 +83,12 @@ export interface JiraData {
   devSettings: Record<string, { branchPrefix: string; version: number }>;
   /** 저장소 웹훅(V44) — 목업은 수신하지 않는다(시크릿 원문도 두지 않는다). 옛 저장분에는 없다(normalize가 채운다) */
   repositoryWebhooks: MockRepositoryWebhook[];
+  /** 저장소 폴링 동기화(V45) — 목업은 Git 서버를 부르지 않는다(지금 동기화 = "변경 없음"). 토큰 원문도 두지 않는다 */
+  scmSyncs: MockScmSync[];
+}
+
+export interface MockScmSync extends ScmSync {
+  projectId: string;
 }
 
 /** 목업 웹훅 한 줄 — 서버 repository_webhook(시크릿 암호문 제외) */

@@ -337,6 +337,7 @@ export function createSeedData(options: { rich?: boolean } = {}): JiraData {
     devCommits: seedCommits(daysAgo),
     devSettings: {},
     repositoryWebhooks: [],
+    scmSyncs: [],
     triageEntries: [],
     automationRules: [],
     automationRuns: [],

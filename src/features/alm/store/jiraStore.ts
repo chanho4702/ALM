@@ -360,3 +360,10 @@ export const updateDevSettings = impl.updateDevSettings;
 export const listRepositoryWebhooks = impl.listRepositoryWebhooks;
 export const issueRepositoryWebhook = impl.issueRepositoryWebhook;
 export const deleteRepositoryWebhook = impl.deleteRepositoryWebhook;
+/**
+ * 저장소 폴링 동기화(V45) — 폐쇄망 등에서 ALM이 Git API를 읽는다(설치 스위치 ALM_SCM_SYNC). 관리자만, 토큰은 넣을 때만 보낸다.
+ */
+export const listScmSyncs = impl.listScmSyncs;
+export const saveScmSync = impl.saveScmSync;
+export const deleteScmSync = impl.deleteScmSync;
+export const runScmSync = impl.runScmSync;

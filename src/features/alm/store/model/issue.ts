@@ -305,6 +305,8 @@ export interface WebLink {
   kind: WebLinkKind;
   createdBy: string;
   createdAt: string;
+  /** PR 상태(V45, kind=PR만) — 웹훅·폴링이 채운다. 목업 시드·사람이 붙인 링크는 없음 */
+  state?: "OPEN" | "MERGED" | "CLOSED" | null;
 }
 
 export interface WebLinkInput {
