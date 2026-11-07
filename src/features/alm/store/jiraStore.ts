@@ -353,3 +353,10 @@ export const listProjectCommits = impl.listProjectCommits;
 /** 프로젝트 개발 설정(V43) — git 브랜치 이름 접두(읽기 누구나, 쓰기 관리자·expectedVersion 409) */
 export const getDevSettings = impl.getDevSettings;
 export const updateDevSettings = impl.updateDevSettings;
+/**
+ * 저장소 웹훅(V44) — GitHub push·pull_request / GitLab Push·Merge Request를 받아 커밋·PR을 이슈에 잇는다.
+ * 관리(목록·발급·삭제)는 프로젝트 관리자만, 시크릿 원문은 발급 응답에 한 번만 온다.
+ */
+export const listRepositoryWebhooks = impl.listRepositoryWebhooks;
+export const issueRepositoryWebhook = impl.issueRepositoryWebhook;
+export const deleteRepositoryWebhook = impl.deleteRepositoryWebhook;

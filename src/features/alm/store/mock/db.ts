@@ -348,6 +348,7 @@ function normalize(data: JiraData): JiraData {
   data.repositories ??= [];
   data.devCommits ??= [];
   data.devSettings ??= {};
+  data.repositoryWebhooks ??= [];
   data.notifications ??= [];
   data.boards ??= [];
   data.links ??= [];

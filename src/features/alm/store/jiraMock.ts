@@ -376,6 +376,9 @@ export {
   listProjectCommits,
   getDevSettings,
   updateDevSettings,
+  listRepositoryWebhooks,
+  issueRepositoryWebhook,
+  deleteRepositoryWebhook,
 } from "./mock/development";
 export { __ingestMockCommits } from "./mock/development";
 export type { MockCommitIngest } from "./mock/development";

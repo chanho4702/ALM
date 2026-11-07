@@ -9,6 +9,10 @@ import type {
   DevCommit,
   DevRepository,
   DevRepositoryInput,
+  DevWebhook,
+  DevWebhookIssued,
+  DevWebhookList,
+  DevWebhookProvider,
   IssueDevelopment,
   JiraData,
   MockDevCommit,
@@ -109,6 +113,8 @@ export async function saveProjectRepositories(projectId: string, inputs: DevRepo
     return { id: nextId(), projectId, name, url, defaultBranch };
   });
   data.repositories = [...data.repositories.filter((r) => r.projectId !== projectId), ...fresh];
+  // 등록에서 빠진 저장소의 웹훅은 함께 지운다(서버 CodeRepositoryService.replace와 같다)
+  data.repositoryWebhooks = data.repositoryWebhooks.filter((w) => w.projectId !== projectId || seen.has(w.repositoryUrl));
   persist();
   return clone(fresh.map(toRepository));
 }
@@ -359,4 +365,89 @@ export async function updateDevSettings(
   data.devSettings[projectId] = next;
   persist();
   return { projectId, ...next };
+}
+
+// ── 저장소 웹훅(V44) — 목업은 관리만 흉내 낸다(수신 없음). 규칙·문구는 서버 RepositoryWebhookService와 같다 ──
+
+function randomHex(bytes: number): string {
+  const buf = new Uint8Array(bytes);
+  globalThis.crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function randomPublicId(): string {
+  const buf = new Uint8Array(24);
+  globalThis.crypto.getRandomValues(buf);
+  return btoa(String.fromCharCode(...buf)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+const toWebhook = ({ projectId: _projectId, ...hook }: DevWebhook & { projectId: string }): DevWebhook => clone(hook);
+
+/** 관리자만 — 목업에는 암호화 키 개념이 없어 늘 발급할 수 있다 */
+export async function listRepositoryWebhooks(projectId: string): Promise<DevWebhookList> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  return { encryptionConfigured: true, webhooks: data.repositoryWebhooks.filter((w) => w.projectId === projectId).map(toWebhook) };
+}
+
+export async function issueRepositoryWebhook(
+  projectId: string,
+  input: { repositoryUrl: string; provider: DevWebhookProvider },
+): Promise<DevWebhookIssued> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  const provider = input.provider === "GITLAB" ? "GITLAB" : input.provider === "GITHUB" || !input.provider ? "GITHUB" : null;
+  if (!provider) throw bad("웹훅 제공자는 GITHUB 또는 GITLAB이어야 합니다");
+  const url = normalizeRepositoryUrl(input.repositoryUrl);
+  if (!data.repositories.some((r) => r.projectId === projectId && r.url === url)) {
+    throw bad(`먼저 저장소를 프로젝트에 등록하세요: ${url}`);
+  }
+  const secret = randomHex(32);
+  const now = new Date().toISOString();
+  let hook = data.repositoryWebhooks.find((w) => w.projectId === projectId && w.repositoryUrl === url);
+  if (hook) {
+    Object.assign(hook, {
+      provider,
+      actorId: CURRENT_USER_ID,
+      secretRotatedAt: now,
+      lastDeliveryAt: null,
+      lastEvent: null,
+      lastOutcome: null,
+      lastMessage: null,
+    });
+    const publicId = hook.payloadPath.slice(hook.payloadPath.lastIndexOf("/") + 1);
+    hook.payloadPath = `/api/alm/webhooks/${provider.toLowerCase()}/${publicId}`;
+  } else {
+    hook = {
+      id: nextId(),
+      projectId,
+      repositoryUrl: url,
+      provider,
+      payloadPath: `/api/alm/webhooks/${provider.toLowerCase()}/${randomPublicId()}`,
+      payloadUrl: null,
+      actorId: CURRENT_USER_ID,
+      createdAt: now,
+      secretRotatedAt: now,
+      lastDeliveryAt: null,
+      lastEvent: null,
+      lastOutcome: null,
+      lastMessage: null,
+      recentDeliveries: [],
+    };
+    data.repositoryWebhooks.push(hook);
+  }
+  persist();
+  return { webhook: toWebhook(hook), secret };
+}
+
+export async function deleteRepositoryWebhook(projectId: string, webhookId: string): Promise<void> {
+  const data = load();
+  requireProject(data, projectId);
+  assertCanAdmin(data, projectId);
+  const before = data.repositoryWebhooks.length;
+  data.repositoryWebhooks = data.repositoryWebhooks.filter((w) => !(w.projectId === projectId && w.id === webhookId));
+  if (data.repositoryWebhooks.length === before) throw new ApiError(404, "웹훅을 찾을 수 없습니다");
+  persist();
 }

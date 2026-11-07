@@ -268,6 +268,12 @@ export type {
   ProjectCommitQuery,
   ProjectCommitPage,
   DevSettings,
+  DevWebhookProvider,
+  DevWebhookOutcome,
+  DevWebhookDelivery,
+  DevWebhook,
+  DevWebhookList,
+  DevWebhookIssued,
 } from "./model/development";
 export {
   BRANCH_PREFIX_MAX,

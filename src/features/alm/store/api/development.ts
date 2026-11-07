@@ -8,12 +8,17 @@ import type {
   DevPullRequest,
   DevRepository,
   DevRepositoryInput,
+  DevWebhook,
+  DevWebhookIssued,
+  DevWebhookList,
+  DevWebhookOutcome,
+  DevWebhookProvider,
   IssueDevelopment,
   ProjectCommitPage,
   ProjectCommitQuery,
 } from "../types";
 import { toBackendId } from "../mapping";
-import { json, jsonBody, searchParams, sharedApiFetch } from "./http";
+import { json, jsonBody, postJson, searchParams, sharedApiFetch } from "./http";
 
 interface RepositoryDto {
   id: number;
@@ -191,5 +196,90 @@ export async function updateDevSettings(
         jsonBody({ branchPrefix: input.branchPrefix, expectedVersion: input.expectedVersion }),
       ),
     ),
+  );
+}
+
+// ── 저장소 웹훅(V44) — 관리 GET/POST /projects/{id}/settings/webhooks, DELETE …/webhooks/{id}. 수신은 GitHub·GitLab 몫 ──
+
+interface WebhookDeliveryDto {
+  deliveryId: string;
+  event: string;
+  outcome: string;
+  message: string | null;
+  receivedAt: string;
+}
+
+interface WebhookDto {
+  id: number;
+  repositoryUrl: string;
+  provider: string;
+  payloadPath: string;
+  payloadUrl: string | null;
+  actorId: number;
+  createdAt: string;
+  secretRotatedAt: string;
+  lastDeliveryAt: string | null;
+  lastEvent: string | null;
+  lastOutcome: string | null;
+  lastMessage: string | null;
+  recentDeliveries?: WebhookDeliveryDto[] | null;
+}
+
+const OUTCOMES: readonly DevWebhookOutcome[] = ["PROCESSED", "IGNORED", "PING", "REJECTED", "FAILED"];
+/** 모르는 값(서버가 늘린 결과)은 실패로 보이지 않게 IGNORED로 — 문구(message)는 그대로 뜬다 */
+const toOutcome = (value: string | null | undefined): DevWebhookOutcome =>
+  OUTCOMES.includes(value as DevWebhookOutcome) ? (value as DevWebhookOutcome) : "IGNORED";
+
+export function mapWebhook(dto: WebhookDto): DevWebhook {
+  return {
+    id: String(dto.id),
+    repositoryUrl: dto.repositoryUrl,
+    provider: dto.provider === "GITLAB" ? "GITLAB" : "GITHUB",
+    payloadPath: dto.payloadPath,
+    payloadUrl: dto.payloadUrl ?? null,
+    actorId: String(dto.actorId),
+    createdAt: dto.createdAt,
+    secretRotatedAt: dto.secretRotatedAt,
+    lastDeliveryAt: dto.lastDeliveryAt ?? null,
+    lastEvent: dto.lastEvent ?? null,
+    lastOutcome: dto.lastOutcome ? toOutcome(dto.lastOutcome) : null,
+    lastMessage: dto.lastMessage ?? null,
+    recentDeliveries: (dto.recentDeliveries ?? []).map((d) => ({
+      deliveryId: d.deliveryId,
+      event: d.event,
+      outcome: toOutcome(d.outcome),
+      message: d.message ?? null,
+      receivedAt: d.receivedAt,
+    })),
+  };
+}
+
+/** 관리자만(목록도 — 최근 수신에 저장소 활동이 보인다) */
+export async function listRepositoryWebhooks(projectId: string): Promise<DevWebhookList> {
+  const dto = await json<{ encryptionConfigured: boolean; webhooks?: WebhookDto[] | null }>(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/webhooks`),
+  );
+  return { encryptionConfigured: dto.encryptionConfigured === true, webhooks: (dto.webhooks ?? []).map(mapWebhook) };
+}
+
+/** 만들기·재발급 — 같은 저장소면 경로는 그대로, 시크릿만 새로. `secret`은 이 응답에서만 보인다 */
+export async function issueRepositoryWebhook(
+  projectId: string,
+  input: { repositoryUrl: string; provider: DevWebhookProvider },
+): Promise<DevWebhookIssued> {
+  const dto = await json<{ webhook: WebhookDto; secret: string }>(
+    await sharedApiFetch(
+      `/api/alm/projects/${toBackendId(projectId)}/settings/webhooks`,
+      postJson({ repositoryUrl: input.repositoryUrl, provider: input.provider }),
+    ),
+  );
+  return { webhook: mapWebhook(dto.webhook), secret: dto.secret };
+}
+
+export async function deleteRepositoryWebhook(projectId: string, webhookId: string): Promise<void> {
+  await json(
+    await sharedApiFetch(`/api/alm/projects/${toBackendId(projectId)}/settings/webhooks/${toBackendId(webhookId)}`, {
+      method: "DELETE",
+    }),
   );
 }

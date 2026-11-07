@@ -7,6 +7,7 @@ import type { DevRepository } from "../../store/types";
 import { MAX_PROJECT_REPOSITORIES } from "../../store/types";
 import { listProjectRepositories, saveProjectRepositories } from "../../store/jiraStore";
 import { describeDevelopmentError } from "./IssueDevelopmentPanel";
+import { WebhooksPanel } from "./WebhooksPanel";
 import "./development.css";
 
 export interface RepositoriesPanelProps {
@@ -205,6 +206,8 @@ export function RepositoriesPanel({ projectId, projectKey, canManage }: Reposito
           </>
         )}
       </Card>
+      {/* 웹훅(V44) — 관리자만. 서버 값(saved)이 바뀌면 다시 읽는다(빠진 저장소의 웹훅은 서버가 지운다) */}
+      {canManage && saved !== null ? <WebhooksPanel projectId={projectId} repositories={saved} /> : null}
     </div>
   );
 }

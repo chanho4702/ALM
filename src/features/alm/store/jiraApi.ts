@@ -330,4 +330,7 @@ export {
   listProjectCommits,
   getDevSettings,
   updateDevSettings,
+  listRepositoryWebhooks,
+  issueRepositoryWebhook,
+  deleteRepositoryWebhook,
 } from "./api/development";

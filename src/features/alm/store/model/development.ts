@@ -21,6 +21,56 @@ export interface DevRepositoryInput {
 /** 프로젝트당 저장소 상한(서버 `CodeRepositoryService.MAX_REPOSITORIES`) */
 export const MAX_PROJECT_REPOSITORIES = 20;
 
+/** 저장소 웹훅 제공자(V44) — 수신 경로 `/api/alm/webhooks/{github|gitlab}/{id}` */
+export type DevWebhookProvider = "GITHUB" | "GITLAB";
+
+/**
+ * 웹훅 수신 결과 — PROCESSED(처리) · IGNORED(처리하지 않는 이벤트) · PING(GitHub 연결 확인) ·
+ * REJECTED(서명·저장소 불일치) · FAILED(처리 실패 — 호스팅에서 재전송하면 다시 처리)
+ */
+export type DevWebhookOutcome = "PROCESSED" | "IGNORED" | "PING" | "REJECTED" | "FAILED";
+
+/** 처리한 전달 한 건(최근 10건만 온다) */
+export interface DevWebhookDelivery {
+  deliveryId: string;
+  event: string;
+  outcome: DevWebhookOutcome;
+  message: string | null;
+  receivedAt: string;
+}
+
+/** 저장소 웹훅(V44) — 시크릿 원문은 없다(발급 응답에 한 번만) */
+export interface DevWebhook {
+  id: string;
+  repositoryUrl: string;
+  provider: DevWebhookProvider;
+  /** `/api/alm/webhooks/github/…` — 공개 주소 뒤에 붙인다 */
+  payloadPath: string;
+  /** 서버에 공개 주소(ALM_WEBHOOK_PUBLIC_URL)가 있을 때만 전체 URL. 없으면 화면이 자기 오리진으로 만든다 */
+  payloadUrl: string | null;
+  /** 이벤트를 처리할 때 권한을 쓰는 사람(시크릿을 마지막으로 발급한 관리자) */
+  actorId: string;
+  createdAt: string;
+  secretRotatedAt: string;
+  lastDeliveryAt: string | null;
+  lastEvent: string | null;
+  lastOutcome: DevWebhookOutcome | null;
+  lastMessage: string | null;
+  recentDeliveries: DevWebhookDelivery[];
+}
+
+export interface DevWebhookList {
+  /** 서버에 시크릿 암호화 키가 있나 — 없으면 발급할 수 없다(400) */
+  encryptionConfigured: boolean;
+  webhooks: DevWebhook[];
+}
+
+/** 발급·재발급 결과 — `secret`은 이때 한 번만 보인다 */
+export interface DevWebhookIssued {
+  webhook: DevWebhook;
+  secret: string;
+}
+
 /** 프로젝트 개발 설정(V43) — git 브랜치 이름 접두. 저장한 적 없으면 접두 ""·version 0 */
 export interface DevSettings {
   projectId: string;

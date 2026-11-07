@@ -330,3 +330,95 @@ a.dev-commit-title:focus-visible {
     justify-content: flex-start;
   }
 }
+
+/* 저장소 웹훅(V44) */
+.webhook-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-200);
+  margin: var(--chanho-space-150) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.webhook-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-100);
+  padding: var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+}
+
+.webhook-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.webhook-provider {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.webhook-field {
+  display: flex;
+  align-items: center;
+  gap: var(--chanho-space-100);
+  min-width: 0;
+}
+
+.webhook-field-label {
+  flex: none;
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-subtle);
+}
+
+.webhook-field-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: var(--chanho-space-50) var(--chanho-space-75);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-neutral);
+  font-size: var(--chanho-font-size-75);
+}
+
+.webhook-secret-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chanho-space-50);
+}
+
+.webhook-status,
+.webhook-deliveries li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--chanho-space-100);
+}
+
+.webhook-status-text {
+  color: var(--chanho-color-text-default);
+  font-size: var(--chanho-font-size-75);
+}
+
+.webhook-deliveries summary {
+  cursor: pointer;
+  font-size: var(--chanho-font-size-75);
+  color: var(--chanho-color-text-subtle);
+}
+
+.webhook-deliveries ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--chanho-space-75);
+  margin: var(--chanho-space-75) 0 0;
+  padding: 0;
+  list-style: none;
+}
