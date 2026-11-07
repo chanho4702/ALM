@@ -37,7 +37,7 @@ beforeEach(() => {
 describe("App 라우팅과 전역 셸", () => {
   it("루트 접근 시 For you 홈(/home)이 열리고 전역 사이드바가 보인다", async () => {
     renderApp();
-    expect(await screen.findByRole("heading", { name: /안녕하세요/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "오늘의 작업" })).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("/home");
     // 전역 사이드바: 홈/프로젝트 + 프로젝트 목록
     const nav = globalNav();
@@ -161,7 +161,7 @@ describe("App 라우팅과 전역 셸", () => {
   it("리사이즈 핸들 키보드(→/Home)로 사이드바 너비를 조절한다", async () => {
     const user = userEvent.setup();
     renderApp("/home");
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     const resizer = within(globalNav()).getByRole("separator", { name: "사이드바 너비 조절" });
     expect(resizer).toHaveAttribute("aria-valuenow", "240");

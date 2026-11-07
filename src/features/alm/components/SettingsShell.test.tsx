@@ -73,7 +73,7 @@ describe("설정 셸 — 설정은 뷰 탭이 아니라 전용 사이드바가 �
     expect(await screen.findByRole("button", { name: "기본 스킴 워크플로 편집" })).toBeInTheDocument();
 
     await user.click(within(nav).getByRole("button", { name: "홈으로" }));
-    expect(await screen.findByRole("heading", { name: /안녕하세요/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "오늘의 작업" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "전역 내비게이션" })).toBeInTheDocument();
   });
 });

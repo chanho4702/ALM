@@ -311,7 +311,7 @@ describe("AQL 모드 — 저장 필터와 전역 검색", () => {
   it("전역 검색 입력이 AQL로 보이면 'AQL로 검색'이 뜬다", async () => {
     const user = userEvent.setup();
     renderSearch("/home");
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.change(screen.getByLabelText("전역 검색"), { target: { value: "type = 버그" } });
@@ -326,7 +326,7 @@ describe("AQL 모드 — 저장 필터와 전역 검색", () => {
 
   it("평범한 검색어에는 'AQL로 검색'이 뜨지 않는다", async () => {
     renderSearch("/home");
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.change(screen.getByLabelText("전역 검색"), { target: { value: "칸반" } });

@@ -206,7 +206,7 @@ describe("전역 검색 모달 → 고급 검색", () => {
   it("모달의 '고급 검색으로'가 입력어를 들고 /search로 이동한다", async () => {
     const user = userEvent.setup();
     renderSearch("/home");
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.change(screen.getByLabelText("전역 검색"), { target: { value: "칸반" } });

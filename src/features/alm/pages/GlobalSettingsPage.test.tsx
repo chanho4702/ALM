@@ -31,7 +31,7 @@ describe("전역 관리 (/settings)", () => {
   it("상단바 ⚙으로 진입하고, 디폴트 스킴이 배정 수와 함께 보인다", async () => {
     const user = userEvent.setup();
     renderSettings("/home");
-    await screen.findByRole("heading", { name: /안녕하세요/ });
+    await screen.findByRole("heading", { name: "오늘의 작업" });
 
     // ⚙ 드롭다운(지라 구조) → 이슈 항목 → 설정 사이드바에서 스킴으로
     await user.click(screen.getByRole("button", { name: "설정" }));

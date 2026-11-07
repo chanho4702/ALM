@@ -70,9 +70,9 @@ describe("홈 로딩", () => {
     // 최근 15건·기한 지남·마감 임박·담당자 필요 — 사용자 없이도 바로 나간다
     await waitFor(() => expect(search).toHaveBeenCalledTimes(4));
     expect(search).toHaveBeenCalledWith({}, { page: 0, size: 15 }, { field: "updated", dir: "desc" });
-    expect(screen.queryByRole("heading", { name: /안녕하세요/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "오늘의 작업" })).not.toBeInTheDocument();
     resolveUser(currentUser);
-    expect(await screen.findByRole("heading", { name: /안녕하세요/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "오늘의 작업" })).toBeInTheDocument();
     // "나에게 배정됨"은 사용자를 안 뒤 미완료만, 상한을 두고 묻는다
     expect(search).toHaveBeenCalledWith(
       { assigneeIds: [currentUser.id], openOnly: true },
@@ -90,6 +90,6 @@ describe("홈 로딩", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("홈을 불러오지 못했습니다");
     expect(screen.getByText("연결을 확인해 주세요")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(await screen.findByRole("heading", { name: /안녕하세요/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "오늘의 작업" })).toBeInTheDocument();
   });
 });
