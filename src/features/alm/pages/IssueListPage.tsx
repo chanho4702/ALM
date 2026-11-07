@@ -786,21 +786,24 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
                 ) : null}
               </div>
               <div className="issue-toolbar-actions">
-                <SavedViewsBar controller={views} />
-                <ViewOptionsPanel state={views.state} onChange={views.setState} />
-                <ColumnPicker
-                  columns={pickerColumns}
-                  hidden={tablePrefs.hidden}
-                  onHiddenChange={tablePrefs.setHidden}
-                  onReset={tablePrefs.reset}
-                />
-                <Button variant="secondary" disabled={actionsDisabled || !issues?.length} onClick={exportCsv}>
-                  {`CSV 내보내기 (${exportScope})`}
-                </Button>
-                <Button variant="secondary" disabled={!metadataLoaded || metadataLoading || metadataError !== null} onClick={() => setImportOpen(true)}>
-                  CSV 가져오기
-                </Button>
-                <span className="bulk-bar-divider" aria-hidden />
+                <div className="issue-toolbar-view-actions">
+                  <SavedViewsBar controller={views} />
+                  <ViewOptionsPanel state={views.state} onChange={views.setState} />
+                  <ColumnPicker
+                    columns={pickerColumns}
+                    hidden={tablePrefs.hidden}
+                    onHiddenChange={tablePrefs.setHidden}
+                    onReset={tablePrefs.reset}
+                  />
+                </div>
+                <div className="issue-toolbar-file-actions">
+                  <Button variant="secondary" disabled={actionsDisabled || !issues?.length} onClick={exportCsv}>
+                    {`CSV 내보내기 (${exportScope})`}
+                  </Button>
+                  <Button variant="secondary" disabled={!metadataLoaded || metadataLoading || metadataError !== null} onClick={() => setImportOpen(true)}>
+                    CSV 가져오기
+                  </Button>
+                </div>
                 <div className="issue-pager" role="navigation" aria-label="페이지">
                   <Button
                     variant="ghost"
