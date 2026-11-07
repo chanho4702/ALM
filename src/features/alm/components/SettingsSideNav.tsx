@@ -14,20 +14,20 @@ export const ORG_ADMIN_BASE = "/settings/org";
 
 /** 프로젝트 설정 구획 — URL 세그먼트(`/projects/:id/settings/:section`)와 메뉴 라벨 */
 export const PROJECT_SETTINGS_SECTIONS = [
-  { id: "general", label: "일반" },
-  { id: "members", label: "사용자·권한" },
-  { id: "components", label: "컴포넌트" },
-  { id: "workflow", label: "워크플로" },
-  { id: "types", label: "이슈 타입" },
-  { id: "fields", label: "필드" },
-  { id: "planning", label: "계획(사이클·추정)" },
-  { id: "triage", label: "트리아지" },
-  { id: "automation", label: "자동화" },
+  { id: "general", label: "일반", group: "프로젝트" },
+  { id: "members", label: "사용자·권한", group: "프로젝트" },
+  { id: "components", label: "컴포넌트", group: "프로젝트" },
+  { id: "workflow", label: "워크플로", group: "작업 방식" },
+  { id: "types", label: "이슈 타입", group: "작업 방식" },
+  { id: "fields", label: "필드", group: "작업 방식" },
+  { id: "planning", label: "계획(사이클·추정)", group: "작업 방식" },
+  { id: "triage", label: "트리아지", group: "작업 방식" },
+  { id: "automation", label: "자동화", group: "작업 방식" },
   // 개발 기록(V41) — 커밋을 모을 git 저장소
-  { id: "repositories", label: "저장소" },
-  { id: "import", label: "가져오기" },
+  { id: "repositories", label: "저장소", group: "연동·도구" },
+  { id: "import", label: "가져오기", group: "연동·도구" },
   // agent-service가 있는 플랫폼에서만 메뉴에 보인다(useAiTeamActive) — URL로 들어와도 화면이 빈 상태를 그린다
-  { id: "ai-team", label: "AI 팀" },
+  { id: "ai-team", label: "AI 팀", group: "연동·도구" },
 ] as const;
 
 /**

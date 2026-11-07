@@ -61,7 +61,6 @@ import {
   sameFields,
   sameFieldsByType,
 } from "../components/fieldConfig";
-import { ProjectAvatar } from "../components/ProjectAvatar";
 import { ProjectMembersPanel } from "../components/ProjectMembersPanel";
 import { ProjectShortcutsPanel } from "../components/ProjectShortcutsPanel";
 import { ComponentsPanel } from "../components/ComponentsPanel";
@@ -400,8 +399,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
   ) : null;
 
   const general = (
-    <div className="project-settings">
-      <Card padding="lg" title="일반">
+    <div className="project-settings project-settings-general">
+      <Card padding="lg" title="일반" className="settings-primary-card">
         <form className="project-create-form" onSubmit={handleSave}>
           {projectConflict ? (
             <Banner variant="warning">
@@ -488,35 +487,37 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         </form>
       </Card>
       <ProjectShortcutsPanel projectId={project.id} canManage={myRole === "admin"} />
-      <Card padding="lg" title="보관" className="project-archive-zone">
-        <p className="project-danger-desc">
-          {project.archivedAt
-            ? "보관된 프로젝트는 읽기만 할 수 있습니다. 해제하면 다시 편집할 수 있습니다."
-            : "끝난 프로젝트를 보관하면 읽기 전용이 되고 목록에 \"보관됨\"으로 남습니다. 언제든 해제할 수 있습니다."}
-        </p>
-        <Button
-          variant="secondary"
-          onClick={() =>
-            void run(project.archivedAt ? "보관 해제 실패" : "보관 실패", async () => {
-              if (project.archivedAt) await unarchiveProject(project.id);
-              else await archiveProject(project.id);
-              await onProjectsChanged();
-              toast({ title: project.archivedAt ? "보관을 해제했습니다" : "프로젝트를 보관했습니다", appearance: "success" });
-            })
-          }
-        >
-          {project.archivedAt ? "보관 해제" : "프로젝트 보관"}
-        </Button>
-      </Card>
-      <Card padding="lg" title="위험 구역" className="project-danger-zone">
-        <p className="project-danger-desc">
-          프로젝트를 삭제하면 이슈 {issueCount}개와 함께 휴지통으로 옮겨집니다. 휴지통에서 복원하거나
-          영구 삭제할 수 있습니다.
-        </p>
-        <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
-          프로젝트 삭제
-        </Button>
-      </Card>
+      <div className="project-maintenance-grid">
+        <Card padding="lg" title="보관" className="project-archive-zone settings-secondary-card">
+          <p className="project-danger-desc">
+            {project.archivedAt
+              ? "보관된 프로젝트는 읽기만 할 수 있습니다. 해제하면 다시 편집할 수 있습니다."
+              : "끝난 프로젝트를 보관하면 읽기 전용이 되고 목록에 \"보관됨\"으로 남습니다. 언제든 해제할 수 있습니다."}
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              void run(project.archivedAt ? "보관 해제 실패" : "보관 실패", async () => {
+                if (project.archivedAt) await unarchiveProject(project.id);
+                else await archiveProject(project.id);
+                await onProjectsChanged();
+                toast({ title: project.archivedAt ? "보관을 해제했습니다" : "프로젝트를 보관했습니다", appearance: "success" });
+              })
+            }
+          >
+            {project.archivedAt ? "보관 해제" : "프로젝트 보관"}
+          </Button>
+        </Card>
+        <Card padding="lg" title="삭제" className="project-danger-zone settings-secondary-card">
+          <p className="project-danger-desc">
+            프로젝트를 삭제하면 이슈 {issueCount}개와 함께 휴지통으로 옮겨집니다. 휴지통에서 복원하거나
+            영구 삭제할 수 있습니다.
+          </p>
+          <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+            프로젝트 삭제
+          </Button>
+        </Card>
+      </div>
     </div>
   );
 
@@ -783,8 +784,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
       </nav>
 
       <header className="project-header settings-header">
-        <ProjectAvatar project={project} size="lg" />
         <div className="settings-header-text">
+          <span className="settings-header-context">{project.name} · {project.key}</span>
           <h1 className="project-header-name">프로젝트 설정</h1>
           <span className="settings-header-sub">{sectionLabel}</span>
         </div>
