@@ -6611,6 +6611,32 @@ th:last-child > [role="separator"] {
     padding-inline: var(--alm-content-gutter);
   }
 
+  /* 백로그는 데스크톱의 카드 밀도를 유지하되, 작은 화면에서는 헤더 액션과 입력이
+     제목을 밀어내지 않게 각각 한 줄을 확보한다. */
+  .backlog-heading {
+    flex-basis: 100%;
+  }
+
+  .sprint-panel {
+    gap: var(--chanho-space-100);
+    padding: var(--chanho-space-150);
+    box-shadow: none;
+  }
+
+  .sprint-panel-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .backlog-create-form {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .backlog-create-form > div {
+    flex-basis: 100%;
+  }
+
   .issue-detail-modal.issue-detail-modal {
     width: calc(100vw - var(--chanho-space-200));
     max-height: calc(100dvh - var(--chanho-space-200));
