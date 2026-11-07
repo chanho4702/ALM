@@ -42,6 +42,7 @@ describe("ProjectSettingsPage", () => {
     renderSettings();
 
     expect(await screen.findByRole("heading", { name: "일반" })).toBeInTheDocument();
+    expect(screen.getByText("기본 정보와 담당 규칙")).toBeInTheDocument();
     expect(screen.getByText("ALM", { selector: ".issue-key-cell" })).toBeInTheDocument(); // 키 표시
     expect(screen.queryByLabelText("키")).not.toBeInTheDocument(); // 입력 필드는 아님
 

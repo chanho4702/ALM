@@ -230,7 +230,8 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
     (iconDraft === AUTO ? "" : iconDraft) !== project.icon ||
     (colorDraft === AUTO ? "" : colorDraft) !== project.color ||
     urlDraft !== project.url;
-  const sectionLabel = PROJECT_SETTINGS_SECTIONS.find((s) => s.id === section)?.label ?? "";
+  const sectionDescription =
+    PROJECT_SETTINGS_SECTIONS.find((candidate) => candidate.id === section)?.description ?? "";
 
   /** 설정 액션 공통 래퍼 — 실패 toast, 끝나면 설정 재조회 */
   const run = async (failTitle: string, action: () => Promise<unknown>) => {
@@ -787,7 +788,7 @@ export function ProjectSettingsPage({ projects, onProjectsChanged }: ProjectSett
         <div className="settings-header-text">
           <span className="settings-header-context">{project.name} · {project.key}</span>
           <h1 className="project-header-name">프로젝트 설정</h1>
-          <span className="settings-header-sub">{sectionLabel}</span>
+          <span className="settings-header-sub">{sectionDescription}</span>
         </div>
       </header>
 
