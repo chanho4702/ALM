@@ -51,7 +51,7 @@ import {
   updateIssue,
 } from "../store/jiraStore";
 import type { IssueLinkView } from "../store/jiraStore";
-import { errorStatus } from "../store/mapping";
+import { errorStatus, isDuplicateSubmit } from "../store/mapping";
 import { settleWithConcurrency } from "../store/concurrency";
 import { recordIssueView } from "../store/uiStore";
 import { IssueTypeGlyph } from "./IssueTypeGlyph";
@@ -92,6 +92,7 @@ import { branchName } from "./branchName";
 import { favoriteOfIssue, useFavorites } from "./useFavorites";
 import { StoryPointsInput } from "./StoryPointsInput";
 import { usePlanningSettings } from "./usePlanningSettings";
+import { useSubmitOnce } from "./useSubmitOnce";
 import { decideIssueEvent, isDevelopmentOnlyEvent, useProjectRealtime } from "./realtime/ProjectRealtime";
 import { IssueDevelopmentPanel } from "./development/IssueDevelopmentPanel";
 import "./favorites.css";
@@ -220,6 +221,8 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [linkTargetId, setLinkTargetId] = useState<string | null>(null);
   // 하위 이슈·링크 추가 폼은 기본 접힘 — 지라처럼 섹션 헤더의 + 버튼으로 편다
   const [subtaskFormOpen, setSubtaskFormOpen] = useState(false);
+  /** 하위 이슈 추가 — 생성 중 두 번째 Enter·클릭을 막고 멱등 키를 싣는다(N10) */
+  const subtaskSubmit = useSubmitOnce();
   const [linkFormOpen, setLinkFormOpen] = useState(false);
   const linkFormRef = useRef<HTMLDivElement>(null);
   const [, setSearchParams] = useSearchParams();
@@ -587,21 +590,27 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
 
   const handleSubtaskSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!issue) return;
+    if (!issue || !subtaskDraft.trim()) return;
     try {
       // 부모와 같은 스프린트에 하위 작업 생성
-      await createIssue({
-        projectId: issue.projectId,
-        title: subtaskDraft,
-        type: childType,
-        parentId: issue.id,
-        sprintId: issue.sprintId,
+      const created = await subtaskSubmit.run(async (idempotencyKey) => {
+        await createIssue({
+          projectId: issue.projectId,
+          title: subtaskDraft,
+          type: childType,
+          parentId: issue.id,
+          sprintId: issue.sprintId,
+          idempotencyKey,
+        });
       });
+      if (!created) return; // 이미 진행 중인 제출 — 두 번째는 버린다
       setSubtaskDraft("");
       await refreshRelations(issue.id);
       await onIssueChanged();
       toast({ title: "하위 이슈를 추가했습니다", appearance: "success" });
     } catch (error) {
+      // 409 이중 제출은 첫 요청이 처리한다 — 실패로 알리지 않는다(N10)
+      if (isDuplicateSubmit(error)) return;
       toast({
         title: "하위 이슈 추가 실패",
         description: error instanceof Error ? error.message : String(error),
@@ -1080,9 +1089,10 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                     placeholder="하위 작업 제목"
                     value={subtaskDraft}
                     autoFocus
+                    disabled={subtaskSubmit.busy}
                     onChange={(e) => setSubtaskDraft(e.target.value)}
                   />
-                  <Button type="submit" size="small" disabled={!subtaskDraft.trim()}>
+                  <Button type="submit" size="small" disabled={!subtaskDraft.trim()} loading={subtaskSubmit.busy}>
                     추가
                   </Button>
                   <Button

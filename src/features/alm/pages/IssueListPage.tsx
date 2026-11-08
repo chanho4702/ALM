@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isDuplicateSubmit } from "../store/mapping";
 import { useParams } from "react-router";
 import {
   Checkbox,
@@ -164,15 +165,15 @@ function ProjectIssueList({ projectId }: { projectId: string | undefined }) {
   };
 
   const reload = useCallback(() => setRefreshVersion((version) => version + 1), []);
-  const createInList = async (title: string): Promise<boolean> => {
+  const createInList = async (title: string, idempotencyKey: string): Promise<boolean> => {
     if (!projectId) return false;
     try {
-      const created = await createIssue({ projectId, title });
+      const created = await createIssue({ projectId, title, idempotencyKey });
       toast({ title: `${created.key}를 만들었습니다`, appearance: "success" });
       reload();
       return true;
     } catch (error) {
-      toast({ title: "이슈 생성 실패", description: error instanceof Error ? error.message : String(error), appearance: "danger" });
+      if (!isDuplicateSubmit(error)) toast({ title: "이슈 생성 실패", description: error instanceof Error ? error.message : String(error), appearance: "danger" });
       return false;
     }
   };

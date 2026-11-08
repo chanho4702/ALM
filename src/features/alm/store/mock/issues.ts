@@ -83,6 +83,13 @@ export async function getIssueByKey(key: string): Promise<Issue | null> {
   return issue ? clone(issue) : null;
 }
 
+/**
+ * 멱등 키 → 만든 이슈 id(N10) — 서버와 같은 의미론: 같은 키로 다시 만들면 처음 이슈를 돌려준다.
+ * 성공한 생성만 기억한다(검증 실패는 기억하지 않아 같은 키로 다시 만들 수 있다). 기억한 이슈가 사라졌으면
+ * (초기화·삭제) 새로 만든다. 목업 세션 동안만 메모리에 둔다.
+ */
+const createdByIdempotencyKey = new Map<string, string>();
+
 export async function createIssue(input: {
   projectId: string;
   title: string;
@@ -107,8 +114,15 @@ export async function createIssue(input: {
   storyPoints?: number | null;
   /** 트리아지 대기열로 만든다(V35, 편집자) — 트리아지를 켠 프로젝트만 */
   triage?: boolean;
+  /** 멱등 키(N10) — 같은 키면 처음 만든 이슈를 그대로 돌려준다 */
+  idempotencyKey?: string;
 }): Promise<Issue> {
   const data = load();
+  if (input.idempotencyKey) {
+    const replayId = createdByIdempotencyKey.get(input.idempotencyKey);
+    const replay = replayId ? data.issues.find((i) => i.id === replayId) : undefined;
+    if (replay) return clone(replay);
+  }
   const project = data.projects.find((p) => p.id === input.projectId);
   if (!project) throw new Error("프로젝트를 찾을 수 없습니다");
   const title = input.title.trim();
@@ -212,6 +226,8 @@ export async function createIssue(input: {
   }
   applyResolutionRule(data, issue, "todo", undefined);
   data.issues.push(issue);
+  // await 전에 기억한다 — 같은 키의 동시 호출도 두 번째는 위에서 처음 이슈를 받는다
+  if (input.idempotencyKey) createdByIdempotencyKey.set(input.idempotencyKey, issue.id);
   // 보고자(생성자)와 담당자는 자동 워처 — 지라 기본 동작
   if (preferencesOf(data, CURRENT_USER_ID).autoWatch.created) addWatcher(data, issue.id, CURRENT_USER_ID, now);
   if (issue.assigneeId) addWatcher(data, issue.id, issue.assigneeId, now);

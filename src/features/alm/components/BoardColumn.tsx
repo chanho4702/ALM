@@ -9,6 +9,7 @@ import type { Issue, IssueStatus, User, WorkflowStatus } from "../store/types";
 import { SortableIssueCard } from "./IssueCard";
 import { StatusGlyph } from "./StatusGlyph";
 import { STATUS_LABELS } from "./labels";
+import { useSubmitOnce } from "./useSubmitOnce";
 import "./board-workflow.css";
 
 export interface BoardColumnProps {
@@ -22,8 +23,11 @@ export interface BoardColumnProps {
   usersById: Record<string, User>;
   /** 카드 클릭 시 이슈 상세 열기 */
   onOpenIssue?: (key: string) => void;
-  /** 컬럼 하단 인라인 생성 — 지라의 "+ 만들기" (해당 상태로 바로 생성) */
-  onCreateIssue?: (status: string, title: string) => void | Promise<void>;
+  /**
+   * 컬럼 하단 인라인 생성 — 지라의 "+ 만들기" (해당 상태로 바로 생성).
+   * `false`를 돌려주면 실패로 보고 입력을 남긴다. `idempotencyKey`는 폼 인스턴스당 하나(재시도는 같은 키).
+   */
+  onCreateIssue?: (status: string, title: string, idempotencyKey: string) => boolean | void | Promise<boolean | void>;
   /** 컬럼 표시 이름 (미지정 시 기본 상태 라벨 폴백) */
   columnName?: string;
   /**
@@ -74,13 +78,16 @@ export function BoardColumn({
   const overWip = wipLimit !== null && issues.length > wipLimit;
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
+  const submit = useSubmitOnce();
   // 컬럼 droppable id = status 문자열(스윔레인은 "밴드키:status") → resolveMove가 컬럼 드롭을 인식한다
   const { setNodeRef, isOver } = useDroppable({ id: droppableId ?? columnId ?? status, disabled: Boolean(blockedReason) });
 
   const handleCreateSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!title.trim() || !onCreateIssue) return;
-    await onCreateIssue(status, title);
+    // 생성 중 두 번째 Enter·클릭은 무시한다(N10) — 성공해야 입력을 비우고 닫는다
+    const ok = await submit.run(async (idempotencyKey) => onCreateIssue(status, title, idempotencyKey));
+    if (!ok) return;
     setTitle("");
     setCreating(false);
   };
@@ -148,6 +155,7 @@ export function BoardColumn({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
+              disabled={submit.busy}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   setTitle("");
@@ -167,7 +175,7 @@ export function BoardColumn({
               >
                 취소
               </Button>
-              <Button type="submit" size="small" disabled={!title.trim()}>
+              <Button type="submit" size="small" disabled={!title.trim()} loading={submit.busy}>
                 만들기
               </Button>
             </div>

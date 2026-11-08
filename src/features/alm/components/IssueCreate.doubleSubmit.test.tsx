@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { ToastProvider } from "@chanho/react";
 import { App } from "../../../app/App";
 import * as store from "../store/jiraStore";
+import { DuplicateSubmitError } from "../store/mapping";
 // 지연 로드 청크를 수집 시점에 미리 올린다(병렬 실행에서 첫 findBy 한도 초과 방지)
 import "./IssueDetailModal";
 import "../pages/BoardPage";
@@ -94,6 +95,22 @@ describe("이슈 생성 이중 제출 가드(N10)", () => {
     await user.keyboard("{Enter}");
     await waitFor(() => expect(callsFor("다음 하위")).toHaveLength(1));
     expect(callsFor("다음 하위")[0][0].idempotencyKey).not.toBe(first[0].idempotencyKey);
+  }, 30_000);
+
+  it("하위 이슈 폼: 서버 409(같은 요청 처리 중)는 실패 토스트 없이 입력을 남긴다", async () => {
+    createIssue.mockRejectedValueOnce(new DuplicateSubmitError("같은 요청이 처리 중입니다"));
+    const user = userEvent.setup();
+    renderAt("/projects/p1/board?issue=ALM-1");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    await user.click(within(dialog).getByRole("button", { name: "하위 이슈" }));
+    const input = within(dialog).getByLabelText("하위 이슈 추가");
+    await user.type(input, "처리 중");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(callsFor("처리 중")).toHaveLength(1));
+    await waitFor(() => expect(input).not.toBeDisabled());
+    expect(input).toHaveValue("처리 중");
+    expect(screen.queryByText("하위 이슈 추가 실패")).not.toBeInTheDocument();
   }, 30_000);
 
   it("만들기 대화상자: 제출 클릭 두 번이면 createIssue 한 번(회귀 고정)", async () => {

@@ -73,13 +73,14 @@ describe("createIssue 멱등 키(N10)", () => {
     expect(headerOf(spy.mock.calls[1][1], "Idempotency-Key")).toBe("k-9");
   });
 
-  it("409가 계속되면 몇 번 뒤 409 오류로 끝난다(무한 재시도 금지)", async () => {
+  it("409가 계속되면 몇 번 뒤 이중 제출 오류로 끝난다(무한 재시도 금지, 화면은 토스트 생략)", async () => {
     vi.useFakeTimers();
     const spy = vi
       .spyOn(client, "sharedApiFetch")
       .mockImplementation(async () => response(409, { error: "같은 요청이 처리 중입니다" }));
     const result = createIssue({ projectId: "3", title: "로그인 오류", idempotencyKey: "k-9" });
-    const settled = expect(result).rejects.toMatchObject({ status: 409 });
+    // 화면이 실패 토스트를 생략하는 표지 — 첫 요청의 응답이 결과를 처리한다
+    const settled = expect(result).rejects.toMatchObject({ status: 409, name: "DuplicateSubmitError" });
     await vi.runAllTimersAsync();
     await settled;
     expect(spy.mock.calls.length).toBeGreaterThan(1);
@@ -90,7 +91,15 @@ describe("createIssue 멱등 키(N10)", () => {
     const spy = vi
       .spyOn(client, "sharedApiFetch")
       .mockResolvedValueOnce(response(409, { error: "충돌" }));
-    await expect(createIssue({ projectId: "3", title: "로그인 오류" })).rejects.toMatchObject({ status: 409 });
+    await expect(createIssue({ projectId: "3", title: "로그인 오류" })).rejects.toMatchObject({ status: 409, name: "ApiError" });
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("재응답 사이 이슈가 지워져 404면 일반 실패로 끝난다", async () => {
+    vi.spyOn(client, "sharedApiFetch").mockResolvedValueOnce(response(404, { error: "찾을 수 없습니다" }));
+    await expect(createIssue({ projectId: "3", title: "로그인 오류", idempotencyKey: "k-4" })).rejects.toMatchObject({
+      status: 404,
+      name: "ApiError",
+    });
   });
 });

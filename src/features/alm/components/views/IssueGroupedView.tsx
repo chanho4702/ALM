@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isDuplicateSubmit } from "../../store/mapping";
 import type { ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Badge, Button, EmptyState, Lozenge, SkeletonListItem, Tag, useToast } from "@chanho/react";
@@ -248,7 +249,7 @@ export function IssueGroupedView({ projectId, state, chips, refreshKey = 0, sele
   }
 
   const usersById = new Map(ctx.users.map((u) => [u.id, u]));
-  const onCreateInGroup = async (group: IssueGroup, title: string): Promise<boolean> => {
+  const onCreateInGroup = async (group: IssueGroup, title: string, idempotencyKey: string): Promise<boolean> => {
     const patch = groupCreatePatch(group.kind, group.value);
     try {
       const created = await createIssue({
@@ -257,13 +258,14 @@ export function IssueGroupedView({ projectId, state, chips, refreshKey = 0, sele
         ...patch,
         type: patch.type as IssueType | undefined,
         priority: patch.priority as IssuePriority | undefined,
+        idempotencyKey,
       });
       toast({ title: `${created.key}를 ${group.label}에 만들었습니다`, appearance: "success" });
       setRetry((value) => value + 1);
       onIssueCreated?.();
       return true;
     } catch (failure) {
-      toast({ title: "이슈 생성 실패", description: failure instanceof Error ? failure.message : String(failure), appearance: "danger" });
+      if (!isDuplicateSubmit(failure)) toast({ title: "이슈 생성 실패", description: failure instanceof Error ? failure.message : String(failure), appearance: "danger" });
       return false;
     }
   };
@@ -317,7 +319,7 @@ export function IssueGroupedView({ projectId, state, chips, refreshKey = 0, sele
 
 interface RowContext {
   /** 그룹 머리글 인라인 만들기 — 없으면 버튼을 그리지 않는다 */
-  onCreateInGroup?: (group: IssueGroup, title: string) => Promise<boolean>;
+  onCreateInGroup?: (group: IssueGroup, title: string, idempotencyKey: string) => Promise<boolean>;
   ctx: GroupingContext;
   usersById: Map<string, User>;
   properties: ViewProperty[];
@@ -354,7 +356,7 @@ function GroupSection({
         </Heading>
         {/* 그룹 머리글 인라인 만들기 — 최상위 그룹만(하위 그룹 값까지 합치지 않는다) */}
         {level === 3 && rowProps.onCreateInGroup ? (
-          <InlineIssueCreate compact where={group.label} onCreate={(title) => rowProps.onCreateInGroup!(group, title)} />
+          <InlineIssueCreate compact where={group.label} onCreate={(title, idempotencyKey) => rowProps.onCreateInGroup!(group, title, idempotencyKey)} />
         ) : null}
       </div>
       {isCollapsed ? null : group.subGroups && group.subGroups.length > 0 ? (

@@ -311,6 +311,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 이중 제출(N10) — 같은 멱등 키의 첫 요청이 서버에서 아직 처리 중(409)이라 이 요청은 버렸다.
+ * 첫 요청의 응답이 결과를 처리하므로 화면은 실패 토스트를 띄우지 않는다(`isDuplicateSubmit`).
+ */
+export class DuplicateSubmitError extends ApiError {
+  constructor(message: string) {
+    super(409, message);
+    this.name = "DuplicateSubmitError";
+  }
+}
+
+/** 멱등 키 409(같은 요청 처리 중)인가 — 생성 화면이 실패 토스트를 생략하는 기준 */
+export function isDuplicateSubmit(error: unknown): boolean {
+  return error instanceof DuplicateSubmitError;
+}
+
 /** 오류의 HTTP 상태 — 상태를 모르는 오류(네트워크·목업의 일반 Error)면 null */
 export function errorStatus(error: unknown): number | null {
   return error instanceof ApiError ? error.status : null;

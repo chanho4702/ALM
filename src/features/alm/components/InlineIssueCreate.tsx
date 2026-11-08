@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { Button, TextField } from "@chanho/react";
 import { Plus } from "lucide-react";
+import { useSubmitOnce } from "./useSubmitOnce";
 import "./inlineCreate.css";
 
 export interface InlineIssueCreateProps {
   /** 어디에 만드는지 — 버튼·입력의 접근 이름("Sprint 1에 이슈 만들기") */
   where: string;
-  /** 제목만으로 만든다. true를 돌려주면 입력을 비우고 열어 둔다(연달아 만들기 — Linear) */
-  onCreate: (title: string) => Promise<boolean>;
+  /**
+   * 제목만으로 만든다. true를 돌려주면 입력을 비우고 열어 둔다(연달아 만들기 — Linear).
+   * `idempotencyKey`는 제출 시도 묶음당 하나 — 실패 뒤 재시도는 같은 키, 성공하면 새 키(N10)
+   */
+  onCreate: (title: string, idempotencyKey: string) => Promise<boolean>;
   /** 처음부터 열어 둔다 */
   defaultOpen?: boolean;
   compact?: boolean;
@@ -20,7 +24,7 @@ export interface InlineIssueCreateProps {
 export function InlineIssueCreate({ where, onCreate, defaultOpen = false, compact = false }: InlineIssueCreateProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [title, setTitle] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useSubmitOnce();
 
   const close = () => {
     setTitle("");
@@ -48,13 +52,10 @@ export function InlineIssueCreate({ where, onCreate, defaultOpen = false, compac
       onSubmit={(event) => {
         event.preventDefault();
         const trimmed = title.trim();
-        if (!trimmed || busy) return;
-        setBusy(true);
-        void onCreate(trimmed)
-          .then((ok) => {
-            if (ok) setTitle("");
-          })
-          .finally(() => setBusy(false));
+        if (!trimmed) return;
+        void run((idempotencyKey) => onCreate(trimmed, idempotencyKey)).then((ok) => {
+          if (ok) setTitle("");
+        });
       }}
     >
       <TextField

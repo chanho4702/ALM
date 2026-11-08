@@ -1,6 +1,6 @@
 // alm-backend REST 어댑터 — issues (jiraApi.ts에서 분할, 동작 불변)
 import type { IssuePriority, IssueType, Issue } from "../types";
-import { type IssueDto, mapIssue, toBackendId, toApiIssuePriority, toApiIssueType, toApiResolution } from "../mapping";
+import { DuplicateSubmitError, extractApiError, type IssueDto, mapIssue, toBackendId, toApiIssuePriority, toApiIssueType, toApiResolution } from "../mapping";
 import { type IssueSearchCriteria, type IssueSort, MAX_SEARCH_PAGE_SIZE, type IssueAggregateGroup, type IssueAggregate, queryToCriteria } from "../issueSearch";
 import type { IssueQuery } from "../searchQuery";
 import { newMentionIds } from "../richText";
@@ -189,7 +189,18 @@ export interface IssueCreateInput {
   storyPoints?: number | null;
   /** V35 — 트리아지 대기열로 만든다(편집자, 트리아지를 켠 프로젝트) */
   triage?: boolean;
+  /**
+   * 멱등 키(N10) — `Idempotency-Key` 헤더로 보낸다(본문 아님). 폼 인스턴스(제출 시도 묶음)당 UUID 하나,
+   * 실패 뒤 재시도는 같은 키. 없으면 헤더를 생략한다.
+   */
+  idempotencyKey?: string;
 }
+
+/**
+ * 같은 키가 서버에서 아직 처리 중일 때(409) 다시 묻는 간격 — 처음 요청이 끝나면 서버가 그 결과를
+ * 200 + `Idempotency-Replayed: true`로 돌려준다. 몇 번 뒤에도 409면 그 오류로 끝낸다(무한 재시도 금지).
+ */
+const IDEMPOTENT_RETRY_DELAYS_MS = [300, 700, 1500];
 
 /** 계획 필드(V30) 본문 — `details`와 달리 **보낸 키만** 바뀐다(생략 = 그대로, null = 비우기) */
 export function planningBody(input: { startDate?: string | null; storyPoints?: number | null }): Record<string, unknown> | undefined {
@@ -205,11 +216,15 @@ function assertCreateFieldsSupported(_input: IssueCreateInput): void {
 
 export async function createIssue(input: IssueCreateInput): Promise<Issue> {
   assertCreateFieldsSupported(input);
-  const response = await sharedApiFetch(
+  const key = input.idempotencyKey;
+  const send = () => sharedApiFetch(
     `/api/alm/projects/${toBackendId(input.projectId)}/issues`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(key ? { "Idempotency-Key": key } : {}),
+      },
       body: JSON.stringify({
         title: input.title.trim(),
         description: input.description ?? "",
@@ -232,6 +247,17 @@ export async function createIssue(input: IssueCreateInput): Promise<Issue> {
       }),
     },
   );
+  let response = await send();
+  // 409 = 같은 키의 요청이 서버에서 처리 중 — 키가 있을 때만 같은 키로 잠시 뒤 다시 물어 처음 결과를 받는다
+  for (const delay of key ? IDEMPOTENT_RETRY_DELAYS_MS : []) {
+    if (response.status !== 409) break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    response = await send();
+  }
+  if (key && response.status === 409) {
+    const body: unknown = await response.json().catch(() => null);
+    throw new DuplicateSubmitError(extractApiError(409, body));
+  }
   return mapIssue(await json(response));
 }
 

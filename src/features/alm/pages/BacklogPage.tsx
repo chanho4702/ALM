@@ -38,7 +38,7 @@ import {
 } from "../components/SprintPanel";
 import { SprintEditModal } from "../components/SprintEditModal";
 import type { SprintPlanDraft } from "../components/SprintEditModal";
-import { errorStatus } from "../store/mapping";
+import { errorStatus, isDuplicateSubmit } from "../store/mapping";
 import { SprintCompleteModal } from "../components/SprintCompleteModal";
 import type { MoveTarget } from "../components/SprintPanel";
 import {
@@ -135,15 +135,16 @@ export function BacklogPage() {
   });
 
   /** 스프린트 패널 인라인 만들기(Linear) — 제목만, 그 스프린트로 */
-  const createInSprint = async (sprint: Sprint, title: string): Promise<boolean> => {
+  const createInSprint = async (sprint: Sprint, title: string, idempotencyKey: string): Promise<boolean> => {
     if (!projectId) return false;
     try {
-      const created = await createIssue({ projectId, title, sprintId: sprint.id });
+      const created = await createIssue({ projectId, title, sprintId: sprint.id, idempotencyKey });
       toast({ title: `${created.key}를 ${sprint.name}에 만들었습니다`, appearance: "success" });
       await reload();
       return true;
     } catch (error) {
-      toast({ title: "이슈 생성 실패", description: error instanceof Error ? error.message : String(error), appearance: "danger" });
+      // 409 이중 제출은 첫 요청이 처리한다 — 실패로 알리지 않는다(N10)
+      if (!isDuplicateSubmit(error)) toast({ title: "이슈 생성 실패", description: error instanceof Error ? error.message : String(error), appearance: "danger" });
       return false;
     }
   };

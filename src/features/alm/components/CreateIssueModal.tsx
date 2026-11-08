@@ -1,4 +1,5 @@
 import { StoryPointsInput } from "./StoryPointsInput";
+import { isDuplicateSubmit } from "../store/mapping";
 import { usePlanningSettings } from "./usePlanningSettings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -39,6 +40,7 @@ import { usePriorities } from "./usePriorities";
 import { useIssueTypes } from "./useIssueTypes";
 import { useLinkTypes } from "./useLinkTypes";
 import { LINK_KIND_DEFAULT, linkKindOptions, parseLinkKind, type LinkKind } from "./linkKinds";
+import { useSubmitOnce } from "./useSubmitOnce";
 
 // Radix Select는 option value에 빈 문자열을 허용하지 않는다 → null은 센티널로 표현
 const UNASSIGNED = "unassigned";
@@ -106,7 +108,9 @@ export function CreateIssueModal({
   const [linkTargetId, setLinkTargetId] = useState(NO_PARENT);
   const [linkDrafts, setLinkDrafts] = useState<LinkDraft[]>([]);
   const [createAnother, setCreateAnother] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  /** 이중 제출 가드 + 멱등 키(N10) — 계속 만들기로 폼을 비우면 다음 제출은 새 키 */
+  const submitGuard = useSubmitOnce();
+  const submitting = submitGuard.busy;
   /** 프로젝트 설정 본문 — 필드 구성은 아래에서 **선택한 이슈 타입으로** 해석한다 */
   const [settingsBody, setSettingsBody] = useState<SettingsBody | null>(null);
 
@@ -334,70 +338,73 @@ export function CreateIssueModal({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmit) return;
-    setSubmitting(true);
     try {
-      const issue = await createIssue({
-        projectId,
-        title,
-        // 숨긴 필드는 값도 보내지 않는다 — 스토어가 기본값(우선순위·기본 담당자)을 채운다
-        description: show("description") ? description : "",
-        type,
-        ...(show("priority") ? { priority } : {}),
-        assigneeId: show("assignee") && assigneeId !== UNASSIGNED ? assigneeId : null,
-        dueDate: show("dueDate") ? dueDate || null : null,
-        labels: show("labels") ? parsedLabels : [],
-        componentIds: show("components") ? componentIds : [],
-        parentId: showParent && parentId !== NO_PARENT ? parentId : null,
-        sprintId: show("sprint") && sprintId !== BACKLOG ? sprintId : null,
-        fixVersionId: show("fixVersion") && fixVersionId !== NO_VERSION ? fixVersionId : null,
-        estimateHours:
-          show("estimate") && estimateHours.trim() ? Number(estimateHours) : null,
-        // 계획 필드는 값이 있을 때만 싣는다(REST planning은 보낸 키만 바꾼다)
-        ...(show("startDate") && startDate ? { startDate } : {}),
-        ...(show("storyPoints") && storyPoints.trim() ? { storyPoints: Number(storyPoints) } : {}),
-      });
-      // 연결 이슈는 생성 뒤에 건다 — 하나가 실패해도 이슈 자체는 남고, 실패만 알린다
-      const failed: string[] = [];
-      for (const draft of linkDrafts) {
-        const { type: linkType, inbound } = parseLinkKind(draft.kind);
-        try {
-          await addIssueLink({
-            sourceId: inbound ? draft.targetId : issue.id,
-            targetId: inbound ? issue.id : draft.targetId,
-            type: linkType,
-          });
-        } catch {
-          failed.push(projectIssues.find((i) => i.id === draft.targetId)?.key ?? draft.targetId);
+      await submitGuard.run(async (idempotencyKey) => {
+        const issue = await createIssue({
+          idempotencyKey,
+          projectId,
+          title,
+          // 숨긴 필드는 값도 보내지 않는다 — 스토어가 기본값(우선순위·기본 담당자)을 채운다
+          description: show("description") ? description : "",
+          type,
+          ...(show("priority") ? { priority } : {}),
+          assigneeId: show("assignee") && assigneeId !== UNASSIGNED ? assigneeId : null,
+          dueDate: show("dueDate") ? dueDate || null : null,
+          labels: show("labels") ? parsedLabels : [],
+          componentIds: show("components") ? componentIds : [],
+          parentId: showParent && parentId !== NO_PARENT ? parentId : null,
+          sprintId: show("sprint") && sprintId !== BACKLOG ? sprintId : null,
+          fixVersionId: show("fixVersion") && fixVersionId !== NO_VERSION ? fixVersionId : null,
+          estimateHours:
+            show("estimate") && estimateHours.trim() ? Number(estimateHours) : null,
+          // 계획 필드는 값이 있을 때만 싣는다(REST planning은 보낸 키만 바꾼다)
+          ...(show("startDate") && startDate ? { startDate } : {}),
+          ...(show("storyPoints") && storyPoints.trim() ? { storyPoints: Number(storyPoints) } : {}),
+        });
+        // 연결 이슈는 생성 뒤에 건다 — 하나가 실패해도 이슈 자체는 남고, 실패만 알린다
+        const failed: string[] = [];
+        for (const draft of linkDrafts) {
+          const { type: linkType, inbound } = parseLinkKind(draft.kind);
+          try {
+            await addIssueLink({
+              sourceId: inbound ? draft.targetId : issue.id,
+              targetId: inbound ? issue.id : draft.targetId,
+              type: linkType,
+            });
+          } catch {
+            failed.push(projectIssues.find((i) => i.id === draft.targetId)?.key ?? draft.targetId);
+          }
         }
-      }
-      toast({
-        title: `${issue.key}를 만들었습니다`,
-        description: failed.length > 0 ? `연결하지 못한 이슈: ${failed.join(", ")}` : undefined,
-        appearance: failed.length > 0 ? "info" : "success",
+        toast({
+          title: `${issue.key}를 만들었습니다`,
+          description: failed.length > 0 ? `연결하지 못한 이슈: ${failed.join(", ")}` : undefined,
+          appearance: failed.length > 0 ? "info" : "success",
+        });
+        // 만들었으면 초안은 끝 — 지우고, 이어 만들기의 빈 폼으로 초안을 덮지 않게 잠깐 멈춘다
+        pauseDraft.current = true;
+        void clearCreateIssueDraft(projectId);
+        setRestoredAt(null);
+        if (createAnother) {
+          reset(true);
+          // 재응답(200 Replayed)은 같은 이슈 — id로 확인해 한 번만 넣는다
+          setProjectIssues((prev) => (prev.some((i) => i.id === issue.id) ? prev : [...prev, issue]));
+          setTimeout(() => {
+            pauseDraft.current = false;
+          }, 0);
+          return;
+        }
+        reset(false);
+        onOpenChange(false);
+        await onCreated(issue);
       });
-      // 만들었으면 초안은 끝 — 지우고, 이어 만들기의 빈 폼으로 초안을 덮지 않게 잠깐 멈춘다
-      pauseDraft.current = true;
-      void clearCreateIssueDraft(projectId);
-      setRestoredAt(null);
-      if (createAnother) {
-        reset(true);
-        setProjectIssues((prev) => [...prev, issue]);
-        setTimeout(() => {
-          pauseDraft.current = false;
-        }, 0);
-        return;
-      }
-      reset(false);
-      onOpenChange(false);
-      await onCreated(issue);
     } catch (error) {
+      // 409 이중 제출은 첫 요청이 처리한다 — 실패로 알리지 않는다(N10)
+      if (isDuplicateSubmit(error)) return;
       toast({
         title: "이슈 생성 실패",
         description: error instanceof Error ? error.message : String(error),
         appearance: "danger",
       });
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -733,7 +740,7 @@ export function CreateIssueModal({
             <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>
               취소
             </Button>
-            <Button type="submit" disabled={!canSubmit}>
+            <Button type="submit" disabled={!canSubmit} loading={submitting}>
               만들기
             </Button>
           </div>

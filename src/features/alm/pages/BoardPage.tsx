@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isDuplicateSubmit } from "../store/mapping";
 import { MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
@@ -229,25 +230,31 @@ export function BoardPage() {
   const { run: runTransition, element: transitionScreen } = useTransitionRunner(statuses);
 
   /** 컬럼 하단 인라인 생성 — 스크럼: 활성 스프린트로, 칸반: 백로그로. 매핑 열은 그 열의 첫 상태로 */
-  const handleColumnCreate = async (status: string, title: string) => {
-    if (!projectId || !board) return;
-    if (board.type === "scrum" && !sprint) return;
+  /** 컬럼 인라인 만들기 — 실패면 false(컬럼이 입력을 남기고, 재시도는 같은 멱등 키로) */
+  const handleColumnCreate = async (status: string, title: string, idempotencyKey: string): Promise<boolean> => {
+    if (!projectId || !board) return false;
+    if (board.type === "scrum" && !sprint) return false;
+    let ok = true;
     try {
       const issue = await createIssue({
         projectId,
         title,
         status,
         sprintId: board.type === "scrum" ? sprint!.id : null,
+        idempotencyKey,
       });
       toast({ title: `${issue.key}를 만들었습니다`, appearance: "success" });
     } catch (error) {
-      toast({
+      ok = false;
+      // 409 이중 제출은 첫 요청이 처리한다 — 실패로 알리지 않는다(N10)
+      if (!isDuplicateSubmit(error)) toast({
         title: "이슈 생성 실패",
         description: error instanceof Error ? error.message : String(error),
         appearance: "danger",
       });
     }
     await reload();
+    return ok;
   };
 
   /** 스프린트 완료 — 백로그와 같은 흐름(결과 토스트·배너). "새 스프린트 보기"는 백로그의 그 패널로 */
