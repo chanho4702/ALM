@@ -141,52 +141,70 @@ export function BoardSettingsModal({
   return (
     <>
       <Modal
-        trigger={<span hidden />}
         title="보드 설정"
+        description="보드에 표시할 이슈와 열 구성을 관리합니다"
         open={open}
         onOpenChange={onOpenChange}
-        className="board-settings-modal"
+        size="large"
       >
         <form className="board-settings-form" onSubmit={handleSubmit}>
-          <TextField label="이름" value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="board-settings-overview">
+            <TextField label="보드 이름" value={name} onChange={(e) => setName(e.target.value)} />
+            <Select
+              label="기본 스윔레인"
+              value={swimlane}
+              options={SWIMLANE_OPTIONS}
+              onValueChange={(v) => setSwimlane(v as BoardSwimlane)}
+            />
+          </div>
 
           <fieldset className="board-settings-fieldset">
-            <legend>저장 필터 — 보드에 보일 이슈 (비우면 전체)</legend>
-            <div className="board-settings-checks" role="group" aria-label="담당자 필터">
-              {users.map((user) => (
-                <Checkbox
-                  key={user.id}
-                  label={user.name}
-                  checked={assigneeIds.includes(user.id)}
-                  onCheckedChange={() => setAssigneeIds((prev) => toggle(prev, user.id))}
-                />
-              ))}
-              <Checkbox
-                label="미지정"
-                checked={assigneeIds.includes("unassigned")}
-                onCheckedChange={() => setAssigneeIds((prev) => toggle(prev, "unassigned"))}
-              />
-            </div>
-            <div className="board-settings-checks" role="group" aria-label="타입 필터">
-              {issueTypes.map(({ id: type, name }) => (
-                <Checkbox
-                  key={type}
-                  label={name}
-                  checked={types.includes(type)}
-                  onCheckedChange={() => setTypes((prev) => toggle(prev, type))}
-                />
-              ))}
-            </div>
-            {labelOptions.length > 0 ? (
-              <div className="board-settings-checks" role="group" aria-label="라벨 필터">
-                {labelOptions.map((label) => (
+            <legend>보드 필터</legend>
+            <p className="board-settings-section-help">선택한 조건의 이슈만 보드에 표시합니다. 모두 비우면 전체 이슈가 표시됩니다.</p>
+            <div className="board-settings-filter-group">
+              <span className="board-settings-filter-label">담당자</span>
+              <div className="board-settings-checks" role="group" aria-label="담당자 필터">
+                {users.map((user) => (
                   <Checkbox
-                    key={label}
-                    label={label}
-                    checked={labels.includes(label)}
-                    onCheckedChange={() => setLabels((prev) => toggle(prev, label))}
+                    key={user.id}
+                    label={user.name}
+                    checked={assigneeIds.includes(user.id)}
+                    onCheckedChange={() => setAssigneeIds((prev) => toggle(prev, user.id))}
                   />
                 ))}
+                <Checkbox
+                  label="미지정"
+                  checked={assigneeIds.includes("unassigned")}
+                  onCheckedChange={() => setAssigneeIds((prev) => toggle(prev, "unassigned"))}
+                />
+              </div>
+            </div>
+            <div className="board-settings-filter-group">
+              <span className="board-settings-filter-label">이슈 유형</span>
+              <div className="board-settings-checks" role="group" aria-label="타입 필터">
+                {issueTypes.map(({ id: type, name }) => (
+                  <Checkbox
+                    key={type}
+                    label={name}
+                    checked={types.includes(type)}
+                    onCheckedChange={() => setTypes((prev) => toggle(prev, type))}
+                  />
+                ))}
+              </div>
+            </div>
+            {labelOptions.length > 0 ? (
+              <div className="board-settings-filter-group">
+                <span className="board-settings-filter-label">라벨</span>
+                <div className="board-settings-checks" role="group" aria-label="라벨 필터">
+                  {labelOptions.map((label) => (
+                    <Checkbox
+                      key={label}
+                      label={label}
+                      checked={labels.includes(label)}
+                      onCheckedChange={() => setLabels((prev) => toggle(prev, label))}
+                    />
+                  ))}
+                </div>
               </div>
             ) : null}
           </fieldset>
@@ -201,20 +219,18 @@ export function BoardSettingsModal({
             statuses={statuses}
           />
 
-          <Select
-            label="기본 스윔레인"
-            value={swimlane}
-            options={SWIMLANE_OPTIONS}
-            onValueChange={(v) => setSwimlane(v as BoardSwimlane)}
-          />
-          <Switch
-            label="기본 보드로 지정"
-            checked={isDefault}
-            disabled={board.isDefault}
-            onCheckedChange={setIsDefault}
-          />
+          <fieldset className="board-settings-fieldset board-settings-preferences">
+            <legend>기본 동작</legend>
+            <Switch
+              label="이 프로젝트의 기본 보드로 지정"
+              checked={isDefault}
+              disabled={board.isDefault}
+              onCheckedChange={setIsDefault}
+            />
+            {board.isDefault ? <p className="board-settings-section-help">현재 기본 보드입니다</p> : null}
+          </fieldset>
 
-          <div className="project-delete-actions">
+          <div className="board-settings-footer">
             <Button
               type="button"
               variant="danger"
@@ -222,18 +238,24 @@ export function BoardSettingsModal({
             >
               보드 삭제
             </Button>
-            <Button type="submit" disabled={!name.trim()}>
-              저장
-            </Button>
+            <div className="board-settings-footer-actions">
+              <Button type="button" variant="subtle" onClick={() => onOpenChange(false)}>
+                취소
+              </Button>
+              <Button type="submit" disabled={!name.trim()}>
+                변경 사항 저장
+              </Button>
+            </div>
           </div>
         </form>
       </Modal>
 
       {confirmingDelete ? (
         <Modal
-          trigger={<span hidden />}
           title="보드 삭제"
+          description="보드만 삭제되며 이슈는 그대로 유지됩니다"
           open
+          size="small"
           onOpenChange={(next) => {
             if (!next) setConfirmingDelete(false);
           }}

@@ -1941,18 +1941,22 @@ body {
   font-size: var(--chanho-font-size-100);
 }
 
-/* 보드 설정 모달 */
-.board-settings-modal.board-settings-modal {
-  width: min(560px, calc(100vw - 32px));
-}
-
 .board-settings-form {
   display: flex;
   flex-direction: column;
+  gap: var(--chanho-space-300);
+}
+
+.board-settings-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 1fr);
   gap: var(--chanho-space-200);
-  max-height: 70vh;
-  overflow-y: auto;
-  padding-right: var(--chanho-space-100);
+  align-items: end;
+}
+
+.board-settings-overview > div,
+.board-settings-overview button[role="combobox"] {
+  width: 100%;
 }
 
 .board-settings-fieldset {
@@ -1962,7 +1966,7 @@ body {
   border-radius: var(--chanho-radius-medium);
   display: flex;
   flex-direction: column;
-  gap: var(--chanho-space-150);
+  gap: var(--chanho-space-200);
 }
 
 .board-settings-fieldset legend {
@@ -1970,6 +1974,26 @@ body {
   font-size: var(--chanho-font-size-75);
   font-weight: var(--chanho-font-weight-semibold);
   color: var(--chanho-color-text-subtle);
+}
+
+.board-settings-section-help {
+  margin: 0;
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+}
+
+.board-settings-filter-group {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--chanho-space-150);
+  align-items: start;
+}
+
+.board-settings-filter-label {
+  padding-top: var(--chanho-space-25);
+  color: var(--chanho-color-text-subtle);
+  font-size: var(--chanho-font-size-75);
+  font-weight: var(--chanho-font-weight-medium);
 }
 
 .board-settings-checks {
@@ -1982,6 +2006,46 @@ body {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: var(--chanho-space-100);
+}
+
+.board-settings-preferences {
+  gap: var(--chanho-space-75);
+}
+
+.board-settings-footer {
+  position: sticky;
+  bottom: calc(0px - var(--chanho-space-300));
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--chanho-space-200);
+  margin: 0 calc(0px - var(--chanho-space-300)) calc(0px - var(--chanho-space-300));
+  padding: var(--chanho-space-200) var(--chanho-space-300);
+  border-top: 1px solid var(--chanho-color-border-default);
+  background: var(--chanho-color-background-surface-overlay);
+}
+
+.board-settings-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--chanho-space-100);
+}
+
+@media (max-width: 600px) {
+  .board-settings-overview,
+  .board-settings-filter-group,
+  .board-settings-column-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .board-settings-footer {
+    bottom: calc(0px - var(--chanho-space-200));
+    margin: 0 calc(0px - var(--chanho-space-200)) calc(0px - var(--chanho-space-200));
+    padding: var(--chanho-space-150) var(--chanho-space-200);
+  }
 }
 
 .board-column-header {

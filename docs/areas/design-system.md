@@ -1,4 +1,4 @@
-# 디자인 시스템 (@chanho/react 0.15.0 / @chanho/tokens 0.7.0)
+# 디자인 시스템 (@chanho/react 0.18.0 / @chanho/tokens 0.7.0)
 
 GitHub Packages(`@chanho4702/*`)에서 받고 pnpm alias로 `@chanho/*` 이름을 유지한다(S-03, 2026-09-04 — 전엔 `file:../design-system/artifacts/*.tgz`). 새 버전은 design-system에 `v*` 태그를 밀어 발행한 뒤 `package.json`과 `pnpm-workspace.yaml`의 `overrides` **두 곳**의 버전을 함께 올린다. Radix 기반. **다른 UI 라이브러리 금지**,
 커스텀 마크업은 토큰(`--chanho-*`)만.
@@ -175,6 +175,11 @@ DS `Select`/`TextField`의 `label`이 문자열이라 아이콘을 넣을 수 �
 
 `--chanho-motion-duration-{instant,fast,base,moderate,slow}`·`--chanho-motion-easing-{standard,enter,exit}` — 동작 줄이기에서 1ms로 줄어든다.
 새 화면의 전환 효과는 `--chanho-transition-*`나 하드코딩 ms 대신 이 토큰을 쓴다(상태 전환 메뉴·보드 흐린 열·트리아지 목록).
+
+## 0.18.0 (2026-11-08) — 모달 크기
+
+- `Modal size="small | medium | large | xlarge"`는 400px·480px·720px·960px 공통 폭을 제공한다.
+  기본값은 기존과 같은 `medium`이다. 앱 CSS에서 모달 폭을 직접 덮어쓰지 말고 내용 밀도에 맞는 크기를 고른다.
 
 
 ## Linear 강점 반영에서 정한 것 (2026-10-24)

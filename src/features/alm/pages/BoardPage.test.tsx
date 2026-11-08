@@ -240,11 +240,12 @@ describe("보드 컬럼 WIP·설정 모달", () => {
     await user.click(screen.getByRole("button", { name: "보드 메뉴" }));
     await user.click(await screen.findByRole("menuitem", { name: "보드 설정" }));
     const dialog = await screen.findByRole("dialog", { name: "보드 설정" });
+    expect(dialog).toHaveAccessibleDescription("보드에 표시할 이슈와 열 구성을 관리합니다");
 
-    const nameField = within(dialog).getByLabelText("이름");
+    const nameField = within(dialog).getByLabelText("보드 이름");
     await user.clear(nameField);
     await user.type(nameField, "백엔드 파이프라인");
-    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+    await user.click(within(dialog).getByRole("button", { name: "변경 사항 저장" }));
 
     expect(
       await screen.findByText("백엔드 파이프라인", { selector: ".board-name" }),

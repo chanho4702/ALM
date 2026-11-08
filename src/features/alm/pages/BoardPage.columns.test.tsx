@@ -57,7 +57,7 @@ describe("보드 열 매핑 (C4)", () => {
     await user.click(await screen.findByRole("option", { name: "할 일" }));
     expect(within(dialog).getByRole("list", { name: "진행 중 열의 상태" })).toHaveTextContent("할 일");
 
-    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+    await user.click(within(dialog).getByRole("button", { name: "변경 사항 저장" }));
     const merged = await screen.findByRole("region", { name: "진행 중" });
     await waitFor(() => expect(within(merged).getByText("ALM-5")).toBeInTheDocument());
     expect(within(merged).getByText("ALM-3")).toBeInTheDocument();
