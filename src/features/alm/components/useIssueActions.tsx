@@ -59,10 +59,14 @@ export function patchIssueLocally(issue: Issue, patch: BulkIssuePatch): Issue {
   };
 }
 
-/** 이슈 상세 링크 — 라우터 basename(`/alm`)을 포함한 절대 주소 */
-export function issueLink(issue: Pick<Issue, "key" | "projectId">): string {
+/**
+ * 이슈 정규 링크 — 라우터 basename(`/alm`)을 포함한 절대 주소 `…/alm/browse/{KEY}`.
+ * 키만 담아 프로젝트 이동·위키 붙여넣기에도 깨지지 않는다(`BrowseIssueRedirect`가 상세 모달로 보낸다).
+ * 예전 `projects/{id}/issues?issue=` 주소도 그대로 열린다.
+ */
+export function issueLink(issue: Pick<Issue, "key">): string {
   const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-  return new URL(`${base}projects/${issue.projectId}/issues?issue=${encodeURIComponent(issue.key)}`, window.location.origin).href;
+  return new URL(`${base}browse/${encodeURIComponent(issue.key)}`, window.location.origin).href;
 }
 
 /** 대상 묘사 — "ALM-3" 또는 "3개 이슈" */

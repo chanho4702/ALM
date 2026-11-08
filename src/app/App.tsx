@@ -6,6 +6,7 @@ import { AppShell } from "../features/alm/components/AppShell";
 import { StartRedirect } from "../features/alm/components/StartRedirect";
 import { ProjectLayout } from "../features/alm/components/ProjectLayout";
 import { BoardRedirect } from "../features/alm/pages/BoardRedirect";
+import { BrowseIssueRedirect } from "../features/alm/pages/BrowseIssueRedirect";
 import { ProjectListPage } from "../features/alm/pages/ProjectListPage";
 import { HomePage } from "../features/alm/pages/HomePage";
 import { OrgAccountGate } from "../features/alm/components/OrgAccountGate";
@@ -190,6 +191,8 @@ function AppRoutes() {
             </LazyPage>
           }
         />
+        {/* 키만으로 여는 정규 주소(위키 스마트 링크·링크 복사) — 상세 모달 주소로 교체 이동 */}
+        <Route path="/browse/:key" element={<BrowseIssueRedirect />} />
         <Route
           path="/projects"
           element={<ProjectListPage projects={projects} onProjectsChanged={reload} />}
