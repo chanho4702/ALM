@@ -24,9 +24,10 @@ export interface InlineIssueCreateProps {
 export function InlineIssueCreate({ where, onCreate, defaultOpen = false, compact = false }: InlineIssueCreateProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [title, setTitle] = useState("");
-  const { busy, run } = useSubmitOnce();
+  const { busy, run, reset } = useSubmitOnce();
 
   const close = () => {
+    reset();
     setTitle("");
     setOpen(false);
   };
@@ -53,7 +54,7 @@ export function InlineIssueCreate({ where, onCreate, defaultOpen = false, compac
         event.preventDefault();
         const trimmed = title.trim();
         if (!trimmed) return;
-        void run((idempotencyKey) => onCreate(trimmed, idempotencyKey)).then((ok) => {
+        void run((idempotencyKey) => onCreate(trimmed, idempotencyKey), trimmed).then((ok) => {
           if (ok) setTitle("");
         });
       }}

@@ -223,6 +223,11 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
   const [subtaskFormOpen, setSubtaskFormOpen] = useState(false);
   /** 하위 이슈 추가 — 생성 중 두 번째 Enter·클릭을 막고 멱등 키를 싣는다(N10) */
   const subtaskSubmit = useSubmitOnce();
+  /** 하위 이슈 폼 닫기 — 남은 멱등 키를 버린다(다시 열어 만들면 새 키) */
+  const closeSubtaskForm = () => {
+    subtaskSubmit.reset();
+    setSubtaskFormOpen(false);
+  };
   const [linkFormOpen, setLinkFormOpen] = useState(false);
   const linkFormRef = useRef<HTMLDivElement>(null);
   const [, setSearchParams] = useSearchParams();
@@ -602,7 +607,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
           sprintId: issue.sprintId,
           idempotencyKey,
         });
-      });
+      }, JSON.stringify([subtaskDraft, childType]));
       if (!created) return; // 이미 진행 중인 제출 — 두 번째는 버린다
       setSubtaskDraft("");
       await refreshRelations(issue.id);
@@ -1013,7 +1018,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   size="small"
                   aria-expanded={subtaskFormOpen}
                   iconBefore={<Plus size={14} />}
-                  onClick={() => setSubtaskFormOpen((open) => !open)}
+                  onClick={() => (subtaskFormOpen ? closeSubtaskForm() : setSubtaskFormOpen(true))}
                 >
                   하위 이슈
                 </Button>
@@ -1075,7 +1080,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                   onKeyDown={(event) => {
                     if (event.key !== "Escape") return;
                     event.stopPropagation();
-                    setSubtaskFormOpen(false);
+                    closeSubtaskForm();
                   }}
                 >
                   <Select
@@ -1099,7 +1104,7 @@ export function IssueDetailModal({ issueKey, onClose, onIssueChanged }: IssueDet
                     type="button"
                     variant="ghost"
                     size="small"
-                    onClick={() => setSubtaskFormOpen(false)}
+                    onClick={closeSubtaskForm}
                   >
                     취소
                   </Button>

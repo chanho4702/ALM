@@ -86,7 +86,7 @@ export function BoardColumn({
     event.preventDefault();
     if (!title.trim() || !onCreateIssue) return;
     // 생성 중 두 번째 Enter·클릭은 무시한다(N10) — 성공해야 입력을 비우고 닫는다
-    const ok = await submit.run(async (idempotencyKey) => onCreateIssue(status, title, idempotencyKey));
+    const ok = await submit.run(async (idempotencyKey) => onCreateIssue(status, title, idempotencyKey), JSON.stringify([status, title]));
     if (!ok) return;
     setTitle("");
     setCreating(false);
@@ -158,6 +158,7 @@ export function BoardColumn({
               disabled={submit.busy}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
+                  submit.reset();
                   setTitle("");
                   setCreating(false);
                 }
@@ -169,6 +170,7 @@ export function BoardColumn({
                 size="small"
                 variant="ghost"
                 onClick={() => {
+                  submit.reset();
                   setTitle("");
                   setCreating(false);
                 }}

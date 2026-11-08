@@ -63,4 +63,20 @@ describe("BoardColumn 인라인 만들기 — 이중 제출 가드(N10)", () => 
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(2));
     expect(onCreate.mock.calls[1][2]).toBe(onCreate.mock.calls[0][2]);
   });
+
+  it("실패 뒤 제목을 고치면 새 멱등 키를 싣는다", async () => {
+    const onCreate = vi.fn<(status: string, title: string, key?: string) => Promise<boolean>>()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    renderColumn(onCreate);
+    const { user, input } = await openForm("처음");
+
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(input).not.toBeDisabled());
+    await user.type(input, " 수정");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(2));
+    expect(onCreate.mock.calls[1][1]).toBe("처음 수정");
+    expect(onCreate.mock.calls[1][2]).not.toBe(onCreate.mock.calls[0][2]);
+  });
 });

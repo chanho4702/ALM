@@ -305,6 +305,8 @@ export function CreateIssueModal({
     (!parentRequired || parentId !== NO_PARENT);
 
   const reset = (keepContext: boolean) => {
+    // 폼을 비우면 남은 멱등 키도 버린다(닫기·취소 뒤 다시 만들면 새 키)
+    submitGuard.reset();
     setTitle("");
     setDescription("");
     setLinkDrafts([]);
@@ -339,28 +341,29 @@ export function CreateIssueModal({
     event.preventDefault();
     if (!canSubmit) return;
     try {
+      // 요청 본문 — 실패 뒤 이 값이 바뀌면 멱등 키를 새로 만든다(서버는 같은 키면 처음 이슈를 재응답)
+      const input = {
+        projectId,
+        title,
+        // 숨긴 필드는 값도 보내지 않는다 — 스토어가 기본값(우선순위·기본 담당자)을 채운다
+        description: show("description") ? description : "",
+        type,
+        ...(show("priority") ? { priority } : {}),
+        assigneeId: show("assignee") && assigneeId !== UNASSIGNED ? assigneeId : null,
+        dueDate: show("dueDate") ? dueDate || null : null,
+        labels: show("labels") ? parsedLabels : [],
+        componentIds: show("components") ? componentIds : [],
+        parentId: showParent && parentId !== NO_PARENT ? parentId : null,
+        sprintId: show("sprint") && sprintId !== BACKLOG ? sprintId : null,
+        fixVersionId: show("fixVersion") && fixVersionId !== NO_VERSION ? fixVersionId : null,
+        estimateHours:
+          show("estimate") && estimateHours.trim() ? Number(estimateHours) : null,
+        // 계획 필드는 값이 있을 때만 싣는다(REST planning은 보낸 키만 바꾼다)
+        ...(show("startDate") && startDate ? { startDate } : {}),
+        ...(show("storyPoints") && storyPoints.trim() ? { storyPoints: Number(storyPoints) } : {}),
+      };
       await submitGuard.run(async (idempotencyKey) => {
-        const issue = await createIssue({
-          idempotencyKey,
-          projectId,
-          title,
-          // 숨긴 필드는 값도 보내지 않는다 — 스토어가 기본값(우선순위·기본 담당자)을 채운다
-          description: show("description") ? description : "",
-          type,
-          ...(show("priority") ? { priority } : {}),
-          assigneeId: show("assignee") && assigneeId !== UNASSIGNED ? assigneeId : null,
-          dueDate: show("dueDate") ? dueDate || null : null,
-          labels: show("labels") ? parsedLabels : [],
-          componentIds: show("components") ? componentIds : [],
-          parentId: showParent && parentId !== NO_PARENT ? parentId : null,
-          sprintId: show("sprint") && sprintId !== BACKLOG ? sprintId : null,
-          fixVersionId: show("fixVersion") && fixVersionId !== NO_VERSION ? fixVersionId : null,
-          estimateHours:
-            show("estimate") && estimateHours.trim() ? Number(estimateHours) : null,
-          // 계획 필드는 값이 있을 때만 싣는다(REST planning은 보낸 키만 바꾼다)
-          ...(show("startDate") && startDate ? { startDate } : {}),
-          ...(show("storyPoints") && storyPoints.trim() ? { storyPoints: Number(storyPoints) } : {}),
-        });
+        const issue = await createIssue({ ...input, idempotencyKey });
         // 연결 이슈는 생성 뒤에 건다 — 하나가 실패해도 이슈 자체는 남고, 실패만 알린다
         const failed: string[] = [];
         for (const draft of linkDrafts) {
@@ -396,7 +399,7 @@ export function CreateIssueModal({
         reset(false);
         onOpenChange(false);
         await onCreated(issue);
-      });
+      }, JSON.stringify(input));
     } catch (error) {
       // 409 이중 제출은 첫 요청이 처리한다 — 실패로 알리지 않는다(N10)
       if (isDuplicateSubmit(error)) return;
@@ -737,7 +740,14 @@ export function CreateIssueModal({
                 필수 항목 미입력: {missingRequiredFields.map((id) => FIELD_LABELS[id]).join(", ")}
               </span>
             ) : null}
-            <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => {
+                submitGuard.reset();
+                onOpenChange(false);
+              }}
+            >
               취소
             </Button>
             <Button type="submit" disabled={!canSubmit} loading={submitting}>

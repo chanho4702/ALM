@@ -97,6 +97,51 @@ describe("이슈 생성 이중 제출 가드(N10)", () => {
     expect(callsFor("다음 하위")[0][0].idempotencyKey).not.toBe(first[0].idempotencyKey);
   }, 30_000);
 
+  it("하위 이슈 폼: 실패 뒤 제목을 고쳐 재시도하면 새 멱등 키 — 옛 이슈 재응답 방지", async () => {
+    createIssue.mockRejectedValueOnce(new Error("일시 오류"));
+    const user = userEvent.setup();
+    renderAt("/projects/p1/board?issue=ALM-1");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    await user.click(within(dialog).getByRole("button", { name: "하위 이슈" }));
+    const input = within(dialog).getByLabelText("하위 이슈 추가");
+    await user.type(input, "고치기 전");
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText("하위 이슈 추가 실패")).toBeInTheDocument();
+    await waitFor(() => expect(input).not.toBeDisabled());
+
+    await user.clear(input);
+    await user.type(input, "고친 뒤");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(input).toHaveValue(""));
+    const [before] = callsFor("고치기 전");
+    const [after] = callsFor("고친 뒤");
+    expect(after[0].idempotencyKey).toEqual(expect.any(String));
+    expect(after[0].idempotencyKey).not.toBe(before[0].idempotencyKey);
+  }, 30_000);
+
+  it("하위 이슈 폼: 실패 뒤 취소하고 다시 열어 만들면 같은 제목이어도 새 멱등 키", async () => {
+    createIssue.mockRejectedValueOnce(new Error("응답 유실"));
+    const user = userEvent.setup();
+    renderAt("/projects/p1/board?issue=ALM-1");
+    const dialog = await screen.findByRole("dialog", { name: "ALM-1" });
+    await user.click(within(dialog).getByRole("button", { name: "하위 이슈" }));
+    await user.type(within(dialog).getByLabelText("하위 이슈 추가"), "취소 후 다시");
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText("하위 이슈 추가 실패")).toBeInTheDocument();
+    await waitFor(() => expect(within(dialog).getByLabelText("하위 이슈 추가")).not.toBeDisabled());
+
+    await user.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect(within(dialog).queryByLabelText("하위 이슈 추가")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "하위 이슈" }));
+    const input = within(dialog).getByLabelText("하위 이슈 추가");
+    if (!(input as HTMLInputElement).value) await user.type(input, "취소 후 다시");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(callsFor("취소 후 다시")).toHaveLength(2));
+    const [first, second] = callsFor("취소 후 다시");
+    expect(second[0].idempotencyKey).toEqual(expect.any(String));
+    expect(second[0].idempotencyKey).not.toBe(first[0].idempotencyKey);
+  }, 30_000);
+
   it("하위 이슈 폼: 서버 409(같은 요청 처리 중)는 실패 토스트 없이 입력을 남긴다", async () => {
     createIssue.mockRejectedValueOnce(new DuplicateSubmitError("같은 요청이 처리 중입니다"));
     const user = userEvent.setup();
