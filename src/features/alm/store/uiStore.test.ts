@@ -98,8 +98,8 @@ describe("uiStore 접힘/정리", () => {
 });
 
 describe("uiStore 사이드바 너비", () => {
-  it("기본 240, 저장 시 180~400으로 클램프한다", async () => {
-    expect(await getSideNavWidth()).toBe(240);
+  it("기본 260, 저장 시 180~400으로 클램프한다", async () => {
+    expect(await getSideNavWidth()).toBe(260);
     await setSideNavWidth(320);
     expect(await getSideNavWidth()).toBe(320);
     await setSideNavWidth(50);

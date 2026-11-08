@@ -160,13 +160,13 @@ describe("App 라우팅과 전역 셸", () => {
     await screen.findByRole("heading", { name: "오늘의 작업" });
 
     const resizer = within(globalNav()).getByRole("separator", { name: "사이드바 너비 조절" });
-    expect(resizer).toHaveAttribute("aria-valuenow", "240");
+    expect(resizer).toHaveAttribute("aria-valuenow", "260");
 
     resizer.focus();
     await user.keyboard("{ArrowRight}");
-    expect(resizer).toHaveAttribute("aria-valuenow", "256");
+    expect(resizer).toHaveAttribute("aria-valuenow", "276");
     await user.keyboard("{Home}");
-    expect(resizer).toHaveAttribute("aria-valuenow", "240");
+    expect(resizer).toHaveAttribute("aria-valuenow", "260");
   });
 
   it("프로젝트 내부에는 브레드크럼(프로젝트/이름)과 활성 뷰 탭이 보인다", async () => {

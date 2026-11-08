@@ -144,18 +144,38 @@ export function AppShell({ projects }: AppShellProps) {
     </button>
   );
   const createAction = projects.length > 0 ? (
-    <Button onClick={() => setCreateOpen(true)}>만들기</Button>
+    <Button iconBefore={<Plus size={16} aria-hidden="true" />} onClick={() => setCreateOpen(true)}>
+      만들기
+    </Button>
   ) : null;
   const mobileCreateAction = projects.length > 0 ? (
     <Button
-      iconOnly
+      iconBefore={<Plus size={16} aria-hidden="true" />}
       aria-label="이슈 만들기"
       title="이슈 만들기"
       onClick={() => setCreateOpen(true)}
     >
-      <Plus size={18} aria-hidden="true" />
+      만들기
     </Button>
   ) : null;
+  const searchField = (
+    <label className="alm-global-search">
+      <Search size={16} aria-hidden="true" />
+      <input
+        type="search"
+        aria-label="전역 검색"
+        placeholder="이슈, 프로젝트 검색"
+        onChange={(event) => {
+          const query = event.currentTarget.value;
+          if (!query.trim()) return;
+          setSearchQuery(query);
+          setSearchOpen(true);
+          event.currentTarget.value = "";
+        }}
+      />
+      <kbd aria-hidden="true">/</kbd>
+    </label>
+  );
   /** 벨 = 인박스 열기(Linear Inbox 전체 화면) */
   const openNotifications = () => {
     reloadNotifications();
@@ -240,17 +260,14 @@ export function AppShell({ projects }: AppShellProps) {
         </header>
       ) : <TopBar
         brand={brand}
-        // 첫 입력에 검색 모달을 열고, 이어지는 검색은 모달 안 인풋이 담당한다
-        onSearch={(query) => {
-          if (query.trim()) {
-            setSearchQuery(query);
-            setSearchOpen(true);
-          }
-        }}
-        searchPlaceholder="이슈 검색"
+        searchTrailing={
+          <>
+            {searchField}
+            {createAction}
+          </>
+        }
         actions={
           <>
-            {createAction}
             {paletteAction}
             {notificationAction}
             {accountActions}

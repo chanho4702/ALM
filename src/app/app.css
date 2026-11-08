@@ -53,7 +53,7 @@ body {
 
 .global-nav {
   position: relative; /* 리사이즈 핸들·접기 토글 기준 */
-  width: 240px; /* 기본값 — 실제 너비는 인라인 스타일(uiStore)로 덮인다 */
+  width: 260px; /* 기본값 — WIKI 셸과 같은 폭, 실제 너비는 인라인 스타일(uiStore)로 덮인다 */
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -138,7 +138,7 @@ body {
   min-height: 36px;
   padding: var(--chanho-space-75) var(--chanho-space-100);
   border: 0;
-  border-radius: var(--chanho-radius-medium);
+  border-radius: var(--chanho-radius-small);
   background: none;
   font: inherit;
   font-size: var(--chanho-font-size-100);
@@ -156,7 +156,7 @@ body {
 .global-nav-item.is-active {
   background: var(--chanho-color-background-neutral-hovered);
   color: var(--chanho-color-text-selected);
-  font-weight: var(--chanho-font-weight-medium);
+  font-weight: var(--chanho-font-weight-semibold);
 }
 
 .global-nav-item.is-active:hover {
@@ -323,7 +323,7 @@ body {
   align-items: center;
   gap: var(--chanho-space-100);
   min-width: 0;
-  padding: var(--chanho-space-100) var(--alm-content-gutter) 0;
+  padding: var(--chanho-space-100) var(--alm-content-gutter) var(--chanho-space-50);
 }
 
 .project-header > * {
@@ -356,7 +356,7 @@ body {
   align-items: center;
   gap: var(--chanho-space-50);
   min-width: 0;
-  padding: var(--chanho-space-100) var(--alm-content-gutter) 0;
+  padding: 0 var(--alm-content-gutter);
   border-bottom: 1px solid var(--chanho-color-border-default);
   overflow: hidden;
 }
@@ -2925,6 +2925,10 @@ body {
   gap: var(--chanho-space-100);
   align-items: center;
   margin-bottom: var(--chanho-space-200);
+  padding: var(--chanho-space-150);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-subtle);
 }
 
 /* 라벨은 .visually-hidden-label로 감춘다(접근성 이름은 유지) — 칩과 높이를 맞추기 위해 */
@@ -2972,13 +2976,13 @@ body {
 /* ── 홈 (For you) — 지라처럼 가운데 단일 컬럼 ───────────── */
 
 .home-page {
-  /* 프로젝트 디렉터리와 같은 960px 작업 폭 — 4개 이어서 하기 카드도 한 줄을 유지한다. */
+  /* 프로젝트 디렉터리와 같은 960px 작업 폭 — 이어서 하기는 읽기 쉬운 2열로 묶는다. */
   width: min(960px, 100%);
   max-width: 960px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--chanho-space-400);
+  gap: var(--chanho-space-500);
   container-type: inline-size;
 }
 
@@ -3026,17 +3030,17 @@ body {
 }
 
 .home-section-title {
-  margin: 0 0 var(--chanho-space-100);
-  font-size: var(--chanho-font-size-100);
-  font-weight: 600;
-  color: var(--chanho-color-text-subtle);
+  margin: 0 0 var(--chanho-space-200);
+  font-size: var(--chanho-font-size-200);
+  font-weight: var(--chanho-font-weight-semibold);
+  color: var(--chanho-color-text-default);
 }
 
 /* 이어서 하기 — 지라의 "Pick up where you left off" 카드 줄 */
 .home-resume-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--chanho-space-100);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--chanho-space-200);
 }
 
 .home-resume-card {
@@ -3044,7 +3048,8 @@ body {
   align-items: center;
   gap: var(--chanho-space-100);
   min-width: 0;
-  padding: var(--chanho-space-150);
+  min-height: 72px;
+  padding: var(--chanho-space-200);
   border: 1px solid var(--chanho-color-border-default);
   border-radius: var(--chanho-radius-medium);
   background: var(--chanho-color-background-surface);
@@ -3052,12 +3057,12 @@ body {
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard), border-color var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard);
+  transition: border-color var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard), box-shadow var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard);
 }
 
 .home-resume-card:hover {
-  background: var(--chanho-color-background-neutral-hovered);
   border-color: var(--chanho-color-border-input);
+  box-shadow: var(--chanho-shadow-100);
 }
 
 .home-resume-card-glyph {

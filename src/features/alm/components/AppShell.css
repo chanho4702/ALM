@@ -3,7 +3,8 @@
   position: sticky;
   top: 0;
   z-index: var(--chanho-z-navigation);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: var(--chanho-space-100);
   min-height: var(--chanho-space-600);
@@ -15,12 +16,76 @@
   min-width: 0;
 }
 
-.app-mobile-actions {
+/* WIKI와 같은 제품 셸 문법: 검색은 중앙 슬롯을 채우는 34px 도구이고,
+   ALM의 `/` 단축키를 오른쪽 키캡으로 드러낸다. 입력 첫 글자는 기존 검색 모달로 이어진다. */
+.alm-global-search {
   display: flex;
   align-items: center;
-  gap: var(--chanho-space-50);
-  margin-left: auto;
+  flex: 1;
   min-width: 0;
+  max-width: 520px;
+  height: 34px;
+  padding-inline: var(--chanho-space-100) var(--chanho-space-50);
+  border: 1px solid var(--chanho-color-border-input);
+  border-radius: var(--chanho-radius-medium);
+  background: var(--chanho-color-background-input);
+  color: var(--chanho-color-text-subtle);
+  transition: border-color var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard), box-shadow var(--chanho-motion-duration-fast) var(--chanho-motion-easing-standard);
+}
+
+.alm-global-search:focus-within {
+  border-color: var(--chanho-color-border-focused);
+  box-shadow: inset 0 0 0 1px var(--chanho-color-border-focused);
+}
+
+.alm-global-search input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding-inline: var(--chanho-space-75);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--chanho-color-text-default);
+  font: inherit;
+  font-size: var(--chanho-font-size-75);
+}
+
+.alm-global-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.alm-global-search kbd {
+  min-width: 24px;
+  padding: 2px var(--chanho-space-50);
+  border: 1px solid var(--chanho-color-border-default);
+  border-radius: var(--chanho-radius-small);
+  background: var(--chanho-color-background-surface);
+  color: var(--chanho-color-text-subtle);
+  font-family: var(--chanho-font-family-sans);
+  font-size: var(--chanho-font-size-50);
+  line-height: 1;
+  text-align: center;
+}
+
+@media (min-width: 721px) {
+  .app-shell > header > div:has(> .alm-global-search) > .alm-global-search {
+    flex: 1 1 20rem;
+    width: 100%;
+  }
+}
+
+.app-mobile-actions {
+  display: flex;
+  justify-self: end;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--chanho-space-50);
+  width: max-content;
+}
+
+.app-mobile-actions > button[aria-label="이슈 만들기"] {
+  padding-inline: var(--chanho-space-100);
 }
 
 .app-mobile-topbar button {

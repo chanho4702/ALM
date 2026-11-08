@@ -18,7 +18,7 @@ export interface ViewedIssue {
 
 export const SIDENAV_MIN_WIDTH = 180;
 export const SIDENAV_MAX_WIDTH = 400;
-export const SIDENAV_DEFAULT_WIDTH = 240;
+export const SIDENAV_DEFAULT_WIDTH = 260;
 
 /** uiStore가 바뀔 때마다 window에 발행 — 사이드바 등 구독자가 다시 읽는다 */
 export const UI_CHANGED_EVENT = "alm:ui-changed";
