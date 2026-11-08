@@ -201,7 +201,7 @@ export function GlobalSettingsPage() {
         title={section === "personal" || section === "notifications" ? "개인 설정" : "ALM 관리"}
         bottom={
           section === "personal" ? (
-            <span className="settings-header-sub">시작 화면 · 자동 관찰</span>
+            <span className="settings-header-sub">프로필 · 화면 · 시작 화면 · 자동 관찰</span>
           ) : section === "notifications" ? (
             <span className="settings-header-sub">앱 내 알림 수신</span>
           ) : (

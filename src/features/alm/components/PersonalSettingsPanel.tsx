@@ -11,6 +11,7 @@ import {
   uploadMyAvatar, formatAvatarLimit } from "../store/jiraStore";
 import { UserAvatar } from "./UserAvatar";
 import { keyboardShortcutsEnabled, setKeyboardShortcutsEnabled } from "../store/uiStore";
+import { useThemePreference } from "./ThemeToggle";
 
 const START_PAGE_OPTIONS: { value: StartPage; label: string }[] = [
   { value: "home", label: "홈(For you)" },
@@ -30,6 +31,7 @@ export interface PersonalSettingsPanelProps {
 
 export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
   const toast = useToast();
+  const { theme, toggle: toggleTheme } = useThemePreference();
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [saved, setSaved] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [loading, setLoading] = useState(true);
@@ -222,6 +224,20 @@ export function PersonalSettingsPanel({ part }: PersonalSettingsPanelProps) {
               </Button>
             </div>
           </div>
+        </div>
+      </Card>
+      <Card padding="lg" title="화면">
+        <p className="settings-help">
+          밝은 화면과 어두운 화면을 전환합니다. 이 브라우저에만 저장되고 바로 적용됩니다.
+        </p>
+        <div className="settings-toggle-list">
+          <Switch
+            label="다크 모드"
+            checked={theme === "dark"}
+            onCheckedChange={(checked) => {
+              if (checked !== (theme === "dark")) toggleTheme();
+            }}
+          />
         </div>
       </Card>
       <Card padding="lg" title="자동 관찰">

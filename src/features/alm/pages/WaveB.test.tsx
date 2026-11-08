@@ -115,10 +115,11 @@ describe("명령 팔레트 (⌘K / Ctrl+K)", () => {
     await waitFor(async () => expect((await getIssueByKey("ALM-7"))?.priority).toBe("highest"));
   });
 
-  it("상단바 버튼으로도 열린다", async () => {
+  it("설정 메뉴에서도 열린다", async () => {
     const user = userEvent.setup();
     await openIssueList();
-    await user.click(screen.getByRole("button", { name: "명령 팔레트" }));
+    await user.click(screen.getByRole("button", { name: "설정" }));
+    await user.click(await screen.findByRole("menuitem", { name: /명령 팔레트/ }));
     expect(await screen.findByRole("dialog", { name: "명령 팔레트" })).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { lazy, useEffect, useRef, useState } from "react";
-import { Bell, Command, Menu, Plus, Search } from "lucide-react";
+import { Bell, Menu, Plus, Search } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Badge, Button, Modal, TopBar } from "@chanho/react";
 import type { Issue, Project, User } from "../store/types";
@@ -9,10 +9,9 @@ import { recordProjectVisit, setUiUser } from "../store/uiStore";
 import { LazyModal } from "./LazyContent";
 import { GlobalSideNav } from "./GlobalSideNav";
 import { SettingsSideNav, isSettingsPath } from "./SettingsSideNav";
-import { ThemeToggle } from "./ThemeToggle";
 import { AnnouncementBanner } from "./AnnouncementBanner";
-import { UserAvatar } from "./UserAvatar";
 import { SettingsMenu } from "./SettingsMenu";
+import { AccountMenu } from "./AccountMenu";
 import { ShortcutHelpModal } from "./ShortcutHelpModal";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { CommandPaletteHost } from "./CommandPaletteHost";
@@ -181,19 +180,6 @@ export function AppShell({ projects }: AppShellProps) {
     reloadNotifications();
     navigate("/notifications");
   };
-  // 명령 팔레트 — 마우스로도 열 수 있게 상단바에 둔다(키는 ⌘K / Ctrl+K)
-  const paletteAction = (
-    <Button
-      variant="ghost"
-      className="topbar-icon"
-      aria-label="명령 팔레트"
-      aria-keyshortcuts="Control+K Meta+K"
-      title="명령 팔레트 (Ctrl+K)"
-      onClick={() => openCommandPalette()}
-    >
-      <Command size={18} />
-    </Button>
-  );
   const notificationAction = (
     <Button
       variant="ghost"
@@ -209,15 +195,17 @@ export function AppShell({ projects }: AppShellProps) {
   );
   const accountActions = (
     <>
-      <SettingsMenu />
-      <ThemeToggle />
-      {authUser ? (
-        <>
-          <span className="jira-auth-user">{authUser.name ?? authUser.email}</span>
-          <Button variant="ghost" onClick={() => void logout()}>로그아웃</Button>
-        </>
+      <SettingsMenu
+        onOpenCommandPalette={openCommandPalette}
+        onOpenShortcutHelp={() => setShortcutHelpOpen(true)}
+      />
+      {me || authUser ? (
+        <AccountMenu
+          user={me}
+          label={authUser?.name ?? authUser?.email ?? me?.name ?? "사용자"}
+          onLogout={authUser ? () => void logout() : undefined}
+        />
       ) : null}
-      {me ? <UserAvatar user={me} size="small" /> : null}
     </>
   );
   const navigation = isSettingsPath(location.pathname) ? (
@@ -268,7 +256,6 @@ export function AppShell({ projects }: AppShellProps) {
         }
         actions={
           <>
-            {paletteAction}
             {notificationAction}
             {accountActions}
           </>

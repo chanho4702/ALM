@@ -1,12 +1,14 @@
 import {
   Bell,
   Bot,
-  FolderKanban,
-  KeyRound,
+  Command,
+  Keyboard,
   ListChecks,
+  Moon,
   Server,
   Settings,
   SlidersHorizontal,
+  Sun,
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -15,6 +17,7 @@ import type { DropdownItem } from "@chanho/react";
 import { useOrgProfile } from "./OrgAccountGate";
 import { ORG_ADMIN_BASE } from "./SettingsSideNav";
 import { useAiTeamActive } from "./useAiTeamActive";
+import { useThemePreference } from "./ThemeToggle";
 
 // 위키 스페이스 5, 페이지 47 — "꺼지지 않는 개발팀"(agent-service) 가이드 페이지.
 // 같은 오리진에서 nginx가 두 앱을 함께 서빙하므로 절대 경로 하나로 충분하다.
@@ -27,10 +30,17 @@ const AI_TEAM_GUIDE_URL = "/wiki/spaces/5/pages/47";
  * 관리자 그룹은 **전역 관리자에게만** 보인다. 판정은 `/api/org/me.globalRoles`(위키와 같은 응답)
  * 하나이며, 예전처럼 관리자 엔드포인트를 찔러 403을 화면에 띄우지 않는다.
  */
-export function SettingsMenu() {
+export function SettingsMenu({
+  onOpenCommandPalette,
+  onOpenShortcutHelp,
+}: {
+  onOpenCommandPalette: () => void;
+  onOpenShortcutHelp: () => void;
+}) {
   const navigate = useNavigate();
   const { isGlobalAdmin } = useOrgProfile();
   const aiTeamActive = useAiTeamActive();
+  const { theme, toggle } = useThemePreference();
   const aiTeamItems: DropdownItem[] = aiTeamActive
     ? [
         {
@@ -58,12 +68,6 @@ export function SettingsMenu() {
           onSelect: () => navigate("/settings/system"),
         },
         {
-          label: "프로젝트",
-          description: "프로젝트 세부, 사용자·권한, 바로 가기를 관리합니다",
-          icon: <FolderKanban size={16} />,
-          onSelect: () => navigate("/projects"),
-        },
-        {
           label: "이슈 항목",
           description: "이슈 타입, 상태 카테고리, 워크플로 스킴을 구성합니다",
           icon: <ListChecks size={16} />,
@@ -89,6 +93,12 @@ export function SettingsMenu() {
       items={[
         { heading: "개인 설정" },
         {
+          label: theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환",
+          description: "화면 색을 바꿉니다. 이 브라우저에만 저장됩니다",
+          icon: theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />,
+          onSelect: toggle,
+        },
+        {
           label: "일반 설정",
           description: "시작 화면, 자동 관찰 같은 개인 기본 설정을 관리합니다",
           icon: <SlidersHorizontal size={16} />,
@@ -101,12 +111,16 @@ export function SettingsMenu() {
           onSelect: () => navigate("/settings/notifications"),
         },
         {
-          // 토큰 관리 화면은 계정 포털(myFront `/app`)에 있다 — 같은 오리진이지만 다른 SPA라
-          // 라우터가 아니라 전체 페이지 이동이다.
-          label: "API 토큰",
-          description: "스크립트·CI에서 쓰는 개인 토큰을 발급하고 폐기합니다",
-          icon: <KeyRound size={16} />,
-          onSelect: () => window.location.assign("/app/tokens"),
+          label: "명령 팔레트",
+          description: "이동과 이슈 작업을 한곳에서 실행합니다",
+          icon: <Command size={16} aria-hidden="true" />,
+          onSelect: onOpenCommandPalette,
+        },
+        {
+          label: "단축키 도움말",
+          description: "키보드로 빠르게 다니는 법",
+          icon: <Keyboard size={16} aria-hidden="true" />,
+          onSelect: onOpenShortcutHelp,
         },
         ...aiTeamItems,
         ...adminItems,

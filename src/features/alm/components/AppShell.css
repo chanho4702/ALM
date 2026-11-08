@@ -124,8 +124,19 @@
   border-top: 1px solid var(--chanho-color-border-default);
 }
 
-.app-mobile-account-actions .jira-auth-user {
-  overflow-wrap: anywhere;
+/* WIKI와 같은 계정 진입점 — 이름·로그아웃을 헤더에 펼치지 않고 아바타 하나로 묶는다. */
+.alm-user-menu-trigger {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: var(--chanho-radius-full);
+  background: transparent;
+  cursor: pointer;
+}
+
+.alm-user-menu-trigger:focus-visible {
+  outline: 2px solid var(--chanho-color-border-focused);
+  outline-offset: 2px;
 }
 
 .app-shell-mobile .project-list-content,

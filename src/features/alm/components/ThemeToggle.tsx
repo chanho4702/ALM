@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { Moon, Sun } from "lucide-react";
-import { Button } from "@chanho/react";
+import { useCallback, useEffect, useState } from "react";
 
 const THEME_KEY = "alm.theme";
+const THEME_CHANGED_EVENT = "alm:theme-changed";
 export type Theme = "light" | "dark";
 
 /** localStorage에 저장된 테마 (없으면 light). main.tsx 초기 적용에 쓴다. */
@@ -15,26 +14,27 @@ export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
 }
 
-/** 헤더용 라이트/다크 토글. 현재 값은 문서 루트의 data-theme에서 읽는다. */
-export function ThemeToggle() {
+export function setStoredTheme(theme: Theme) {
+  applyTheme(theme);
+  localStorage.setItem(THEME_KEY, theme);
+  window.dispatchEvent(new CustomEvent<Theme>(THEME_CHANGED_EVENT, { detail: theme }));
+}
+
+/** 상단 메뉴와 일반 설정 화면이 같은 테마 상태를 공유한다. */
+export function useThemePreference() {
   const [theme, setTheme] = useState<Theme>(
-    () => (document.documentElement.dataset.theme as Theme) || "light",
+    () => (document.documentElement.dataset.theme as Theme) || readStoredTheme(),
   );
 
-  const toggle = () => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    applyTheme(next);
-    localStorage.setItem(THEME_KEY, next);
-  };
+  useEffect(() => {
+    const sync = (event: Event) => setTheme((event as CustomEvent<Theme>).detail);
+    window.addEventListener(THEME_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(THEME_CHANGED_EVENT, sync);
+  }, []);
 
-  return (
-    <Button iconOnly className="topbar-icon"
-      variant="ghost"
-      onClick={toggle}
-      aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
-    >
-      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-    </Button>
-  );
+  const toggle = useCallback(() => {
+    setStoredTheme(theme === "dark" ? "light" : "dark");
+  }, [theme]);
+
+  return { theme, toggle };
 }

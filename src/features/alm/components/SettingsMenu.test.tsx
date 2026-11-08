@@ -54,6 +54,8 @@ describe("⚙ 설정 메뉴 (지라 설정 드롭다운 구조)", () => {
     const menu = await screen.findByRole("menu");
     expect(within(menu).getByText("개인 설정")).toBeInTheDocument();
     expect(within(menu).getByText("ALM 관리자 설정")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /다크 모드로 전환/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /단축키 도움말/ })).toBeInTheDocument();
     const notifications = within(menu).getByRole("menuitem", { name: /알림 설정/ });
     expect(notifications).toHaveTextContent("앱 내 알림을 받을지");
     expect(within(menu).getByRole("menuitem", { name: /이슈 항목/ })).toHaveTextContent("워크플로 스킴");
@@ -68,7 +70,7 @@ describe("⚙ 설정 메뉴 (지라 설정 드롭다운 구조)", () => {
     expect(within(nav).getByRole("button", { name: "알림 설정" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("개인 설정 그룹의 'API 토큰'은 계정 포털로 전체 페이지 이동한다", async () => {
+  it("사용자 메뉴의 'API 토큰'은 계정 포털로 전체 페이지 이동한다", async () => {
     const assign = vi.fn();
     // 토큰 화면은 다른 SPA(myFront /app)라 라우터가 아니라 window.location으로 나간다.
     // jsdom의 실제 assign은 "Not implemented"를 던지므로 스텁으로 바꿔 호출만 확인한다.
@@ -86,7 +88,7 @@ describe("⚙ 설정 메뉴 (지라 설정 드롭다운 구조)", () => {
       </ToastProvider>,
     );
     await screen.findByRole("table", { name: "프로젝트 목록" });
-    await user.click(screen.getByRole("button", { name: "설정" }));
+    await user.click(screen.getByRole("button", { name: "사용자 메뉴" }));
     const menu = await screen.findByRole("menu");
     const tokens = within(menu).getByRole("menuitem", { name: /API 토큰/ });
     expect(tokens).toHaveTextContent("개인 토큰");
